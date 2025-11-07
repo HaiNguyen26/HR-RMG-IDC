@@ -74,10 +74,20 @@ DECLARE
     user_record RECORD;
 BEGIN
     -- Tạo thông báo cho tất cả users của phòng ban target
+    -- đồng thời gửi cho ADMIN và người gửi yêu cầu. Đảm bảo file lưu UTF-8.
     FOR user_record IN 
-        SELECT id FROM users
-        WHERE role = NEW.target_department
-          AND trang_thai = 'ACTIVE'
+        SELECT DISTINCT id FROM (
+            SELECT id FROM users
+            WHERE trang_thai = 'ACTIVE'
+              AND (
+                  role = NEW.target_department
+                  OR role = 'ADMIN'
+              )
+            UNION ALL
+            SELECT NEW.requested_by AS id
+            FROM users
+            WHERE NEW.requested_by IS NOT NULL
+        ) AS recipients
     LOOP
         INSERT INTO notifications (user_id, request_id, type, title, message)
         VALUES (

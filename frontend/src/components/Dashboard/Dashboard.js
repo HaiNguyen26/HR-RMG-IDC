@@ -116,7 +116,7 @@ const Dashboard = ({ onAddEmployee, employees, onRefreshEmployees, currentUser, 
           }
           console.groupEnd();
         }
-        
+
         if (showToast) {
           if (failedCount === 0) {
             showToast(`Đã import thành công ${successCount} nhân viên`, 'success');
@@ -299,8 +299,8 @@ const Dashboard = ({ onAddEmployee, employees, onRefreshEmployees, currentUser, 
             {/* Chỉ hiển thị các nút quản trị cho HR, ADMIN - không hiển thị cho EMPLOYEE */}
             {currentUser?.role !== 'EMPLOYEE' && (
               <div className="employee-table-actions-group">
-                <button 
-                  className="btn-action-secondary" 
+                <button
+                  className="btn-action-secondary"
                   onClick={handleExportTemplate}
                   title="Xuất file mẫu Excel"
                 >
@@ -311,8 +311,8 @@ const Dashboard = ({ onAddEmployee, employees, onRefreshEmployees, currentUser, 
                   </svg>
                   <span>Xuất mẫu</span>
                 </button>
-                <button 
-                  className="btn-action-secondary" 
+                <button
+                  className="btn-action-secondary"
                   onClick={handleExportEmployees}
                   title="Xuất danh sách nhân viên ra Excel"
                   disabled={employees.length === 0}
@@ -324,8 +324,8 @@ const Dashboard = ({ onAddEmployee, employees, onRefreshEmployees, currentUser, 
                   </svg>
                   <span>Xuất Excel</span>
                 </button>
-                <button 
-                  className="btn-action-secondary" 
+                <button
+                  className="btn-action-secondary"
                   onClick={handleImportClick}
                   disabled={importing}
                   title="Import nhân viên từ file Excel"
@@ -354,15 +354,15 @@ const Dashboard = ({ onAddEmployee, employees, onRefreshEmployees, currentUser, 
               </div>
             )}
           </div>
-                <EmployeeTable
-                  employees={employees}
-                  onRefresh={onRefreshEmployees}
-                  currentUser={currentUser}
-                  showToast={showToast}
-                  showConfirm={showConfirm}
-                  onUpdateEquipment={onUpdateEquipment}
-                  branchFilter={branchFilter}
-                />
+          <EmployeeTable
+            employees={employees}
+            onRefresh={onRefreshEmployees}
+            currentUser={currentUser}
+            showToast={showToast}
+            showConfirm={showConfirm}
+            onUpdateEquipment={onUpdateEquipment}
+            branchFilter={branchFilter}
+          />
         </div>
       </div>
     </div>

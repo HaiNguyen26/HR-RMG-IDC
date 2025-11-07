@@ -210,11 +210,12 @@ const EquipmentAssignment = ({ employee, onComplete, onCancel, currentUser, show
                 employeeId: employeeId,
                 requestType: requestTypeMap[key],
                 targetDepartment: departmentMap[key],
-                requestTitle: requestTitle,
+                title: requestTitle,
                 items: validItems.map(item => ({
-                  item_name: item.name.trim(),
+                  name: item.name.trim(),
                   quantity: item.quantity || 1
                 })),
+                requestedBy: currentUser?.id || null,
               });
 
               if (showToast) {
