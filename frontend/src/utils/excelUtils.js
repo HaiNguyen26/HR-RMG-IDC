@@ -16,7 +16,7 @@ const parseDateString = (value) => {
   if (!trimmed) return null;
 
   // Accept dd/mm/yyyy or dd-mm-yyyy
-  const parts = trimmed.split(/[\/\-]/);
+  const parts = trimmed.split(/[/-]/);
   if (parts.length !== 3) return null;
 
   const day = parseInt(parts[0], 10);
