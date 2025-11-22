@@ -160,9 +160,6 @@ const CustomDropdown = ({ id, value, onChange, options, placeholder, error, clas
     );
 };
 
-// Mock data has been removed - using real API data only
-const MOCK_CANDIDATES = [];
-
 const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }) => {
     const [candidates, setCandidates] = useState([]);
     const [allCandidates, setAllCandidates] = useState([]); // Store all candidates for counting
@@ -180,7 +177,6 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
     const [interviewDate, setInterviewDate] = useState('');
     const [interviewTime, setInterviewTime] = useState('');
     const [interviewFormErrors, setInterviewFormErrors] = useState({});
-    const [useMockData, setUseMockData] = useState(false); // Flag to use mock data for preview - DISABLED
     const [isEditingNotes, setIsEditingNotes] = useState(false);
     const [candidateNotes, setCandidateNotes] = useState('');
     const [isSavingNotes, setIsSavingNotes] = useState(false);
@@ -329,30 +325,6 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
         }
 
         try {
-            // Use mock data for preview
-            if (useMockData) {
-                // Filter mock data based on status and search
-                let filtered = [...MOCK_CANDIDATES];
-
-                if (selectedStatus !== 'all') {
-                    filtered = filtered.filter(c => c.status === selectedStatus);
-                }
-
-                if (searchQuery && searchQuery.trim()) {
-                    const query = searchQuery.toLowerCase();
-                    filtered = filtered.filter(c =>
-                        c.ho_ten.toLowerCase().includes(query) ||
-                        c.so_dien_thoai.includes(query) ||
-                        c.cccd.includes(query) ||
-                        c.vi_tri_ung_tuyen.toLowerCase().includes(query)
-                    );
-                }
-
-                setCandidates(filtered);
-                setAllCandidates(MOCK_CANDIDATES);
-                setLoading(false);
-                return;
-            }
 
             // Fetch filtered candidates and all candidates in parallel for better performance
             const [response, allResponse] = await Promise.all([
@@ -614,19 +586,6 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
     const handleStatusChange = async (candidateId, newStatus) => {
         try {
-            // If using mock data, just update local state
-            if (useMockData) {
-                setCandidates(prev => prev.map(c =>
-                    c.id === candidateId ? { ...c, status: newStatus } : c
-                ));
-                setAllCandidates(prev => prev.map(c =>
-                    c.id === candidateId ? { ...c, status: newStatus } : c
-                ));
-                if (showToast) {
-                    showToast('Đã cập nhật trạng thái ứng viên (Mock)', 'success');
-                }
-                return;
-            }
 
             const response = await candidatesAPI.updateStatus(candidateId, { status: newStatus });
 
@@ -677,15 +636,6 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
         }
 
         try {
-            // If using mock data, just update local state
-            if (useMockData) {
-                setCandidates(prev => prev.filter(c => c.id !== candidateId));
-                setAllCandidates(prev => prev.filter(c => c.id !== candidateId));
-                if (showToast) {
-                    showToast('Đã xóa ứng viên (Mock)', 'success');
-                }
-                return;
-            }
 
             const response = await candidatesAPI.delete(candidateId);
 
@@ -1272,11 +1222,6 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
         setFormLoading(true);
         try {
-            // If using mock data, just add to local state
-            if (useMockData) {
-                const newCandidate = {
-                    id: Date.now(), // Temporary ID
-                    ho_ten: formData.hoTen,
                     ngay_sinh: formData.ngaySinh,
                     vi_tri_ung_tuyen: formData.viTriUngTuyen,
                     phong_ban: formData.phongBan,
@@ -1512,7 +1457,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                         <tbody>
                             {candidates.map(candidate => {
                                 const statusInfo = statusConfig[candidate.status] || statusConfig.PENDING_INTERVIEW;
-                                // Normalize data - handle both snake_case (from API) and camelCase (from mock)
+                                // Normalize data - handle both snake_case (from API) and camelCase
                                 const normalized = {
                                     id: candidate.id,
                                     hoTen: candidate.hoTen || candidate.ho_ten || '',
