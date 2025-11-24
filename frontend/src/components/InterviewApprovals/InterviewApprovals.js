@@ -43,7 +43,6 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
         chucDanhCanTuyen: '',
         soLuongYeuCau: '',
         phongBan: '',
-        nguoiQuanLyTrucTiep: '',
         moTaCongViec: '', // 'co' or 'chua_co'
         loaiLaoDong: '', // 'thoi_vu' or 'toan_thoi_gian'
         lyDoTuyen: {
@@ -798,14 +797,10 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                     candidatesAPI.getPositions().catch(err => {
                         console.error('❌ Error fetching positions:', err);
                         return { data: { success: false, data: [] } };
-                    }),
-                    employeesAPI.getManagers().catch(err => {
-                        console.error('❌ Error fetching managers:', err);
-                        return { data: { success: false, data: [] } };
                     })
                 ];
 
-                const [departmentsRes, positionsRes, managersRes] = await Promise.all(fetchPromises);
+                const [departmentsRes, positionsRes] = await Promise.all(fetchPromises);
 
                 // Xử lý departments
                 if (departmentsRes.data?.success) {
@@ -825,20 +820,6 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 } else {
                     console.error('❌ Failed to load positions:', positionsRes.data);
                     setJobTitles([]);
-                }
-
-                // Xử lý managers
-                if (managersRes.data?.success) {
-                    const managerList = managersRes.data.data || [];
-                    setManagers(managerList);
-                    console.log('✅ Managers loaded:', managerList);
-                } else {
-                    console.error('❌ Failed to load managers:', managersRes.data);
-                    setManagers([]);
-                    // Chỉ hiển thị toast nếu managers fail (vì đây là bắt buộc)
-                    if (showToast) {
-                        showToast('Không thể tải danh sách quản lý. Vui lòng thử lại.', 'warning');
-                    }
                 }
             } catch (error) {
                 console.error('Error fetching form data:', error);
@@ -863,7 +844,6 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
             chucDanhCanTuyen: '',
             soLuongYeuCau: '',
             phongBan: '',
-            nguoiQuanLyTrucTiep: '',
             moTaCongViec: '',
             loaiLaoDong: '',
             lyDoTuyen: {
@@ -934,9 +914,6 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
         if (!recruitmentRequestForm.phongBan.trim()) {
             errors.phongBan = 'Vui lòng nhập phòng ban';
         }
-        if (!recruitmentRequestForm.nguoiQuanLyTrucTiep.trim()) {
-            errors.nguoiQuanLyTrucTiep = 'Vui lòng nhập người quản lý trực tiếp';
-        }
         if (!recruitmentRequestForm.moTaCongViec) {
             errors.moTaCongViec = 'Vui lòng chọn trạng thái mô tả công việc';
         }
@@ -974,7 +951,6 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 chucDanhCanTuyen: recruitmentRequestForm.chucDanhCanTuyen,
                 soLuongYeuCau: recruitmentRequestForm.soLuongYeuCau,
                 phongBan: recruitmentRequestForm.phongBan,
-                nguoiQuanLyTrucTiep: recruitmentRequestForm.nguoiQuanLyTrucTiep,
                 moTaCongViec: recruitmentRequestForm.moTaCongViec,
                 loaiLaoDong: recruitmentRequestForm.loaiLaoDong,
                 lyDoTuyen: recruitmentRequestForm.lyDoTuyen,

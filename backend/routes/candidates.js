@@ -2761,7 +2761,7 @@ router.post('/recruitment-requests', async (req, res) => {
             tieuChuanTuyenChon
         } = req.body;
 
-        if (!managerId || !managerType || !chucDanhCanTuyen || !soLuongYeuCau || !phongBan || !nguoiQuanLyTrucTiep) {
+        if (!managerId || !managerType || !chucDanhCanTuyen || !soLuongYeuCau || !phongBan) {
             await client.query('ROLLBACK');
             return res.status(400).json({
                 success: false,
@@ -2836,7 +2836,7 @@ router.post('/recruitment-requests', async (req, res) => {
                 ly_do_tuyen, ly_do_khac_ghi_chu,
                 tieu_chuan_tuyen_chon,
                 status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'PENDING')
+            ) VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, $8, $9, $10, 'PENDING')
             RETURNING *
         `;
 
@@ -2846,7 +2846,6 @@ router.post('/recruitment-requests', async (req, res) => {
             chucDanhCanTuyen,
             parseInt(soLuongYeuCau, 10),
             phongBan,
-            nguoiQuanLyTrucTiep,
             moTaCongViec || null,
             loaiLaoDong || null,
             lyDoTuyen ? JSON.stringify(lyDoTuyen) : null,
@@ -3017,14 +3016,14 @@ const seedDepartmentsAndPositions = async () => {
     try {
         // Đảm bảo table tồn tại trước
         await ensureCandidatesTable();
-        
+
         // Kiểm tra xem đã có dữ liệu chưa
         const checkDept = await pool.query(`
             SELECT COUNT(DISTINCT phong_ban) as count
             FROM candidates
             WHERE phong_ban IS NOT NULL AND phong_ban != ''
         `);
-        
+
         const checkPos = await pool.query(`
             SELECT COUNT(DISTINCT vi_tri_ung_tuyen) as count
             FROM candidates
@@ -3039,16 +3038,16 @@ const seedDepartmentsAndPositions = async () => {
         // Nếu chưa có dữ liệu, thêm vào
         if (deptCount === 0 || posCount === 0) {
             console.log('🌱 Seeding departments and positions...');
-            
+
             // Danh sách phòng ban
             const departments = [
-                'Mua hàng', 'Hành chính', 'DVĐT', 'QA', 'Khảo sát thiết kế', 
+                'Mua hàng', 'Hành chính', 'DVĐT', 'QA', 'Khảo sát thiết kế',
                 'Tự động', 'CNC', 'Dịch vụ kỹ thuật', 'Kế toán'
             ];
-            
+
             // Danh sách vị trí ứng tuyển
             const positions = [
-                'Mua hàng', 'Tạp vụ & nấu ăn', 'Hàn bo mạch', 'Chất lượng', 
+                'Mua hàng', 'Tạp vụ & nấu ăn', 'Hàn bo mạch', 'Chất lượng',
                 'Khảo sát thiết kế', 'Admin dự án', 'Lắp ráp', 'Lắp ráp JIG, Pallet',
                 'Điện lập trình PLC', 'Thiết kế máy tự động', 'Vận hành máy CNC',
                 'Dịch vụ Kỹ thuật', 'Kế toán nội bộ', 'Kế toán bán hàng'
@@ -3064,7 +3063,7 @@ const seedDepartmentsAndPositions = async () => {
                     FROM candidates
                     WHERE phong_ban = $1 AND ho_ten = $2
                 `, [dept, `[Placeholder - ${dept}]`]);
-                
+
                 const exists = parseInt(existing.rows[0].count) || 0;
                 if (exists === 0) {
                     await pool.query(`
@@ -3083,7 +3082,7 @@ const seedDepartmentsAndPositions = async () => {
                     FROM candidates
                     WHERE vi_tri_ung_tuyen = $1 AND ho_ten = $2
                 `, [pos, `[Placeholder - ${pos}]`]);
-                
+
                 const exists = parseInt(existing.rows[0].count) || 0;
                 if (exists === 0) {
                     await pool.query(`
@@ -3094,7 +3093,7 @@ const seedDepartmentsAndPositions = async () => {
                     console.log(`  ✅ Inserted position: ${pos}`);
                 }
             }
-            
+
             console.log(`✅ Seeding completed - Departments: ${deptInserted}, Positions: ${posInserted}`);
         } else {
             console.log('✅ Departments and positions already exist, skipping seed');
