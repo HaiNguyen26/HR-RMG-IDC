@@ -2938,6 +2938,56 @@ router.put('/recruitment-requests/:id/status', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/candidates/departments - Lấy danh sách phòng ban từ candidates (DISTINCT)
+ */
+router.get('/departments', async (req, res) => {
+    try {
+        const query = `
+            SELECT DISTINCT phong_ban as department
+            FROM candidates
+            WHERE phong_ban IS NOT NULL AND phong_ban != ''
+            ORDER BY phong_ban ASC
+        `;
+        const result = await pool.query(query);
+        res.json({
+            success: true,
+            data: result.rows.map(row => row.department)
+        });
+    } catch (error) {
+        console.error('Error fetching candidate departments:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách phòng ban: ' + error.message
+        });
+    }
+});
+
+/**
+ * GET /api/candidates/positions - Lấy danh sách vị trí ứng tuyển từ candidates (DISTINCT)
+ */
+router.get('/positions', async (req, res) => {
+    try {
+        const query = `
+            SELECT DISTINCT vi_tri_ung_tuyen as position
+            FROM candidates
+            WHERE vi_tri_ung_tuyen IS NOT NULL AND vi_tri_ung_tuyen != ''
+            ORDER BY vi_tri_ung_tuyen ASC
+        `;
+        const result = await pool.query(query);
+        res.json({
+            success: true,
+            data: result.rows.map(row => row.position)
+        });
+    } catch (error) {
+        console.error('Error fetching candidate positions:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách vị trí ứng tuyển: ' + error.message
+        });
+    }
+});
+
 module.exports = router;
 
 

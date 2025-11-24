@@ -778,24 +778,24 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
         }));
     };
 
-    // Fetch form data (departments, job titles, managers) when recruitment request modal opens
+    // Fetch form data (departments from candidates, positions from candidates, managers from employees) when recruitment request modal opens
     useEffect(() => {
         const fetchFormData = async () => {
             if (!isRecruitmentRequestModalOpen) return;
             
             setLoadingFormData(true);
             try {
-                const [departmentsRes, jobTitlesRes, managersRes] = await Promise.all([
-                    employeesAPI.getDepartments(),
-                    employeesAPI.getJobTitles(),
-                    employeesAPI.getManagers()
+                const [departmentsRes, positionsRes, managersRes] = await Promise.all([
+                    candidatesAPI.getDepartments(), // Lấy từ candidates
+                    candidatesAPI.getPositions(), // Lấy từ candidates
+                    employeesAPI.getManagers() // Lấy từ employees
                 ]);
 
                 if (departmentsRes.data?.success) {
                     setDepartments(departmentsRes.data.data || []);
                 }
-                if (jobTitlesRes.data?.success) {
-                    setJobTitles(jobTitlesRes.data.data || []);
+                if (positionsRes.data?.success) {
+                    setJobTitles(positionsRes.data.data || []); // Sử dụng positions từ candidates làm job titles
                 }
                 if (managersRes.data?.success) {
                     setManagers(managersRes.data.data || []);
@@ -1830,7 +1830,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                     <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
                                         <div className="recruitment-request-form-field">
                                             <label className="recruitment-request-form-label">
-                                                Chức danh cần tuyển <span className="required">*</span>
+                                                Vị trí ứng tuyển <span className="required">*</span>
                                             </label>
                                             <select
                                                 className={`recruitment-request-form-input recruitment-request-form-select ${recruitmentRequestErrors.chucDanhCanTuyen ? 'error' : ''}`}
@@ -1838,9 +1838,9 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                 onChange={(e) => handleRecruitmentRequestChange('chucDanhCanTuyen', e.target.value)}
                                                 disabled={loadingFormData}
                                             >
-                                                <option value="">-- Chọn chức danh --</option>
-                                                {jobTitles.map((title, index) => (
-                                                    <option key={index} value={title}>{title}</option>
+                                                <option value="">-- Chọn vị trí ứng tuyển --</option>
+                                                {jobTitles.map((position, index) => (
+                                                    <option key={index} value={position}>{position}</option>
                                                 ))}
                                             </select>
                                             {recruitmentRequestErrors.chucDanhCanTuyen && (

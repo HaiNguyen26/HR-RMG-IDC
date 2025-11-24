@@ -174,6 +174,9 @@ export const candidatesAPI = {
   getAllRecruitmentRequests: (params) => api.get('/candidates/recruitment-requests', { params }),
   getRecruitmentRequestById: (id) => api.get(`/candidates/recruitment-requests/${id}`),
   updateRecruitmentRequestStatus: (id, data) => api.put(`/candidates/recruitment-requests/${id}/status`, data),
+  // Candidate metadata API
+  getDepartments: () => api.get('/candidates/departments'),
+  getPositions: () => api.get('/candidates/positions'),
 };
 
 // Notification system removed
