@@ -2739,7 +2739,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                                 locale={DATE_PICKER_LOCALE}
                                                 className={`candidate-modal-form-input candidate-modal-datepicker ${formErrors.ngaySinh ? 'error' : ''}`}
                                                 placeholderText="Chọn ngày sinh"
-                                                withPortal
+                                                popperContainer={({ children }) => children}
                                                 autoComplete="off"
                                                 showYearDropdown
                                                 showMonthDropdown
@@ -2748,7 +2748,9 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                                 scrollableYearDropdown
                                                 useShortMonthInDropdown
                                                 minDate={new Date(1900, 0, 1)}
+                                                maxDate={today()}
                                                 openToDate={formData.ngaySinh ? parseISODateString(formData.ngaySinh) : new Date(2000, 0, 1)}
+                                                adjustDateOnChange={false}
                                             />
                                             {formErrors.ngaySinh && (
                                                 <span className="candidate-modal-form-error">{formErrors.ngaySinh}</span>
@@ -2974,7 +2976,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                                 locale={DATE_PICKER_LOCALE}
                                                 className={`candidate-modal-form-input candidate-modal-datepicker ${formErrors.ngayCapCCCD ? 'error' : ''}`}
                                                 placeholderText="Chọn ngày cấp"
-                                                withPortal
+                                                popperContainer={({ children }) => children}
                                                 autoComplete="off"
                                                 showYearDropdown
                                                 showMonthDropdown
@@ -2983,7 +2985,9 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                                 scrollableYearDropdown
                                                 useShortMonthInDropdown
                                                 minDate={new Date(1900, 0, 1)}
+                                                maxDate={today()}
                                                 openToDate={formData.ngayCapCCCD ? parseISODateString(formData.ngayCapCCCD) : new Date(2000, 0, 1)}
+                                                adjustDateOnChange={false}
                                             />
                                             {formErrors.ngayCapCCCD && (
                                                 <span className="candidate-modal-form-error">{formErrors.ngayCapCCCD}</span>
