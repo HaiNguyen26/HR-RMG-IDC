@@ -6,6 +6,16 @@
 -- ============================================
 -- WARNING: Đây là script hủy dữ liệu, chạy cẩn thận!
 -- ============================================
+-- LƯU Ý QUAN TRỌNG:
+-- ✅ Script này CHỈ XÓA DỮ LIỆU (rows) trong các bảng
+-- ✅ KHÔNG ảnh hưởng đến:
+--    - PostgreSQL Roles/Users (database roles)
+--    - Permissions/Grants (quyền truy cập)
+--    - Table structure (cấu trúc bảng, columns, constraints, indexes)
+--    - Database structure (schemas, functions, triggers)
+--    - Bảng employees và users (giữ nguyên dữ liệu)
+-- ✅ Chỉ sử dụng TRUNCATE TABLE - xóa rows, giữ nguyên schema
+-- ============================================
 -- Usage: 
 --   psql -U postgres -d HR_Management_System -f reset_database_keep_employees.sql
 --   Hoặc chạy từ pgAdmin/psql console
@@ -76,6 +86,10 @@ BEGIN
     RAISE NOTICE '   - request_items';
     RAISE NOTICE '   - notifications';
     RAISE NOTICE '   - equipment_assignments';
+    RAISE NOTICE '========================================';
+    RAISE NOTICE '✅ PostgreSQL Roles và Permissions vẫn được giữ nguyên';
+    RAISE NOTICE '✅ Cấu trúc bảng (schema) vẫn được giữ nguyên';
+    RAISE NOTICE '✅ Chỉ dữ liệu (rows) trong các bảng bị xóa';
     RAISE NOTICE '========================================';
 END $$;
 
