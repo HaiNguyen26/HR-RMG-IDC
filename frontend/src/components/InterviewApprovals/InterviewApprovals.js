@@ -101,7 +101,6 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [submittingRecruitmentRequest, setSubmittingRecruitmentRequest] = useState(false);
     const [departments, setDepartments] = useState([]);
     const [jobTitles, setJobTitles] = useState([]);
-    const [managers, setManagers] = useState([]);
     const [loadingFormData, setLoadingFormData] = useState(false);
     const [showCustomPhongBan, setShowCustomPhongBan] = useState(false);
     const [showCustomViTri, setShowCustomViTri] = useState(false);
@@ -781,7 +780,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
         }));
     };
 
-    // Fetch form data (departments from candidates, positions from candidates, managers from employees) when recruitment request modal opens
+    // Fetch form data (departments from candidates, positions from candidates) when recruitment request modal opens
     useEffect(() => {
         const fetchFormData = async () => {
             if (!isRecruitmentRequestModalOpen) return;
@@ -1969,29 +1968,6 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                         )}
                                         {recruitmentRequestErrors.phongBan && (
                                             <span className="recruitment-request-error-text">{recruitmentRequestErrors.phongBan}</span>
-                                        )}
-                                    </div>
-
-                                    {/* Người quản lý trực tiếp */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">
-                                            Người quản lý trực tiếp <span className="required">*</span>
-                                        </label>
-                                        <select
-                                            className={`recruitment-request-form-input recruitment-request-form-select ${recruitmentRequestErrors.nguoiQuanLyTrucTiep ? 'error' : ''}`}
-                                            value={recruitmentRequestForm.nguoiQuanLyTrucTiep}
-                                            onChange={(e) => handleRecruitmentRequestChange('nguoiQuanLyTrucTiep', e.target.value)}
-                                            disabled={loadingFormData}
-                                        >
-                                            <option value="">-- Chọn người quản lý trực tiếp --</option>
-                                            {managers.map((manager) => (
-                                                <option key={manager.id} value={manager.ho_ten}>
-                                                    {manager.ho_ten} {manager.chuc_danh ? `(${manager.chuc_danh})` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {recruitmentRequestErrors.nguoiQuanLyTrucTiep && (
-                                            <span className="recruitment-request-error-text">{recruitmentRequestErrors.nguoiQuanLyTrucTiep}</span>
                                         )}
                                     </div>
 
