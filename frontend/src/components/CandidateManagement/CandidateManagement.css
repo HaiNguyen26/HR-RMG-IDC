@@ -2088,13 +2088,18 @@ select {
 /* Ensure date picker popper doesn't affect layout when using portal */
 /* Calendar should always be above dropdown menus */
 .react-datepicker__portal {
-    z-index: 1010 !important;
+    z-index: 10000 !important;
 }
 
 /* Ensure calendar is above all other elements in modal */
 .candidate-action-modal-content~.react-datepicker__portal,
 .candidate-modal-form-group~.react-datepicker__portal {
-    z-index: 1011 !important;
+    z-index: 10001 !important;
+}
+
+/* Popper container (when not using portal) */
+.react-datepicker-popper {
+    z-index: 10000 !important;
 }
 
 .react-datepicker__portal .react-datepicker {
@@ -2111,27 +2116,57 @@ select {
     background-color: #dc2626 !important;
     border-bottom: none !important;
     border-radius: 0 !important;
-    padding: 0.875rem 1rem !important;
+    padding: 0.875rem 0.5rem 1rem 0.5rem !important;
     text-align: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+    position: relative !important;
 }
 
 .react-datepicker__portal .react-datepicker__current-month {
-    display: block !important;
-    text-align: center !important;
-    margin-bottom: 0 !important;
-    color: #ffffff !important;
-    font-weight: 600 !important;
-    font-size: 1rem !important;
+    display: none !important; /* Hide default month display, use dropdowns instead */
 }
 
 /* Hide month and year dropdowns */
-/* Year and Month Dropdowns - Ensure they are visible */
+/* Year and Month Dropdowns - Ensure they are visible and properly styled */
 .react-datepicker__month-dropdown-container,
-.react-datepicker__year-dropdown-container,
+.react-datepicker__year-dropdown-container {
+    display: inline-block !important;
+    margin: 0 0.25rem !important;
+    vertical-align: middle !important;
+}
+
+.react-datepicker__portal .react-datepicker__month-dropdown-container,
+.react-datepicker__portal .react-datepicker__year-dropdown-container {
+    display: inline-block !important;
+    margin: 0 0.25rem !important;
+    vertical-align: middle !important;
+}
+
 .react-datepicker__month-read-view,
 .react-datepicker__year-read-view,
 .react-datepicker__month-dropdown,
-.react-datepicker__year-dropdown,
+.react-datepicker__year-dropdown {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.react-datepicker__portal .react-datepicker__month-read-view,
+.react-datepicker__portal .react-datepicker__year-read-view {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.react-datepicker__portal .react-datepicker__month-dropdown,
+.react-datepicker__portal .react-datepicker__year-dropdown {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
 .react-datepicker__month-select,
 .react-datepicker__year-select {
     display: block !important;
@@ -2139,15 +2174,9 @@ select {
     opacity: 1 !important;
 }
 
-.react-datepicker__portal .react-datepicker__month-dropdown-container,
-.react-datepicker__portal .react-datepicker__year-dropdown-container,
-.react-datepicker__portal .react-datepicker__month-read-view,
-.react-datepicker__portal .react-datepicker__year-read-view,
-.react-datepicker__portal .react-datepicker__month-dropdown,
-.react-datepicker__portal .react-datepicker__year-dropdown,
 .react-datepicker__portal .react-datepicker__month-select,
 .react-datepicker__portal .react-datepicker__year-select {
-    display: block !important;
+    display: inline-block !important;
     visibility: visible !important;
     opacity: 1 !important;
 }
@@ -2363,28 +2392,43 @@ select {
 
 .react-datepicker__portal .react-datepicker__month-select,
 .react-datepicker__portal .react-datepicker__year-select {
-    padding: 0.625rem 2.5rem 0.625rem 1rem !important;
-    border-radius: 0.75rem !important;
-    border: 1px solid #e2e8f0 !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    color: #1e293b !important;
+    padding: 0.5rem 2rem 0.5rem 0.875rem !important;
+    border-radius: 0.5rem !important;
+    border: 2px solid rgba(255, 255, 255, 0.3) !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    color: #ffffff !important;
     font-size: 0.875rem !important;
     font-weight: 600 !important;
     cursor: pointer !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
     outline: none !important;
     appearance: none !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%230096FF' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E") !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E") !important;
     background-repeat: no-repeat !important;
-    background-position: right 0.75rem center !important;
-    background-size: 1.25rem !important;
-    margin: 0 0.25rem !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
-    min-width: 120px;
-    text-align: left;
+    background-position: right 0.625rem center !important;
+    background-size: 1rem !important;
+    margin: 0 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    min-width: 100px !important;
+    max-width: 120px !important;
+    text-align: left !important;
+}
+
+.react-datepicker__portal .react-datepicker__month-select:hover,
+.react-datepicker__portal .react-datepicker__year-select:hover {
+    background: rgba(255, 255, 255, 0.25) !important;
+    border-color: rgba(255, 255, 255, 0.5) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.react-datepicker__portal .react-datepicker__month-select:focus,
+.react-datepicker__portal .react-datepicker__year-select:focus {
+    background: rgba(255, 255, 255, 0.3) !important;
+    border-color: rgba(255, 255, 255, 0.7) !important;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Remove native select arrow and styling completely */

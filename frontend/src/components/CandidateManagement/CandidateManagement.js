@@ -2734,12 +2734,22 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                                         }
                                                     });
                                                 }}
-                                                maxDate={today()}
                                                 dateFormat="dd/MM/yyyy"
                                                 locale={DATE_PICKER_LOCALE}
                                                 className={`candidate-modal-form-input candidate-modal-datepicker ${formErrors.ngaySinh ? 'error' : ''}`}
                                                 placeholderText="Chọn ngày sinh"
-                                                popperContainer={({ children }) => children}
+                                                withPortal
+                                                portalId="root-portal"
+                                                popperModifiers={[
+                                                    {
+                                                        name: 'preventOverflow',
+                                                        options: {
+                                                            rootBoundary: 'viewport',
+                                                            tether: false,
+                                                            altAxis: true,
+                                                        },
+                                                    },
+                                                ]}
                                                 autoComplete="off"
                                                 showYearDropdown
                                                 showMonthDropdown
@@ -2971,12 +2981,22 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                                         }
                                                     });
                                                 }}
-                                                maxDate={today()}
                                                 dateFormat="dd/MM/yyyy"
                                                 locale={DATE_PICKER_LOCALE}
                                                 className={`candidate-modal-form-input candidate-modal-datepicker ${formErrors.ngayCapCCCD ? 'error' : ''}`}
                                                 placeholderText="Chọn ngày cấp"
-                                                popperContainer={({ children }) => children}
+                                                withPortal
+                                                portalId="root-portal"
+                                                popperModifiers={[
+                                                    {
+                                                        name: 'preventOverflow',
+                                                        options: {
+                                                            rootBoundary: 'viewport',
+                                                            tether: false,
+                                                            altAxis: true,
+                                                        },
+                                                    },
+                                                ]}
                                                 autoComplete="off"
                                                 showYearDropdown
                                                 showMonthDropdown
