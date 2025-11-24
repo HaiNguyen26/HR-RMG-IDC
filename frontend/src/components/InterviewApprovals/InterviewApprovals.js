@@ -104,6 +104,10 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [jobTitles, setJobTitles] = useState([]);
     const [managers, setManagers] = useState([]);
     const [loadingFormData, setLoadingFormData] = useState(false);
+    const [showCustomPhongBan, setShowCustomPhongBan] = useState(false);
+    const [showCustomViTri, setShowCustomViTri] = useState(false);
+    const [customPhongBan, setCustomPhongBan] = useState('');
+    const [customViTri, setCustomViTri] = useState('');
 
     // Mapping vị trí ứng tuyển từ code sang tên đầy đủ
     const viTriMap = {
@@ -792,13 +796,25 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 ]);
 
                 if (departmentsRes.data?.success) {
-                    setDepartments(departmentsRes.data.data || []);
+                    const deptList = departmentsRes.data.data || [];
+                    setDepartments(deptList);
+                    console.log('✅ Departments loaded:', deptList);
+                } else {
+                    console.error('❌ Failed to load departments:', departmentsRes.data);
                 }
                 if (positionsRes.data?.success) {
-                    setJobTitles(positionsRes.data.data || []); // Sử dụng positions từ candidates làm job titles
+                    const positionList = positionsRes.data.data || [];
+                    setJobTitles(positionList); // Sử dụng positions từ candidates làm job titles
+                    console.log('✅ Positions loaded:', positionList);
+                } else {
+                    console.error('❌ Failed to load positions:', positionsRes.data);
                 }
                 if (managersRes.data?.success) {
-                    setManagers(managersRes.data.data || []);
+                    const managerList = managersRes.data.data || [];
+                    setManagers(managerList);
+                    console.log('✅ Managers loaded:', managerList);
+                } else {
+                    console.error('❌ Failed to load managers:', managersRes.data);
                 }
             } catch (error) {
                 console.error('Error fetching form data:', error);
@@ -815,6 +831,10 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
 
     const handleCloseRecruitmentRequestModal = () => {
         setIsRecruitmentRequestModalOpen(false);
+        setShowCustomPhongBan(false);
+        setShowCustomViTri(false);
+        setCustomPhongBan('');
+        setCustomViTri('');
         setRecruitmentRequestForm({
             chucDanhCanTuyen: '',
             soLuongYeuCau: '',
@@ -1835,14 +1855,39 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                             <select
                                                 className={`recruitment-request-form-input recruitment-request-form-select ${recruitmentRequestErrors.chucDanhCanTuyen ? 'error' : ''}`}
                                                 value={recruitmentRequestForm.chucDanhCanTuyen}
-                                                onChange={(e) => handleRecruitmentRequestChange('chucDanhCanTuyen', e.target.value)}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    if (value === 'OTHER') {
+                                                        setShowCustomViTri(true);
+                                                        handleRecruitmentRequestChange('chucDanhCanTuyen', '');
+                                                    } else {
+                                                        setShowCustomViTri(false);
+                                                        setCustomViTri('');
+                                                        handleRecruitmentRequestChange('chucDanhCanTuyen', value);
+                                                    }
+                                                }}
                                                 disabled={loadingFormData}
                                             >
                                                 <option value="">-- Chọn vị trí ứng tuyển --</option>
                                                 {jobTitles.map((position, index) => (
                                                     <option key={index} value={position}>{position}</option>
                                                 ))}
+                                                <option value="OTHER">-- Khác (Nhập mới) --</option>
                                             </select>
+                                            {showCustomViTri && (
+                                                <input
+                                                    type="text"
+                                                    className={`recruitment-request-form-input ${recruitmentRequestErrors.chucDanhCanTuyen ? 'error' : ''}`}
+                                                    value={customViTri}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        setCustomViTri(value);
+                                                        handleRecruitmentRequestChange('chucDanhCanTuyen', value);
+                                                    }}
+                                                    placeholder="Nhập vị trí ứng tuyển mới"
+                                                    style={{ marginTop: '8px' }}
+                                                />
+                                            )}
                                             {recruitmentRequestErrors.chucDanhCanTuyen && (
                                                 <span className="recruitment-request-error-text">{recruitmentRequestErrors.chucDanhCanTuyen}</span>
                                             )}
@@ -1889,14 +1934,39 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                         <select
                                             className={`recruitment-request-form-input recruitment-request-form-select ${recruitmentRequestErrors.phongBan ? 'error' : ''}`}
                                             value={recruitmentRequestForm.phongBan}
-                                            onChange={(e) => handleRecruitmentRequestChange('phongBan', e.target.value)}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (value === 'OTHER') {
+                                                    setShowCustomPhongBan(true);
+                                                    handleRecruitmentRequestChange('phongBan', '');
+                                                } else {
+                                                    setShowCustomPhongBan(false);
+                                                    setCustomPhongBan('');
+                                                    handleRecruitmentRequestChange('phongBan', value);
+                                                }
+                                            }}
                                             disabled={loadingFormData}
                                         >
                                             <option value="">-- Chọn phòng ban --</option>
                                             {departments.map((dept, index) => (
                                                 <option key={index} value={dept}>{dept}</option>
                                             ))}
+                                            <option value="OTHER">-- Khác (Nhập mới) --</option>
                                         </select>
+                                        {showCustomPhongBan && (
+                                            <input
+                                                type="text"
+                                                className={`recruitment-request-form-input ${recruitmentRequestErrors.phongBan ? 'error' : ''}`}
+                                                value={customPhongBan}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    setCustomPhongBan(value);
+                                                    handleRecruitmentRequestChange('phongBan', value);
+                                                }}
+                                                placeholder="Nhập phòng ban mới"
+                                                style={{ marginTop: '8px' }}
+                                            />
+                                        )}
                                         {recruitmentRequestErrors.phongBan && (
                                             <span className="recruitment-request-error-text">{recruitmentRequestErrors.phongBan}</span>
                                         )}
