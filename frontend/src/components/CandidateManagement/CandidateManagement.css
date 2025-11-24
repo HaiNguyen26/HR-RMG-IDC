@@ -2395,9 +2395,9 @@ select {
     padding: 0.5rem 2rem 0.5rem 0.875rem !important;
     border-radius: 0.5rem !important;
     border: 2px solid rgba(255, 255, 255, 0.3) !important;
-    background: rgba(255, 255, 255, 0.15) !important;
-    background-color: rgba(255, 255, 255, 0.15) !important;
-    color: #ffffff !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #1e293b !important;
     font-size: 0.875rem !important;
     font-weight: 600 !important;
     cursor: pointer !important;
@@ -2406,7 +2406,7 @@ select {
     appearance: none !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E") !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%231e293b' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E") !important;
     background-repeat: no-repeat !important;
     background-position: right 0.625rem center !important;
     background-size: 1rem !important;
@@ -2419,14 +2419,14 @@ select {
 
 .react-datepicker__portal .react-datepicker__month-select:hover,
 .react-datepicker__portal .react-datepicker__year-select:hover {
-    background: rgba(255, 255, 255, 0.25) !important;
+    background: #f8fafc !important;
     border-color: rgba(255, 255, 255, 0.5) !important;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
 }
 
 .react-datepicker__portal .react-datepicker__month-select:focus,
 .react-datepicker__portal .react-datepicker__year-select:focus {
-    background: rgba(255, 255, 255, 0.3) !important;
+    background: #ffffff !important;
     border-color: rgba(255, 255, 255, 0.7) !important;
     box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.15) !important;
 }
@@ -2468,6 +2468,7 @@ select {
 
 .react-datepicker__portal .react-datepicker__month-option,
 .react-datepicker__portal .react-datepicker__year-option {
+    color: #1e293b !important;
     padding: 0.75rem 1rem !important;
     border-radius: 0.5rem !important;
     margin: 0.125rem 0.25rem !important;
