@@ -890,16 +890,34 @@ router.get('/job-titles', async (req, res) => {
  */
 router.get('/managers', async (req, res) => {
     try {
+        // Kiểm tra xem bảng employees có tồn tại không
+        const tableExists = await pool.query(`
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = 'employees'
+            )
+        `);
+
+        if (!tableExists.rows[0].exists) {
+            return res.status(400).json({
+                success: false,
+                message: 'Bảng employees chưa tồn tại trong database'
+            });
+        }
+
         const query = `
             SELECT id, ho_ten, chuc_danh, phong_ban, email
             FROM employees
             WHERE (trang_thai = 'ACTIVE' OR trang_thai = 'PENDING' OR trang_thai IS NULL)
             ORDER BY ho_ten ASC
         `;
+        
         const result = await pool.query(query);
+        
         res.json({
             success: true,
-            data: result.rows
+            data: result.rows || []
         });
     } catch (error) {
         console.error('Error fetching managers:', error);
