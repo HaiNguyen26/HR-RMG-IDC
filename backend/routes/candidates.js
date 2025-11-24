@@ -2708,7 +2708,7 @@ const ensureRecruitmentRequestsTable = async () => {
             chuc_danh_can_tuyen VARCHAR(255) NOT NULL,
             so_luong_yeu_cau INTEGER NOT NULL,
             phong_ban VARCHAR(255) NOT NULL,
-            nguoi_quan_ly_truc_tiep VARCHAR(255) NOT NULL,
+            nguoi_quan_ly_truc_tiep VARCHAR(255),
             mo_ta_cong_viec VARCHAR(20) CHECK (mo_ta_cong_viec IN ('co', 'chua_co')),
             loai_lao_dong VARCHAR(20) CHECK (loai_lao_dong IN ('thoi_vu', 'toan_thoi_gian')),
             ly_do_tuyen JSONB,
@@ -2729,6 +2729,30 @@ const ensureRecruitmentRequestsTable = async () => {
 
     try {
         await pool.query(createTableQuery);
+        
+        // Alter existing table to allow NULL for nguoi_quan_ly_truc_tiep if it exists
+        await pool.query(`
+            DO $$
+            BEGIN
+                -- Check if column exists and has NOT NULL constraint
+                IF EXISTS (
+                    SELECT 1 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'recruitment_requests' 
+                    AND column_name = 'nguoi_quan_ly_truc_tiep'
+                    AND is_nullable = 'NO'
+                ) THEN
+                    ALTER TABLE recruitment_requests 
+                    ALTER COLUMN nguoi_quan_ly_truc_tiep DROP NOT NULL;
+                    RAISE NOTICE '✅ Đã cho phép nguoi_quan_ly_truc_tiep NULL';
+                END IF;
+            EXCEPTION
+                WHEN OTHERS THEN
+                    -- Ignore errors (column might not exist or constraint already dropped)
+                    NULL;
+            END $$;
+        `);
+        
         console.log('✓ Recruitment requests table ensured');
     } catch (error) {
         console.error('Error ensuring recruitment_requests table:', error);
