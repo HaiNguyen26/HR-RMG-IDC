@@ -2125,6 +2125,20 @@ select {
 }
 
 /* Hide month and year dropdowns */
+/* Year and Month Dropdowns - Ensure they are visible */
+.react-datepicker__month-dropdown-container,
+.react-datepicker__year-dropdown-container,
+.react-datepicker__month-read-view,
+.react-datepicker__year-read-view,
+.react-datepicker__month-dropdown,
+.react-datepicker__year-dropdown,
+.react-datepicker__month-select,
+.react-datepicker__year-select {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
 .react-datepicker__portal .react-datepicker__month-dropdown-container,
 .react-datepicker__portal .react-datepicker__year-dropdown-container,
 .react-datepicker__portal .react-datepicker__month-read-view,
@@ -2133,8 +2147,9 @@ select {
 .react-datepicker__portal .react-datepicker__year-dropdown,
 .react-datepicker__portal .react-datepicker__month-select,
 .react-datepicker__portal .react-datepicker__year-select {
-    display: none !important;
-    visibility: hidden !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 /* Navigation arrows - White color */
