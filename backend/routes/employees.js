@@ -890,16 +890,20 @@ router.get('/job-titles', async (req, res) => {
  */
 router.get('/managers', async (req, res) => {
     try {
-        // Thử query trực tiếp, nếu table không tồn tại thì trả về empty array
+        // Thử query trực tiếp, lấy tất cả nhân viên đang hoạt động
+        // Có thể filter theo chức danh quản lý sau nếu cần
         const query = `
             SELECT id, ho_ten, chuc_danh, phong_ban, email
             FROM employees
             WHERE (trang_thai = 'ACTIVE' OR trang_thai = 'PENDING' OR trang_thai IS NULL)
+              AND ho_ten IS NOT NULL
+              AND ho_ten != ''
             ORDER BY ho_ten ASC
         `;
         
         try {
             const result = await pool.query(query);
+            console.log(`✅ Fetched ${result.rows.length} managers from database`);
             res.json({
                 success: true,
                 data: result.rows || []
@@ -918,7 +922,7 @@ router.get('/managers', async (req, res) => {
             }
         }
     } catch (error) {
-        console.error('Error fetching managers:', error);
+        console.error('❌ Error fetching managers:', error);
         // Trả về success với empty array thay vì error để frontend vẫn có thể hoạt động
         res.json({
             success: true,
