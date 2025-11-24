@@ -50,7 +50,7 @@ INSERT INTO candidates (ho_ten, phong_ban, vi_tri_ung_tuyen, status, notes, crea
 VALUES
     -- Vị trí: Mua hàng
     ('[Placeholder - Mua hàng]', NULL, 'Mua hàng', 'PENDING_INTERVIEW', 'Dữ liệu mẫu cho dropdown vị trí ứng tuyển', NOW()),
-    
+  
     -- Vị trí: Tạp vụ & nấu ăn
     ('[Placeholder - Tạp vụ & nấu ăn]', NULL, 'Tạp vụ & nấu ăn', 'PENDING_INTERVIEW', 'Dữ liệu mẫu cho dropdown vị trí ứng tuyển', NOW()),
     

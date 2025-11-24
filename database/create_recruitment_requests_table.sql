@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS recruitment_requests (
     chuc_danh_can_tuyen VARCHAR(255) NOT NULL,
     so_luong_yeu_cau INTEGER NOT NULL,
     phong_ban VARCHAR(255) NOT NULL,
-    nguoi_quan_ly_truc_tiep VARCHAR(255) NOT NULL,
+    nguoi_quan_ly_truc_tiep VARCHAR(255),
     mo_ta_cong_viec VARCHAR(20) CHECK (mo_ta_cong_viec IN ('co', 'chua_co')),
     loai_lao_dong VARCHAR(20) CHECK (loai_lao_dong IN ('thoi_vu', 'toan_thoi_gian')),
     ly_do_tuyen JSONB,
