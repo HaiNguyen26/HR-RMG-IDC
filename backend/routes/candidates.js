@@ -660,6 +660,10 @@ router.get('/', async (req, res) => {
                 ORDER BY candidate_id, updated_at DESC
             ) ir ON c.id = ir.candidate_id
             WHERE 1=1
+            -- Loại bỏ các placeholder records (dữ liệu mẫu cho dropdown)
+            AND (c.ho_ten NOT LIKE '[Placeholder%' OR c.ho_ten IS NULL)
+            AND (c.notes NOT LIKE '%Dữ liệu mẫu cho dropdown%' OR c.notes IS NULL)
+            AND (c.notes NOT LIKE '%Được tạo tự động từ yêu cầu tuyển dụng%' OR c.notes IS NULL)
         `;
         const params = [];
         let paramIndex = 1;
@@ -2802,10 +2806,10 @@ router.post('/recruitment-requests', async (req, res) => {
                 LIMIT 1
             `;
             const existingResult = await client.query(checkExistingQuery, [
-                phongBan || null, 
+                phongBan || null,
                 chucDanhCanTuyen || null
             ]);
-            
+
             if (existingResult.rows[0].count === '0') {
                 // Tạo placeholder candidate với cả phòng ban và vị trí
                 const placeholderCandidateQuery = `
