@@ -1222,30 +1222,6 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
         setFormLoading(true);
         try {
-                    ngay_sinh: formData.ngaySinh,
-                    vi_tri_ung_tuyen: formData.viTriUngTuyen,
-                    phong_ban: formData.phongBan,
-                    so_dien_thoai: formData.soDienThoai,
-                    cccd: formData.cccd,
-                    ngay_cap_cccd: formData.ngayCapCCCD,
-                    noi_cap_cccd: formData.noiCapCCCD,
-                    ngay_gui_cv: formData.ngayGuiCV,
-                    status: 'PENDING_INTERVIEW',
-                    created_at: new Date().toISOString()
-                };
-
-                setCandidates(prev => [newCandidate, ...prev]);
-                setAllCandidates(prev => [newCandidate, ...prev]);
-
-                if (showToast) {
-                    showToast('Đã lưu thông tin ứng viên thành công! (Mock)', 'success');
-                }
-
-                handleModalClose();
-                setFormLoading(false);
-                return;
-            }
-
             const formDataToSend = new FormData();
             formDataToSend.append('hoTen', formData.hoTen);
             formDataToSend.append('gioiTinh', formData.gioiTinh || '');
