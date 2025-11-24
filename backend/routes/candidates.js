@@ -2737,8 +2737,11 @@ ensureRecruitmentRequestsTable();
 
 // POST /api/candidates/recruitment-requests - Create recruitment request
 router.post('/recruitment-requests', async (req, res) => {
+    const client = await pool.connect();
     try {
+        await client.query('BEGIN');
         await ensureRecruitmentRequestsTable();
+        await ensureCandidatesTable();
 
         const {
             managerId,
@@ -2755,12 +2758,66 @@ router.post('/recruitment-requests', async (req, res) => {
         } = req.body;
 
         if (!managerId || !managerType || !chucDanhCanTuyen || !soLuongYeuCau || !phongBan || !nguoiQuanLyTrucTiep) {
+            await client.query('ROLLBACK');
             return res.status(400).json({
                 success: false,
                 message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
             });
         }
 
+        // Kiểm tra và thêm phòng ban vào candidates nếu chưa có
+        if (phongBan) {
+            const checkPhongBanQuery = `
+                SELECT COUNT(*) as count
+                FROM candidates
+                WHERE phong_ban = $1
+                LIMIT 1
+            `;
+            const phongBanResult = await client.query(checkPhongBanQuery, [phongBan]);
+            
+            if (phongBanResult.rows[0].count === '0') {
+                // Tạo placeholder candidate để phòng ban xuất hiện trong dropdown
+                const placeholderCandidateQuery = `
+                    INSERT INTO candidates (ho_ten, phong_ban, vi_tri_ung_tuyen, status, notes)
+                    VALUES ($1, $2, $3, 'PENDING_INTERVIEW', $4)
+                    ON CONFLICT DO NOTHING
+                `;
+                await client.query(placeholderCandidateQuery, [
+                    `[Placeholder - ${phongBan}]`,
+                    phongBan,
+                    chucDanhCanTuyen || null,
+                    'Được tạo tự động từ yêu cầu tuyển dụng'
+                ]);
+            }
+        }
+
+        // Kiểm tra và thêm vị trí ứng tuyển vào candidates nếu chưa có
+        if (chucDanhCanTuyen) {
+            const checkViTriQuery = `
+                SELECT COUNT(*) as count
+                FROM candidates
+                WHERE vi_tri_ung_tuyen = $1
+                LIMIT 1
+            `;
+            const viTriResult = await client.query(checkViTriQuery, [chucDanhCanTuyen]);
+            
+            if (viTriResult.rows[0].count === '0') {
+                // Tạo placeholder candidate để vị trí xuất hiện trong dropdown
+                const placeholderCandidateQuery = `
+                    INSERT INTO candidates (ho_ten, phong_ban, vi_tri_ung_tuyen, status, notes)
+                    VALUES ($1, $2, $3, 'PENDING_INTERVIEW', $4)
+                    ON CONFLICT DO NOTHING
+                `;
+                await client.query(placeholderCandidateQuery, [
+                    `[Placeholder - ${chucDanhCanTuyen}]`,
+                    phongBan || null,
+                    chucDanhCanTuyen,
+                    'Được tạo tự động từ yêu cầu tuyển dụng'
+                ]);
+            }
+        }
+
+        // Tạo recruitment request
         const insertQuery = `
             INSERT INTO recruitment_requests (
                 manager_id, manager_type,
@@ -2773,7 +2830,7 @@ router.post('/recruitment-requests', async (req, res) => {
             RETURNING *
         `;
 
-        const result = await pool.query(insertQuery, [
+        const result = await client.query(insertQuery, [
             managerId,
             managerType,
             chucDanhCanTuyen,
@@ -2787,17 +2844,22 @@ router.post('/recruitment-requests', async (req, res) => {
             tieuChuanTuyenChon ? JSON.stringify(tieuChuanTuyenChon) : null
         ]);
 
+        await client.query('COMMIT');
+
         res.json({
             success: true,
             message: 'Yêu cầu tuyển dụng đã được gửi thành công!',
             data: result.rows[0]
         });
     } catch (error) {
+        await client.query('ROLLBACK');
         console.error('Error creating recruitment request:', error);
         res.status(500).json({
             success: false,
             message: 'Lỗi khi tạo yêu cầu tuyển dụng: ' + error.message
         });
+    } finally {
+        client.release();
     }
 });
 
