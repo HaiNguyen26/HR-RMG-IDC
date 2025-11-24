@@ -2765,7 +2765,11 @@ router.post('/recruitment-requests', async (req, res) => {
             });
         }
 
-        // Kiểm tra và thêm phòng ban vào candidates nếu chưa có
+        // Kiểm tra và thêm phòng ban/vị trí vào candidates nếu chưa có
+        // Tạo một placeholder candidate duy nhất nếu cần
+        let needPhongBan = false;
+        let needViTri = false;
+
         if (phongBan) {
             const checkPhongBanQuery = `
                 SELECT COUNT(*) as count
@@ -2774,24 +2778,9 @@ router.post('/recruitment-requests', async (req, res) => {
                 LIMIT 1
             `;
             const phongBanResult = await client.query(checkPhongBanQuery, [phongBan]);
-            
-            if (phongBanResult.rows[0].count === '0') {
-                // Tạo placeholder candidate để phòng ban xuất hiện trong dropdown
-                const placeholderCandidateQuery = `
-                    INSERT INTO candidates (ho_ten, phong_ban, vi_tri_ung_tuyen, status, notes)
-                    VALUES ($1, $2, $3, 'PENDING_INTERVIEW', $4)
-                    ON CONFLICT DO NOTHING
-                `;
-                await client.query(placeholderCandidateQuery, [
-                    `[Placeholder - ${phongBan}]`,
-                    phongBan,
-                    chucDanhCanTuyen || null,
-                    'Được tạo tự động từ yêu cầu tuyển dụng'
-                ]);
-            }
+            needPhongBan = phongBanResult.rows[0].count === '0';
         }
 
-        // Kiểm tra và thêm vị trí ứng tuyển vào candidates nếu chưa có
         if (chucDanhCanTuyen) {
             const checkViTriQuery = `
                 SELECT COUNT(*) as count
@@ -2800,18 +2789,35 @@ router.post('/recruitment-requests', async (req, res) => {
                 LIMIT 1
             `;
             const viTriResult = await client.query(checkViTriQuery, [chucDanhCanTuyen]);
+            needViTri = viTriResult.rows[0].count === '0';
+        }
+
+        // Tạo placeholder candidate nếu cần (chỉ tạo 1 record với cả phòng ban và vị trí)
+        if (needPhongBan || needViTri) {
+            // Kiểm tra xem đã có candidate nào với cả 2 thông tin chưa (tránh tạo duplicate)
+            const checkExistingQuery = `
+                SELECT COUNT(*) as count
+                FROM candidates
+                WHERE phong_ban = $1 AND vi_tri_ung_tuyen = $2
+                LIMIT 1
+            `;
+            const existingResult = await client.query(checkExistingQuery, [
+                phongBan || null, 
+                chucDanhCanTuyen || null
+            ]);
             
-            if (viTriResult.rows[0].count === '0') {
-                // Tạo placeholder candidate để vị trí xuất hiện trong dropdown
+            if (existingResult.rows[0].count === '0') {
+                // Tạo placeholder candidate với cả phòng ban và vị trí
                 const placeholderCandidateQuery = `
                     INSERT INTO candidates (ho_ten, phong_ban, vi_tri_ung_tuyen, status, notes)
                     VALUES ($1, $2, $3, 'PENDING_INTERVIEW', $4)
                     ON CONFLICT DO NOTHING
                 `;
+                const placeholderName = `[Placeholder${phongBan ? ` - ${phongBan}` : ''}${chucDanhCanTuyen ? ` - ${chucDanhCanTuyen}` : ''}]`;
                 await client.query(placeholderCandidateQuery, [
-                    `[Placeholder - ${chucDanhCanTuyen}]`,
+                    placeholderName,
                     phongBan || null,
-                    chucDanhCanTuyen,
+                    chucDanhCanTuyen || null,
                     'Được tạo tự động từ yêu cầu tuyển dụng'
                 ]);
             }
