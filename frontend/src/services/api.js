@@ -177,6 +177,8 @@ export const candidatesAPI = {
   // Candidate metadata API
   getDepartments: () => api.get('/candidates/departments'),
   getPositions: () => api.get('/candidates/positions'),
+  // Get CV file URL
+  getCVUrl: (candidateId) => `${API_URL}/candidates/cv/${candidateId}`,
 };
 
 // Notification system removed

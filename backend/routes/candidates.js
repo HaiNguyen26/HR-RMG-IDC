@@ -2729,7 +2729,7 @@ const ensureRecruitmentRequestsTable = async () => {
 
     try {
         await pool.query(createTableQuery);
-        
+
         // Alter existing table to allow NULL for nguoi_quan_ly_truc_tiep if it exists
         await pool.query(`
             DO $$
@@ -2752,7 +2752,7 @@ const ensureRecruitmentRequestsTable = async () => {
                     NULL;
             END $$;
         `);
-        
+
         console.log('✓ Recruitment requests table ensured');
     } catch (error) {
         console.error('Error ensuring recruitment_requests table:', error);
@@ -3140,13 +3140,51 @@ router.get('/departments', async (req, res) => {
         const query = `
             SELECT DISTINCT phong_ban as department
             FROM candidates
-            WHERE phong_ban IS NOT NULL AND phong_ban != ''
+            WHERE phong_ban IS NOT NULL 
+              AND phong_ban != ''
+              AND phong_ban NOT IN ('HANHCHINH', 'TAPVU_NAUAN')
+              AND NOT (phong_ban ~ '^[A-Z0-9_]+$' AND phong_ban LIKE '%_%')
             ORDER BY phong_ban ASC
         `;
         const result = await pool.query(query);
+        
+        // Lọc bỏ các giá trị code cũ (enum values - chứa dấu gạch dưới và chữ in hoa)
+        // Ví dụ: TAPVU_NAUAN, HANHCHINH
+        const departments = result.rows
+            .map(row => row.department)
+            .filter(dept => {
+                // Loại bỏ các giá trị code enum (chứa dấu gạch dưới và toàn chữ in hoa hoặc chữ in hoa + số)
+                if (!dept || dept.trim() === '') return false;
+                
+                // Loại bỏ các giá trị code enum cụ thể đã biết
+                const excludedCodes = ['TAPVU_NAUAN', 'HANHCHINH', 'MUAHANG', 'HAN_BOMACH', 
+                    'CHATLUONG', 'KHAOSAT_THIETKE', 'ADMIN_DUAN', 'LAPRAP', 
+                    'LAPRAP_JIG_PALLET', 'DIEN_LAPTRINH_PLC', 'THIETKE_MAY_TUDONG',
+                    'VANHANH_MAY_CNC', 'DICHVU_KYTHUAT', 'KETOAN_NOIBO', 'KETOAN_BANHANG'];
+                
+                if (excludedCodes.includes(dept.toUpperCase())) {
+                    return false;
+                }
+                
+                // Nếu có dấu gạch dưới và toàn chữ in hoa/số, thì là code enum cũ
+                if (dept.includes('_') && /^[A-Z0-9_]+$/.test(dept)) {
+                    return false;
+                }
+                
+                // Loại bỏ các giá trị chỉ có chữ in hoa không có khoảng trắng (có thể là code)
+                // Ví dụ: HANHCHINH, DVĐT (nhưng DVĐT có thể hợp lệ, nên kiểm tra kỹ hơn)
+                const deptUpper = dept.toUpperCase();
+                if (/^[A-Z0-9]+$/.test(deptUpper) && dept.length <= 20 && !dept.includes(' ') && !dept.includes('Đ')) {
+                    // Loại bỏ các giá trị toàn chữ in hoa và số, không có ký tự đặc biệt Việt Nam
+                    return false;
+                }
+                
+                return true;
+            });
+        
         res.json({
             success: true,
-            data: result.rows.map(row => row.department)
+            data: departments
         });
     } catch (error) {
         console.error('Error fetching candidate departments:', error);
@@ -3168,13 +3206,31 @@ router.get('/positions', async (req, res) => {
         const query = `
             SELECT DISTINCT vi_tri_ung_tuyen as position
             FROM candidates
-            WHERE vi_tri_ung_tuyen IS NOT NULL AND vi_tri_ung_tuyen != ''
+            WHERE vi_tri_ung_tuyen IS NOT NULL 
+              AND vi_tri_ung_tuyen != ''
+              AND vi_tri_ung_tuyen NOT IN ('TAPVU_NAUAN')
+              AND NOT (vi_tri_ung_tuyen ~ '^[A-Z0-9_]+$' AND vi_tri_ung_tuyen LIKE '%_%')
             ORDER BY vi_tri_ung_tuyen ASC
         `;
         const result = await pool.query(query);
+        
+        // Lọc bỏ các giá trị code cũ (enum values - chứa dấu gạch dưới và chữ in hoa)
+        // Ví dụ: TAPVU_NAUAN
+        const positions = result.rows
+            .map(row => row.position)
+            .filter(pos => {
+                // Loại bỏ các giá trị code enum (chứa dấu gạch dưới và toàn chữ in hoa hoặc chữ in hoa + số)
+                if (!pos || pos.trim() === '') return false;
+                // Nếu có dấu gạch dưới và toàn chữ in hoa/số, thì là code enum cũ
+                if (pos.includes('_') && /^[A-Z0-9_]+$/.test(pos)) {
+                    return false;
+                }
+                return true;
+            });
+        
         res.json({
             success: true,
-            data: result.rows.map(row => row.position)
+            data: positions
         });
     } catch (error) {
         console.error('Error fetching candidate positions:', error);
@@ -3182,6 +3238,100 @@ router.get('/positions', async (req, res) => {
             success: false,
             message: 'Lỗi khi lấy danh sách vị trí ứng tuyển: ' + error.message
         });
+    }
+});
+
+/**
+ * GET /api/candidates/cv/:id - Tải/xem file CV đính kèm của ứng viên
+ */
+router.get('/cv/:id', async (req, res) => {
+    try {
+        const candidateId = parseInt(req.params.id, 10);
+        
+        if (isNaN(candidateId) || candidateId <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'ID ứng viên không hợp lệ'
+            });
+        }
+
+        // Lấy thông tin file CV từ database
+        const result = await pool.query(
+            'SELECT cv_file_path, cv_file_name FROM candidates WHERE id = $1',
+            [candidateId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy ứng viên'
+            });
+        }
+
+        const candidate = result.rows[0];
+        const cvFilePath = candidate.cv_file_path;
+        const cvFileName = candidate.cv_file_name;
+
+        if (!cvFilePath) {
+            return res.status(404).json({
+                success: false,
+                message: 'Ứng viên này chưa có file CV đính kèm'
+            });
+        }
+
+        // Kiểm tra file có tồn tại không
+        const fullPath = path.isAbsolute(cvFilePath) 
+            ? cvFilePath 
+            : path.join(__dirname, '..', cvFilePath);
+
+        if (!fs.existsSync(fullPath)) {
+            console.error(`CV file not found at path: ${fullPath}`);
+            return res.status(404).json({
+                success: false,
+                message: 'File CV không tồn tại trên server'
+            });
+        }
+
+        // Xác định MIME type dựa trên extension
+        const ext = path.extname(fullPath).toLowerCase();
+        let contentType = 'application/octet-stream';
+        if (ext === '.pdf') {
+            contentType = 'application/pdf';
+        } else if (ext === '.doc') {
+            contentType = 'application/msword';
+        } else if (ext === '.docx') {
+            contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        }
+
+        // Đặt tên file cho download (sử dụng tên gốc hoặc tên từ database)
+        const downloadFileName = cvFileName || `CV-${candidateId}${ext}`;
+
+        // Trả về file
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(downloadFileName)}"`);
+        
+        // Stream file về client
+        const fileStream = fs.createReadStream(fullPath);
+        fileStream.pipe(res);
+
+        fileStream.on('error', (error) => {
+            console.error('Error streaming CV file:', error);
+            if (!res.headersSent) {
+                res.status(500).json({
+                    success: false,
+                    message: 'Lỗi khi đọc file CV: ' + error.message
+                });
+            }
+        });
+
+    } catch (error) {
+        console.error('Error serving CV file:', error);
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                message: 'Lỗi khi tải file CV: ' + error.message
+            });
+        }
     }
 });
 

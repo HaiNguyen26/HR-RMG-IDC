@@ -1054,13 +1054,14 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
     const handleViewCV = () => {
         if (!selectedCandidate) return;
-        const cvPath = selectedCandidate.cvFilePath || selectedCandidate.cv_file_path;
-        if (cvPath) {
-            // Open CV in new tab
-            window.open(`/api/candidates/cv/${cvPath}`, '_blank');
+        const candidateId = selectedCandidate.id;
+        if (candidateId) {
+            // Open CV in new tab using the new API endpoint
+            const cvUrl = candidatesAPI.getCVUrl(candidateId);
+            window.open(cvUrl, '_blank');
         } else {
             if (showToast) {
-                showToast('Không tìm thấy file CV', 'error');
+                showToast('Không tìm thấy thông tin ứng viên', 'error');
             }
         }
     };
@@ -1584,10 +1585,6 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                                 {statusConfig[selectedCandidate.status]?.label || 'Chờ PV'}
                                             </span>
                                         </div>
-                                    </div>
-                                    <div className="candidate-info-card">
-                                        <div className="candidate-info-label">Địa chỉ tạm trú</div>
-                                        <div className="candidate-info-value">{selectedCandidate.diaChiTamTru || selectedCandidate.dia_chi_tam_tru || '-'}</div>
                                     </div>
                                 </div>
                             </div>
@@ -4152,6 +4149,20 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
                         {/* Preview Actions */}
                         <div className="candidate-preview-actions">
+                            {/* Hiển thị nút xem file đính kèm nếu có */}
+                            {(selectedCandidate.cvFilePath || selectedCandidate.cv_file_path || selectedCandidate.cvFileName || selectedCandidate.cv_file_name) && (
+                                <button
+                                    type="button"
+                                    className="candidate-modal-btn candidate-modal-btn-preview"
+                                    onClick={handleViewCV}
+                                    title="Xem file CV đính kèm"
+                                >
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    <span>Xem file đính kèm</span>
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 className="candidate-modal-btn candidate-modal-btn-cancel"
@@ -4445,55 +4456,27 @@ const RecruitmentRequestDetailView = ({ request }) => {
                             </div>
                         )}
 
-                        {/* Kỹ năng và Khả năng - 2 cột */}
-                        {(tieuChuanTuyenChon.kyNang || tieuChuanTuyenChon.khaNang) && (
-                            <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
-                                {tieuChuanTuyenChon.kyNang && (
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Kỹ năng</label>
-                                        <div className="recruitment-request-form-value">{tieuChuanTuyenChon.kyNang || '-'}</div>
-                                    </div>
-                                )}
-                                {tieuChuanTuyenChon.khaNang && (
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Khả năng</label>
-                                        <div className="recruitment-request-form-value">{tieuChuanTuyenChon.khaNang || '-'}</div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Ngoại hình và Tính cách - 2 cột */}
-                        {(tieuChuanTuyenChon.ngoaiHinh || tieuChuanTuyenChon.tinhCach) && (
-                            <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
-                                {tieuChuanTuyenChon.ngoaiHinh && (
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Ngoại hình</label>
-                                        <div className="recruitment-request-form-value">{tieuChuanTuyenChon.ngoaiHinh || '-'}</div>
-                                    </div>
-                                )}
-                                {tieuChuanTuyenChon.tinhCach && (
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Tính cách</label>
-                                        <div className="recruitment-request-form-value">{tieuChuanTuyenChon.tinhCach || '-'}</div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Ưu tiên */}
-                        {tieuChuanTuyenChon.uuTien && (
+                        {/* Kỹ năng - Display as table */}
+                        {tieuChuanTuyenChon.kyNang && (
                             <div className="recruitment-request-form-field">
-                                <label className="recruitment-request-form-label">Ưu tiên</label>
-                                <div className="recruitment-request-form-value">{tieuChuanTuyenChon.uuTien || '-'}</div>
-                            </div>
-                        )}
-
-                        {/* Yêu cầu khác */}
-                        {tieuChuanTuyenChon.yeuCauKhac && (
-                            <div className="recruitment-request-form-field">
-                                <label className="recruitment-request-form-label">Yêu cầu khác</label>
-                                <div className="recruitment-request-form-value">{tieuChuanTuyenChon.yeuCauKhac || '-'}</div>
+                                <div className="recruitment-request-skills-table">
+                                    <div className="recruitment-request-skills-row">
+                                        <label className="recruitment-request-skills-label">Kỹ năng giao tiếp</label>
+                                        <div className="recruitment-request-skills-value">{tieuChuanTuyenChon.kyNang.kyNangGiaoTiep || tieuChuanTuyenChon.kyNang?.ky_nang_giao_tiep || '-'}</div>
+                                    </div>
+                                    <div className="recruitment-request-skills-row">
+                                        <label className="recruitment-request-skills-label">Thái độ làm việc <span className="recruitment-request-skills-note">(Trách nhiệm,...)</span></label>
+                                        <div className="recruitment-request-skills-value">{tieuChuanTuyenChon.kyNang.thaiDoLamViec || tieuChuanTuyenChon.kyNang?.thai_do_lam_viec || '-'}</div>
+                                    </div>
+                                    <div className="recruitment-request-skills-row">
+                                        <label className="recruitment-request-skills-label">Kỹ năng quản lý <span className="recruitment-request-skills-note">(Áp dụng cho Trưởng phòng trở lên)</span></label>
+                                        <div className="recruitment-request-skills-value">{tieuChuanTuyenChon.kyNang.kyNangQuanLy || tieuChuanTuyenChon.kyNang?.ky_nang_quan_ly || '-'}</div>
+                                    </div>
+                                    <div className="recruitment-request-skills-row">
+                                        <label className="recruitment-request-skills-label">Yêu cầu khác</label>
+                                        <div className="recruitment-request-skills-value">{tieuChuanTuyenChon.kyNang.yeuCauKhac || tieuChuanTuyenChon.kyNang?.yeu_cau_khac || '-'}</div>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>

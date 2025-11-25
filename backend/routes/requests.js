@@ -2,6 +2,73 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 
+// Ensure requests and request_items tables exist
+const ensureRequestsTable = async () => {
+    try {
+        // Create requests table
+        const createRequestsTable = `
+            CREATE TABLE IF NOT EXISTS requests (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+                request_type VARCHAR(50) NOT NULL CHECK (request_type IN ('IT_EQUIPMENT', 'OFFICE_SUPPLIES', 'ACCOUNTING', 'OTHER')),
+                target_department VARCHAR(20) NOT NULL CHECK (target_department IN ('IT', 'HR', 'ACCOUNTING', 'OTHER')),
+                title VARCHAR(255) NOT NULL,
+                description TEXT,
+                items JSONB,
+                status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'IN_PROGRESS', 'COMPLETED', 'REJECTED')),
+                priority VARCHAR(20) DEFAULT 'NORMAL' CHECK (priority IN ('LOW', 'NORMAL', 'HIGH', 'URGENT')),
+                requested_by INTEGER REFERENCES users(id),
+                assigned_to INTEGER REFERENCES users(id),
+                completed_at TIMESTAMP NULL,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_requests_employee_id ON requests(employee_id);
+            CREATE INDEX IF NOT EXISTS idx_requests_target_department ON requests(target_department);
+            CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status);
+            CREATE INDEX IF NOT EXISTS idx_requests_request_type ON requests(request_type);
+            CREATE INDEX IF NOT EXISTS idx_requests_requested_by ON requests(requested_by);
+            CREATE INDEX IF NOT EXISTS idx_requests_assigned_to ON requests(assigned_to);
+            CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at DESC);
+        `;
+
+        // Create request_items table
+        const createRequestItemsTable = `
+            CREATE TABLE IF NOT EXISTS request_items (
+                id SERIAL PRIMARY KEY,
+                request_id INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+                item_name VARCHAR(255) NOT NULL,
+                quantity INTEGER DEFAULT 1,
+                quantity_provided INTEGER DEFAULT 0,
+                status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PARTIAL', 'COMPLETED', 'CANCELLED')),
+                notes TEXT,
+                provided_by INTEGER REFERENCES users(id),
+                provided_at TIMESTAMP NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_request_items_request_id ON request_items(request_id);
+            CREATE INDEX IF NOT EXISTS idx_request_items_status ON request_items(status);
+        `;
+
+        await pool.query(createRequestsTable);
+        await pool.query(createRequestItemsTable);
+
+        console.log('✓ Requests and request_items tables ensured');
+    } catch (error) {
+        console.error('Error ensuring requests tables:', error);
+        // Don't throw - allow the request to continue even if table creation fails
+    }
+};
+
+// Ensure tables on module load
+ensureRequestsTable().catch((error) => {
+    console.error('Error ensuring requests tables on load:', error);
+});
+
 const normalizeDepartment = (value) => {
     if (!value) return null;
     return value.toString().trim().toUpperCase();
@@ -54,6 +121,7 @@ const getUserIdFromEmployeeId = async (employeeIds) => {
  */
 router.get('/', async (req, res) => {
     try {
+        await ensureRequestsTable();
         const { targetDepartment, status, userId, employeeId } = req.query;
 
         // Clean up orphaned requests (requests without valid employees or employees with INACTIVE status) before fetching
@@ -152,6 +220,7 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
     try {
+        await ensureRequestsTable();
         const { id } = req.params;
 
         const query = `
@@ -216,6 +285,7 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
     try {
+        await ensureRequestsTable();
         const {
             employeeId,
             requestType,
@@ -328,6 +398,7 @@ router.post('/', async (req, res) => {
  */
 router.put('/:id', async (req, res) => {
     try {
+        await ensureRequestsTable();
         const { id } = req.params;
         const {
             status,
@@ -445,6 +516,7 @@ router.put('/:id', async (req, res) => {
  */
 router.delete('/:id', async (req, res) => {
     try {
+        await ensureRequestsTable();
         const { id } = req.params;
 
         // Chỉ cho phép xóa nếu status là PENDING
@@ -487,6 +559,7 @@ router.delete('/:id', async (req, res) => {
  */
 router.get('/stats/:department', async (req, res) => {
     try {
+        await ensureRequestsTable();
         const { department } = req.params;
 
         const query = `
@@ -521,6 +594,7 @@ router.get('/stats/:department', async (req, res) => {
  */
 router.put('/:id/items/:itemId', async (req, res) => {
     try {
+        await ensureRequestsTable();
         const { id, itemId } = req.params;
         const { quantityProvided, notes, providedBy } = req.body;
 

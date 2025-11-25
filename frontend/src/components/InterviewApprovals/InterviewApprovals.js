@@ -89,13 +89,13 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 khac: false,
                 khacValue: ''
             },
-            kyNang: '',
-            khaNang: '',
-            ngoaiHinh: '',
-            tinhCach: '',
-            uuTien: '',
-            yeuCauKhac: ''
-        }
+            kyNang: {
+                kyNangGiaoTiep: '',
+                thaiDoLamViec: '',
+                kyNangQuanLy: '',
+                yeuCauKhac: ''
+            },
+            }
     });
     const [recruitmentRequestErrors, setRecruitmentRequestErrors] = useState({});
     const [submittingRecruitmentRequest, setSubmittingRecruitmentRequest] = useState(false);
@@ -888,12 +888,12 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                     khac: false,
                     khacValue: ''
                 },
-                kyNang: '',
-                khaNang: '',
-                ngoaiHinh: '',
-                tinhCach: '',
-                uuTien: '',
-                yeuCauKhac: ''
+                kyNang: {
+                    kyNangGiaoTiep: '',
+                    thaiDoLamViec: '',
+                    kyNangQuanLy: '',
+                    yeuCauKhac: ''
+                },
             }
         });
         setRecruitmentRequestErrors({});
@@ -2389,74 +2389,48 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
 
                                     {/* Kỹ năng */}
                                     <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Kỹ năng</label>
-                                        <input
-                                            type="text"
-                                            className="recruitment-request-form-input"
-                                            value={recruitmentRequestForm.tieuChuanTuyenChon.kyNang}
-                                            onChange={(e) => handleTieuChuanTuyenChonChange('kyNang', e.target.value)}
-                                            placeholder="Nhập kỹ năng yêu cầu"
-                                        />
-                                    </div>
-
-                                    {/* Khả năng */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Khả năng</label>
-                                        <input
-                                            type="text"
-                                            className="recruitment-request-form-input"
-                                            value={recruitmentRequestForm.tieuChuanTuyenChon.khaNang}
-                                            onChange={(e) => handleTieuChuanTuyenChonChange('khaNang', e.target.value)}
-                                            placeholder="Nhập khả năng yêu cầu"
-                                        />
-                                    </div>
-
-                                    {/* Ngoại hình */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Ngoại hình</label>
-                                        <input
-                                            type="text"
-                                            className="recruitment-request-form-input"
-                                            value={recruitmentRequestForm.tieuChuanTuyenChon.ngoaiHinh}
-                                            onChange={(e) => handleTieuChuanTuyenChonChange('ngoaiHinh', e.target.value)}
-                                            placeholder="Nhập yêu cầu về ngoại hình"
-                                        />
-                                    </div>
-
-                                    {/* Tính cách */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Tính cách</label>
-                                        <input
-                                            type="text"
-                                            className="recruitment-request-form-input"
-                                            value={recruitmentRequestForm.tieuChuanTuyenChon.tinhCach}
-                                            onChange={(e) => handleTieuChuanTuyenChonChange('tinhCach', e.target.value)}
-                                            placeholder="Nhập yêu cầu về tính cách"
-                                        />
-                                    </div>
-
-                                    {/* Ưu tiên */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Ưu tiên</label>
-                                        <input
-                                            type="text"
-                                            className="recruitment-request-form-input"
-                                            value={recruitmentRequestForm.tieuChuanTuyenChon.uuTien}
-                                            onChange={(e) => handleTieuChuanTuyenChonChange('uuTien', e.target.value)}
-                                            placeholder="Nhập yêu cầu ưu tiên"
-                                        />
-                                    </div>
-
-                                    {/* Yêu cầu khác */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Yêu cầu khác</label>
-                                        <input
-                                            type="text"
-                                            className="recruitment-request-form-input"
-                                            value={recruitmentRequestForm.tieuChuanTuyenChon.yeuCauKhac}
-                                            onChange={(e) => handleTieuChuanTuyenChonChange('yeuCauKhac', e.target.value)}
-                                            placeholder="Nhập yêu cầu khác (nếu có)"
-                                        />
+                                        <div className="recruitment-request-skills-table">
+                                            <div className="recruitment-request-skills-row">
+                                                <label className="recruitment-request-skills-label">Kỹ năng giao tiếp</label>
+                                                <input
+                                                    type="text"
+                                                    className="recruitment-request-form-input recruitment-request-skills-input"
+                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.kyNang.kyNangGiaoTiep || ''}
+                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('kyNang', 'kyNangGiaoTiep', e.target.value)}
+                                                    placeholder="Nhập kỹ năng giao tiếp"
+                                                />
+                                            </div>
+                                            <div className="recruitment-request-skills-row">
+                                                <label className="recruitment-request-skills-label">Thái độ làm việc <span className="recruitment-request-skills-note">(Trách nhiệm,...)</span></label>
+                                                <input
+                                                    type="text"
+                                                    className="recruitment-request-form-input recruitment-request-skills-input"
+                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.kyNang.thaiDoLamViec || ''}
+                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('kyNang', 'thaiDoLamViec', e.target.value)}
+                                                    placeholder="Nhập thái độ làm việc"
+                                                />
+                                            </div>
+                                            <div className="recruitment-request-skills-row">
+                                                <label className="recruitment-request-skills-label">Kỹ năng quản lý <span className="recruitment-request-skills-note">(Áp dụng cho Trưởng phòng trở lên)</span></label>
+                                                <input
+                                                    type="text"
+                                                    className="recruitment-request-form-input recruitment-request-skills-input"
+                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.kyNang.kyNangQuanLy || ''}
+                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('kyNang', 'kyNangQuanLy', e.target.value)}
+                                                    placeholder="Nhập kỹ năng quản lý"
+                                                />
+                                            </div>
+                                            <div className="recruitment-request-skills-row">
+                                                <label className="recruitment-request-skills-label">Yêu cầu khác</label>
+                                                <input
+                                                    type="text"
+                                                    className="recruitment-request-form-input recruitment-request-skills-input"
+                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.kyNang.yeuCauKhac || ''}
+                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('kyNang', 'yeuCauKhac', e.target.value)}
+                                                    placeholder="Nhập yêu cầu khác"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

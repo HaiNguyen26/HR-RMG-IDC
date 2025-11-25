@@ -71,6 +71,7 @@ HR-Management-System/
 
 ## 📚 Tài liệu
 
+### Development
 - [Hướng dẫn khởi động chi tiết](docs/HUONG_DAN_KHOI_DONG.md)
 - [Hướng dẫn chạy trong PowerShell/CMD](docs/CHAY_POWERSHELL_CMD.md)
 - [Chạy nhanh](docs/CHAY_NHANH.md)
@@ -78,6 +79,16 @@ HR-Management-System/
 - [API Documentation](docs/README_API.md)
 - [Database Documentation](docs/DATABASE_README.md)
 - [Login Credentials](docs/LOGIN_CREDENTIALS.md)
+
+### Deployment
+- [⚡ DEPLOY NGAY - Copy & Paste từng bước](DEPLOY_NOW.md) ⭐ **BẮT ĐẦU TỪ ĐÂY**
+- [🔗 Deploy từ GitHub](docs/DEPLOY_FROM_GITHUB.md) ⭐ **KHUYẾN NGHỊ**
+- [🔄 Migrate từ Local lên Server](docs/MIGRATE_FROM_LOCAL.md) ⭐ **CÓ DATABASE Ở LOCAL?**
+- [📝 Hướng dẫn Deploy Từng Bước Chi tiết](docs/DEPLOYMENT_STEP_BY_STEP.md)
+- [🚀 Triển khai lên Ubuntu Server (Hướng dẫn nhanh)](docs/DEPLOYMENT_QUICK_START.md)
+- [📖 Triển khai lên Ubuntu Server (Hướng dẫn chi tiết)](docs/DEPLOYMENT_UBUNTU.md)
+- [🔄 Cập nhật Code sau khi Deploy](docs/UPDATE_DEPLOYMENT.md)
+- [✅ Đánh giá Tính năng HR](docs/HR_FEATURES_ASSESSMENT.md)
 
 ## ⚙️ Cấu hình
 

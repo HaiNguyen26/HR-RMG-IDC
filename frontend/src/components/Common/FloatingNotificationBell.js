@@ -36,7 +36,7 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
         }
     };
 
-    // Fetch unread notifications count (leave + overtime + attendance + candidates)
+    // Fetch unread notifications count (leave + overtime + attendance + candidates + recruitment requests)
     const fetchUnreadCount = async (currentReadIds = null) => {
         if (!currentUser || currentUser.role !== 'HR') return;
 
@@ -68,6 +68,11 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                 search: ''
             });
 
+            // Fetch recruitment requests (pending, approved, rejected)
+            const recruitmentResponse = await candidatesAPI.getAllRecruitmentRequests({
+                status: 'all'
+            });
+
             const leaveRequests = leaveResponse.data?.success && Array.isArray(leaveResponse.data.data)
                 ? leaveResponse.data.data
                 : [];
@@ -80,8 +85,11 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
             const candidates = candidatesResponse.data?.success && Array.isArray(candidatesResponse.data.data)
                 ? candidatesResponse.data.data
                 : [];
+            const recruitmentRequests = recruitmentResponse.data?.success && Array.isArray(recruitmentResponse.data.data)
+                ? recruitmentResponse.data.data
+                : [];
 
-            // Combine and create unique IDs (type:leave_id, type:overtime_id, type:attendance_id, or type:candidate_id)
+            // Combine and create unique IDs (type:leave_id, type:overtime_id, type:attendance_id, type:candidate_id, or type:recruitment:id)
             // Filter to only count recent decisions (within last 7 days) or pending requests
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -127,7 +135,7 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                         // Get position - map from value to label
                         const positionValue = candidate.viTriUngTuyen || candidate.vi_tri_ung_tuyen || '';
                         const positionLabel = getPositionLabel(positionValue);
-                        
+
                         // Build employee_name: if candidate name exists, show "Manager - CandidateName", else just show candidate name or fallback
                         let employeeNameValue;
                         if (candidateName) {
@@ -135,7 +143,7 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                         } else {
                             employeeNameValue = managerName !== 'N/A' ? managerName : 'Chưa có tên';
                         }
-                        
+
                         return {
                             ...candidate,
                             notificationId: `candidate:${candidate.id}:${candidate.status || 'UNKNOWN'}`,
@@ -146,7 +154,19 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                             viTriUngTuyen: positionValue,
                             viTriUngTuyenLabel: positionLabel
                         };
+                    }),
+                ...recruitmentRequests
+                    .filter(req => {
+                        // Only show PENDING requests or if updated within last 7 days
+                        if (req.status === 'PENDING') return true;
+                        const updatedAt = new Date(req.updated_at || req.created_at || 0);
+                        return updatedAt >= sevenDaysAgo;
                     })
+                    .map(req => ({
+                        ...req,
+                        notificationId: `recruitment:${req.id}:${req.status || 'UNKNOWN'}`,
+                        notificationType: 'recruitment'
+                    }))
             ];
 
             // Use provided readIds or current state
@@ -162,7 +182,7 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
         }
     };
 
-    // Fetch notifications for modal (leave + overtime + attendance + candidates)
+    // Fetch notifications for modal (leave + overtime + attendance + candidates + recruitment requests)
     const fetchNotifications = async () => {
         if (!currentUser || currentUser.role !== 'HR') return;
 
@@ -195,6 +215,11 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                 search: ''
             });
 
+            // Fetch recruitment requests (pending, approved, rejected)
+            const recruitmentResponse = await candidatesAPI.getAllRecruitmentRequests({
+                status: 'all'
+            });
+
             const leaveRequests = leaveResponse.data?.success && Array.isArray(leaveResponse.data.data)
                 ? leaveResponse.data.data
                 : [];
@@ -206,6 +231,9 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                 : [];
             const candidates = candidatesResponse.data?.success && Array.isArray(candidatesResponse.data.data)
                 ? candidatesResponse.data.data
+                : [];
+            const recruitmentRequests = recruitmentResponse.data?.success && Array.isArray(recruitmentResponse.data.data)
+                ? recruitmentResponse.data.data
                 : [];
 
             // Combine and add metadata
@@ -270,7 +298,7 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                         // Get position - map from value to label
                         const positionValue = candidate.viTriUngTuyen || candidate.vi_tri_ung_tuyen || '';
                         const positionLabel = getPositionLabel(positionValue);
-                        
+
                         return {
                             ...candidate,
                             notificationId: `candidate:${candidate.id}:${candidate.status || 'UNKNOWN'}`,
@@ -282,7 +310,20 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                             viTriUngTuyen: positionValue,
                             viTriUngTuyenLabel: positionLabel
                         };
+                    }),
+                ...recruitmentRequests
+                    .filter(req => {
+                        // Only show PENDING requests or if updated within last 7 days
+                        if (req.status === 'PENDING') return true;
+                        const updatedAt = new Date(req.updated_at || req.created_at || 0);
+                        return updatedAt >= sevenDaysAgo;
                     })
+                    .map(req => ({
+                        ...req,
+                        notificationId: `recruitment:${req.id}:${req.status || 'UNKNOWN'}`,
+                        notificationType: 'recruitment',
+                        createdAt: req.created_at
+                    }))
             ];
 
             // Sort by created_at descending (most recent first)
@@ -343,8 +384,13 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
     };
 
     // Handle click on notification item - mark as read
-    const handleNotificationClick = (notificationId) => {
+    const handleNotificationClick = (notificationId, e) => {
         if (!notificationId) return;
+
+        // Don't mark as read if clicking delete button
+        if (e && (e.target.closest('.floating-notification-delete-btn') || e.target.classList.contains('floating-notification-delete-btn'))) {
+            return;
+        }
 
         // Check if already read
         if (readRequestIds.has(notificationId)) return;
@@ -356,6 +402,24 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
 
         // Update unread count immediately
         setUnreadCount(prev => Math.max(0, prev - 1));
+
+        // Re-fetch to ensure accuracy
+        fetchUnreadCount(newReadIds);
+    };
+
+    // Handle delete notification - remove from read list and re-fetch
+    const handleDeleteNotification = (notificationId, e) => {
+        e.stopPropagation();
+        if (!notificationId) return;
+
+        // Remove from read list
+        const newReadIds = new Set(readRequestIds);
+        newReadIds.delete(notificationId);
+        setReadRequestIds(newReadIds);
+        saveReadRequestIds(newReadIds);
+
+        // Remove from notifications list
+        setNotifications(prev => prev.filter(n => n.notificationId !== notificationId));
 
         // Re-fetch to ensure accuracy
         fetchUnreadCount(newReadIds);
@@ -385,6 +449,7 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
         const statusMap = {
             'PENDING_TEAM_LEAD': 'Chờ QL trực tiếp',
             'PENDING_DIRECTOR': 'Chờ Giám đốc',
+            'PENDING': 'Chờ xử lý',
             'APPROVED': 'Đã duyệt',
             'REJECTED': 'Đã từ chối',
             'PASSED': 'Đã duyệt',
@@ -402,6 +467,9 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
         }
         if (notificationType === 'candidate') {
             return 'Ứng viên';
+        }
+        if (notificationType === 'recruitment') {
+            return 'Yêu cầu tuyển dụng';
         }
         return type === 'RESIGNATION' ? 'Xin nghỉ việc' : 'Xin nghỉ phép';
     };
@@ -500,14 +568,27 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                                         const isOvertime = notification.notificationType === 'overtime';
                                         const isAttendance = notification.notificationType === 'attendance';
                                         const isCandidate = notification.notificationType === 'candidate';
+                                        const isRecruitment = notification.notificationType === 'recruitment';
                                         return (
                                             <div
                                                 key={notification.notificationId}
                                                 className={`floating-notification-item ${isRead ? 'floating-notification-item--read' : 'floating-notification-item--unread'}`}
-                                                onClick={() => handleNotificationClick(notification.notificationId)}
+                                                onClick={(e) => handleNotificationClick(notification.notificationId, e)}
                                             >
                                                 {!isRead && (
                                                     <div className="floating-notification-unread-indicator"></div>
+                                                )}
+                                                {isRead && (
+                                                    <button
+                                                        type="button"
+                                                        className="floating-notification-delete-btn"
+                                                        onClick={(e) => handleDeleteNotification(notification.notificationId, e)}
+                                                        title="Xóa thông báo"
+                                                    >
+                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                        </svg>
+                                                    </button>
                                                 )}
                                                 <div className="floating-notification-item-header">
                                                     <div className="floating-notification-item-title">
@@ -519,6 +600,9 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                                                                         return notification.employee_name.split(' - ')[1] || notification.hoTen || notification.ho_ten || 'Chưa có tên';
                                                                     }
                                                                     return notification.hoTen || notification.ho_ten || notification.employee_name || 'Chưa có tên';
+                                                                }
+                                                                if (isRecruitment) {
+                                                                    return notification.manager_name || notification.phong_ban || notification.phongBan || 'Chưa có tên';
                                                                 }
                                                                 return notification.employee_name || 'Chưa có tên';
                                                             })()}
@@ -532,7 +616,7 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                                                     </span>
                                                 </div>
                                                 <div className="floating-notification-item-details">
-                                                    {!isCandidate && (
+                                                    {!isCandidate && !isRecruitment && (
                                                         <div className="floating-notification-detail">
                                                             <svg className="floating-notification-detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -548,6 +632,30 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                                                             </span>
                                                         </div>
                                                     )}
+                                                    {isRecruitment && (
+                                                        <>
+                                                            <div className="floating-notification-detail">
+                                                                <svg className="floating-notification-detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                                                </svg>
+                                                                <span>{notification.phong_ban || notification.phongBan || '-'}</span>
+                                                            </div>
+                                                            <div className="floating-notification-detail">
+                                                                <svg className="floating-notification-detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                                                </svg>
+                                                                <span>{notification.chuc_danh_can_tuyen || notification.chucDanhCanTuyen || '-'}</span>
+                                                            </div>
+                                                            {notification.so_luong_yeu_cau || notification.soLuongYeuCau ? (
+                                                                <div className="floating-notification-detail">
+                                                                    <svg className="floating-notification-detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                                                    </svg>
+                                                                    <span>Số lượng: {notification.so_luong_yeu_cau || notification.soLuongYeuCau}</span>
+                                                                </div>
+                                                            ) : null}
+                                                        </>
+                                                    )}
                                                     {isCandidate && (
                                                         <div className="floating-notification-detail">
                                                             <svg className="floating-notification-detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -556,10 +664,10 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                                                             <span>
                                                                 {(() => {
                                                                     // Try multiple sources for candidate name
-                                                                    const candidateName = notification.hoTen || notification.ho_ten || 
-                                                                                          (notification.employee_name && notification.employee_name.includes(' - ') 
-                                                                                           ? notification.employee_name.split(' - ')[1] 
-                                                                                           : null);
+                                                                    const candidateName = notification.hoTen || notification.ho_ten ||
+                                                                        (notification.employee_name && notification.employee_name.includes(' - ')
+                                                                            ? notification.employee_name.split(' - ')[1]
+                                                                            : null);
                                                                     return candidateName || 'Chưa có tên';
                                                                 })()}
                                                             </span>

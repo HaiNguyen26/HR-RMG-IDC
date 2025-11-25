@@ -2125,7 +2125,8 @@ select {
 }
 
 .react-datepicker__portal .react-datepicker__current-month {
-    display: none !important; /* Hide default month display, use dropdowns instead */
+    display: none !important;
+    /* Hide default month display, use dropdowns instead */
 }
 
 /* Hide month and year dropdowns */
@@ -3436,6 +3437,44 @@ select {
     color: #1e40af;
     /* Electric Blue Đậm (Blue 800) */
     font-weight: 700;
+}
+
+/* Button to view attached file */
+.candidate-view-file-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+}
+
+.candidate-view-file-btn:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+    transform: translateY(-1px);
+}
+
+.candidate-view-file-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+}
+
+.candidate-view-file-btn svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+}
+
+.candidate-view-file-btn span {
+    white-space: nowrap;
 }
 
 /* Status Tag in Action Modal - with Soft Glow */
@@ -4989,6 +5028,79 @@ select {
 }
 
 /* Form Value - Read-only display */
+/* Skills Table Styles for Detail View */
+.recruitment-request-skills-table {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    background: #ffffff;
+    margin: 0;
+    table-layout: auto;
+}
+
+.recruitment-request-skills-row {
+    display: table-row;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.recruitment-request-skills-row:last-child {
+    border-bottom: none;
+}
+
+.recruitment-request-skills-label {
+    display: table-cell;
+    padding: 0.75rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1f2937;
+    background: #f9fafb;
+    vertical-align: middle;
+    border-right: 1px solid #e5e7eb;
+    white-space: nowrap;
+    width: auto;
+    min-width: fit-content;
+}
+
+.recruitment-request-skills-note {
+    font-weight: 400;
+    font-style: italic;
+    color: #6b7280;
+    margin-left: 0.25rem;
+}
+
+.recruitment-request-skills-value {
+    display: table-cell;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: #374151;
+    vertical-align: middle;
+    width: 100%;
+    word-wrap: break-word;
+}
+
+.recruitment-request-form-field:has(.recruitment-request-skills-table) {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    width: 100%;
+    max-width: 100%;
+}
+
+.recruitment-request-form-field:has(.recruitment-request-skills-table):hover {
+    background: transparent !important;
+    border: none !important;
+}
+
+.recruitment-request-form-field:has(.recruitment-request-skills-table):focus-within {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
 .recruitment-request-form-value {
     padding: 0.625rem 0.875rem;
     background: #ffffff;

@@ -1963,3 +1963,116 @@
     position: relative;
     z-index: 10;
 }
+
+/* Skills Table */
+.recruitment-request-skills-table {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    background: #ffffff;
+    margin: 0;
+    table-layout: auto;
+}
+
+.recruitment-request-skills-row {
+    display: table-row;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.recruitment-request-skills-row:last-child {
+    border-bottom: none;
+}
+
+.recruitment-request-skills-label {
+    display: table-cell;
+    padding: 0.75rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1f2937;
+    background: #f9fafb;
+    vertical-align: middle;
+    border-right: 1px solid #e5e7eb;
+    white-space: nowrap;
+    width: auto;
+    min-width: fit-content;
+}
+
+.recruitment-request-skills-note {
+    font-weight: 400;
+    font-style: italic;
+    color: #6b7280;
+    margin-left: 0.25rem;
+}
+
+.recruitment-request-skills-input {
+    display: table-cell;
+    padding: 0.625rem 0.875rem;
+    border: none;
+    border-radius: 0;
+    width: 100%;
+    vertical-align: middle;
+}
+
+.recruitment-request-skills-input:focus {
+    outline: none;
+    background: #f0f9ff;
+}
+
+/* Remove padding from field when it contains skills table */
+.recruitment-request-form-field:has(.recruitment-request-skills-table) {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    width: 100%;
+    max-width: 100%;
+}
+
+.recruitment-request-form-field:has(.recruitment-request-skills-table):hover {
+    background: transparent !important;
+    border: none !important;
+}
+
+.recruitment-request-form-field:has(.recruitment-request-skills-table):focus-within {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Ensure table takes full width */
+.recruitment-request-form-field:has(.recruitment-request-skills-table) .recruitment-request-skills-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    margin: 0 !important;
+}
+
+/* Remove gap from form content when it contains skills table field */
+.recruitment-request-form-content:has(.recruitment-request-form-field:has(.recruitment-request-skills-table)) {
+    gap: 1rem;
+}
+
+/* Ensure input reaches the edge */
+.recruitment-request-skills-input {
+    display: table-cell;
+    padding: 0.625rem 0.875rem;
+    padding-right: 0.875rem !important;
+    border: none !important;
+    border-radius: 0;
+    width: 100%;
+    vertical-align: middle;
+    box-sizing: border-box;
+    margin: 0;
+}
+
+/* Remove right border radius from last cell in each row */
+.recruitment-request-skills-row .recruitment-request-skills-input:last-child {
+    border-radius: 0 0.375rem 0.375rem 0;
+}
+
+.recruitment-request-skills-row:last-child .recruitment-request-skills-input:last-child {
+    border-radius: 0 0.375rem 0 0;
+}
