@@ -23,7 +23,7 @@ module.exports = {
     {
       name: 'hr-rmg-idc-frontend',
       script: 'serve',
-      args: '-s build -l 3002',  // Port khác với app cũ
+      args: ['-s', 'build', '-l', '3002'],  // Port khác với app cũ - dùng array thay vì string
       cwd: '/var/www/hr-rmg-idc/frontend',
       env: {
         NODE_ENV: 'production'
