@@ -115,6 +115,11 @@ else
     git clone $GITHUB_REPO .
 fi
 
+# Xóa các file hướng dẫn cũ từ server cũ (nếu có)
+echo "   🗑️  Xóa các file hướng dẫn cũ..."
+cd $APP_DIR
+rm -f DEPLOY_NOW.md PUSH_TO_GITHUB.md QUICK_DEPLOY_OLD.md 2>/dev/null || true
+
 echo ""
 
 # Bước 3: Setup Database
