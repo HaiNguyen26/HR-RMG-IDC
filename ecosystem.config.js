@@ -1,39 +1,40 @@
+// PM2 Ecosystem Config cho HR Management System - RMG-IDC
+// Server mới: 27.71.16.15
+
 module.exports = {
   apps: [
     {
-      name: 'hr-backend',
+      name: 'hr-rmg-idc-backend',
       script: './backend/server.js',
-      cwd: process.cwd(),
-      instances: 2,
-      exec_mode: 'cluster',
+      cwd: '/var/www/hr-rmg-idc',
       env: {
         NODE_ENV: 'production',
-        PORT: 3000
+        PORT: 3001  // Port khác với app cũ để tránh xung đột
       },
-      error_file: './logs/backend-error.log',
-      out_file: './logs/backend-out.log',
+      error_file: '/var/www/hr-rmg-idc/logs/backend-error.log',
+      out_file: '/var/www/hr-rmg-idc/logs/backend-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
+      instances: 1,
       autorestart: true,
-      max_memory_restart: '500M',
       watch: false,
-      ignore_watch: ['node_modules', 'logs', 'uploads']
+      max_memory_restart: '1G'
     },
     {
-      name: 'hr-frontend',
+      name: 'hr-rmg-idc-frontend',
       script: 'serve',
-      args: '-s build -l 3001',
-      cwd: './frontend',
+      args: '-s build -l 3002',  // Port khác với app cũ
+      cwd: '/var/www/hr-rmg-idc/frontend',
       env: {
-        NODE_ENV: 'production',
-        PORT: 3001
+        NODE_ENV: 'production'
       },
-      error_file: './logs/frontend-error.log',
-      out_file: './logs/frontend-out.log',
+      error_file: '/var/www/hr-rmg-idc/logs/frontend-error.log',
+      out_file: '/var/www/hr-rmg-idc/logs/frontend-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      instances: 1,
       autorestart: true,
       watch: false
     }
   ]
 };
-
-

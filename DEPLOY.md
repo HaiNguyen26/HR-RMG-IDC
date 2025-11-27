@@ -1,32 +1,46 @@
-# 🚀 HƯỚNG DẪN DEPLOY - Từng Bước Một
+# 🚀 HƯỚNG DẪN DEPLOY - HR Management System
 
-## 📋 Mục lục
+> ⚠️ **Server mới:** IP **27.71.16.15**  
+> 📖 **Xem hướng dẫn chi tiết:** [DEPLOY_SERVER_NEW.md](DEPLOY_SERVER_NEW.md)
 
-1. [Push Code lên GitHub](#1-push-code-lên-github)
-2. [Chuẩn bị Server](#2-chuẩn-bị-server)
-3. [Clone Code và Setup](#3-clone-code-và-setup)
-4. [Database](#4-database)
-5. [Cấu hình và Build](#5-cấu-hình-và-build)
-6. [Deploy với PM2](#6-deploy-với-pm2)
-7. [Cấu hình Nginx](#7-cấu-hình-nginx)
-8. [Hoàn thành](#8-hoàn-thành)
+## ⚡ Deploy Nhanh (Tự động)
 
----
-
-## 1. Push Code lên GitHub
-
-### ✅ Đã hoàn thành!
-
-Code đã được push lên: **https://github.com/HaiNguyen26/HR-RMG**
-
----
-
-## 2. Chuẩn bị Server
-
-**SSH vào server:**
 ```bash
-ssh root@103.56.161.203
+# SSH vào server
+ssh root@27.71.16.15
+
+# Chạy script tự động
+curl -sSL https://raw.githubusercontent.com/HaiNguyen26/HR---RMG-IDC/main/deploy-new-server.sh | bash
+
+# Hoặc clone và chạy
+git clone https://github.com/HaiNguyen26/HR---RMG-IDC.git
+cd HR---RMG-IDC
+chmod +x deploy-new-server.sh
+sudo ./deploy-new-server.sh
 ```
+
+## 📖 Deploy Thủ công
+
+Xem file **`DEPLOY_SERVER_NEW.md`** để có hướng dẫn chi tiết từng bước.
+
+---
+
+## 📋 Thông tin
+
+- **GitHub:** https://github.com/HaiNguyen26/HR---RMG-IDC.git
+- **Server IP:** 27.71.16.15
+- **App Directory:** `/var/www/hr-rmg-idc`
+- **Database:** `HR_Management_System_RMG_IDC`
+- **Ports:** Backend 3001, Frontend 3002
+
+---
+
+<details>
+<summary>📜 Hướng dẫn cũ (đã không còn sử dụng)</summary>
+
+## 2. Chuẩn bị Server (CŨ - KHÔNG DÙNG)
+
+⚠️ **Server cũ đã không còn sử dụng**
 
 ### Bước 2.1: Cài Node.js 20
 
