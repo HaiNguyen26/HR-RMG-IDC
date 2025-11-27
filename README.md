@@ -81,14 +81,11 @@ HR-Management-System/
 - [Login Credentials](docs/LOGIN_CREDENTIALS.md)
 
 ### Deployment
-- [⚡ DEPLOY NGAY - Copy & Paste từng bước](DEPLOY_NOW.md) ⭐ **BẮT ĐẦU TỪ ĐÂY**
-- [🔗 Deploy từ GitHub](docs/DEPLOY_FROM_GITHUB.md) ⭐ **KHUYẾN NGHỊ**
-- [🔄 Migrate từ Local lên Server](docs/MIGRATE_FROM_LOCAL.md) ⭐ **CÓ DATABASE Ở LOCAL?**
-- [📝 Hướng dẫn Deploy Từng Bước Chi tiết](docs/DEPLOYMENT_STEP_BY_STEP.md)
-- [🚀 Triển khai lên Ubuntu Server (Hướng dẫn nhanh)](docs/DEPLOYMENT_QUICK_START.md)
-- [📖 Triển khai lên Ubuntu Server (Hướng dẫn chi tiết)](docs/DEPLOYMENT_UBUNTU.md)
-- [🔄 Cập nhật Code sau khi Deploy](docs/UPDATE_DEPLOYMENT.md)
-- [✅ Đánh giá Tính năng HR](docs/HR_FEATURES_ASSESSMENT.md)
+- [🚀 DEPLOY - Hướng dẫn từng bước](DEPLOY.md) ⭐ **BẮT ĐẦU TỪ ĐÂY**
+- [🔄 WORKFLOW - Code và Deploy hàng ngày](WORKFLOW.md) ⭐ **WORKFLOW HÀNG NGÀY - ĐỌC FILE NÀY**
+- [🔄 UPDATE - Cập nhật Code & Database (Chi tiết)](UPDATE.md)
+- [🗄️ Lựa chọn Database](DATABASE_OPTIONS.md) - Database mới hay Migrate?
+- [📦 Migrate Database từ Local](MIGRATE_DATABASE.md) - **Nếu có database ở local**
 
 ## ⚙️ Cấu hình
 

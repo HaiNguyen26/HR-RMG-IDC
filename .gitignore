@@ -29,6 +29,9 @@ backup_*.sql
 backup_*.dump
 backups/
 
+# Nhưng cho phép các script SQL trong thư mục scripts/
+!scripts/*.sql
+
 # OS
 .DS_Store
 Thumbs.db

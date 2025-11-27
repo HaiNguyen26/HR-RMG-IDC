@@ -153,6 +153,11 @@ export const candidatesAPI = {
       'Content-Type': 'multipart/form-data'
     }
   }),
+  update: (id, formData) => api.put(`/candidates/${id}`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  }),
   updateStatus: (id, data) => api.put(`/candidates/${id}/status`, data),
   updateNotes: (id, data) => api.put(`/candidates/${id}/notes`, data),
   delete: (id) => api.delete(`/candidates/${id}`),

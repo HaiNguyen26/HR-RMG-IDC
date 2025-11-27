@@ -169,6 +169,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isActionModalOpen, setIsActionModalOpen] = useState(false);
     const [selectedCandidate, setSelectedCandidate] = useState(null);
+    const [editingCandidateId, setEditingCandidateId] = useState(null);
     const [isManagerSelectModalOpen, setIsManagerSelectModalOpen] = useState(false);
     const [managers, setManagers] = useState([]);
     const [selectedManagerId, setSelectedManagerId] = useState('');
@@ -661,11 +662,13 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
     // Modal form handlers
     const handleModalOpen = () => {
+        setEditingCandidateId(null);
         setIsModalOpen(true);
     };
 
     const handleModalClose = () => {
         setIsModalOpen(false);
+        setEditingCandidateId(null);
         setFormData({
             hoTen: '',
             gioiTinh: '',
@@ -702,6 +705,119 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
         ]);
         setFormErrors({});
         setDragActive(false);
+    };
+
+    const handleEditCandidate = async (candidate) => {
+        try {
+            // Fetch full candidate data
+            const response = await candidatesAPI.getAll({});
+            if (response.data?.success && Array.isArray(response.data.data)) {
+                const fullCandidate = response.data.data.find(c => {
+                    const candidateId = parseInt(c.id, 10);
+                    const targetId = parseInt(candidate.id, 10);
+                    return candidateId === targetId;
+                });
+                
+                if (fullCandidate) {
+                    // Normalize and load data into form
+                    setFormData({
+                        hoTen: fullCandidate.hoTen || fullCandidate.ho_ten || '',
+                        gioiTinh: fullCandidate.gioiTinh || fullCandidate.gioi_tinh || '',
+                        ngaySinh: fullCandidate.ngaySinh || fullCandidate.ngay_sinh || '',
+                        noiSinh: fullCandidate.noiSinh || fullCandidate.noi_sinh || '',
+                        tinhTrangHonNhan: fullCandidate.tinhTrangHonNhan || fullCandidate.tinh_trang_hon_nhan || '',
+                        danToc: fullCandidate.danToc || fullCandidate.dan_toc || '',
+                        quocTich: fullCandidate.quocTich || fullCandidate.quoc_tich || '',
+                        tonGiao: fullCandidate.tonGiao || fullCandidate.ton_giao || '',
+                        viTriUngTuyen: fullCandidate.viTriUngTuyen || fullCandidate.vi_tri_ung_tuyen || '',
+                        phongBan: fullCandidate.phongBan || fullCandidate.phong_ban || '',
+                        soDienThoai: fullCandidate.soDienThoai || fullCandidate.so_dien_thoai || '',
+                        soDienThoaiKhac: fullCandidate.soDienThoaiKhac || fullCandidate.so_dien_thoai_khac || '',
+                        email: fullCandidate.email || '',
+                        cccd: fullCandidate.cccd || '',
+                        ngayCapCCCD: fullCandidate.ngayCapCCCD || fullCandidate.ngay_cap_cccd || '',
+                        noiCapCCCD: fullCandidate.noiCapCCCD || fullCandidate.noi_cap_cccd || '',
+                        nguyenQuan: fullCandidate.nguyenQuan || fullCandidate.nguyen_quan || '',
+                        diaChiTamTru: fullCandidate.diaChiTamTru || fullCandidate.dia_chi_tam_tru || '',
+                        trinhDoVanHoa: fullCandidate.trinhDoVanHoa || fullCandidate.trinh_do_van_hoa || '',
+                        trinhDoChuyenMon: fullCandidate.trinhDoChuyenMon || fullCandidate.trinh_do_chuyen_mon || '',
+                        chuyenNganh: fullCandidate.chuyenNganh || fullCandidate.chuyen_nganh || '',
+                        ngayGuiCV: fullCandidate.ngayGuiCV || fullCandidate.ngay_gui_cv || '',
+                        cvFile: null // Don't load existing file
+                    });
+
+                    // Load JSONB arrays
+                    let kinhNghiemData = [];
+                    if (fullCandidate.kinhNghiemLamViec || fullCandidate.kinh_nghiem_lam_viec) {
+                        try {
+                            const data = typeof fullCandidate.kinhNghiemLamViec === 'string' 
+                                ? JSON.parse(fullCandidate.kinhNghiemLamViec) 
+                                : (fullCandidate.kinh_nghiem_lam_viec 
+                                    ? (typeof fullCandidate.kinh_nghiem_lam_viec === 'string' 
+                                        ? JSON.parse(fullCandidate.kinh_nghiem_lam_viec) 
+                                        : fullCandidate.kinh_nghiem_lam_viec)
+                                    : fullCandidate.kinhNghiemLamViec);
+                            kinhNghiemData = Array.isArray(data) && data.length > 0 ? data : [{ ngayBatDau: '', ngayKetThuc: '', congTy: '', chucDanh: '' }];
+                        } catch (e) {
+                            console.error('Error parsing kinhNghiemLamViec:', e);
+                            kinhNghiemData = [{ ngayBatDau: '', ngayKetThuc: '', congTy: '', chucDanh: '' }];
+                        }
+                    } else {
+                        kinhNghiemData = [{ ngayBatDau: '', ngayKetThuc: '', congTy: '', chucDanh: '' }];
+                    }
+
+                    let quaTrinhData = [];
+                    if (fullCandidate.quaTrinhDaoTao || fullCandidate.qua_trinh_dao_tao) {
+                        try {
+                            const data = typeof fullCandidate.quaTrinhDaoTao === 'string' 
+                                ? JSON.parse(fullCandidate.quaTrinhDaoTao) 
+                                : (fullCandidate.qua_trinh_dao_tao 
+                                    ? (typeof fullCandidate.qua_trinh_dao_tao === 'string' 
+                                        ? JSON.parse(fullCandidate.qua_trinh_dao_tao) 
+                                        : fullCandidate.qua_trinh_dao_tao)
+                                    : fullCandidate.quaTrinhDaoTao);
+                            quaTrinhData = Array.isArray(data) && data.length > 0 ? data : [{ ngayBatDau: '', ngayKetThuc: '', truongDaoTao: '', chuyenNganhDaoTao: '', vanBangChungChi: '' }];
+                        } catch (e) {
+                            console.error('Error parsing quaTrinhDaoTao:', e);
+                            quaTrinhData = [{ ngayBatDau: '', ngayKetThuc: '', truongDaoTao: '', chuyenNganhDaoTao: '', vanBangChungChi: '' }];
+                        }
+                    } else {
+                        quaTrinhData = [{ ngayBatDau: '', ngayKetThuc: '', truongDaoTao: '', chuyenNganhDaoTao: '', vanBangChungChi: '' }];
+                    }
+
+                    let ngoaiNguData = [];
+                    if (fullCandidate.trinhDoNgoaiNgu || fullCandidate.trinh_do_ngoai_ngu) {
+                        try {
+                            const data = typeof fullCandidate.trinhDoNgoaiNgu === 'string' 
+                                ? JSON.parse(fullCandidate.trinhDoNgoaiNgu) 
+                                : (fullCandidate.trinh_do_ngoai_ngu 
+                                    ? (typeof fullCandidate.trinh_do_ngoai_ngu === 'string' 
+                                        ? JSON.parse(fullCandidate.trinh_do_ngoai_ngu) 
+                                        : fullCandidate.trinh_do_ngoai_ngu)
+                                    : fullCandidate.trinhDoNgoaiNgu);
+                            ngoaiNguData = Array.isArray(data) && data.length > 0 ? data : [{ ngoaiNgu: '', chungChi: '', diem: '', khaNangSuDung: '' }];
+                        } catch (e) {
+                            console.error('Error parsing trinhDoNgoaiNgu:', e);
+                            ngoaiNguData = [{ ngoaiNgu: '', chungChi: '', diem: '', khaNangSuDung: '' }];
+                        }
+                    } else {
+                        ngoaiNguData = [{ ngoaiNgu: '', chungChi: '', diem: '', khaNangSuDung: '' }];
+                    }
+
+                    setKinhNghiemLamViec(kinhNghiemData);
+                    setQuaTrinhDaoTao(quaTrinhData);
+                    setTrinhDoNgoaiNgu(ngoaiNguData);
+                    setEditingCandidateId(fullCandidate.id);
+                    setIsModalOpen(true);
+                    setIsActionModalOpen(false);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading candidate data:', error);
+            if (showToast) {
+                showToast('Lỗi khi tải thông tin ứng viên', 'error');
+            }
+        }
     };
 
     const handleActionModalClose = () => {
@@ -1254,10 +1370,18 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                 formDataToSend.append('cvFile', formData.cvFile);
             }
 
-            await candidatesAPI.create(formDataToSend);
-
-            if (showToast) {
-                showToast('Đã lưu thông tin ứng viên thành công!', 'success');
+            if (editingCandidateId) {
+                // Update existing candidate
+                await candidatesAPI.update(editingCandidateId, formDataToSend);
+                if (showToast) {
+                    showToast('Đã cập nhật thông tin ứng viên thành công!', 'success');
+                }
+            } else {
+                // Create new candidate
+                await candidatesAPI.create(formDataToSend);
+                if (showToast) {
+                    showToast('Đã lưu thông tin ứng viên thành công!', 'success');
+                }
             }
 
             // Reset form and close modal
@@ -1596,6 +1720,20 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                             <div className="candidate-action-modal-actions">
                                 <h3 className="candidate-action-modal-section-title">Thao tác</h3>
                                 <div className="candidate-action-buttons">
+                                    {/* Nút Chỉnh sửa - Hiển thị cho tất cả trạng thái */}
+                                    <button
+                                        type="button"
+                                        className="candidate-action-modal-btn candidate-action-modal-edit"
+                                        onClick={() => {
+                                            handleEditCandidate(selectedCandidate);
+                                        }}
+                                    >
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                        </svg>
+                                        <span>Chỉnh sửa hồ sơ</span>
+                                    </button>
+
                                     {/* Nút Chi tiết nhân viên - Hiển thị cho tất cả trạng thái */}
                                     <button
                                         type="button"
@@ -1854,21 +1992,6 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                                 </svg>
                                                 <span>Xem chi tiết CV</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="candidate-action-modal-btn candidate-action-modal-edit"
-                                                onClick={() => {
-                                                    // TODO: Implement edit functionality
-                                                    if (showToast) {
-                                                        showToast('Tính năng chỉnh sửa đang được phát triển', 'info');
-                                                    }
-                                                }}
-                                            >
-                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                                </svg>
-                                                <span>Chỉnh sửa hồ sơ</span>
                                             </button>
                                             <button
                                                 type="button"
@@ -2655,7 +2778,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                 <svg className="candidate-modal-title-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
                                 </svg>
-                                <span>Thêm Ứng viên mới</span>
+                                <span>{editingCandidateId ? 'Chỉnh sửa Ứng viên' : 'Thêm Ứng viên mới'}</span>
                             </h2>
                             <button
                                 type="button"
@@ -3481,7 +3604,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                         className="candidate-modal-btn candidate-modal-btn-submit"
                                         disabled={formLoading}
                                     >
-                                        {formLoading ? 'Đang lưu...' : 'Lưu lại'}
+                                        {formLoading ? 'Đang lưu...' : (editingCandidateId ? 'Cập nhật' : 'Lưu lại')}
                                     </button>
                                 </div>
                             </form>

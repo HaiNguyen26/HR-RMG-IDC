@@ -930,6 +930,220 @@ router.post('/', upload.single('cvFile'), async (req, res) => {
     }
 });
 
+// PUT /api/candidates/:id - Cập nhật thông tin ứng viên
+router.put('/:id', upload.single('cvFile'), async (req, res) => {
+    try {
+        await ensureCandidatesTable();
+
+        const { id } = req.params;
+        const {
+            hoTen,
+            gioiTinh,
+            ngaySinh,
+            noiSinh,
+            tinhTrangHonNhan,
+            danToc,
+            quocTich,
+            tonGiao,
+            viTriUngTuyen,
+            phongBan,
+            soDienThoai,
+            soDienThoaiKhac,
+            email,
+            cccd,
+            ngayCapCCCD,
+            noiCapCCCD,
+            nguyenQuan,
+            diaChiTamTru,
+            trinhDoVanHoa,
+            trinhDoChuyenMon,
+            chuyenNganh,
+            kinhNghiemLamViec,
+            quaTrinhDaoTao,
+            trinhDoNgoaiNgu,
+            ngayGuiCV
+        } = req.body;
+
+        // Check if candidate exists
+        const checkResult = await pool.query('SELECT id, cv_file_path FROM candidates WHERE id = $1', [id]);
+        if (checkResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy ứng viên'
+            });
+        }
+
+        // Validation
+        if (!hoTen || !ngaySinh || !viTriUngTuyen || !phongBan || !soDienThoai || !cccd || !ngayCapCCCD || !noiCapCCCD || !ngayGuiCV) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+            });
+        }
+
+        // Parse JSON arrays if they are strings
+        let kinhNghiemData = null;
+        if (kinhNghiemLamViec) {
+            try {
+                kinhNghiemData = typeof kinhNghiemLamViec === 'string' ? JSON.parse(kinhNghiemLamViec) : kinhNghiemLamViec;
+            } catch (e) {
+                console.error('Error parsing kinhNghiemLamViec:', e);
+            }
+        }
+
+        let quaTrinhData = null;
+        if (quaTrinhDaoTao) {
+            try {
+                quaTrinhData = typeof quaTrinhDaoTao === 'string' ? JSON.parse(quaTrinhDaoTao) : quaTrinhDaoTao;
+            } catch (e) {
+                console.error('Error parsing quaTrinhDaoTao:', e);
+            }
+        }
+
+        let ngoaiNguData = null;
+        if (trinhDoNgoaiNgu) {
+            try {
+                ngoaiNguData = typeof trinhDoNgoaiNgu === 'string' ? JSON.parse(trinhDoNgoaiNgu) : trinhDoNgoaiNgu;
+            } catch (e) {
+                console.error('Error parsing trinhDoNgoaiNgu:', e);
+            }
+        }
+
+        // Handle CV file update
+        let cvFilePath = checkResult.rows[0].cv_file_path;
+        let cvFileName = null;
+        
+        if (req.file) {
+            // Delete old CV file if exists
+            if (cvFilePath && fs.existsSync(cvFilePath)) {
+                try {
+                    fs.unlinkSync(cvFilePath);
+                } catch (unlinkError) {
+                    console.error('Error deleting old CV file:', unlinkError);
+                }
+            }
+            cvFilePath = req.file.path;
+            cvFileName = req.file.originalname;
+        }
+
+        const updateQuery = `
+            UPDATE candidates SET
+                ho_ten = $1,
+                gioi_tinh = $2,
+                ngay_sinh = $3,
+                noi_sinh = $4,
+                tinh_trang_hon_nhan = $5,
+                dan_toc = $6,
+                quoc_tich = $7,
+                ton_giao = $8,
+                vi_tri_ung_tuyen = $9,
+                phong_ban = $10,
+                so_dien_thoai = $11,
+                so_dien_thoai_khac = $12,
+                email = $13,
+                cccd = $14,
+                ngay_cap_cccd = $15,
+                noi_cap_cccd = $16,
+                nguyen_quan = $17,
+                dia_chi_tam_tru = $18,
+                trinh_do_van_hoa = $19,
+                trinh_do_chuyen_mon = $20,
+                chuyen_nganh = $21,
+                kinh_nghiem_lam_viec = $22,
+                qua_trinh_dao_tao = $23,
+                trinh_do_ngoai_ngu = $24,
+                ngay_gui_cv = $25,
+                cv_file_path = $26,
+                cv_file_name = $27,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $28
+            RETURNING *
+        `;
+
+        const result = await pool.query(updateQuery, [
+            hoTen,
+            gioiTinh || null,
+            ngaySinh,
+            noiSinh || null,
+            tinhTrangHonNhan || null,
+            danToc || null,
+            quocTich || null,
+            tonGiao || null,
+            viTriUngTuyen,
+            phongBan,
+            soDienThoai,
+            soDienThoaiKhac || null,
+            email || null,
+            cccd,
+            ngayCapCCCD,
+            noiCapCCCD,
+            nguyenQuan || null,
+            diaChiTamTru || null,
+            trinhDoVanHoa || null,
+            trinhDoChuyenMon || null,
+            chuyenNganh || null,
+            kinhNghiemData ? JSON.stringify(kinhNghiemData) : null,
+            quaTrinhData ? JSON.stringify(quaTrinhData) : null,
+            ngoaiNguData ? JSON.stringify(ngoaiNguData) : null,
+            ngayGuiCV,
+            cvFilePath,
+            cvFileName,
+            id
+        ]);
+
+        res.json({
+            success: true,
+            message: 'Đã cập nhật thông tin ứng viên thành công',
+            data: {
+                id: result.rows[0].id,
+                hoTen: result.rows[0].ho_ten,
+                gioiTinh: result.rows[0].gioi_tinh,
+                ngaySinh: result.rows[0].ngay_sinh,
+                noiSinh: result.rows[0].noi_sinh,
+                tinhTrangHonNhan: result.rows[0].tinh_trang_hon_nhan,
+                danToc: result.rows[0].dan_toc,
+                quocTich: result.rows[0].quoc_tich,
+                tonGiao: result.rows[0].ton_giao,
+                viTriUngTuyen: result.rows[0].vi_tri_ung_tuyen,
+                phongBan: result.rows[0].phong_ban,
+                soDienThoai: result.rows[0].so_dien_thoai,
+                soDienThoaiKhac: result.rows[0].so_dien_thoai_khac,
+                email: result.rows[0].email,
+                cccd: result.rows[0].cccd,
+                ngayCapCCCD: result.rows[0].ngay_cap_cccd,
+                noiCapCCCD: result.rows[0].noi_cap_cccd,
+                nguyenQuan: result.rows[0].nguyen_quan,
+                diaChiTamTru: result.rows[0].dia_chi_tam_tru,
+                trinhDoVanHoa: result.rows[0].trinh_do_van_hoa,
+                trinhDoChuyenMon: result.rows[0].trinh_do_chuyen_mon,
+                chuyenNganh: result.rows[0].chuyen_nganh,
+                kinhNghiemLamViec: result.rows[0].kinh_nghiem_lam_viec,
+                quaTrinhDaoTao: result.rows[0].qua_trinh_dao_tao,
+                trinhDoNgoaiNgu: result.rows[0].trinh_do_ngoai_ngu,
+                ngayGuiCV: result.rows[0].ngay_gui_cv,
+                cvFilePath: result.rows[0].cv_file_path,
+                cvFileName: result.rows[0].cv_file_name,
+                status: result.rows[0].status,
+                updatedAt: result.rows[0].updated_at
+            }
+        });
+    } catch (error) {
+        console.error('Error updating candidate:', error);
+        // Delete uploaded file if exists
+        if (req.file && req.file.path) {
+            try {
+                fs.unlinkSync(req.file.path);
+            } catch (unlinkError) {
+                console.error('Error deleting uploaded file:', unlinkError);
+            }
+        }
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi cập nhật thông tin ứng viên: ' + error.message
+        });
+    }
+});
+
 // PUT /api/candidates/:id/status - Cập nhật trạng thái ứng viên
 router.put('/:id/status', async (req, res) => {
     try {

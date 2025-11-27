@@ -166,21 +166,38 @@ if [ -d "$FRONTEND_DIR" ] && [ -f "$FRONTEND_DIR/package.json" ]; then
     cd "$APP_DIR"
 fi
 
-# Step 5: Check for Database Migrations
-print_step "Step 5: Check for Database Migrations"
+# Step 5: Apply Database Migrations
+print_step "Step 5: Apply Database Migrations"
 
-if [ -d "$APP_DIR/database" ]; then
-    MIGRATION_FILES=$(find "$APP_DIR/database" -name "*.sql" -type f | wc -l)
+if [ -d "$APP_DIR/database/migrations" ]; then
+    MIGRATION_FILES=$(find "$APP_DIR/database/migrations" -name "*.sql" -type f | wc -l)
     if [ "$MIGRATION_FILES" -gt 0 ]; then
-        print_warning "Found SQL files in database directory."
-        print_warning "Please review and run migrations manually if needed:"
-        echo "  psql -U $DB_USER -d $DB_NAME -f database/migration_file.sql"
+        print_status "Found $MIGRATION_FILES migration file(s)."
         
-        read -p "Do you want to list migration files? (y/N): " -n 1 -r
+        read -p "Apply migrations now? (Y/n): " -n 1 -r
         echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            ls -la "$APP_DIR/database"/*.sql
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            print_status "Applying database migrations..."
+            
+            for migration_file in $(ls -1 "$APP_DIR/database/migrations"/*.sql | sort); do
+                migration_name=$(basename "$migration_file")
+                print_status "Running: $migration_name"
+                
+                if sudo -u postgres psql -d "$DB_NAME" -f "$migration_file" >> /tmp/migration.log 2>&1; then
+                    print_status "✓ Success: $migration_name"
+                else
+                    print_error "✗ Failed: $migration_name"
+                    print_error "Check log: /tmp/migration.log"
+                    exit 1
+                fi
+            done
+            
+            print_status "All migrations applied successfully."
+        else
+            print_warning "Migrations skipped. Please run manually if needed."
         fi
+    else
+        print_status "No migration files found."
     fi
 fi
 
