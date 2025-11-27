@@ -1,6 +1,9 @@
-# HR Management System
+# HR Management System - RMG-IDC
 
 Hệ thống quản lý nhân sự - Web Application với Node.js, React.js và PostgreSQL
+
+**🚀 Deploy:** [QUICK_DEPLOY.md](QUICK_DEPLOY.md) | [DEPLOY_SERVER_NEW.md](DEPLOY_SERVER_NEW.md)  
+**📍 Server:** 27.71.16.15
 
 ## 🚀 Khởi động nhanh
 
