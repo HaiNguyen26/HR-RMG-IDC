@@ -736,6 +736,50 @@ sudo systemctl status nginx
 
 ---
 
+### 8.3. Cập nhật Frontend để dùng API path mới
+
+Sau khi cấu hình Nginx với path `/hr/api`, cần cập nhật frontend để gọi API đúng path.
+
+**Cách 1: Sửa file API config (khuyến nghị)**
+
+```bash
+cd /var/www/hr-rmg-idc/frontend/src
+nano services/api.js
+```
+
+Tìm dòng `baseURL` hoặc `API_BASE_URL` và sửa thành:
+
+```javascript
+const API_BASE_URL = process.env.REACT_APP_API_URL || '/hr/api';
+```
+
+**Cách 2: Dùng environment variable (tốt hơn)**
+
+```bash
+cd /var/www/hr-rmg-idc/frontend
+nano .env
+```
+
+Thêm hoặc sửa:
+
+```
+REACT_APP_API_URL=/hr/api
+```
+
+Sau đó rebuild frontend:
+
+```bash
+npm run build
+pm2 restart hr-rmg-idc-frontend
+```
+
+**Kiểm tra:**
+- Truy cập `http://27.71.16.15/hr`
+- Mở Developer Tools (F12) → Network tab
+- Xem các API calls có dùng path `/hr/api` không
+
+---
+
 **Tùy chọn khác: Tạo config riêng (nếu muốn tách biệt hoàn toàn)**
 
 ```bash
