@@ -713,7 +713,21 @@ Tìm dòng `location / {` và thêm TRƯỚC nó:
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        rewrite ^/hr/(.*)$ /$1 break;
+        # Không dùng rewrite, để serve trực tiếp từ serve
+    }
+    
+    # HR Management System - Static files (JS, CSS, images)
+    location /hr/static {
+        proxy_pass http://localhost:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Đảm bảo MIME types đúng
+        add_header Content-Type application/javascript;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
     }
 
     # Location / của app cũ (giữ nguyên)
@@ -752,6 +766,36 @@ sudo nginx -T | grep "location"
 - App cũ: `http://27.71.16.15/` ✅
 - App HR Frontend: `http://27.71.16.15/hr` ✅
 - App HR Backend API: `http://27.71.16.15/hr/api` ✅
+
+**Nếu gặp lỗi MIME type (Refused to execute script/apply style):**
+
+Lỗi này xảy ra khi static files (JS, CSS) được serve với MIME type sai. Có thể do:
+1. Rewrite rule không đúng
+2. Serve không serve đúng static files
+
+**Giải pháp: Sửa lại location /hr (bỏ rewrite):**
+
+```nginx
+    # HR Management System - Frontend (KHÔNG dùng rewrite)
+    location /hr {
+        proxy_pass http://localhost:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # BỎ rewrite ^/hr/(.*)$ /$1 break; - để serve trực tiếp
+    }
+```
+
+Sau đó:
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
 
 **⚠️ Lưu ý:** Sau khi cấu hình, cần cập nhật frontend để dùng API path `/hr/api` thay vì `/api`. Xem phần 8.3 bên dưới.
 
