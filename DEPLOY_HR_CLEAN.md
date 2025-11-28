@@ -73,27 +73,20 @@ sudo chown -R $USER:$USER /var/www/hr-rmg-idc
 
 ---
 
-## BƯỚC 3: RESTORE DATABASE
+## BƯỚC 3: KIỂM TRA DATABASE
 
 **Trên server:**
 
 ```bash
-# 1. Upload file backup lên server (từ máy local)
-# Sử dụng SCP hoặc SFTP để upload file .dump hoặc .sql
-
-# 2. Tạo database (nếu chưa có)
-sudo -u postgres psql -c "CREATE DATABASE \"HR_Management_System\";"
-
-# 3. Restore database
-# Nếu là file .dump:
-sudo -u postgres pg_restore -d HR_Management_System -v /path/to/backup/file.dump
-
-# Nếu là file .sql:
-sudo -u postgres psql -d HR_Management_System -f /path/to/backup/file.sql
-
-# 4. Kiểm tra
+# Kiểm tra database đã có dữ liệu chưa
 sudo -u postgres psql -d HR_Management_System -c "\dt"
 ```
+
+**Nếu thấy có bảng (ví dụ: employees, candidates, leave_requests...):**
+- ✅ Database đã có dữ liệu → **Bỏ qua restore, tiếp tục BƯỚC 4**
+
+**Nếu không có bảng hoặc cần restore lại:**
+- Upload file backup từ máy local lên server và restore
 
 ---
 
