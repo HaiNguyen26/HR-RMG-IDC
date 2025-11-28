@@ -604,11 +604,34 @@ pm2 logs hr-rmg-idc-frontend --lines 20
 
 **Lưu ý:** File `start-frontend.sh` đã được tạo trong repository, chỉ cần pull code và chạy các bước trên.
 
-**✅ Xác nhận:**
-- App cũ (`it-request-api` trên port 4000) vẫn đang chạy bình thường
-- App mới (`hr-rmg-idc-backend` trên port 3001, `hr-rmg-idc-frontend` trên port 3002) đã khởi động thành công
-- Không có xung đột port, PM2 name, hoặc thư mục
-- Cả 2 apps có thể chạy đồng thời mà không ảnh hưởng lẫn nhau
+**Kiểm tra frontend có chạy đúng:**
+
+```bash
+# 1. Kiểm tra port 3002 đang listen
+sudo ss -tulpn | grep :3002
+
+# 2. Xóa log cũ và xem log mới (nếu vẫn thấy lỗi cũ)
+pm2 flush hr-rmg-idc-frontend
+pm2 logs hr-rmg-idc-frontend --lines 10
+
+# 3. Test truy cập frontend
+curl http://localhost:3002
+# Hoặc từ máy khác: curl http://27.71.16.15:3002
+```
+
+**Nếu thấy log "Accepting connections at http://localhost:3002":**
+- ✅ Frontend đã chạy thành công!
+- Lỗi "getaddrinfo ENOTFOUND -l" có thể là log cũ từ lần chạy trước
+- Dùng `pm2 flush` để xóa log cũ và xem log mới
+
+**✅ Xác nhận thành công:**
+- ✅ App cũ (`it-request-api` trên port 4000) vẫn đang chạy bình thường
+- ✅ App mới (`hr-rmg-idc-backend` trên port 3001, `hr-rmg-idc-frontend` trên port 3002) đã khởi động thành công
+- ✅ Port 3002 đang listen và serve content đúng cách
+- ✅ Không có xung đột port, PM2 name, hoặc thư mục
+- ✅ Cả 2 apps có thể chạy đồng thời mà không ảnh hưởng lẫn nhau
+- ✅ Frontend có thể truy cập tại: `http://27.71.16.15:3002`
+- ✅ Backend API có thể truy cập tại: `http://27.71.16.15:3001/api`
 
 ---
 
