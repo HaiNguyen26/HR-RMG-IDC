@@ -673,11 +673,15 @@ cat /etc/nginx/sites-enabled/*
 
 **🎯 Mục tiêu:** App cũ truy cập qua `http://27.71.16.15/`, app HR truy cập qua `http://27.71.16.15/hr`
 
-**⚠️ QUAN TRỌNG:** Để tách biệt hoàn toàn 2 apps và không ảnh hưởng lẫn nhau, nên tạo file config riêng cho app HR thay vì sửa config của app cũ.
+**✅ Cách 1: Tạo file config riêng (KHuyến nghị - Tách biệt hoàn toàn, dễ bảo trì)**
 
-**✅ Cách 1: Tạo file config riêng (Khuyến nghị - Tách biệt hoàn toàn)**
+⚠️ **QUAN TRỌNG:** Đây là cách được khuyến nghị vì:
+- ✅ Tách biệt hoàn toàn: Mỗi app có file config riêng
+- ✅ Dễ bảo trì: Sửa app này không ảnh hưởng app kia
+- ✅ Dễ quản lý: Có thể enable/disable từng app riêng
+- ✅ An toàn: Không sợ sửa nhầm ảnh hưởng app cũ
 
-Tạo file config riêng cho app HR, không động vào config của app cũ.
+**Lưu ý:** Sẽ có warning "conflicting server name" nhưng không ảnh hưởng hoạt động. Nginx sẽ load cả 2 configs và match location theo thứ tự.
 
 **Bước 1: Tạo file config riêng cho app HR**
 
@@ -779,11 +783,13 @@ sudo systemctl reload nginx
 sudo nginx -T | grep -B 5 -A 10 "location /hr"
 ```
 
-**✅ Ưu điểm của cách này:**
-- ✅ Tách biệt hoàn toàn: Mỗi app có file config riêng
-- ✅ Không ảnh hưởng app cũ: Không cần sửa file `it-request-tracking`
-- ✅ Dễ quản lý: Có thể enable/disable từng app riêng
-- ✅ Dễ bảo trì: Sửa config app này không ảnh hưởng app kia
+**✅ Ưu điểm của cách này (Cách 1 - File riêng):**
+- ✅ **Tách biệt hoàn toàn:** Mỗi app có file config riêng
+- ✅ **Không ảnh hưởng app cũ:** Không cần sửa file `it-request-tracking`
+- ✅ **Dễ quản lý:** Có thể enable/disable từng app riêng
+- ✅ **Dễ bảo trì:** Sửa config app này không ảnh hưởng app kia
+- ✅ **An toàn:** Không sợ sửa nhầm ảnh hưởng app cũ
+- ✅ **Dễ review:** Thay đổi của từng app rõ ràng, dễ theo dõi
 
 **Để disable app HR (nếu cần):**
 ```bash
@@ -799,9 +805,19 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ---
 
-**Cách 2: Thêm vào config của app cũ (Không khuyến nghị - Có thể ảnh hưởng lẫn nhau)**
+**Cách 2: Gộp vào config của app cũ (Không khuyến nghị - Khó bảo trì)**
 
 ⚠️ **Lưu ý:** Cách này sẽ sửa file config của app cũ, có thể ảnh hưởng khi phát triển.
+
+**Nhược điểm:**
+- ❌ Khó bảo trì: Phải sửa file chung, dễ ảnh hưởng lẫn nhau
+- ❌ Khó quản lý: Không thể enable/disable từng app riêng
+- ❌ Rủi ro: Sửa nhầm có thể ảnh hưởng cả 2 apps
+- ❌ Khó review: Thay đổi của 2 apps nằm trong 1 file
+
+**Chỉ dùng cách này nếu:**
+- Không muốn có warning "conflicting server name"
+- Hoặc muốn đơn giản hóa (nhưng sẽ khó bảo trì sau này)
 
 Nếu vẫn muốn dùng cách này, thêm vào file `/etc/nginx/sites-available/it-request-tracking` TRƯỚC location `/`:
 
