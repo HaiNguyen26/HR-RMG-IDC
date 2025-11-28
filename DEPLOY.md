@@ -5,6 +5,20 @@
 - **Hệ điều hành:** Ubuntu Server 22.04 LTS
 - **Repository:** https://github.com/HaiNguyen26/HR-RMG-IDC.git
 
+## ⚠️ Lưu ý Quan Trọng
+
+**Trên server này đã có app cũ đang chạy:**
+- **App cũ:** `it-request-tracking` (PM2: `it-request-api`, Port: 4000)
+- **Thư mục:** `/var/www/it-request-tracking`
+
+**App mới (HR Management System) được cấu hình để KHÔNG xung đột:**
+- **Ports:** 3001 (backend), 3002 (frontend) - khác với app cũ
+- **PM2 Names:** `hr-rmg-idc-backend`, `hr-rmg-idc-frontend` - tên riêng biệt
+- **Thư mục:** `/var/www/hr-rmg-idc` - thư mục riêng
+- **Database:** `HR_Management_System` - database riêng
+
+**✅ Cả 2 apps có thể chạy đồng thời mà không ảnh hưởng lẫn nhau!**
+
 ---
 
 ## PHẦN 1: BACKUP DATABASE LOCAL
@@ -144,7 +158,7 @@ pm2 list
 
 # Kiểm tra ports đang được sử dụng
 sudo netstat -tulpn | grep LISTEN
-# hoặc
+# hoặc (nếu netstat không có)
 sudo ss -tulpn | grep LISTEN
 
 # Kiểm tra thư mục ứng dụng cũ
@@ -155,22 +169,49 @@ ls -la /etc/nginx/sites-available/
 ls -la /etc/nginx/sites-enabled/
 ```
 
-**Ghi chú lại:**
-- Ports mà app cũ đang dùng: `_____________`
-- Tên PM2 apps của app cũ: `_____________`
-- Thư mục của app cũ: `_____________`
-- Database của app cũ: `_____________`
+**📋 Thông tin app cũ trên server này (đã kiểm tra):**
+- **Tên app:** `it-request-tracking`
+- **PM2 app name:** `it-request-api`
+- **Port:** `4000` (backend)
+- **Thư mục:** `/var/www/it-request-tracking`
+- **Nginx config:** `it-request-tracking` (port 80)
+- **Database:** (cần kiểm tra riêng)
+
+**✅ Xác nhận không xung đột:**
+- App cũ dùng port 4000 → App mới dùng port 3001, 3002 ✅
+- App cũ ở `/var/www/it-request-tracking` → App mới ở `/var/www/hr-rmg-idc` ✅
+- App cũ PM2 name: `it-request-api` → App mới: `hr-rmg-idc-backend`, `hr-rmg-idc-frontend` ✅
+
+**Ghi chú thêm (nếu có app khác):**
+- Ports mà app khác đang dùng: `_____________`
+- Tên PM2 apps khác: `_____________`
+- Thư mục của app khác: `_____________`
+- Database của app khác: `_____________`
 
 ### 3.3. Xác nhận cấu hình không xung đột
 
+**Bảng so sánh:**
+
+| Thành phần | App cũ (it-request-tracking) | App mới (HR Management System) | Xung đột? |
+|------------|------------------------------|--------------------------------|-----------|
+| **Backend Port** | 4000 | 3001 | ✅ Không |
+| **Frontend Port** | - | 3002 | ✅ Không |
+| **PM2 Backend** | `it-request-api` | `hr-rmg-idc-backend` | ✅ Không |
+| **PM2 Frontend** | - | `hr-rmg-idc-frontend` | ✅ Không |
+| **Thư mục** | `/var/www/it-request-tracking` | `/var/www/hr-rmg-idc` | ✅ Không |
+| **Nginx Config** | `it-request-tracking` | `hr-rmg-idc` (tùy chọn) | ✅ Không |
+| **Database** | (riêng) | `HR_Management_System` | ✅ Không |
+
+**✅ KẾT LUẬN: Hoàn toàn không có xung đột! Có thể deploy an toàn.**
+
 **Ứng dụng HR Management System mới sẽ sử dụng:**
-- **Backend Port:** 3001 (đảm bảo không trùng với app cũ)
-- **Frontend Port:** 3002 (đảm bảo không trùng với app cũ)
+- **Backend Port:** 3001 (khác với app cũ port 4000)
+- **Frontend Port:** 3002 (app cũ không có frontend riêng)
 - **PM2 App Names:** `hr-rmg-idc-backend`, `hr-rmg-idc-frontend` (tên riêng biệt)
 - **Thư mục:** `/var/www/hr-rmg-idc` (thư mục riêng)
 - **Database:** `HR_Management_System` (database riêng)
 
-**Nếu có xung đột port:**
+**Nếu trong tương lai có xung đột port:**
 - Thay đổi port trong `ecosystem.config.js` và `backend/.env`
 - Chọn port khác (ví dụ: 3003, 3004, 4001, 4002...)
 
@@ -441,9 +482,10 @@ pm2 save
 ```
 
 **✅ Xác nhận:**
-- App cũ vẫn đang chạy bình thường
-- App mới đã khởi động thành công
-- Không có xung đột port
+- App cũ (`it-request-api` trên port 4000) vẫn đang chạy bình thường
+- App mới (`hr-rmg-idc-backend` trên port 3001, `hr-rmg-idc-frontend` trên port 3002) đã khởi động thành công
+- Không có xung đột port, PM2 name, hoặc thư mục
+- Cả 2 apps có thể chạy đồng thời mà không ảnh hưởng lẫn nhau
 
 ---
 
@@ -750,9 +792,15 @@ pm2 restart hr-rmg-idc-frontend
 - **PM2 Backend:** `hr-rmg-idc-backend`
 - **PM2 Frontend:** `hr-rmg-idc-frontend`
 - **Database:** `HR_Management_System`
+- **Thư mục:** `/var/www/hr-rmg-idc`
 
-**App cũ:**
-- Ghi chú lại thông tin app cũ để tránh nhầm lẫn: `_____________`
+**App cũ (it-request-tracking):**
+- **Backend Port:** 4000
+- **PM2 App:** `it-request-api`
+- **Thư mục:** `/var/www/it-request-tracking`
+- **Nginx:** `it-request-tracking` (port 80)
+
+**✅ Không có xung đột giữa 2 apps!**
 
 ### 12.3. Truy cập ứng dụng
 
