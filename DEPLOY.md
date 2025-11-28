@@ -797,25 +797,45 @@ sudo nginx -T | grep "server_name 27.71.16.15" -A 5
 **Nếu đã xóa location /hr khỏi config app cũ nhưng vẫn truy cập được:**
 
 Có thể do:
-1. Đã tạo file config riêng `hr-rmg-idc` và enable nó
-2. Nginx chưa reload đúng
+1. Nginx chưa reload sau khi xóa → **Nguyên nhân phổ biến nhất**
+2. Browser đang cache
 3. Có file config khác đang xử lý
 
-**Kiểm tra:**
+**Giải pháp:**
 
 ```bash
-# Xem file nào đang xử lý location /hr
-sudo nginx -T | grep -B 20 "location /hr"
+# Bước 1: Đảm bảo đã xóa location /hr khỏi tất cả file config
+# Kiểm tra file app cũ
+cat /etc/nginx/sites-available/it-request-tracking | grep -A 10 "location /hr"
 
-# Kiểm tra xem có file hr-rmg-idc trong sites-enabled không
-ls -la /etc/nginx/sites-enabled/
+# Kiểm tra tất cả file trong sites-available
+grep -r "location /hr" /etc/nginx/sites-available/
 
-# Nếu có file hr-rmg-idc, xem nội dung
-cat /etc/nginx/sites-enabled/hr-rmg-idc
+# Bước 2: Test config
+sudo nginx -t
 
-# Nếu không có, kiểm tra lại file app cũ
-cat /etc/nginx/sites-enabled/it-request-tracking | grep -A 10 "location /hr"
+# Bước 3: Reload Nginx (quan trọng!)
+sudo systemctl reload nginx
+
+# Hoặc restart hoàn toàn nếu reload không đủ
+sudo systemctl restart nginx
+
+# Bước 4: Kiểm tra lại config đã được load
+sudo nginx -T | grep -A 10 "location /hr"
+
+# Nếu không có output → config đã được xóa thành công
+
+# Bước 5: Clear browser cache và test lại
+# Hoặc test bằng curl (không dùng cache)
+curl -I http://27.71.16.15/hr
 ```
+
+**Nếu vẫn truy cập được sau khi reload:**
+
+Có thể do browser cache. Thử:
+- Hard refresh: `Ctrl+Shift+R` (Windows/Linux) hoặc `Cmd+Shift+R` (Mac)
+- Hoặc mở tab ẩn danh (Incognito)
+- Hoặc test bằng curl: `curl http://27.71.16.15/hr`
 
 **Nếu muốn xóa hoàn toàn và tạo lại:**
 
