@@ -669,19 +669,19 @@ cat /etc/nginx/sites-enabled/*
   - **Tùy chọn 2:** Dùng port khác (ví dụ: 8080)
   - **Tùy chọn 3:** Không dùng Nginx, truy cập trực tiếp qua port 3002 (đơn giản nhất)
 
-### 8.2. Tạo file cấu hình Nginx (chỉ nếu cần)
+### 8.2. Cấu hình Nginx để truy cập app HR qua link riêng
 
-**Tùy chọn A: Dùng path riêng (ví dụ: `/hr`) - Khuyến nghị**
+**🎯 Mục tiêu:** App cũ truy cập qua `http://27.71.16.15/`, app HR truy cập qua `http://27.71.16.15/hr`
 
-⚠️ **LƯU Ý:** Cần sửa file config của app cũ (`it-request-tracking`) để thêm location cho app mới, hoặc tạo config riêng.
+**✅ Cách đơn giản nhất: Thêm vào config của app cũ**
 
-**Cách 1: Thêm vào config của app cũ (đơn giản hơn)**
+**Bước 1: Sửa file config của app cũ**
 
 ```bash
 sudo nano /etc/nginx/sites-available/it-request-tracking
 ```
 
-Thêm vào cuối file (trước dấu `}` cuối cùng):
+**Bước 2: Thêm vào cuối file (trước dấu `}` cuối cùng):**
 
 ```nginx
     # HR Management System - Frontend
@@ -713,7 +713,30 @@ Thêm vào cuối file (trước dấu `}` cuối cùng):
     }
 ```
 
-**Cách 2: Tạo config riêng (nếu muốn tách biệt)**
+**Bước 3: Test và reload Nginx**
+
+```bash
+# Test cấu hình Nginx
+sudo nginx -t
+
+# Nếu test thành công, reload Nginx
+sudo systemctl reload nginx
+
+# Kiểm tra lại
+sudo systemctl status nginx
+```
+
+**Bước 4: Kiểm tra truy cập**
+
+- App cũ: `http://27.71.16.15/` ✅
+- App HR Frontend: `http://27.71.16.15/hr` ✅
+- App HR Backend API: `http://27.71.16.15/hr/api` ✅
+
+**⚠️ Lưu ý:** Sau khi cấu hình, cần cập nhật frontend để dùng API path `/hr/api` thay vì `/api`. Xem phần 8.3 bên dưới.
+
+---
+
+**Tùy chọn khác: Tạo config riêng (nếu muốn tách biệt hoàn toàn)**
 
 ```bash
 sudo nano /etc/nginx/sites-available/hr-rmg-idc
