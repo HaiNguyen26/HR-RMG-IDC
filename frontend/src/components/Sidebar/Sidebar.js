@@ -71,7 +71,7 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
             <div className="sidebar-logo-section">
                 <div className="logo-content">
                     {/* Logo */}
-                    <img src="/LogoRMG.png" alt="RMG Logo" className="logo-img" />
+                    <img src={process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL}/LogoRMG.png` : '/LogoRMG.png'} alt="RMG Logo" className="logo-img" />
 
                     {/* HR System Text - Styled */}
                     <div className="sidebar-header-text">

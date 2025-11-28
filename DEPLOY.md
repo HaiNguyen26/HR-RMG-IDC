@@ -1,419 +1,799 @@
-# 🚀 HƯỚNG DẪN DEPLOY - HR Management System
+# Hướng Dẫn Deploy HR Management System lên Cloud Server
 
-> ⚠️ **Server mới:** IP **27.71.16.15**  
-> 📖 **Xem hướng dẫn chi tiết:** [DEPLOY_SERVER_NEW.md](DEPLOY_SERVER_NEW.md)
+## Thông tin Server
+- **IP:** 27.71.16.15
+- **Hệ điều hành:** Ubuntu Server 22.04 LTS
+- **Repository:** https://github.com/HaiNguyen26/HR-RMG-IDC.git
 
-## ⚡ Deploy Nhanh (Tự động)
+---
+
+## PHẦN 1: BACKUP DATABASE LOCAL
+
+### 1.1. Backup Database PostgreSQL
+
+Trên máy local (Windows), mở PowerShell hoặc Command Prompt và chạy:
 
 ```bash
-# SSH vào server
+# Tạo thư mục backup nếu chưa có
+mkdir backup
+
+# Backup database (thay đổi thông tin kết nối nếu cần)
+pg_dump -h localhost -U postgres -d HR_Management_System -F c -f backup/hr_management_backup_$(Get-Date -Format "yyyyMMdd_HHmmss").dump
+
+# Hoặc backup dạng SQL
+pg_dump -h localhost -U postgres -d HR_Management_System -f backup/hr_management_backup_$(Get-Date -Format "yyyyMMdd_HHmmss").sql
+```
+
+**Lưu ý:** Nhập password của PostgreSQL khi được yêu cầu.
+
+### 1.2. Kiểm tra file backup
+
+Đảm bảo file backup đã được tạo trong thư mục `backup/`. File backup sẽ được upload lên server sau.
+
+---
+
+## PHẦN 2: ĐƯA CODE LÊN GITHUB
+
+### 2.1. Khởi tạo Git Repository (nếu chưa có)
+
+```bash
+# Kiểm tra xem đã có git chưa
+git status
+
+# Nếu chưa có, khởi tạo
+git init
+
+# Thêm remote repository
+git remote add origin https://github.com/HaiNguyen26/HR-RMG-IDC.git
+```
+
+### 2.2. Tạo file .gitignore (nếu chưa có)
+
+Tạo file `.gitignore` trong thư mục gốc với nội dung:
+
+```
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Environment variables
+.env
+backend/.env
+frontend/.env
+
+# Build files
+frontend/build/
+dist/
+
+# Logs
+*.log
+logs/
+backend/logs/
+frontend/logs/
+
+# Database
+*.sql
+*.dump
+backup/
+database/*.sql
+database/*.dump
+
+# Uploads
+backend/uploads/
+frontend/uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# PM2
+.pm2/
+ecosystem.config.js
+
+# Temporary files
+*.tmp
+*.temp
+```
+
+### 2.3. Commit và Push code
+
+```bash
+# Thêm tất cả file (trừ những file trong .gitignore)
+git add .
+
+# Commit
+git commit -m "Initial commit: HR Management System"
+
+# Push lên GitHub (lần đầu)
+git push -u origin main
+
+# Hoặc nếu branch là master
+git push -u origin master
+```
+
+**Lưu ý:** Nếu GitHub yêu cầu authentication, bạn cần:
+- Tạo Personal Access Token trên GitHub
+- Sử dụng token thay vì password khi push
+
+---
+
+## PHẦN 3: KIỂM TRA VÀ ĐẢM BẢO KHÔNG XUNG ĐỘT VỚI APP CŨ
+
+### 3.1. Kết nối SSH vào server
+
+```bash
 ssh root@27.71.16.15
-
-# Chạy script tự động
-curl -sSL https://raw.githubusercontent.com/HaiNguyen26/HR---RMG-IDC/main/deploy-new-server.sh | bash
-
-# Hoặc clone và chạy
-git clone https://github.com/HaiNguyen26/HR---RMG-IDC.git
-cd HR---RMG-IDC
-chmod +x deploy-new-server.sh
-sudo ./deploy-new-server.sh
+# hoặc
+ssh username@27.71.16.15
 ```
 
-## 📖 Deploy Thủ công
+### 3.2. Kiểm tra ứng dụng cũ đang chạy
 
-Xem file **`DEPLOY_SERVER_NEW.md`** để có hướng dẫn chi tiết từng bước.
-
----
-
-## 📋 Thông tin
-
-- **GitHub:** https://github.com/HaiNguyen26/HR---RMG-IDC.git
-- **Server IP:** 27.71.16.15
-- **App Directory:** `/var/www/hr-rmg-idc`
-- **Database:** `HR_Management_System_RMG_IDC`
-- **Ports:** Backend 3001, Frontend 3002
-
----
-
-<details>
-<summary>📜 Hướng dẫn cũ (đã không còn sử dụng)</summary>
-
-## 2. Chuẩn bị Server (CŨ - KHÔNG DÙNG)
-
-⚠️ **Server cũ đã không còn sử dụng**
-
-### Bước 2.1: Cài Node.js 20
+**⚠️ QUAN TRỌNG: Kiểm tra trước khi deploy để đảm bảo không xung đột!**
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs
-node --version  # Kiểm tra: phải >= v20
+# Kiểm tra PM2 apps đang chạy
+pm2 list
+
+# Kiểm tra ports đang được sử dụng
+sudo netstat -tulpn | grep LISTEN
+# hoặc
+sudo ss -tulpn | grep LISTEN
+
+# Kiểm tra thư mục ứng dụng cũ
+ls -la /var/www/
+
+# Kiểm tra Nginx configs (nếu có)
+ls -la /etc/nginx/sites-available/
+ls -la /etc/nginx/sites-enabled/
 ```
 
-### Bước 2.2: Cài PostgreSQL
+**Ghi chú lại:**
+- Ports mà app cũ đang dùng: `_____________`
+- Tên PM2 apps của app cũ: `_____________`
+- Thư mục của app cũ: `_____________`
+- Database của app cũ: `_____________`
+
+### 3.3. Xác nhận cấu hình không xung đột
+
+**Ứng dụng HR Management System mới sẽ sử dụng:**
+- **Backend Port:** 3001 (đảm bảo không trùng với app cũ)
+- **Frontend Port:** 3002 (đảm bảo không trùng với app cũ)
+- **PM2 App Names:** `hr-rmg-idc-backend`, `hr-rmg-idc-frontend` (tên riêng biệt)
+- **Thư mục:** `/var/www/hr-rmg-idc` (thư mục riêng)
+- **Database:** `HR_Management_System` (database riêng)
+
+**Nếu có xung đột port:**
+- Thay đổi port trong `ecosystem.config.js` và `backend/.env`
+- Chọn port khác (ví dụ: 3003, 3004, 4001, 4002...)
+
+### 3.4. Cập nhật hệ thống
 
 ```bash
 sudo apt update
-sudo apt install postgresql postgresql-contrib -y
+sudo apt upgrade -y
+```
+
+### 3.3. Cài đặt Node.js và npm
+
+```bash
+# Cài đặt Node.js 18.x (LTS)
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Kiểm tra phiên bản
+node --version
+npm --version
+```
+
+### 3.5. Cài đặt PostgreSQL (nếu chưa có)
+
+```bash
+# Kiểm tra PostgreSQL đã được cài đặt chưa
+psql --version
+
+# Nếu chưa có, cài đặt
+sudo apt install -y postgresql postgresql-contrib
+
+# Khởi động PostgreSQL
 sudo systemctl start postgresql
 sudo systemctl enable postgresql
+
+# Đặt password cho user postgres (nếu chưa đặt)
+sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'your_secure_password';"
+
+# Tạo database riêng cho HR Management System
+sudo -u postgres psql -c "CREATE DATABASE \"HR_Management_System\";"
 ```
 
-### Bước 2.3: Cài Git
+**Lưu ý:** 
+- Thay `your_secure_password` bằng password mạnh
+- Database `HR_Management_System` là database riêng, không ảnh hưởng đến database của app cũ
+
+### 3.6. Cài đặt PM2 (nếu chưa có)
 
 ```bash
-sudo apt install git -y
+# Kiểm tra PM2 đã được cài đặt chưa
+pm2 --version
+
+# Nếu chưa có, cài đặt PM2 globally
+sudo npm install -g pm2
+
+# Khởi động PM2 khi server boot (chỉ cần làm 1 lần)
+pm2 startup
+# Chạy lệnh được hiển thị (thường là sudo env PATH=...)
 ```
 
----
+**Lưu ý:** PM2 có thể quản lý nhiều ứng dụng cùng lúc. App mới sẽ có tên riêng và không ảnh hưởng đến app cũ.
 
-## 3. Clone Code và Setup
+### 3.7. Cài đặt serve (cho frontend)
 
 ```bash
-cd /var/www
-sudo git clone https://github.com/HaiNguyen26/HR-RMG.git hr-management-system
-sudo chown -R $USER:$USER /var/www/hr-management-system
-cd /var/www/hr-management-system
+# Kiểm tra serve đã được cài đặt chưa
+serve --version
+
+# Nếu chưa có, cài đặt
+sudo npm install -g serve
 ```
 
----
-
-## 4. Database
-
-### ⚠️ Quan trọng: Chọn loại Database
-
-Bạn có **2 lựa chọn:**
-- **A. Tạo Database Mới (Trống)** - Nếu chưa có dữ liệu
-- **B. Migrate Database từ Local** - Nếu đã có dữ liệu ở local
-
-**Không chắc chọn gì?** Xem `DATABASE_OPTIONS.md` để so sánh 2 phương án.
-
----
-
-### ⚠️ Lưu ý về Password
-
-**KHÔNG cần dùng password của PgAdmin (máy local)!**
-
-- ✅ Trên server, bạn sẽ tạo **password mới** cho PostgreSQL user
-- ✅ Password này **độc lập** với password trên máy local
-- ✅ Bạn có thể đặt password **bất kỳ** (nên dùng mạnh và an toàn)
-- ✅ **QUAN TRỌNG:** Password này phải khớp với password trong file `backend/.env` (bước 5.1)
-
-**Ví dụ password:** `RMG123@hr2025` (hoặc bất kỳ password nào bạn muốn)
-
----
-
-### Tùy chọn A: Tạo Database Mới (Không có dữ liệu)
+### 3.8. Cài đặt Nginx (tùy chọn, để reverse proxy)
 
 ```bash
-# Tạo database và user
-sudo -u postgres psql
+sudo apt install -y nginx
+
+# Khởi động Nginx
+sudo systemctl start nginx
+sudo systemctl enable nginx
 ```
 
-**Trong psql, chạy:**
-```sql
-CREATE DATABASE "HR_Management_System" WITH ENCODING = 'UTF8';
-CREATE USER hr_user WITH PASSWORD 'Hainguyen261097';
-ALTER USER hr_user CREATEDB;
-GRANT ALL PRIVILEGES ON DATABASE "HR_Management_System" TO hr_user;
+---
+
+## PHẦN 4: CLONE CODE TỪ GITHUB
+
+### 4.1. Tạo thư mục cho ứng dụng
+
+```bash
+# Tạo thư mục
+sudo mkdir -p /var/www/hr-rmg-idc
+sudo chown -R $USER:$USER /var/www/hr-rmg-idc
+
+# Di chuyển vào thư mục
+cd /var/www/hr-rmg-idc
+```
+
+### 4.2. Clone repository
+
+```bash
+# Clone code từ GitHub
+git clone https://github.com/HaiNguyen26/HR-RMG-IDC.git .
+
+# Hoặc nếu repository yêu cầu authentication
+git clone https://YOUR_TOKEN@github.com/HaiNguyen26/HR-RMG-IDC.git .
+```
+
+### 4.3. Cài đặt dependencies
+
+```bash
+# Cài đặt dependencies cho backend
+cd backend
+npm install
+cd ..
+
+# Cài đặt dependencies cho frontend
+cd frontend
+npm install
+cd ..
+```
+
+---
+
+## PHẦN 5: RESTORE DATABASE
+
+### 5.1. Upload file backup lên server
+
+**Cách 1: Sử dụng SCP (từ máy local)**
+
+```bash
+# Trên máy local Windows (PowerShell)
+scp backup/hr_management_backup_*.dump username@27.71.16.15:/tmp/
+
+# Hoặc file SQL
+scp backup/hr_management_backup_*.sql username@27.71.16.15:/tmp/
+```
+
+**Cách 2: Sử dụng SFTP hoặc FileZilla**
+
+Kết nối đến server và upload file backup vào thư mục `/tmp/`.
+
+### 5.2. Restore database trên server
+
+```bash
+# Kết nối vào server
+ssh username@27.71.16.15
+
+# Restore từ file dump
+pg_restore -h localhost -U postgres -d HR_Management_System -c /tmp/hr_management_backup_*.dump
+
+# Hoặc restore từ file SQL
+psql -h localhost -U postgres -d HR_Management_System -f /tmp/hr_management_backup_*.sql
+```
+
+**Lưu ý:** Nhập password của PostgreSQL khi được yêu cầu.
+
+### 5.3. Kiểm tra database đã restore
+
+```bash
+# Kết nối vào PostgreSQL
+sudo -u postgres psql -d HR_Management_System
+
+# Kiểm tra các bảng
+\dt
+
+# Đếm số bản ghi trong một số bảng quan trọng
+SELECT COUNT(*) FROM employees;
+SELECT COUNT(*) FROM candidates;
+SELECT COUNT(*) FROM leave_requests;
+
+# Thoát
 \q
 ```
 
-**Password:** `Hainguyen261097` (sẽ dùng trong file `.env` ở bước 5.1)
-
-**Import schema:**
-```bash
-# Dùng sudo -u postgres để tránh lỗi authentication
-sudo -u postgres psql -d HR_Management_System < database/database_schema_postgresql.sql
-```
-
-### Tùy chọn B: Migrate Database từ Local (Có dữ liệu)
-
-**Trên máy local (Windows PowerShell):**
-```powershell
-# Di chuyển đến thư mục project
-cd D:\Web-App-HR-Demo
-
-# Backup database với encoding UTF-8 (QUAN TRỌNG!)
-pg_dump -U postgres -d HR_Management_System --encoding=UTF8 --no-owner --no-acl > backup_hr_management.sql
-
-# Upload lên server (QUAN TRỌNG: Phải ở đúng thư mục có file backup!)
-scp backup_hr_management.sql root@103.56.161.203:/tmp/
-```
-
-**Lưu ý:** Nếu file backup đã có sẵn ở `D:\Web-App-HR-Demo\backup_hr_management.sql`, chỉ cần:
-```powershell
-cd D:\Web-App-HR-Demo
-scp backup_hr_management.sql root@103.56.161.203:/tmp/
-```
-
-**Trên server:**
-```bash
-# Tạo database (như Tùy chọn A)
-sudo -u postgres psql
-# (Chạy các lệnh CREATE DATABASE và CREATE USER như trên)
-# \q
-
-# Restore database (dùng sudo -u postgres để tránh lỗi authentication)
-sudo -u postgres psql -d HR_Management_System < /tmp/backup_hr_management.sql
-```
-
-**Hoặc nếu muốn dùng user hr_user:**
-```bash
-PGPASSWORD='Hainguyen261097' psql -U hr_user -h localhost -d HR_Management_System < /tmp/backup_hr_management.sql
-```
-
 ---
 
-## 5. Cấu hình và Build
+## PHẦN 6: CẤU HÌNH MÔI TRƯỜNG
 
-### Bước 5.1: Backend .env
+### 6.1. Tạo file .env cho backend
 
 ```bash
-cd /var/www/hr-management-system/backend
-cp env.example .env
+cd /var/www/hr-rmg-idc/backend
 nano .env
 ```
 
-**Chỉnh sửa thành:**
+Nội dung file `.env`:
+
 ```env
+# Database Configuration
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=HR_Management_System
-DB_USER=hr_user
-DB_PASSWORD=Hainguyen261097
+DB_USER=postgres
+DB_PASSWORD=your_secure_password
 
-PORT=3000
+# Server Configuration
+PORT=3001
 NODE_ENV=production
 
+# Default Password for New Employees
 DEFAULT_PASSWORD=RMG123@
 ```
 
-**Lưu:** `Ctrl + O`, Enter, `Ctrl + X`
+**Lưu ý:** Thay `your_secure_password` bằng password PostgreSQL đã đặt ở bước 3.4.
 
-### Bước 5.2: Frontend .env
-
-```bash
-cd ../frontend
-nano .env
-```
-
-**Thêm:**
-```env
-REACT_APP_API_URL=http://103.56.161.203/api
-```
-
-**Lưu:** `Ctrl + O`, Enter, `Ctrl + X`
-
-### Bước 5.3: Cài Dependencies
+### 6.2. Build frontend
 
 ```bash
-cd /var/www/hr-management-system
+cd /var/www/hr-rmg-idc/frontend
 
-# Root
-npm install
-
-# Backend
-cd backend
-npm install
-
-# Frontend
-cd ../frontend
-npm install
-```
-
-### Bước 5.4: Build Frontend
-
-```bash
-cd /var/www/hr-management-system/frontend
+# Build production
 npm run build
+
+# Kiểm tra thư mục build đã được tạo
+ls -la build/
 ```
 
 ---
 
-## 6. Deploy với PM2
+## PHẦN 7: CẤU HÌNH PM2
 
-### Bước 6.1: Cài PM2
+### 7.1. Tạo file ecosystem.config.js
+
+File `ecosystem.config.js` đã có trong repository. Kiểm tra và cập nhật nếu cần:
 
 ```bash
-sudo npm install -g pm2
+cd /var/www/hr-rmg-idc
+cat ecosystem.config.js
 ```
 
-### Bước 6.2: Khởi động Backend
+### 7.2. Tạo thư mục logs
 
 ```bash
-cd /var/www/hr-management-system/backend
-pm2 start server.js --name "hr-backend"
+mkdir -p /var/www/hr-rmg-idc/logs
 ```
 
-### Bước 6.3: Khởi động Frontend
+### 7.3. Kiểm tra lại trước khi khởi động
 
 ```bash
-cd /var/www/hr-management-system/frontend/build
-pm2 serve . 3001 --name "hr-frontend" --spa
+# Kiểm tra ports không bị chiếm
+sudo netstat -tulpn | grep :3001
+sudo netstat -tulpn | grep :3002
+
+# Kiểm tra PM2 apps hiện tại
+pm2 list
+
+# Đảm bảo không có app nào trùng tên
+pm2 list | grep hr-rmg-idc
 ```
 
-### Bước 6.4: Lưu PM2
+### 7.4. Khởi động ứng dụng với PM2
 
 ```bash
-pm2 save
-pm2 startup
-# Chạy lệnh mà PM2 đưa ra (copy và paste)
-```
+cd /var/www/hr-rmg-idc
 
-**Kiểm tra:**
-```bash
+# Khởi động ứng dụng (chỉ start apps trong ecosystem.config.js)
+pm2 start ecosystem.config.js
+
+# Kiểm tra trạng thái (sẽ thấy cả app cũ và app mới)
 pm2 status
-pm2 logs
+
+# Xem logs của app mới
+pm2 logs hr-rmg-idc-backend
+pm2 logs hr-rmg-idc-frontend
+
+# Lưu cấu hình PM2 (lưu tất cả apps)
+pm2 save
 ```
+
+**✅ Xác nhận:**
+- App cũ vẫn đang chạy bình thường
+- App mới đã khởi động thành công
+- Không có xung đột port
 
 ---
 
-## 7. Cấu hình Nginx
+## PHẦN 8: CẤU HÌNH NGINX (TÙY CHỌN)
 
-### Bước 7.1: Tạo File Cấu hình
+### 8.1. Kiểm tra Nginx config của app cũ
 
 ```bash
-sudo nano /etc/nginx/sites-available/hr-management
+# Xem các site đã được cấu hình
+ls -la /etc/nginx/sites-available/
+ls -la /etc/nginx/sites-enabled/
+
+# Xem nội dung config của app cũ (nếu có)
+cat /etc/nginx/sites-enabled/default
+# hoặc
+cat /etc/nginx/sites-enabled/[tên-app-cũ]
 ```
 
-**Thêm nội dung:**
+**⚠️ QUAN TRỌNG:** 
+- Nếu app cũ đã dùng port 80, bạn có thể:
+  - Dùng subdomain hoặc path khác
+  - Hoặc dùng port khác (ví dụ: 8080)
+  - Hoặc không dùng Nginx, truy cập trực tiếp qua port 3002
+
+### 8.2. Tạo file cấu hình Nginx (chỉ nếu cần)
+
+**Tùy chọn A: Dùng subdomain hoặc path riêng**
+
+```bash
+sudo nano /etc/nginx/sites-available/hr-rmg-idc
+```
+
+Nội dung (ví dụ dùng path `/hr`):
+
 ```nginx
 server {
     listen 80;
-    server_name 103.56.161.203;
+    server_name 27.71.16.15;
 
-    location / {
+    # HR Management System - Frontend
+    location /hr {
+        proxy_pass http://localhost:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        rewrite ^/hr/(.*)$ /$1 break;
+    }
+
+    # HR Management System - Backend API
+    location /hr/api {
         proxy_pass http://localhost:3001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_cache_bypass $http_upgrade;
-    }
-
-    location /api {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
+        rewrite ^/hr/api/(.*)$ /api/$1 break;
     }
 }
 ```
 
-**Lưu:** `Ctrl + O`, Enter, `Ctrl + X`
-
-### Bước 7.2: Kích hoạt Nginx
+**Tùy chọn B: Dùng port riêng (8080)**
 
 ```bash
-# Tạo link
-sudo ln -s /etc/nginx/sites-available/hr-management /etc/nginx/sites-enabled/
+sudo nano /etc/nginx/sites-available/hr-rmg-idc
+```
 
-# Xóa default
-sudo rm /etc/nginx/sites-enabled/default
+Nội dung:
 
-# Kiểm tra
+```nginx
+server {
+    listen 8080;
+    server_name 27.71.16.15;
+
+    # Frontend
+    location / {
+        proxy_pass http://localhost:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # Backend API
+    location /api {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+### 8.3. Kích hoạt site (chỉ nếu dùng Nginx)
+
+```bash
+# Tạo symbolic link
+sudo ln -s /etc/nginx/sites-available/hr-rmg-idc /etc/nginx/sites-enabled/
+
+# Kiểm tra cấu hình
 sudo nginx -t
 
-# Khởi động lại
-sudo systemctl restart nginx
-sudo systemctl enable nginx
+# Nếu có lỗi, kiểm tra xung đột với app cũ
+# Reload Nginx
+sudo systemctl reload nginx
+```
+
+**Lưu ý:** Nếu không dùng Nginx, bạn có thể truy cập trực tiếp:
+- Frontend: http://27.71.16.15:3002
+- Backend API: http://27.71.16.15:3001/api
+
+---
+
+## PHẦN 9: KIỂM TRA VÀ BẢO MẬT
+
+### 9.1. Kiểm tra ứng dụng hoạt động
+
+```bash
+# Kiểm tra backend
+curl http://localhost:3001/api/employees
+
+# Kiểm tra frontend
+curl http://localhost:3002
+
+# Kiểm tra từ bên ngoài (nếu có Nginx)
+curl http://27.71.16.15
+```
+
+### 9.2. Cấu hình Firewall
+
+```bash
+# Kiểm tra firewall hiện tại
+sudo ufw status
+
+# Cho phép SSH (nếu chưa có)
+sudo ufw allow 22/tcp
+
+# Cho phép HTTP và HTTPS (nếu dùng Nginx, và chưa có)
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+# Cho phép port backend và frontend của app mới
+sudo ufw allow 3001/tcp
+sudo ufw allow 3002/tcp
+
+# Nếu dùng Nginx với port riêng (ví dụ 8080)
+sudo ufw allow 8080/tcp
+
+# Kích hoạt firewall (nếu chưa kích hoạt)
+sudo ufw enable
+
+# Kiểm tra trạng thái
+sudo ufw status
+```
+
+**Lưu ý:** Chỉ thêm rules mới, không xóa rules của app cũ.
+
+### 9.3. Cấu hình PostgreSQL để chỉ chấp nhận localhost
+
+```bash
+# Chỉnh sửa file cấu hình
+sudo nano /etc/postgresql/14/main/pg_hba.conf
+
+# Đảm bảo chỉ có dòng này cho IPv4 local connections:
+host    all             all             127.0.0.1/32            scram-sha-256
+
+# Restart PostgreSQL
+sudo systemctl restart postgresql
 ```
 
 ---
 
-## 8. Hoàn thành
+## PHẦN 10: CÁC LỆNH QUẢN LÝ THƯỜNG DÙNG
 
-### Kiểm tra
+### 10.1. PM2 Commands
 
-**Truy cập:** `http://103.56.161.203`
-
-**Kiểm tra logs:**
 ```bash
-pm2 logs
+# Xem trạng thái
 pm2 status
-sudo systemctl status nginx
-```
 
-### Tài khoản đăng nhập mặc định
+# Xem logs
+pm2 logs
+pm2 logs hr-rmg-idc-backend
+pm2 logs hr-rmg-idc-frontend
 
-- **Username:** `hr001`
-- **Password:** `RMG123@`
-
----
-
-## 🔄 Cập nhật Code sau này
-
-**Xem hướng dẫn chi tiết:** `UPDATE_CODE.md`
-
-**Quy trình nhanh:**
-
-```bash
-cd /var/www/hr-management-system
-git pull origin main
-cd backend && npm install
-cd ../frontend && npm install && npm run build
-cd ..
+# Restart ứng dụng
 pm2 restart all
-pm2 logs --lines 10
+pm2 restart hr-rmg-idc-backend
+pm2 restart hr-rmg-idc-frontend
+
+# Stop ứng dụng
+pm2 stop all
+
+# Xóa ứng dụng khỏi PM2
+pm2 delete all
+```
+
+### 10.2. Update code từ GitHub
+
+```bash
+cd /var/www/hr-rmg-idc
+
+# Pull code mới
+git pull origin main
+
+# Cài đặt dependencies mới (nếu có)
+cd backend && npm install && cd ..
+cd frontend && npm install && npm run build && cd ..
+
+# Restart CHỈ ứng dụng HR Management System (không restart app cũ)
+pm2 restart hr-rmg-idc-backend
+pm2 restart hr-rmg-idc-frontend
+
+# Hoặc restart tất cả (nếu muốn)
+# pm2 restart all
+```
+
+### 10.3. Backup database trên server
+
+```bash
+# Tạo backup
+pg_dump -h localhost -U postgres -d HR_Management_System -F c -f /var/www/hr-rmg-idc/backup/hr_management_$(date +%Y%m%d_%H%M%S).dump
+
+# Hoặc backup SQL
+pg_dump -h localhost -U postgres -d HR_Management_System -f /var/www/hr-rmg-idc/backup/hr_management_$(date +%Y%m%d_%H%M%S).sql
 ```
 
 ---
 
-## 🆘 Sửa lỗi thường gặp
+## PHẦN 11: XỬ LÝ SỰ CỐ
 
-### Lỗi: Cannot connect to database
+### 11.1. Ứng dụng không khởi động
+
 ```bash
-# Kiểm tra PostgreSQL
-sudo systemctl status postgresql
-# Kiểm tra .env file có đúng không
+# Kiểm tra logs
+pm2 logs
+
+# Kiểm tra port đã được sử dụng chưa
+sudo netstat -tulpn | grep :3001
+sudo netstat -tulpn | grep :3002
+
+# Kiểm tra file .env
 cat backend/.env
 ```
 
-### Lỗi: Port already in use
+### 11.2. Database connection error
+
 ```bash
-# Tìm process
-sudo netstat -tulpn | grep :3000
-# Kill process
-sudo kill -9 <PID>
+# Kiểm tra PostgreSQL đang chạy
+sudo systemctl status postgresql
+
+# Kiểm tra kết nối
+sudo -u postgres psql -d HR_Management_System
+
+# Kiểm tra file .env có đúng thông tin không
+cat backend/.env
 ```
 
-### Lỗi: Peer authentication failed
-```bash
-# Dùng sudo -u postgres thay vì -U hr_user
-sudo -u postgres psql -d HR_Management_System < database/database_schema_postgresql.sql
+### 11.3. Frontend không load
 
-# Hoặc dùng PGPASSWORD với localhost
-PGPASSWORD='Hainguyen261097' psql -U hr_user -h localhost -d HR_Management_System < database/database_schema_postgresql.sql
-```
-
-### Lỗi: Permission denied
 ```bash
-# Đổi quyền
-sudo chown -R $USER:$USER /var/www/hr-management-system
+# Kiểm tra thư mục build
+ls -la frontend/build/
+
+# Rebuild frontend
+cd frontend
+npm run build
+cd ..
+
+# Restart frontend
+pm2 restart hr-rmg-idc-frontend
 ```
 
 ---
 
-## ✅ Checklist
+## PHẦN 12: THÔNG TIN QUAN TRỌNG
 
-- [ ] Cài Node.js 20
-- [ ] Cài PostgreSQL
-- [ ] Clone code từ GitHub
-- [ ] Tạo/Restore database
-- [ ] Cấu hình .env files
-- [ ] Cài dependencies và build
-- [ ] Khởi động với PM2
-- [ ] Cấu hình Nginx
-- [ ] Truy cập được http://103.56.161.203
-- [ ] Đăng nhập thành công
+### 12.1. Đường dẫn quan trọng
+
+- **Code:** `/var/www/hr-rmg-idc`
+- **Backend:** `/var/www/hr-rmg-idc/backend`
+- **Frontend:** `/var/www/hr-rmg-idc/frontend`
+- **Logs:** `/var/www/hr-rmg-idc/logs`
+- **Backup:** `/var/www/hr-rmg-idc/backup`
+
+### 12.2. Ports và PM2 Apps
+
+**HR Management System (App mới):**
+- **Backend Port:** 3001
+- **Frontend Port:** 3002
+- **PM2 Backend:** `hr-rmg-idc-backend`
+- **PM2 Frontend:** `hr-rmg-idc-frontend`
+- **Database:** `HR_Management_System`
+
+**App cũ:**
+- Ghi chú lại thông tin app cũ để tránh nhầm lẫn: `_____________`
+
+### 12.3. Truy cập ứng dụng
+
+- **HR Management System (trực tiếp):** http://27.71.16.15:3002
+- **HR Management System (qua Nginx):** http://27.71.16.15:8080 (nếu cấu hình)
+- **Backend API:** http://27.71.16.15:3001/api
+
+### 12.4. Quản lý riêng biệt
+
+**Chỉ quản lý app HR Management System:**
+```bash
+# Xem status
+pm2 list | grep hr-rmg-idc
+
+# Restart
+pm2 restart hr-rmg-idc-backend
+pm2 restart hr-rmg-idc-frontend
+
+# Stop
+pm2 stop hr-rmg-idc-backend
+pm2 stop hr-rmg-idc-frontend
+
+# Xem logs
+pm2 logs hr-rmg-idc-backend
+pm2 logs hr-rmg-idc-frontend
+```
+
+**⚠️ LƯU Ý:** 
+- Không dùng `pm2 delete all` - sẽ xóa cả app cũ!
+- Chỉ dùng `pm2 restart all` nếu muốn restart tất cả apps
+- Luôn chỉ định tên app khi muốn thao tác riêng
 
 ---
 
-**Xong! Chúc bạn thành công!** 🎉
+## KẾT LUẬN
+
+Sau khi hoàn thành tất cả các bước trên, ứng dụng HR Management System sẽ được deploy và chạy trên cloud server. 
+
+**Lưu ý quan trọng:**
+- Đảm bảo backup database thường xuyên
+- Giữ bí mật thông tin trong file `.env`
+- Cập nhật code thường xuyên từ GitHub
+- Monitor logs để phát hiện lỗi sớm
 

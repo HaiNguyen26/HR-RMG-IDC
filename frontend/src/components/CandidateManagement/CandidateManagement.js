@@ -168,6 +168,10 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
     const [selectedStatus, setSelectedStatus] = useState('all');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [importFile, setImportFile] = useState(null);
+    const [importing, setImporting] = useState(false);
+    const [importResults, setImportResults] = useState(null);
     const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [editingCandidateId, setEditingCandidateId] = useState(null);
     const [isManagerSelectModalOpen, setIsManagerSelectModalOpen] = useState(false);
@@ -584,6 +588,93 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
     };
 
     // Filtering is now done on the backend
+
+    // Export template Excel
+    const handleExportTemplate = async () => {
+        try {
+            const response = await candidatesAPI.exportTemplate();
+            const blob = new Blob([response.data], { 
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+            });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Mau_Thong_Tin_Ung_Vien_${new Date().toISOString().split('T')[0]}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            if (showToast) {
+                showToast('Đã tải file mẫu thành công!', 'success');
+            }
+        } catch (error) {
+            console.error('Error exporting template:', error);
+            if (showToast) {
+                showToast('Lỗi khi tải file mẫu: ' + (error.response?.data?.message || error.message), 'error');
+            }
+        }
+    };
+
+    // Handle import file selection
+    const handleImportFileChange = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const allowedTypes = [
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-excel'
+            ];
+            if (!allowedTypes.includes(file.type)) {
+                if (showToast) {
+                    showToast('Chỉ chấp nhận file Excel (.xlsx, .xls)', 'error');
+                }
+                return;
+            }
+            setImportFile(file);
+        }
+    };
+
+    // Handle bulk import
+    const handleBulkImport = async () => {
+        if (!importFile) {
+            if (showToast) {
+                showToast('Vui lòng chọn file Excel để import', 'error');
+            }
+            return;
+        }
+
+        setImporting(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', importFile);
+
+            const response = await candidatesAPI.bulkImport(formData);
+            
+            setImportResults(response.data.results);
+            
+            if (showToast) {
+                showToast(response.data.message, response.data.results.failed > 0 ? 'warning' : 'success');
+            }
+
+            // Reload candidates list
+            await fetchCandidates();
+
+            // Close modal after 3 seconds if successful
+            if (response.data.results.failed === 0) {
+                setTimeout(() => {
+                    setIsImportModalOpen(false);
+                    setImportFile(null);
+                    setImportResults(null);
+                }, 3000);
+            }
+        } catch (error) {
+            console.error('Error importing candidates:', error);
+            if (showToast) {
+                showToast('Lỗi khi import: ' + (error.response?.data?.message || error.message), 'error');
+            }
+        } finally {
+            setImporting(false);
+        }
+    };
 
     const handleStatusChange = async (candidateId, newStatus) => {
         try {
@@ -1419,17 +1510,41 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                             </p>
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        className={`candidate-management-add-btn ${isModalOpen ? 'modal-open' : ''}`}
-                        onClick={isModalOpen ? handleModalClose : handleModalOpen}
-                    >
-                        <svg className="candidate-add-icon" fill="none" stroke="#ffffff" viewBox="0 0 24 24">
-                            <path className="icon-plus" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" stroke="#ffffff" d="M12 4v16m8-8H4"></path>
-                            <path className="icon-x" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" stroke="#ffffff" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                        <span>{isModalOpen ? 'Đóng' : 'Thêm ứng viên'}</span>
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                        <button
+                            type="button"
+                            className="candidate-management-export-btn"
+                            onClick={handleExportTemplate}
+                            title="Xuất file mẫu Excel"
+                        >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px' }}>
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span>Xuất mẫu</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="candidate-management-import-btn"
+                            onClick={() => setIsImportModalOpen(true)}
+                            title="Import hàng loạt từ Excel"
+                        >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px' }}>
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            <span>Import</span>
+                        </button>
+                        <button
+                            type="button"
+                            className={`candidate-management-add-btn ${isModalOpen ? 'modal-open' : ''}`}
+                            onClick={isModalOpen ? handleModalClose : handleModalOpen}
+                        >
+                            <svg className="candidate-add-icon" fill="none" stroke="#ffffff" viewBox="0 0 24 24">
+                                <path className="icon-plus" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" stroke="#ffffff" d="M12 4v16m8-8H4"></path>
+                                <path className="icon-x" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" stroke="#ffffff" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            <span>{isModalOpen ? 'Đóng' : 'Thêm ứng viên'}</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Search Bar */}
@@ -4396,6 +4511,156 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                             {/* Render form details - PHẦN I and PHẦN II */}
                             {/* This will reuse the same form structure from InterviewApprovals but in read-only mode */}
                             <RecruitmentRequestDetailView request={selectedRecruitmentRequest} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Import Modal */}
+            {isImportModalOpen && (
+                <div className="modal-overlay" onClick={() => !importing && setIsImportModalOpen(false)}>
+                    <div className="modal-content candidate-form-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>Import Ứng viên hàng loạt</h2>
+                            <button
+                                type="button"
+                                className="modal-close-btn"
+                                onClick={() => {
+                                    if (!importing) {
+                                        setIsImportModalOpen(false);
+                                        setImportFile(null);
+                                        setImportResults(null);
+                                    }
+                                }}
+                                disabled={importing}
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="modal-body">
+                            {!importResults ? (
+                                <>
+                                    <div style={{ marginBottom: '1.5rem' }}>
+                                        <p style={{ marginBottom: '1rem', color: '#64748b' }}>
+                                            Vui lòng chọn file Excel để import. File phải theo đúng định dạng mẫu.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={handleExportTemplate}
+                                            style={{
+                                                padding: '0.5rem 1rem',
+                                                background: '#f1f5f9',
+                                                border: '1px solid #cbd5e1',
+                                                borderRadius: '0.5rem',
+                                                color: '#475569',
+                                                cursor: 'pointer',
+                                                fontSize: '0.875rem'
+                                            }}
+                                        >
+                                            📥 Tải file mẫu
+                                        </button>
+                                    </div>
+
+                                    <div style={{ marginBottom: '1.5rem' }}>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155' }}>
+                                            Chọn file Excel
+                                        </label>
+                                        <input
+                                            type="file"
+                                            accept=".xlsx,.xls"
+                                            onChange={handleImportFileChange}
+                                            disabled={importing}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.75rem',
+                                                border: '1px solid #cbd5e1',
+                                                borderRadius: '0.5rem',
+                                                fontSize: '0.875rem'
+                                            }}
+                                        />
+                                        {importFile && (
+                                            <p style={{ marginTop: '0.5rem', color: '#059669', fontSize: '0.875rem' }}>
+                                                ✓ Đã chọn: {importFile.name}
+                                            </p>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <div>
+                                    <div style={{
+                                        padding: '1rem',
+                                        borderRadius: '0.5rem',
+                                        marginBottom: '1rem',
+                                        background: importResults.failed > 0 ? '#fef3c7' : '#d1fae5',
+                                        border: `1px solid ${importResults.failed > 0 ? '#fbbf24' : '#10b981'}`
+                                    }}>
+                                        <p style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#1f2937' }}>
+                                            Kết quả import:
+                                        </p>
+                                        <p style={{ color: '#374151' }}>
+                                            ✅ Thành công: <strong>{importResults.success}</strong>
+                                        </p>
+                                        <p style={{ color: '#374151' }}>
+                                            ❌ Thất bại: <strong>{importResults.failed}</strong>
+                                        </p>
+                                    </div>
+
+                                    {importResults.errors && importResults.errors.length > 0 && (
+                                        <div style={{
+                                            maxHeight: '300px',
+                                            overflowY: 'auto',
+                                            padding: '1rem',
+                                            background: '#f9fafb',
+                                            borderRadius: '0.5rem',
+                                            border: '1px solid #e5e7eb'
+                                        }}>
+                                            <p style={{ fontWeight: '600', marginBottom: '0.75rem', color: '#1f2937' }}>
+                                                Chi tiết lỗi:
+                                            </p>
+                                            {importResults.errors.map((error, index) => (
+                                                <div key={index} style={{
+                                                    padding: '0.5rem',
+                                                    marginBottom: '0.5rem',
+                                                    background: '#fff',
+                                                    borderRadius: '0.375rem',
+                                                    fontSize: '0.875rem',
+                                                    color: '#dc2626'
+                                                }}>
+                                                    Dòng {error.row}: {error.candidate ? `${error.candidate} - ` : ''}{error.error}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="modal-footer">
+                            <button
+                                type="button"
+                                className="modal-cancel-btn"
+                                onClick={() => {
+                                    setIsImportModalOpen(false);
+                                    setImportFile(null);
+                                    setImportResults(null);
+                                }}
+                                disabled={importing}
+                            >
+                                {importResults ? 'Đóng' : 'Hủy'}
+                            </button>
+                            {!importResults && (
+                                <button
+                                    type="button"
+                                    className="modal-submit-btn"
+                                    onClick={handleBulkImport}
+                                    disabled={!importFile || importing}
+                                >
+                                    {importing ? 'Đang import...' : 'Import'}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

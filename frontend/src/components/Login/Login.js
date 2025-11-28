@@ -61,7 +61,7 @@ const Login = ({ onLoginSuccess }) => {
           <div className="login-logo-section">
             <div className="login-logo-container">
               <img
-                src="/LogoRMG.png"
+                src={process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL}/LogoRMG.png` : '/LogoRMG.png'}
                 alt="RMG Logo"
                 className="login-logo"
               />

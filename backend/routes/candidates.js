@@ -5,6 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
+const XLSX = require('xlsx');
 
 // Vietnamese fonts configuration - PDFKit uses font file paths directly
 const fontsPath = path.join(__dirname, '../fonts');
@@ -81,6 +82,26 @@ const upload = multer({
             cb(null, true);
         } else {
             cb(new Error('Chỉ chấp nhận file PDF, DOC hoặc DOCX'));
+        }
+    }
+});
+
+// Multer instance for Excel file uploads (bulk import)
+const uploadExcel = multer({
+    storage: multer.memoryStorage(), // Use memory storage for Excel files
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB for Excel files
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+            'application/vnd.ms-excel', // .xls
+            'application/excel', // .xls (alternative)
+            'application/x-excel', // .xls (alternative)
+            'application/x-msexcel' // .xls (alternative)
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Chỉ chấp nhận file Excel (.xlsx, .xls)'));
         }
     }
 });
@@ -168,6 +189,24 @@ const ensureCandidatesTable = async () => {
             IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='trinh_do_ngoai_ngu') THEN
                 ALTER TABLE candidates ADD COLUMN trinh_do_ngoai_ngu JSONB;
             END IF;
+        END $$;
+
+        -- Allow ho_ten to be NULL for bulk import
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_name = 'candidates' 
+                AND column_name = 'ho_ten'
+                AND is_nullable = 'NO'
+            ) THEN
+                ALTER TABLE candidates 
+                ALTER COLUMN ho_ten DROP NOT NULL;
+            END IF;
+        EXCEPTION
+            WHEN OTHERS THEN
+                NULL;
         END $$;
 
         CREATE INDEX IF NOT EXISTS idx_candidates_status ON candidates(status);
@@ -3546,6 +3585,336 @@ router.get('/cv/:id', async (req, res) => {
                 message: 'Lỗi khi tải file CV: ' + error.message
             });
         }
+    }
+});
+
+// GET /api/candidates/export-template - Xuất file mẫu Excel
+router.get('/export-template', async (req, res) => {
+    try {
+        // Tạo workbook mới
+        const workbook = XLSX.utils.book_new();
+        
+        // Định nghĩa các cột với tên tiếng Việt
+        const headers = [
+            'Họ tên*',
+            'Giới tính',
+            'Ngày sinh* (YYYY-MM-DD)',
+            'Nơi sinh',
+            'Tình trạng hôn nhân',
+            'Dân tộc',
+            'Quốc tịch',
+            'Tôn giáo',
+            'Vị trí ứng tuyển*',
+            'Phòng ban*',
+            'Số điện thoại*',
+            'Số điện thoại khác',
+            'Email',
+            'CCCD*',
+            'Ngày cấp CCCD* (YYYY-MM-DD)',
+            'Nơi cấp CCCD*',
+            'Nguyên quán',
+            'Địa chỉ tạm trú',
+            'Trình độ văn hóa',
+            'Trình độ chuyên môn',
+            'Chuyên ngành',
+            'Kinh nghiệm làm việc (JSON)',
+            'Quá trình đào tạo (JSON)',
+            'Trình độ ngoại ngữ (JSON)',
+            'Ngày gửi CV* (YYYY-MM-DD)'
+        ];
+
+        // Tạo worksheet với headers
+        const worksheet = XLSX.utils.aoa_to_sheet([headers]);
+        
+        // Đặt độ rộng cột
+        const colWidths = [
+            { wch: 25 }, // Họ tên
+            { wch: 12 }, // Giới tính
+            { wch: 18 }, // Ngày sinh
+            { wch: 20 }, // Nơi sinh
+            { wch: 18 }, // Tình trạng hôn nhân
+            { wch: 12 }, // Dân tộc
+            { wch: 15 }, // Quốc tịch
+            { wch: 15 }, // Tôn giáo
+            { wch: 25 }, // Vị trí ứng tuyển
+            { wch: 20 }, // Phòng ban
+            { wch: 18 }, // Số điện thoại
+            { wch: 18 }, // Số điện thoại khác
+            { wch: 25 }, // Email
+            { wch: 15 }, // CCCD
+            { wch: 20 }, // Ngày cấp CCCD
+            { wch: 20 }, // Nơi cấp CCCD
+            { wch: 20 }, // Nguyên quán
+            { wch: 30 }, // Địa chỉ tạm trú
+            { wch: 20 }, // Trình độ văn hóa
+            { wch: 25 }, // Trình độ chuyên môn
+            { wch: 20 }, // Chuyên ngành
+            { wch: 40 }, // Kinh nghiệm làm việc
+            { wch: 40 }, // Quá trình đào tạo
+            { wch: 30 }, // Trình độ ngoại ngữ
+            { wch: 18 }  // Ngày gửi CV
+        ];
+        worksheet['!cols'] = colWidths;
+
+        // Thêm một dòng mẫu với hướng dẫn
+        const sampleRow = [
+            'Nguyễn Văn A',
+            'Nam',
+            '1990-01-15',
+            'Hà Nội',
+            'Độc thân',
+            'Kinh',
+            'Việt Nam',
+            'Không',
+            'Lập trình viên',
+            'IT',
+            '0912345678',
+            '',
+            'nguyenvana@email.com',
+            '001234567890',
+            '2010-01-15',
+            'Công an quận 1, TP.HCM',
+            'Hà Nội',
+            '123 Đường ABC, Quận 1, TP.HCM',
+            'Đại học',
+            'Kỹ sư',
+            'Công nghệ thông tin',
+            '[]',
+            '[]',
+            '[]',
+            '2024-01-20'
+        ];
+        XLSX.utils.sheet_add_aoa(worksheet, [sampleRow], { origin: -1 });
+
+        // Thêm worksheet vào workbook
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Mẫu ứng viên');
+
+        // Tạo file Excel
+        const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        // Gửi file về client
+        const fileName = `Mau_Thong_Tin_Ung_Vien_${new Date().toISOString().split('T')[0]}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+        res.send(excelBuffer);
+
+    } catch (error) {
+        console.error('Error exporting template:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi xuất file mẫu: ' + error.message
+        });
+    }
+});
+
+// POST /api/candidates/bulk-import - Import hàng loạt từ Excel
+router.post('/bulk-import', uploadExcel.single('file'), async (req, res) => {
+    try {
+        await ensureCandidatesTable();
+
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vui lòng chọn file Excel để import'
+            });
+        }
+
+        // Đọc file Excel
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+        if (data.length < 2) {
+            return res.status(400).json({
+                success: false,
+                message: 'File Excel không có dữ liệu hoặc chỉ có header'
+            });
+        }
+
+        // Lấy header (dòng đầu tiên)
+        const headers = data[0].map(h => String(h).trim());
+        
+        // Map header tiếng Việt sang tên field
+        const headerMap = {
+            'Họ tên*': 'hoTen',
+            'Giới tính': 'gioiTinh',
+            'Ngày sinh* (YYYY-MM-DD)': 'ngaySinh',
+            'Nơi sinh': 'noiSinh',
+            'Tình trạng hôn nhân': 'tinhTrangHonNhan',
+            'Dân tộc': 'danToc',
+            'Quốc tịch': 'quocTich',
+            'Tôn giáo': 'tonGiao',
+            'Vị trí ứng tuyển*': 'viTriUngTuyen',
+            'Phòng ban*': 'phongBan',
+            'Số điện thoại*': 'soDienThoai',
+            'Số điện thoại khác': 'soDienThoaiKhac',
+            'Email': 'email',
+            'CCCD*': 'cccd',
+            'Ngày cấp CCCD* (YYYY-MM-DD)': 'ngayCapCCCD',
+            'Nơi cấp CCCD*': 'noiCapCCCD',
+            'Nguyên quán': 'nguyenQuan',
+            'Địa chỉ tạm trú': 'diaChiTamTru',
+            'Trình độ văn hóa': 'trinhDoVanHoa',
+            'Trình độ chuyên môn': 'trinhDoChuyenMon',
+            'Chuyên ngành': 'chuyenNganh',
+            'Kinh nghiệm làm việc (JSON)': 'kinhNghiemLamViec',
+            'Quá trình đào tạo (JSON)': 'quaTrinhDaoTao',
+            'Trình độ ngoại ngữ (JSON)': 'trinhDoNgoaiNgu',
+            'Ngày gửi CV* (YYYY-MM-DD)': 'ngayGuiCV'
+        };
+
+        // Tạo mapping từ index cột sang field name
+        const columnMap = {};
+        headers.forEach((header, index) => {
+            const fieldName = headerMap[header];
+            if (fieldName) {
+                columnMap[index] = fieldName;
+            }
+        });
+
+        const results = {
+            success: 0,
+            failed: 0,
+            errors: []
+        };
+
+        // Xử lý từng dòng (bỏ qua dòng đầu tiên - header)
+        for (let i = 1; i < data.length; i++) {
+            const row = data[i];
+            
+            // Bỏ qua dòng trống
+            if (!row || row.every(cell => !cell || String(cell).trim() === '')) {
+                continue;
+            }
+
+            try {
+                // Map dữ liệu từ row sang object
+                const candidateData = {};
+                Object.keys(columnMap).forEach(colIndex => {
+                    const fieldName = columnMap[colIndex];
+                    const value = row[parseInt(colIndex)];
+                    if (value !== undefined && value !== null && String(value).trim() !== '') {
+                        candidateData[fieldName] = String(value).trim();
+                    }
+                });
+
+                // Bỏ qua dòng nếu hoàn toàn trống (không có dữ liệu nào)
+                if (Object.keys(candidateData).length === 0) {
+                    continue;
+                }
+
+                // Parse JSON fields nếu có
+                if (candidateData.kinhNghiemLamViec) {
+                    try {
+                        candidateData.kinhNghiemLamViec = JSON.parse(candidateData.kinhNghiemLamViec);
+                    } catch (e) {
+                        candidateData.kinhNghiemLamViec = null;
+                    }
+                }
+
+                if (candidateData.quaTrinhDaoTao) {
+                    try {
+                        candidateData.quaTrinhDaoTao = JSON.parse(candidateData.quaTrinhDaoTao);
+                    } catch (e) {
+                        candidateData.quaTrinhDaoTao = null;
+                    }
+                }
+
+                if (candidateData.trinhDoNgoaiNgu) {
+                    try {
+                        candidateData.trinhDoNgoaiNgu = JSON.parse(candidateData.trinhDoNgoaiNgu);
+                    } catch (e) {
+                        candidateData.trinhDoNgoaiNgu = null;
+                    }
+                }
+
+                // Kiểm tra trùng số điện thoại (chỉ kiểm tra nếu có số điện thoại)
+                if (candidateData.soDienThoai) {
+                    const checkDuplicate = await pool.query(
+                        'SELECT id FROM candidates WHERE so_dien_thoai = $1',
+                        [candidateData.soDienThoai]
+                    );
+
+                    if (checkDuplicate.rows.length > 0) {
+                        results.failed++;
+                        results.errors.push({
+                            row: i + 1,
+                            candidate: candidateData.hoTen || 'N/A',
+                            error: 'Số điện thoại đã tồn tại'
+                        });
+                        continue;
+                    }
+                }
+
+                // Insert vào database
+                const insertQuery = `
+                    INSERT INTO candidates (
+                        ho_ten, gioi_tinh, ngay_sinh, noi_sinh, tinh_trang_hon_nhan, dan_toc, quoc_tich, ton_giao,
+                        vi_tri_ung_tuyen, phong_ban,
+                        so_dien_thoai, so_dien_thoai_khac, email,
+                        cccd, ngay_cap_cccd, noi_cap_cccd, nguyen_quan,
+                        dia_chi_tam_tru,
+                        trinh_do_van_hoa, trinh_do_chuyen_mon, chuyen_nganh,
+                        kinh_nghiem_lam_viec, qua_trinh_dao_tao, trinh_do_ngoai_ngu,
+                        ngay_gui_cv,
+                        status
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+                    RETURNING id
+                `;
+
+                await pool.query(insertQuery, [
+                    candidateData.hoTen || null,
+                    candidateData.gioiTinh || null,
+                    candidateData.ngaySinh || null,
+                    candidateData.noiSinh || null,
+                    candidateData.tinhTrangHonNhan || null,
+                    candidateData.danToc || null,
+                    candidateData.quocTich || null,
+                    candidateData.tonGiao || null,
+                    candidateData.viTriUngTuyen || null,
+                    candidateData.phongBan || null,
+                    candidateData.soDienThoai || null,
+                    candidateData.soDienThoaiKhac || null,
+                    candidateData.email || null,
+                    candidateData.cccd || null,
+                    candidateData.ngayCapCCCD || null,
+                    candidateData.noiCapCCCD || null,
+                    candidateData.nguyenQuan || null,
+                    candidateData.diaChiTamTru || null,
+                    candidateData.trinhDoVanHoa || null,
+                    candidateData.trinhDoChuyenMon || null,
+                    candidateData.chuyenNganh || null,
+                    candidateData.kinhNghiemLamViec ? JSON.stringify(candidateData.kinhNghiemLamViec) : null,
+                    candidateData.quaTrinhDaoTao ? JSON.stringify(candidateData.quaTrinhDaoTao) : null,
+                    candidateData.trinhDoNgoaiNgu ? JSON.stringify(candidateData.trinhDoNgoaiNgu) : null,
+                    candidateData.ngayGuiCV || null,
+                    'PENDING_INTERVIEW'
+                ]);
+
+                results.success++;
+
+            } catch (error) {
+                results.failed++;
+                results.errors.push({
+                    row: i + 1,
+                    error: error.message
+                });
+            }
+        }
+
+        res.json({
+            success: true,
+            message: `Import hoàn tất: ${results.success} thành công, ${results.failed} thất bại`,
+            results: results
+        });
+
+    } catch (error) {
+        console.error('Error importing candidates:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi import file: ' + error.message
+        });
     }
 });
 

@@ -184,6 +184,14 @@ export const candidatesAPI = {
   getPositions: () => api.get('/candidates/positions'),
   // Get CV file URL
   getCVUrl: (candidateId) => `${API_URL}/candidates/cv/${candidateId}`,
+  // Export template Excel
+  exportTemplate: () => api.get('/candidates/export-template', { responseType: 'blob' }),
+  // Bulk import from Excel
+  bulkImport: (formData) => api.post('/candidates/bulk-import', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  }),
 };
 
 // Notification system removed

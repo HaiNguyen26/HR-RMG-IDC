@@ -2,8 +2,9 @@
 
 Hệ thống quản lý nhân sự - Web Application với Node.js, React.js và PostgreSQL
 
-**🚀 Deploy:** [QUICK_DEPLOY.md](QUICK_DEPLOY.md) | [DEPLOY_SERVER_NEW.md](DEPLOY_SERVER_NEW.md)  
-**📍 Server:** 27.71.16.15
+**🚀 Deploy:** [DEPLOY.md](DEPLOY.md) - Hướng dẫn deploy toàn diện lên cloud server  
+**📍 Server:** 27.71.16.15 (Ubuntu Server 22.04 LTS)  
+**📦 Repository:** https://github.com/HaiNguyen26/HR-RMG-IDC.git
 
 ## 🚀 Khởi động nhanh
 
@@ -84,9 +85,9 @@ HR-Management-System/
 - [Login Credentials](docs/LOGIN_CREDENTIALS.md)
 
 ### Deployment
-- [🚀 DEPLOY - Hướng dẫn từng bước](DEPLOY.md) ⭐ **BẮT ĐẦU TỪ ĐÂY**
-- [🔄 WORKFLOW - Code và Deploy hàng ngày](WORKFLOW.md) ⭐ **WORKFLOW HÀNG NGÀY - ĐỌC FILE NÀY**
-- [🔄 UPDATE - Cập nhật Code & Database (Chi tiết)](UPDATE.md)
+- [🚀 DEPLOY.md - Hướng dẫn deploy từ đầu](DEPLOY.md) ⭐ **BẮT ĐẦU TỪ ĐÂY - FILE DUY NHẤT**
+- [🔄 WORKFLOW - Code và Deploy hàng ngày](WORKFLOW.md) ⭐ **WORKFLOW HÀNG NGÀY**
+- [🔄 UPDATE - Cập nhật Code & Database](UPDATE.md)
 - [🗄️ Lựa chọn Database](DATABASE_OPTIONS.md) - Database mới hay Migrate?
 - [📦 Migrate Database từ Local](MIGRATE_DATABASE.md) - **Nếu có database ở local**
 
