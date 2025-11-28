@@ -28,8 +28,8 @@ module.exports = {
     },
     {
       name: 'hr-rmg-idc-frontend',  // Tên riêng biệt, không trùng với app cũ
-      script: 'serve',
-      args: ['-s', 'build', '-l', '3002'],  // Port riêng, không trùng với app cũ
+      script: 'npx',  // Dùng npx để tránh lỗi parse args
+      args: ['serve', '-s', 'build', '-l', '3002'],  // Port riêng, không trùng với app cũ
       cwd: '/var/www/hr-rmg-idc/frontend',  // Thư mục riêng
       env: {
         NODE_ENV: 'production'

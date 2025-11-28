@@ -156,10 +156,12 @@ ssh username@27.71.16.15
 # Kiểm tra PM2 apps đang chạy
 pm2 list
 
-# Kiểm tra ports đang được sử dụng
-sudo netstat -tulpn | grep LISTEN
-# hoặc (nếu netstat không có)
+# Kiểm tra ports đang được sử dụng (dùng ss trên Ubuntu 22.04)
 sudo ss -tulpn | grep LISTEN
+
+# Hoặc cài đặt netstat nếu muốn dùng (không bắt buộc)
+# sudo apt install net-tools
+# sudo netstat -tulpn | grep LISTEN
 
 # Kiểm tra thư mục ứng dụng cũ
 ls -la /var/www/
@@ -339,34 +341,122 @@ cd ..
 
 ### 5.1. Upload file backup lên server
 
+**⚠️ LƯU Ý:** Thay `username` bằng username thực tế (thường là `root` hoặc user có quyền SSH)
+
 **Cách 1: Sử dụng SCP (từ máy local)**
 
 ```bash
 # Trên máy local Windows (PowerShell)
-scp backup/hr_management_backup_*.dump username@27.71.16.15:/tmp/
+# Thay 'root' bằng username thực tế của bạn
+scp backup/hr_management_backup_*.dump root@27.71.16.15:/tmp/
 
 # Hoặc file SQL
-scp backup/hr_management_backup_*.sql username@27.71.16.15:/tmp/
+scp backup/hr_management_backup_*.sql root@27.71.16.15:/tmp/
 ```
+
+**Nếu gặp lỗi "Permission denied":**
+- Kiểm tra username đúng chưa (thường là `root`)
+- Kiểm tra password đúng chưa
+- Thử dùng SSH key thay vì password
 
 **Cách 2: Sử dụng SFTP hoặc FileZilla**
 
-Kết nối đến server và upload file backup vào thư mục `/tmp/`.
+1. Mở FileZilla hoặc WinSCP
+2. Kết nối đến server:
+   - Host: `27.71.16.15`
+   - Username: `root` (hoặc username của bạn)
+   - Password: (password SSH của bạn)
+   - Port: `22`
+3. Upload file backup vào thư mục `/tmp/`
+
+**Cách 3: Sử dụng base64 encode (cho file nhỏ)**
+
+Nếu file backup nhỏ (< 10MB), có thể dùng base64:
+
+```bash
+# Trên máy local - Encode file
+certutil -encode backup/hr_management_backup_*.dump backup_encoded.txt
+
+# Copy nội dung file backup_encoded.txt
+# Trên server - Tạo file và decode
+nano /tmp/backup_encoded.txt
+# Paste nội dung, sau đó:
+base64 -d /tmp/backup_encoded.txt > /tmp/hr_management_backup.dump
+```
 
 ### 5.2. Restore database trên server
 
 ```bash
-# Kết nối vào server
-ssh username@27.71.16.15
+# Kết nối vào server (thay 'root' bằng username thực tế)
+ssh root@27.71.16.15
 
-# Restore từ file dump
-pg_restore -h localhost -U postgres -d HR_Management_System -c /tmp/hr_management_backup_*.dump
+# Kiểm tra file backup đã được upload
+ls -lh /tmp/hr_management_backup_*
+
+# Cách 1: Restore database mới (KHÔNG dùng flag -c) - Khuyến nghị cho database mới
+# Dùng wildcard (tự động tìm file mới nhất)
+pg_restore -h localhost -U postgres -d HR_Management_System /tmp/hr_management_backup_*.dump
+
+# Cách 2: Dùng tên file cụ thể
+# Ví dụ: file là hr_management_backup_20251128_133354.dump
+pg_restore -h localhost -U postgres -d HR_Management_System /tmp/hr_management_backup_20251128_133354.dump
+
+# Cách 3: Restore với --if-exists -c để bỏ qua lỗi nếu object không tồn tại
+# Lưu ý: --if-exists PHẢI đi kèm với -c
+pg_restore -h localhost -U postgres -d HR_Management_System --if-exists -c /tmp/hr_management_backup_*.dump
 
 # Hoặc restore từ file SQL
 psql -h localhost -U postgres -d HR_Management_System -f /tmp/hr_management_backup_*.sql
 ```
 
-**Lưu ý:** Nhập password của PostgreSQL khi được yêu cầu.
+**Lưu ý:** 
+- **Database mới:** Không dùng flag `-c` (sẽ gây lỗi vì không có gì để xóa)
+- **Database đã có dữ liệu:** Dùng flag `-c` hoặc `--if-exists -c` để xóa trước khi restore
+- Dùng wildcard `*` để tự động tìm file backup (khuyến nghị)
+- Hoặc copy tên file chính xác từ kết quả `ls -lh /tmp/hr_management_backup_*`
+- Nhập password của PostgreSQL (`Hainguyen261097`) khi được yêu cầu
+
+**Nếu gặp lỗi khi restore:**
+
+**Lỗi "relation does not exist":**
+- Nguyên nhân: Dùng flag `-c` trên database mới (chưa có bảng)
+- Giải pháp: Bỏ flag `-c` hoặc dùng `--if-exists -c`
+
+**Lỗi "function already exists":**
+- Nguyên nhân: Database đã có functions từ code tự động tạo schema
+- Giải pháp: Dùng `--if-exists` hoặc bỏ qua lỗi (không ảnh hưởng đến dữ liệu)
+
+```bash
+# Kiểm tra file có tồn tại không
+ls -la /tmp/hr_management_backup_*
+
+# Kiểm tra quyền file
+chmod 644 /tmp/hr_management_backup_*.dump
+
+# Thử restore không dùng -c (cho database mới) - Khuyến nghị
+pg_restore -h localhost -U postgres -d HR_Management_System /tmp/hr_management_backup_*.dump
+
+# Nếu gặp lỗi "already exists", dùng --if-exists -c để bỏ qua
+# Lưu ý: --if-exists PHẢI đi kèm với -c
+pg_restore -h localhost -U postgres -d HR_Management_System --if-exists -c /tmp/hr_management_backup_*.dump
+
+# Hoặc dùng --no-owner --no-acl để bỏ qua một số lỗi về ownership
+pg_restore -h localhost -U postgres -d HR_Management_System --no-owner --no-acl /tmp/hr_management_backup_*.dump
+
+# Hoặc kết hợp cả hai
+pg_restore -h localhost -U postgres -d HR_Management_System --if-exists -c --no-owner --no-acl /tmp/hr_management_backup_*.dump
+
+# Thử restore với verbose để xem lỗi chi tiết
+pg_restore -h localhost -U postgres -d HR_Management_System -v /tmp/hr_management_backup_*.dump
+
+# Nếu vẫn lỗi, có thể bỏ qua lỗi functions (chỉ restore dữ liệu)
+# Các functions sẽ được tạo lại tự động khi ứng dụng chạy
+```
+
+**Lưu ý về lỗi "function already exists":**
+- Lỗi này thường không ảnh hưởng đến dữ liệu
+- Functions sẽ được tạo lại tự động khi ứng dụng chạy lần đầu
+- Có thể bỏ qua và tiếp tục deploy
 
 ### 5.3. Kiểm tra database đã restore
 
@@ -451,9 +541,12 @@ mkdir -p /var/www/hr-rmg-idc/logs
 ### 7.3. Kiểm tra lại trước khi khởi động
 
 ```bash
-# Kiểm tra ports không bị chiếm
-sudo netstat -tulpn | grep :3001
-sudo netstat -tulpn | grep :3002
+# Kiểm tra ports không bị chiếm (dùng ss thay vì netstat trên Ubuntu 22.04)
+sudo ss -tulpn | grep :3001
+sudo ss -tulpn | grep :3002
+
+# Hoặc kiểm tra tất cả ports đang listen
+sudo ss -tulpn | grep LISTEN
 
 # Kiểm tra PM2 apps hiện tại
 pm2 list
@@ -479,6 +572,23 @@ pm2 logs hr-rmg-idc-frontend
 
 # Lưu cấu hình PM2 (lưu tất cả apps)
 pm2 save
+```
+
+**Nếu frontend gặp lỗi "getaddrinfo ENOTFOUND -l":**
+
+```bash
+# Xóa frontend app cũ
+pm2 delete hr-rmg-idc-frontend
+
+# Khởi động lại từ config (đã được sửa để dùng npx)
+pm2 start ecosystem.config.js --only hr-rmg-idc-frontend
+
+# Hoặc khởi động lại tất cả
+pm2 restart ecosystem.config.js
+
+# Kiểm tra lại
+pm2 status
+pm2 logs hr-rmg-idc-frontend --lines 20
 ```
 
 **✅ Xác nhận:**
@@ -737,8 +847,8 @@ pg_dump -h localhost -U postgres -d HR_Management_System -f /var/www/hr-rmg-idc/
 pm2 logs
 
 # Kiểm tra port đã được sử dụng chưa
-sudo netstat -tulpn | grep :3001
-sudo netstat -tulpn | grep :3002
+sudo ss -tulpn | grep :3001
+sudo ss -tulpn | grep :3002
 
 # Kiểm tra file .env
 cat backend/.env
