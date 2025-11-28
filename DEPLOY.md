@@ -775,11 +775,64 @@ sudo nginx -t && sudo systemctl reload nginx
 
 Nếu vẫn muốn dùng cách này, thêm vào file `/etc/nginx/sites-available/it-request-tracking` TRƯỚC location `/`:
 
-**Bước 4: Kiểm tra truy cập**
+**Bước 4: Kiểm tra config đã được load**
+
+```bash
+# Kiểm tra xem file config riêng đã được enable chưa
+ls -la /etc/nginx/sites-enabled/ | grep hr-rmg-idc
+
+# Kiểm tra xem location /hr đang được xử lý bởi file nào
+sudo nginx -T | grep -B 10 "location /hr"
+
+# Kiểm tra tất cả các file config đang active
+sudo nginx -T | grep "server_name 27.71.16.15" -A 5
+```
+
+**Bước 5: Kiểm tra truy cập**
 
 - App cũ: `http://27.71.16.15/` ✅
 - App HR Frontend: `http://27.71.16.15/hr` ✅
 - App HR Backend API: `http://27.71.16.15/hr/api` ✅
+
+**Nếu đã xóa location /hr khỏi config app cũ nhưng vẫn truy cập được:**
+
+Có thể do:
+1. Đã tạo file config riêng `hr-rmg-idc` và enable nó
+2. Nginx chưa reload đúng
+3. Có file config khác đang xử lý
+
+**Kiểm tra:**
+
+```bash
+# Xem file nào đang xử lý location /hr
+sudo nginx -T | grep -B 20 "location /hr"
+
+# Kiểm tra xem có file hr-rmg-idc trong sites-enabled không
+ls -la /etc/nginx/sites-enabled/
+
+# Nếu có file hr-rmg-idc, xem nội dung
+cat /etc/nginx/sites-enabled/hr-rmg-idc
+
+# Nếu không có, kiểm tra lại file app cũ
+cat /etc/nginx/sites-enabled/it-request-tracking | grep -A 10 "location /hr"
+```
+
+**Nếu muốn xóa hoàn toàn và tạo lại:**
+
+```bash
+# Xóa file config cũ (nếu có)
+sudo rm /etc/nginx/sites-enabled/hr-rmg-idc
+
+# Xóa location /hr khỏi file app cũ (nếu còn)
+sudo nano /etc/nginx/sites-available/it-request-tracking
+# Xóa các dòng location /hr và /hr/api
+
+# Test và reload
+sudo nginx -t
+sudo systemctl reload nginx
+
+# Sau đó tạo lại file config riêng theo hướng dẫn trên
+```
 
 **Nếu gặp lỗi MIME type (Refused to execute script/apply style):**
 
