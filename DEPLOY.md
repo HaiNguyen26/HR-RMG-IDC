@@ -654,24 +654,72 @@ cat /etc/nginx/sites-enabled/*
 
 **📋 Thông tin app cũ trên server này:**
 - **Nginx config:** `it-request-tracking` (port 80)
+- **Server name:** `27.71.16.15`
+- **Frontend:** `/var/www/it-request-tracking/webapp/dist` (root path `/`)
+- **Backend API:** `http://127.0.0.1:4000/api/` (path `/api/`)
 - **Không có default site** (đã bị xóa hoặc không enable)
 
 **⚠️ QUAN TRỌNG:** 
-- App cũ (`it-request-tracking`) đã dùng port 80
+- App cũ (`it-request-tracking`) đã chiếm:
+  - Port 80 (root path `/`)
+  - Path `/api/` (backend API)
+- **App mới KHÔNG thể dùng cùng path `/api/`** vì sẽ xung đột
 - Bạn có thể:
-  - **Tùy chọn 1:** Dùng subdomain hoặc path khác (ví dụ: `/hr`)
+  - **Tùy chọn 1:** Dùng path riêng (ví dụ: `/hr` và `/hr/api`) - **Khuyến nghị**
   - **Tùy chọn 2:** Dùng port khác (ví dụ: 8080)
   - **Tùy chọn 3:** Không dùng Nginx, truy cập trực tiếp qua port 3002 (đơn giản nhất)
 
 ### 8.2. Tạo file cấu hình Nginx (chỉ nếu cần)
 
-**Tùy chọn A: Dùng subdomain hoặc path riêng**
+**Tùy chọn A: Dùng path riêng (ví dụ: `/hr`) - Khuyến nghị**
+
+⚠️ **LƯU Ý:** Cần sửa file config của app cũ (`it-request-tracking`) để thêm location cho app mới, hoặc tạo config riêng.
+
+**Cách 1: Thêm vào config của app cũ (đơn giản hơn)**
+
+```bash
+sudo nano /etc/nginx/sites-available/it-request-tracking
+```
+
+Thêm vào cuối file (trước dấu `}` cuối cùng):
+
+```nginx
+    # HR Management System - Frontend
+    location /hr {
+        proxy_pass http://localhost:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        rewrite ^/hr/(.*)$ /$1 break;
+    }
+
+    # HR Management System - Backend API (dùng /hr/api để tránh xung đột với /api/)
+    location /hr/api {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        rewrite ^/hr/api/(.*)$ /api/$1 break;
+    }
+```
+
+**Cách 2: Tạo config riêng (nếu muốn tách biệt)**
 
 ```bash
 sudo nano /etc/nginx/sites-available/hr-rmg-idc
 ```
 
-Nội dung (ví dụ dùng path `/hr`):
+Nội dung:
 
 ```nginx
 server {
@@ -688,6 +736,7 @@ server {
         proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         rewrite ^/hr/(.*)$ /$1 break;
     }
 
@@ -701,6 +750,7 @@ server {
         proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         rewrite ^/hr/api/(.*)$ /api/$1 break;
     }
 }
