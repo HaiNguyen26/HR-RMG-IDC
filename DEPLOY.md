@@ -673,19 +673,19 @@ cat /etc/nginx/sites-enabled/*
 
 **🎯 Mục tiêu:** App cũ truy cập qua `http://27.71.16.15/`, app HR truy cập qua `http://27.71.16.15/hr`
 
-**✅ Cách đơn giản nhất: Thêm vào config của app cũ**
+**⚠️ QUAN TRỌNG:** Để tách biệt hoàn toàn 2 apps và không ảnh hưởng lẫn nhau, nên tạo file config riêng cho app HR thay vì sửa config của app cũ.
 
-**Bước 1: Sửa file config của app cũ**
+**✅ Cách 1: Tạo file config riêng (Khuyến nghị - Tách biệt hoàn toàn)**
+
+Tạo file config riêng cho app HR, không động vào config của app cũ.
+
+**Bước 1: Tạo file config riêng cho app HR**
 
 ```bash
-sudo nano /etc/nginx/sites-available/it-request-tracking
+sudo nano /etc/nginx/sites-available/hr-rmg-idc
 ```
 
-**Bước 2: Thêm vào TRƯỚC location `/` (quan trọng!)**
-
-⚠️ **QUAN TRỌNG:** Location `/hr` phải được đặt TRƯỚC location `/` để Nginx match đúng. Nếu đặt sau, location `/` sẽ match trước và `/hr` sẽ không hoạt động.
-
-Tìm dòng `location / {` và thêm TRƯỚC nó:
+**Bước 2: Thêm nội dung sau (file hoàn toàn riêng biệt):**
 
 ```nginx
     # HR Management System - Backend API (phải đặt TRƯỚC location /)
@@ -735,8 +735,6 @@ Tìm dòng `location / {` và thêm TRƯỚC nó:
         # ... existing config ...
 ```
 
-**Bước 3: Test và reload Nginx**
-
 ```bash
 # Test cấu hình Nginx
 sudo nginx -t
@@ -747,19 +745,35 @@ sudo systemctl reload nginx
 # Kiểm tra lại
 sudo systemctl status nginx
 
-# Kiểm tra xem location /hr đã được thêm chưa
+# Kiểm tra xem config đã được load chưa
 sudo nginx -T | grep -A 10 "location /hr"
 ```
 
-**Nếu vẫn không hoạt động, kiểm tra:**
+**✅ Ưu điểm của cách này:**
+- ✅ Tách biệt hoàn toàn: Mỗi app có file config riêng
+- ✅ Không ảnh hưởng app cũ: Không cần sửa file `it-request-tracking`
+- ✅ Dễ quản lý: Có thể enable/disable từng app riêng
+- ✅ Dễ bảo trì: Sửa config app này không ảnh hưởng app kia
 
+**Để disable app HR (nếu cần):**
 ```bash
-# Xem toàn bộ config để đảm bảo location /hr đặt trước location /
-sudo nginx -T | grep -B 5 -A 10 "location /hr"
-
-# Kiểm tra xem có location nào khác match /hr không
-sudo nginx -T | grep "location"
+sudo rm /etc/nginx/sites-enabled/hr-rmg-idc
+sudo nginx -t && sudo systemctl reload nginx
 ```
+
+**Để enable lại:**
+```bash
+sudo ln -s /etc/nginx/sites-available/hr-rmg-idc /etc/nginx/sites-enabled/hr-rmg-idc
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+---
+
+**Cách 2: Thêm vào config của app cũ (Không khuyến nghị - Có thể ảnh hưởng lẫn nhau)**
+
+⚠️ **Lưu ý:** Cách này sẽ sửa file config của app cũ, có thể ảnh hưởng khi phát triển.
+
+Nếu vẫn muốn dùng cách này, thêm vào file `/etc/nginx/sites-available/it-request-tracking` TRƯỚC location `/`:
 
 **Bước 4: Kiểm tra truy cập**
 
