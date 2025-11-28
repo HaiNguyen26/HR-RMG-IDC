@@ -739,14 +739,44 @@ sudo nano /etc/nginx/sites-available/hr-rmg-idc
 # Test cấu hình Nginx
 sudo nginx -t
 
-# Nếu test thành công, reload Nginx
+# Nếu test thành công, reload Nginx (BẮT BUỘC!)
 sudo systemctl reload nginx
+
+# Hoặc restart hoàn toàn nếu reload không đủ
+sudo systemctl restart nginx
 
 # Kiểm tra lại
 sudo systemctl status nginx
 
 # Kiểm tra xem config đã được load chưa
 sudo nginx -T | grep -A 10 "location /hr"
+
+# Kiểm tra xem file nào đang xử lý location /hr
+sudo nginx -T | grep -B 10 "location /hr"
+```
+
+**Nếu vẫn trỏ vào IT request sau khi reload:**
+
+```bash
+# Kiểm tra xem file hr-rmg-idc đã được enable chưa
+ls -la /etc/nginx/sites-enabled/hr-rmg-idc
+
+# Nếu không có, enable lại
+sudo ln -s /etc/nginx/sites-available/hr-rmg-idc /etc/nginx/sites-enabled/hr-rmg-idc
+
+# Kiểm tra xem file it-request-tracking có location /hr không
+cat /etc/nginx/sites-available/it-request-tracking | grep -A 10 "location /hr"
+
+# Nếu có, xóa location /hr khỏi file it-request-tracking
+sudo nano /etc/nginx/sites-available/it-request-tracking
+# Xóa các dòng location /hr và /hr/api
+
+# Test và reload lại
+sudo nginx -t
+sudo systemctl reload nginx
+
+# Kiểm tra lại
+sudo nginx -T | grep -B 5 -A 10 "location /hr"
 ```
 
 **✅ Ưu điểm của cách này:**
