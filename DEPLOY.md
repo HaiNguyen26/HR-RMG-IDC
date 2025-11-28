@@ -681,10 +681,28 @@ cat /etc/nginx/sites-enabled/*
 sudo nano /etc/nginx/sites-available/it-request-tracking
 ```
 
-**Bước 2: Thêm vào cuối file (trước dấu `}` cuối cùng):**
+**Bước 2: Thêm vào TRƯỚC location `/` (quan trọng!)**
+
+⚠️ **QUAN TRỌNG:** Location `/hr` phải được đặt TRƯỚC location `/` để Nginx match đúng. Nếu đặt sau, location `/` sẽ match trước và `/hr` sẽ không hoạt động.
+
+Tìm dòng `location / {` và thêm TRƯỚC nó:
 
 ```nginx
-    # HR Management System - Frontend
+    # HR Management System - Backend API (phải đặt TRƯỚC location /)
+    location /hr/api {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        rewrite ^/hr/api/(.*)$ /api/$1 break;
+    }
+
+    # HR Management System - Frontend (phải đặt TRƯỚC location /)
     location /hr {
         proxy_pass http://localhost:3002;
         proxy_http_version 1.1;
@@ -698,19 +716,9 @@ sudo nano /etc/nginx/sites-available/it-request-tracking
         rewrite ^/hr/(.*)$ /$1 break;
     }
 
-    # HR Management System - Backend API (dùng /hr/api để tránh xung đột với /api/)
-    location /hr/api {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        rewrite ^/hr/api/(.*)$ /api/$1 break;
-    }
+    # Location / của app cũ (giữ nguyên)
+    location / {
+        # ... existing config ...
 ```
 
 **Bước 3: Test và reload Nginx**
@@ -724,6 +732,19 @@ sudo systemctl reload nginx
 
 # Kiểm tra lại
 sudo systemctl status nginx
+
+# Kiểm tra xem location /hr đã được thêm chưa
+sudo nginx -T | grep -A 10 "location /hr"
+```
+
+**Nếu vẫn không hoạt động, kiểm tra:**
+
+```bash
+# Xem toàn bộ config để đảm bảo location /hr đặt trước location /
+sudo nginx -T | grep -B 5 -A 10 "location /hr"
+
+# Kiểm tra xem có location nào khác match /hr không
+sudo nginx -T | grep "location"
 ```
 
 **Bước 4: Kiểm tra truy cập**
