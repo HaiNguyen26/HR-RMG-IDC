@@ -576,20 +576,33 @@ pm2 save
 
 **Nếu frontend gặp lỗi "getaddrinfo ENOTFOUND -l":**
 
+Lỗi này xảy ra khi PM2 không parse đúng args. Giải pháp: Dùng shell script.
+
 ```bash
-# Xóa frontend app cũ
+# 1. Tạo shell script để chạy serve
+cd /var/www/hr-rmg-idc
+cat > start-frontend.sh << 'EOF'
+#!/bin/bash
+# Shell script để chạy serve cho frontend
+cd /var/www/hr-rmg-idc/frontend
+exec npx serve -s build -l 3002
+EOF
+
+# 2. Cấp quyền thực thi
+chmod +x start-frontend.sh
+
+# 3. Xóa frontend app cũ
 pm2 delete hr-rmg-idc-frontend
 
-# Khởi động lại từ config (đã được sửa để dùng npx)
+# 4. Khởi động lại từ config mới (đã dùng shell script)
 pm2 start ecosystem.config.js --only hr-rmg-idc-frontend
 
-# Hoặc khởi động lại tất cả
-pm2 restart ecosystem.config.js
-
-# Kiểm tra lại
+# 5. Kiểm tra lại
 pm2 status
 pm2 logs hr-rmg-idc-frontend --lines 20
 ```
+
+**Lưu ý:** File `start-frontend.sh` đã được tạo trong repository, chỉ cần pull code và chạy các bước trên.
 
 **✅ Xác nhận:**
 - App cũ (`it-request-api` trên port 4000) vẫn đang chạy bình thường
