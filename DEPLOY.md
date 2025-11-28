@@ -645,16 +645,23 @@ ls -la /etc/nginx/sites-available/
 ls -la /etc/nginx/sites-enabled/
 
 # Xem nội dung config của app cũ (nếu có)
-cat /etc/nginx/sites-enabled/default
-# hoặc
-cat /etc/nginx/sites-enabled/[tên-app-cũ]
+# Ví dụ: app cũ là it-request-tracking
+cat /etc/nginx/sites-enabled/it-request-tracking
+
+# Hoặc xem tất cả configs
+cat /etc/nginx/sites-enabled/*
 ```
 
+**📋 Thông tin app cũ trên server này:**
+- **Nginx config:** `it-request-tracking` (port 80)
+- **Không có default site** (đã bị xóa hoặc không enable)
+
 **⚠️ QUAN TRỌNG:** 
-- Nếu app cũ đã dùng port 80, bạn có thể:
-  - Dùng subdomain hoặc path khác
-  - Hoặc dùng port khác (ví dụ: 8080)
-  - Hoặc không dùng Nginx, truy cập trực tiếp qua port 3002
+- App cũ (`it-request-tracking`) đã dùng port 80
+- Bạn có thể:
+  - **Tùy chọn 1:** Dùng subdomain hoặc path khác (ví dụ: `/hr`)
+  - **Tùy chọn 2:** Dùng port khác (ví dụ: 8080)
+  - **Tùy chọn 3:** Không dùng Nginx, truy cập trực tiếp qua port 3002 (đơn giản nhất)
 
 ### 8.2. Tạo file cấu hình Nginx (chỉ nếu cần)
 
