@@ -901,10 +901,18 @@ router.post('/', upload.single('cvFile'), async (req, res) => {
             }
         }
 
+        // Convert empty strings to null for date fields
+        const normalizeDate = (dateValue) => {
+            if (!dateValue || dateValue === '' || (typeof dateValue === 'string' && dateValue.trim() === '')) {
+                return null;
+            }
+            return dateValue;
+        };
+
         const result = await pool.query(insertQuery, [
             hoTen || null,
             gioiTinh || null,
-            ngaySinh || null,
+            normalizeDate(ngaySinh),
             noiSinh || null,
             tinhTrangHonNhan || null,
             danToc || null,
@@ -916,7 +924,7 @@ router.post('/', upload.single('cvFile'), async (req, res) => {
             soDienThoaiKhac || null,
             email || null,
             cccd || null,
-            ngayCapCCCD || null,
+            normalizeDate(ngayCapCCCD),
             noiCapCCCD || null,
             nguyenQuan || null,
             diaChiTamTru || null,
@@ -926,7 +934,7 @@ router.post('/', upload.single('cvFile'), async (req, res) => {
             kinhNghiemData ? JSON.stringify(kinhNghiemData) : null,
             quaTrinhData ? JSON.stringify(quaTrinhData) : null,
             ngoaiNguData ? JSON.stringify(ngoaiNguData) : null,
-            ngayGuiCV || null,
+            normalizeDate(ngayGuiCV),
             cvFilePath,
             cvFileName,
             'PENDING_INTERVIEW'
@@ -1124,10 +1132,18 @@ router.put('/:id', upload.single('cvFile'), async (req, res) => {
             RETURNING *
         `;
 
+        // Convert empty strings to null for date fields
+        const normalizeDate = (dateValue) => {
+            if (!dateValue || dateValue === '' || dateValue.trim() === '') {
+                return null;
+            }
+            return dateValue;
+        };
+
         const result = await pool.query(updateQuery, [
             hoTen,
             gioiTinh || null,
-            ngaySinh,
+            normalizeDate(ngaySinh),
             noiSinh || null,
             tinhTrangHonNhan || null,
             danToc || null,
@@ -1139,7 +1155,7 @@ router.put('/:id', upload.single('cvFile'), async (req, res) => {
             soDienThoaiKhac || null,
             email || null,
             cccd,
-            ngayCapCCCD,
+            normalizeDate(ngayCapCCCD),
             noiCapCCCD,
             nguyenQuan || null,
             diaChiTamTru || null,
@@ -1149,7 +1165,7 @@ router.put('/:id', upload.single('cvFile'), async (req, res) => {
             kinhNghiemData ? JSON.stringify(kinhNghiemData) : null,
             quaTrinhData ? JSON.stringify(quaTrinhData) : null,
             ngoaiNguData ? JSON.stringify(ngoaiNguData) : null,
-            ngayGuiCV,
+            normalizeDate(ngayGuiCV),
             cvFilePath,
             cvFileName,
             id
@@ -4299,10 +4315,18 @@ router.post('/bulk-import', uploadExcel.single('file'), async (req, res) => {
                     RETURNING id
                 `;
 
+                // Convert empty strings to null for date fields
+                const normalizeDate = (dateValue) => {
+                    if (!dateValue || dateValue === '' || (typeof dateValue === 'string' && dateValue.trim() === '')) {
+                        return null;
+                    }
+                    return dateValue;
+                };
+
                 await pool.query(insertQuery, [
                     candidateData.hoTen || null,
                     candidateData.gioiTinh || null,
-                    candidateData.ngaySinh || null,
+                    normalizeDate(candidateData.ngaySinh),
                     candidateData.noiSinh || null,
                     candidateData.tinhTrangHonNhan || null,
                     candidateData.danToc || null,
@@ -4314,7 +4338,7 @@ router.post('/bulk-import', uploadExcel.single('file'), async (req, res) => {
                     candidateData.soDienThoaiKhac || null,
                     candidateData.email || null,
                     candidateData.cccd || null,
-                    candidateData.ngayCapCCCD || null,
+                    normalizeDate(candidateData.ngayCapCCCD),
                     candidateData.noiCapCCCD || null,
                     candidateData.nguyenQuan || null,
                     candidateData.diaChiTamTru || null,
@@ -4324,7 +4348,7 @@ router.post('/bulk-import', uploadExcel.single('file'), async (req, res) => {
                     candidateData.kinhNghiemLamViec ? JSON.stringify(candidateData.kinhNghiemLamViec) : null,
                     candidateData.quaTrinhDaoTao ? JSON.stringify(candidateData.quaTrinhDaoTao) : null,
                     candidateData.trinhDoNgoaiNgu ? JSON.stringify(candidateData.trinhDoNgoaiNgu) : null,
-                    candidateData.ngayGuiCV || null,
+                    normalizeDate(candidateData.ngayGuiCV),
                     'PENDING_INTERVIEW'
                 ]);
 
