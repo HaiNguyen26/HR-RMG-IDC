@@ -366,8 +366,71 @@ ls -la /var/www/hr-management/frontend/build/
 ```
 
 ### 6.4. Kiểm tra Database
+
+#### Kiểm tra số lượng records trong các bảng chính
+
 ```bash
-PGPASSWORD=Hainguyen261097 psql -h localhost -U hr_user -d HR_Management_System -c "SELECT COUNT(*) FROM employees;"
+# Đếm employees
+PGPASSWORD=Hainguyen261097 psql -h localhost -U hr_user -d HR_Management_System -c "SELECT COUNT(*) as employees_count FROM employees;"
+
+# Đếm tất cả các bảng quan trọng
+PGPASSWORD=Hainguyen261097 psql -h localhost -U hr_user -d HR_Management_System << EOF
+SELECT 
+    'employees' as table_name, COUNT(*) as count FROM employees
+UNION ALL SELECT 'users', COUNT(*) FROM users
+UNION ALL SELECT 'candidates', COUNT(*) FROM candidates
+UNION ALL SELECT 'leave_requests', COUNT(*) FROM leave_requests
+UNION ALL SELECT 'overtime_requests', COUNT(*) FROM overtime_requests
+UNION ALL SELECT 'attendance_adjustments', COUNT(*) FROM attendance_adjustments
+UNION ALL SELECT 'travel_expense_requests', COUNT(*) FROM travel_expense_requests
+UNION ALL SELECT 'interview_requests', COUNT(*) FROM interview_requests
+UNION ALL SELECT 'recruitment_requests', COUNT(*) FROM recruitment_requests
+UNION ALL SELECT 'requests', COUNT(*) FROM requests
+UNION ALL SELECT 'request_items', COUNT(*) FROM request_items
+UNION ALL SELECT 'equipment_assignments', COUNT(*) FROM equipment_assignments
+ORDER BY table_name;
+EOF
+```
+
+#### So sánh với database local
+
+**Trên máy local (Windows PowerShell hoặc Git Bash):**
+```bash
+# Đếm employees trên local
+psql -h localhost -p 5432 -U postgres -d HR_Management_System -c "SELECT COUNT(*) as employees_count FROM employees;"
+
+# Đếm tất cả các bảng
+psql -h localhost -p 5432 -U postgres -d HR_Management_System -c "
+SELECT 
+    'employees' as table_name, COUNT(*) as count FROM employees
+UNION ALL SELECT 'users', COUNT(*) FROM users
+UNION ALL SELECT 'candidates', COUNT(*) FROM candidates
+UNION ALL SELECT 'leave_requests', COUNT(*) FROM leave_requests
+UNION ALL SELECT 'overtime_requests', COUNT(*) FROM overtime_requests
+UNION ALL SELECT 'attendance_adjustments', COUNT(*) FROM attendance_adjustments
+UNION ALL SELECT 'travel_expense_requests', COUNT(*) FROM travel_expense_requests
+UNION ALL SELECT 'interview_requests', COUNT(*) FROM interview_requests
+UNION ALL SELECT 'recruitment_requests', COUNT(*) FROM recruitment_requests
+UNION ALL SELECT 'requests', COUNT(*) FROM requests
+UNION ALL SELECT 'request_items', COUNT(*) FROM request_items
+UNION ALL SELECT 'equipment_assignments', COUNT(*) FROM equipment_assignments
+ORDER BY table_name;
+"
+```
+
+**So sánh:** Đối chiếu số lượng records từ local và server. Nếu giống nhau thì database đã được restore đúng.
+
+#### Kiểm tra dữ liệu cụ thể
+
+```bash
+# Xem một vài employees đầu tiên
+PGPASSWORD=Hainguyen261097 psql -h localhost -U hr_user -d HR_Management_System -c "SELECT id, ho_ten, email, phong_ban FROM employees ORDER BY id LIMIT 5;"
+
+# Kiểm tra employees có email
+PGPASSWORD=Hainguyen261097 psql -h localhost -U hr_user -d HR_Management_System -c "SELECT COUNT(*) as employees_with_email FROM employees WHERE email IS NOT NULL AND email != '';"
+
+# Kiểm tra users
+PGPASSWORD=Hainguyen261097 psql -h localhost -U hr_user -d HR_Management_System -c "SELECT username, role, ho_ten FROM users;"
 ```
 
 ---
