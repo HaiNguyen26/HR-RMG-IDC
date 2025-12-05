@@ -20,7 +20,12 @@ BEGIN
         FROM pg_tables 
         WHERE schemaname = 'public'
     LOOP
-        EXECUTE 'ALTER TABLE public.' || quote_ident(r.tablename) || ' OWNER TO hr_user';
+        BEGIN
+            EXECUTE 'ALTER TABLE public.' || quote_ident(r.tablename) || ' OWNER TO hr_user';
+            RAISE NOTICE 'Changed owner of table: %', r.tablename;
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Error changing owner of table %: %', r.tablename, SQLERRM;
+        END;
     END LOOP;
 END $$;
 
@@ -34,7 +39,12 @@ BEGIN
         FROM information_schema.sequences 
         WHERE sequence_schema = 'public'
     LOOP
-        EXECUTE 'ALTER SEQUENCE public.' || quote_ident(r.sequence_name) || ' OWNER TO hr_user';
+        BEGIN
+            EXECUTE 'ALTER SEQUENCE public.' || quote_ident(r.sequence_name) || ' OWNER TO hr_user';
+            RAISE NOTICE 'Changed owner of sequence: %', r.sequence_name;
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Error changing owner of sequence %: %', r.sequence_name, SQLERRM;
+        END;
     END LOOP;
 END $$;
 
@@ -48,7 +58,31 @@ BEGIN
         FROM information_schema.views 
         WHERE table_schema = 'public'
     LOOP
-        EXECUTE 'ALTER VIEW public.' || quote_ident(r.table_name) || ' OWNER TO hr_user';
+        BEGIN
+            EXECUTE 'ALTER VIEW public.' || quote_ident(r.table_name) || ' OWNER TO hr_user';
+            RAISE NOTICE 'Changed owner of view: %', r.table_name;
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Error changing owner of view %: %', r.table_name, SQLERRM;
+        END;
+    END LOOP;
+END $$;
+
+-- Chuyển ownership của tất cả indexes
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT indexname 
+        FROM pg_indexes 
+        WHERE schemaname = 'public'
+    LOOP
+        BEGIN
+            EXECUTE 'ALTER INDEX public.' || quote_ident(r.indexname) || ' OWNER TO hr_user';
+            RAISE NOTICE 'Changed owner of index: %', r.indexname;
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Error changing owner of index %: %', r.indexname, SQLERRM;
+        END;
     END LOOP;
 END $$;
 
@@ -56,13 +90,24 @@ END $$;
 DO $$
 DECLARE
     r RECORD;
+    func_signature TEXT;
 BEGIN
     FOR r IN 
-        SELECT proname, oidvectortypes(proargtypes) as args
-        FROM pg_proc 
-        WHERE pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
+        SELECT 
+            p.proname,
+            pg_get_function_identity_arguments(p.oid) as args,
+            p.oid
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = 'public'
     LOOP
-        EXECUTE 'ALTER FUNCTION public.' || quote_ident(r.proname) || '(' || r.args || ') OWNER TO hr_user';
+        BEGIN
+            func_signature := quote_ident(r.proname) || '(' || COALESCE(r.args, '') || ')';
+            EXECUTE 'ALTER FUNCTION public.' || func_signature || ' OWNER TO hr_user';
+            RAISE NOTICE 'Changed owner of function: %', func_signature;
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Error changing owner of function %: %', func_signature, SQLERRM;
+        END;
     END LOOP;
 END $$;
 

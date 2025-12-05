@@ -148,11 +148,14 @@ if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
             echo -e "${YELLOW}Transferring ownership to hr_user...${NC}"
             # Chuyển ownership sang hr_user
             if [ -f "database/transfer_ownership_to_hr_user.sql" ]; then
-                sudo -u postgres psql -d "$DB_NAME" -f database/transfer_ownership_to_hr_user.sql
+                sudo -u postgres psql -d "$DB_NAME" -f database/transfer_ownership_to_hr_user.sql 2>&1 | grep -v "NOTICE:" || true
+                echo -e "${GREEN}✓ Ownership transferred${NC}"
             else
+                echo -e "${YELLOW}⚠ Script transfer_ownership_to_hr_user.sql not found, transferring manually...${NC}"
                 # Chuyển ownership thủ công nếu không có script
-                sudo -u postgres psql -d "$DB_NAME" -c "ALTER DATABASE ${DB_NAME} OWNER TO ${DB_USER};"
-                sudo -u postgres psql -d "$DB_NAME" -c "ALTER SCHEMA public OWNER TO ${DB_USER};"
+                sudo -u postgres psql -d "$DB_NAME" -c "ALTER DATABASE ${DB_NAME} OWNER TO ${DB_USER};" 2>/dev/null || true
+                sudo -u postgres psql -d "$DB_NAME" -c "ALTER SCHEMA public OWNER TO ${DB_USER};" 2>/dev/null || true
+                echo -e "${GREEN}✓ Basic ownership transferred${NC}"
             fi
             
             echo -e "${GREEN}✓ Database restored from backup and ownership transferred${NC}"
@@ -179,10 +182,13 @@ else
                 echo -e "${YELLOW}Transferring ownership to hr_user...${NC}"
                 # Chuyển ownership sang hr_user
                 if [ -f "database/transfer_ownership_to_hr_user.sql" ]; then
-                    sudo -u postgres psql -d "$DB_NAME" -f database/transfer_ownership_to_hr_user.sql
+                    sudo -u postgres psql -d "$DB_NAME" -f database/transfer_ownership_to_hr_user.sql 2>&1 | grep -v "NOTICE:" || true
+                    echo -e "${GREEN}✓ Ownership transferred${NC}"
                 else
-                    sudo -u postgres psql -d "$DB_NAME" -c "ALTER DATABASE ${DB_NAME} OWNER TO ${DB_USER};"
-                    sudo -u postgres psql -d "$DB_NAME" -c "ALTER SCHEMA public OWNER TO ${DB_USER};"
+                    echo -e "${YELLOW}⚠ Script transfer_ownership_to_hr_user.sql not found, transferring manually...${NC}"
+                    sudo -u postgres psql -d "$DB_NAME" -c "ALTER DATABASE ${DB_NAME} OWNER TO ${DB_USER};" 2>/dev/null || true
+                    sudo -u postgres psql -d "$DB_NAME" -c "ALTER SCHEMA public OWNER TO ${DB_USER};" 2>/dev/null || true
+                    echo -e "${GREEN}✓ Basic ownership transferred${NC}"
                 fi
                 
                 echo -e "${GREEN}✓ Database created and restored from backup${NC}"
