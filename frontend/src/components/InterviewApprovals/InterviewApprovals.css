@@ -1316,6 +1316,28 @@
     height: 1.25rem;
 }
 
+/* CV Button */
+.interview-detail-action-btn--cv {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 50%, #6d28d9 100%);
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.interview-detail-action-btn--cv:hover:not(:disabled) {
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 50%, #5b21b6 100%);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+    transform: translateY(-1px);
+}
+
+.interview-detail-action-btn--cv svg {
+    width: 1.125rem;
+    height: 1.125rem;
+}
+
 /* Preview Button */
 .interview-detail-action-btn--preview {
     background: #0096FF;
