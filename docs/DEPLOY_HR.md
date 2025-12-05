@@ -694,5 +694,80 @@ Nếu gặp vấn đề:
 
 ---
 
+## 🔄 Reset Database trên Server (Chỉ giữ lại nhân viên)
+
+Script để reset database, xóa toàn bộ dữ liệu nhưng **CHỈ GIỮ LẠI** danh sách nhân viên.
+
+### Cảnh báo
+⚠️ **Script này sẽ XÓA VĨNH VIỄN** tất cả dữ liệu từ:
+- `candidates` (ứng viên)
+- `leave_requests` (đơn nghỉ phép)
+- `overtime_requests` (đơn tăng ca)
+- `attendance_adjustments` (bổ sung chấm công)
+- `travel_expense_requests` (đơn công tác)
+- `interview_requests` (phỏng vấn)
+- `recruitment_requests` (tuyển dụng)
+- `notifications` (thông báo)
+- `request_items` (chi tiết đơn)
+
+**GIỮ LẠI:**
+- ✓ `employees` (nhân viên)
+- ✓ `users` (người dùng hệ thống)
+- ✓ `equipment_assignments` (phân công vật dụng)
+
+### Cách sử dụng
+
+```bash
+# SSH vào server
+ssh root@27.71.16.15
+
+# Di chuyển vào thư mục project
+cd /var/www/hr-management
+
+# Chạy script reset database
+chmod +x scripts/reset-database-on-server.sh
+./scripts/reset-database-on-server.sh
+```
+
+Script sẽ:
+1. Dừng ứng dụng HR (PM2)
+2. Xóa toàn bộ dữ liệu từ các bảng (trừ employees, users, equipment_assignments)
+3. Reset sequences về 1
+4. Khởi động lại ứng dụng HR
+
+---
+
+## 📥 Pull Code từ Git và Cập nhật trên Server
+
+Script để pull code mới nhất từ Git và cập nhật ứng dụng trên server.
+
+### Cách sử dụng
+
+```bash
+# SSH vào server
+ssh root@27.71.16.15
+
+# Di chuyển vào thư mục project
+cd /var/www/hr-management
+
+# Chạy script pull code
+chmod +x scripts/pull-code-on-server.sh
+./scripts/pull-code-on-server.sh
+```
+
+Script sẽ:
+1. Dừng ứng dụng HR (PM2)
+2. Pull code mới nhất từ Git (branch hiện tại)
+3. Cài đặt dependencies (backend và frontend)
+4. Build frontend
+5. Khởi động lại ứng dụng HR
+
+### Lưu ý
+- Script sẽ tự động detect branch hiện tại và pull từ branch đó
+- Nếu có conflict, script sẽ dừng lại và yêu cầu xử lý thủ công
+- Sau khi pull, script sẽ tự động cài đặt dependencies và build frontend
+
+---
+
 **Last Updated**: 2025-01-20
 
