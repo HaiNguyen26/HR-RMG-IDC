@@ -44,8 +44,6 @@
     flex-shrink: 0;
     position: relative;
     overflow: hidden;
-    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    will-change: transform, box-shadow;
 }
 
 
@@ -101,16 +99,6 @@
     z-index: 2;
 }
 
-/* Hover Effect - Lift rõ ràng hơn */
-.employee-dashboard-main-card:hover {
-    transform: translateY(-2px);
-    box-shadow:
-        0 25px 80px rgba(0, 0, 0, 0.15),
-        0 12px 40px rgba(0, 0, 0, 0.1),
-        0 6px 20px rgba(0, 0, 0, 0.08),
-        0 3px 10px rgba(0, 0, 0, 0.05),
-        0 1px 4px rgba(0, 0, 0, 0.04);
-}
 
 /* Header Section với Ambient Light Effect */
 .employee-dashboard-header {
@@ -241,101 +229,45 @@
     flex-shrink: 0;
 }
 
-/* Info Card - Mini Card Design với hiệu ứng Lift & Bounce */
-.employee-info-card {
-    /* Nền Màu Pastel Siêu Nhạt: Xám Rất Nhạt (Off-White) hoặc Electric Blue Pastel Rất Nhạt */
-    background: linear-gradient(to bottom,
-            rgba(241, 245, 249, 0.98) 0%,
-            rgba(237, 242, 247, 0.95) 50%,
-            rgba(233, 240, 245, 0.92) 100%);
-    border-radius: 0.75rem;
-    padding: 1rem;
-    /* Inner Shadow Tinh tế: Electric Blue Nhạt ở góc trên và dưới */
-    box-shadow:
-        inset 0 2px 4px rgba(59, 130, 246, 0.08),
-        inset 0 -1px 2px rgba(59, 130, 246, 0.06),
-        0 1px 3px rgba(0, 0, 0, 0.04),
-        0 1px 2px rgba(0, 0, 0, 0.03);
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    border: 1px solid rgba(226, 232, 240, 0.6);
-    position: relative;
-    will-change: transform, box-shadow;
-    overflow: hidden;
+/* Info Card - Mini Card Design với màu trắng */
+.employee-dashboard .employee-dashboard-info-cards .employee-info-card {
+    background: #ffffff !important;
+    border-radius: 0.75rem !important;
+    padding: 1rem !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.375rem !important;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+    position: relative !important;
+    will-change: transform, box-shadow !important;
+    overflow: hidden !important;
+    color: #1f2937 !important;
 }
 
-/* Mini-Card Important (Mã Nhân viên/Ngày nhập việc) - Nền Electric Blue Pastel nhạt hơn */
-.employee-info-card--important {
-    background: linear-gradient(to bottom,
-            rgba(239, 246, 255, 0.98) 0%,
-            rgba(235, 243, 252, 0.95) 50%,
-            rgba(230, 240, 250, 0.92) 100%);
-    border-color: rgba(59, 130, 246, 0.15);
-    box-shadow:
-        inset 0 2px 4px rgba(59, 130, 246, 0.12),
-        inset 0 -1px 2px rgba(59, 130, 246, 0.08),
-        0 1px 3px rgba(59, 130, 246, 0.06),
-        0 1px 2px rgba(0, 0, 0, 0.03);
+/* Mini-Card Important (Mã Nhân viên/Ngày nhập việc) - Màu trắng */
+.employee-dashboard .employee-dashboard-info-cards .employee-info-card--important {
+    background: #ffffff !important;
+    border-color: rgba(226, 232, 240, 0.8) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
 }
 
-/* Overlay Gradient Trắng trong suốt nhẹ từ trên xuống dưới */
-.employee-info-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(to bottom,
-            rgba(255, 255, 255, 0.6) 0%,
-            rgba(255, 255, 255, 0.3) 30%,
-            transparent 70%);
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0;
-    transition: opacity 0.4s ease;
+
+/* Hiệu ứng Hover - Giữ nguyên màu trắng */
+.employee-dashboard .employee-dashboard-info-cards .employee-info-card:hover {
+    background: #ffffff !important;
+    border-color: rgba(226, 232, 240, 1) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+    transform: translateY(-2px) !important;
 }
 
-/* Hiệu ứng Hover "Bounce & Glow" - Lift nhẹ nhưng rõ ràng với Soft Glow Electric Blue */
-.employee-info-card:hover {
-    /* Nền Electric Blue Pastel đậm hơn một chút (để phản hồi) */
-    background: linear-gradient(to bottom,
-            rgba(239, 246, 255, 1) 0%,
-            rgba(235, 243, 252, 0.98) 50%,
-            rgba(230, 240, 250, 0.96) 100%);
-    border-color: rgba(59, 130, 246, 0.4);
-    /* Soft Glow Electric Blue mờ xung quanh viền + Inner Shadow */
-    box-shadow:
-        /* Inner Shadow - tạo cảm giác "in sâu" */
-        inset 0 2px 4px rgba(59, 130, 246, 0.12),
-        inset 0 -1px 2px rgba(59, 130, 246, 0.08),
-        /* Outer Shadow - Soft Glow Electric Blue */
-        0 12px 32px rgba(59, 130, 246, 0.3),
-        0 6px 16px rgba(59, 130, 246, 0.2),
-        0 3px 8px rgba(96, 165, 250, 0.15),
-        0 1px 4px rgba(147, 197, 253, 0.1),
-        0 1px 3px rgba(0, 0, 0, 0.05);
-    /* Animation Bounce - nảy nhẹ lên rồi về vị trí hover */
-    animation: miniCardBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-/* Mini-Card Important Hover - Nền Electric Blue Pastel đậm hơn */
-.employee-info-card--important:hover {
-    background: linear-gradient(to bottom,
-            rgba(219, 234, 254, 1) 0%,
-            rgba(219, 234, 254, 0.98) 50%,
-            rgba(219, 234, 254, 0.96) 100%);
-    border-color: rgba(59, 130, 246, 0.5);
-    box-shadow:
-        inset 0 2px 4px rgba(59, 130, 246, 0.15),
-        inset 0 -1px 2px rgba(59, 130, 246, 0.12),
-        0 12px 32px rgba(59, 130, 246, 0.35),
-        0 6px 16px rgba(59, 130, 246, 0.25),
-        0 3px 8px rgba(96, 165, 250, 0.2),
-        0 1px 4px rgba(147, 197, 253, 0.15),
-        0 1px 3px rgba(0, 0, 0, 0.05);
+/* Mini-Card Important Hover - Giữ nguyên màu trắng */
+.employee-dashboard .employee-dashboard-info-cards .employee-info-card--important:hover {
+    background: #ffffff !important;
+    border-color: rgba(226, 232, 240, 1) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+    transform: translateY(-2px) !important;
 }
 
 /* Animation Bounce - nảy nhẹ lên rồi về vị trí hover */
@@ -361,30 +293,6 @@
     }
 }
 
-/* Giữ trạng thái Lift sau khi bounce animation kết thúc */
-.employee-info-card:hover::before {
-    opacity: 1;
-}
-
-/* Soft Glow Electric Blue lan tỏa - Pseudo-element cho glow effect */
-.employee-info-card::after {
-    content: '';
-    position: absolute;
-    inset: -4px;
-    border-radius: 0.875rem;
-    background: radial-gradient(circle at center,
-            rgba(59, 130, 246, 0.15) 0%,
-            rgba(96, 165, 250, 0.08) 40%,
-            transparent 70%);
-    pointer-events: none;
-    z-index: -1;
-    opacity: 0;
-    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.employee-info-card:hover::after {
-    opacity: 1;
-}
 
 /* Ensure content is above pseudo-elements */
 .employee-info-card>* {

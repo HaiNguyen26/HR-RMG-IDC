@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { leaveRequestsAPI } from '../../services/api';
+import { employeesAPI, candidatesAPI } from '../../services/api';
 import './Sidebar.css';
 
 const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout }) => {
     const [managerAccessResolved, setManagerAccessResolved] = useState(false);
     const [canApproveFromManagerLookup, setCanApproveFromManagerLookup] = useState(false);
+    const [pendingInterviewCount, setPendingInterviewCount] = useState(0);
 
     useEffect(() => {
         let isMounted = true;
@@ -19,21 +20,55 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
             }
 
             try {
-                const response = await leaveRequestsAPI.getManagers();
-                const managers = response.data?.data || {};
-                const normalizedName = (currentUser.hoTen || currentUser.username || '').trim().toLowerCase();
+                // Helper function để loại bỏ dấu tiếng Việt
+                const removeVietnameseAccents = (str) => {
+                    if (!str) return '';
+                    return str
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/đ/g, 'd')
+                        .replace(/Đ/g, 'D');
+                };
 
-                const isInList = (list) => Array.isArray(list) && list.some((item) => {
-                    if (!item) return false;
-                    if (item.id && item.id === currentUser.id) return true;
-                    const itemName = (item.ho_ten || '').trim().toLowerCase();
-                    return itemName && itemName === normalizedName;
+                // Lấy danh sách employees để kiểm tra quản lý trực tiếp
+                const employeesResponse = await employeesAPI.getAll();
+                const employees = employeesResponse.data?.data || [];
+
+                const currentUserName = (currentUser.hoTen || currentUser.username || '').trim();
+                const normalizedCurrentName = currentUserName.toLowerCase().replace(/\s+/g, ' ').trim();
+                const normalizedCurrentNameNoAccents = removeVietnameseAccents(normalizedCurrentName);
+
+                // Kiểm tra xem có nhân viên nào có quan_ly_truc_tiep trùng với tên user hiện tại không
+                const isTeamLead = employees.some((emp) => {
+                    if (!emp.quan_ly_truc_tiep) return false;
+                    const managerName = (emp.quan_ly_truc_tiep || '').trim();
+                    const normalizedManagerName = managerName.toLowerCase().replace(/\s+/g, ' ').trim();
+                    const normalizedManagerNameNoAccents = removeVietnameseAccents(normalizedManagerName);
+
+                    // Match exact (có dấu)
+                    if (normalizedManagerName === normalizedCurrentName) {
+                        return true;
+                    }
+
+                    // Match exact (không dấu)
+                    if (normalizedManagerNameNoAccents === normalizedCurrentNameNoAccents) {
+                        return true;
+                    }
+
+                    // Fuzzy match (contains)
+                    if (normalizedManagerName.includes(normalizedCurrentName) || normalizedCurrentName.includes(normalizedManagerName)) {
+                        return true;
+                    }
+
+                    if (normalizedManagerNameNoAccents.includes(normalizedCurrentNameNoAccents) || normalizedCurrentNameNoAccents.includes(normalizedManagerNameNoAccents)) {
+                        return true;
+                    }
+
+                    return false;
                 });
 
-                const canApprove = isInList(managers.teamLeads) || isInList(managers.branchManagers);
-
                 if (isMounted) {
-                    setCanApproveFromManagerLookup(Boolean(canApprove));
+                    setCanApproveFromManagerLookup(Boolean(isTeamLead));
                     setManagerAccessResolved(true);
                 }
             } catch (error) {
@@ -52,6 +87,59 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
             isMounted = false;
         };
     }, [currentUser?.id, currentUser?.role, currentUser?.hoTen, currentUser?.username]);
+
+    // Fetch pending interview requests count
+    useEffect(() => {
+        const fetchPendingInterviewCount = async () => {
+            if (!currentUser?.id) {
+                setPendingInterviewCount(0);
+                return;
+            }
+
+            try {
+                // Không gửi managerId để backend tự động filter theo currentUser (cả direct và indirect)
+                const response = await candidatesAPI.getInterviewRequests({});
+
+                if (response.data?.success && Array.isArray(response.data.data)) {
+                    const allRequests = response.data.data;
+                    const currentUserId = currentUser.id;
+
+                    // Đếm PENDING
+                    const pendingCount = allRequests.filter(r => r.status === 'PENDING').length;
+
+                    // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
+                    const pendingEvaluationCount = allRequests.filter(r => {
+                        if (r.status !== 'PENDING_EVALUATION') return false;
+
+                        // Nếu là quản lý trực tiếp
+                        if (r.manager_id === currentUserId) {
+                            return !r.direct_manager_evaluated;
+                        }
+
+                        // Nếu là quản lý gián tiếp
+                        if (r.indirect_manager_id === currentUserId) {
+                            return !r.indirect_manager_evaluated;
+                        }
+
+                        return false;
+                    }).length;
+
+                    setPendingInterviewCount(pendingCount + pendingEvaluationCount);
+                }
+            } catch (error) {
+                console.error('Error fetching pending interview count:', error);
+                setPendingInterviewCount(0);
+            }
+        };
+
+        // Fetch immediately
+        fetchPendingInterviewCount();
+
+        // Poll every 30 seconds to update count
+        const interval = setInterval(fetchPendingInterviewCount, 30000);
+
+        return () => clearInterval(interval);
+    }, [currentUser]);
 
     const isEmployee = currentUser?.role === 'EMPLOYEE';
     const normalizedTitle = (currentUser?.chucDanh || '').toLowerCase();
@@ -102,28 +190,6 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                             <span className="nav-label">Dashboard</span>
                         </button>
                     </li>
-                    {/* Show Requests Management for IT, HR, ACCOUNTING, ADMIN */}
-                    {(currentUser?.role === 'IT' || currentUser?.role === 'HR' || currentUser?.role === 'ACCOUNTING' || currentUser?.role === 'ADMIN') && (
-                        <li>
-                            <button
-                                onClick={() => onNavigate('requests')}
-                                className={`nav-item ${currentView === 'requests' ? 'active' : ''}`}
-                            >
-                                <span className="nav-icon-wrapper">
-                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                                        </path>
-                                    </svg>
-                                </span>
-                                <span className="nav-label">
-                                    {(currentUser?.role === 'HR' && currentUser?.username !== 'hr_admin') || currentUser?.role === 'ADMIN'
-                                        ? 'Theo dõi yêu cầu'
-                                        : 'Quản lý yêu cầu'}
-                                </span>
-                            </button>
-                        </li>
-                    )}
                     {(currentUser?.role === 'HR' || currentUser?.role === 'ADMIN') && (
                         <li>
                             <button
@@ -282,9 +348,29 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                                     </path>
                                                 </svg>
                                             </span>
-                                            <span className="nav-label">Duyệt phỏng vấn</span>
+                                            <span className="nav-label">Phỏng vấn</span>
+                                            {pendingInterviewCount > 0 && (
+                                                <span className="nav-badge nav-badge-pending">{pendingInterviewCount}</span>
+                                            )}
                                         </button>
                                     </li>
+                                    {canApproveFromManagerLookup && (
+                                        <li>
+                                            <button
+                                                onClick={() => onNavigate('probation-list')}
+                                                className={`nav-item nav-item-approval ${currentView === 'probation-list' ? 'active' : ''}`}
+                                            >
+                                                <span className="nav-icon-wrapper">
+                                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                                        </path>
+                                                    </svg>
+                                                </span>
+                                                <span className="nav-label">Danh sách thử việc</span>
+                                            </button>
+                                        </li>
+                                    )}
                                     <li>
                                         <button
                                             onClick={() => onNavigate('travel-expense-approval')}

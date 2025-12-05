@@ -115,6 +115,88 @@ const ensureManagerColumns = async () => {
     return ensureManagerColumnsPromise;
 };
 
+let ensureAdditionalFieldsPromise = null;
+const ensureAdditionalFields = async () => {
+    if (ensureAdditionalFieldsPromise) {
+        return ensureAdditionalFieldsPromise;
+    }
+
+    ensureAdditionalFieldsPromise = (async () => {
+        const checkQuery = `
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'employees'
+              AND column_name IN ('ma_cham_cong', 'loai_hop_dong', 'dia_diem', 'tinh_thue', 'cap_bac')
+        `;
+
+        const result = await pool.query(checkQuery);
+        const existingColumns = new Set(result.rows.map((row) => row.column_name));
+
+        if (!existingColumns.has('ma_cham_cong')) {
+            await pool.query(`
+                ALTER TABLE employees
+                    ADD COLUMN ma_cham_cong VARCHAR(255)
+            `);
+            await pool.query(`
+                COMMENT ON COLUMN employees.ma_cham_cong IS 'Mã chấm công của nhân viên'
+            `);
+        }
+
+        if (!existingColumns.has('loai_hop_dong')) {
+            await pool.query(`
+                ALTER TABLE employees
+                    ADD COLUMN loai_hop_dong VARCHAR(255)
+            `);
+            await pool.query(`
+                COMMENT ON COLUMN employees.loai_hop_dong IS 'Loại hợp đồng (VD: Chính thức, Thử việc, Thời vụ)'
+            `);
+        }
+
+        if (!existingColumns.has('dia_diem')) {
+            await pool.query(`
+                ALTER TABLE employees
+                    ADD COLUMN dia_diem VARCHAR(255)
+            `);
+            await pool.query(`
+                COMMENT ON COLUMN employees.dia_diem IS 'Địa điểm làm việc'
+            `);
+        }
+
+        if (!existingColumns.has('tinh_thue')) {
+            await pool.query(`
+                ALTER TABLE employees
+                    ADD COLUMN tinh_thue VARCHAR(50)
+            `);
+            await pool.query(`
+                COMMENT ON COLUMN employees.tinh_thue IS 'Tính thuế (VD: Có, Không)'
+            `);
+        }
+
+        if (!existingColumns.has('cap_bac')) {
+            await pool.query(`
+                ALTER TABLE employees
+                    ADD COLUMN cap_bac VARCHAR(255)
+            `);
+            await pool.query(`
+                COMMENT ON COLUMN employees.cap_bac IS 'Cấp bậc của nhân viên'
+            `);
+        }
+
+        // Tạo index cho mã chấm công
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_employees_ma_cham_cong 
+            ON employees(ma_cham_cong) 
+            WHERE ma_cham_cong IS NOT NULL
+        `);
+    })().catch((error) => {
+        ensureAdditionalFieldsPromise = null;
+        console.error('Error ensuring additional fields exist:', error);
+        throw error;
+    });
+
+    return ensureAdditionalFieldsPromise;
+};
+
 /**
  * POST /api/employees/bulk - Tạo nhiều nhân viên từ danh sách
  */
@@ -130,9 +212,43 @@ router.post('/bulk', async (req, res) => {
             });
         }
 
+        // Đảm bảo tất cả các cột cần thiết đều tồn tại
         await ensureChiNhanhColumn();
         await ensurePhongBanConstraintDropped();
         await ensureManagerColumns();
+        await ensureAdditionalFields();
+
+        // Kiểm tra lại các cột trước khi insert
+        const checkColumnsQuery = `
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'employees'
+              AND table_schema = 'public'
+              AND column_name IN (
+                'ma_nhan_vien', 'ma_cham_cong', 'ho_ten', 'chuc_danh', 
+                'phong_ban', 'bo_phan', 'chi_nhanh', 'ngay_gia_nhap',
+                'loai_hop_dong', 'dia_diem', 'tinh_thue', 'cap_bac',
+                'email', 'password', 'quan_ly_truc_tiep', 'quan_ly_gian_tiep', 'trang_thai'
+              )
+            ORDER BY column_name
+        `;
+        const columnsCheck = await pool.query(checkColumnsQuery);
+        const existingColumns = new Set(columnsCheck.rows.map(r => r.column_name));
+        const requiredColumns = [
+            'ma_nhan_vien', 'ma_cham_cong', 'ho_ten', 'chuc_danh',
+            'phong_ban', 'bo_phan', 'chi_nhanh', 'ngay_gia_nhap',
+            'loai_hop_dong', 'dia_diem', 'tinh_thue', 'cap_bac',
+            'email', 'password', 'quan_ly_truc_tiep', 'quan_ly_gian_tiep', 'trang_thai'
+        ];
+        const missingColumns = requiredColumns.filter(col => !existingColumns.has(col));
+
+        if (missingColumns.length > 0) {
+            console.error('[BulkImport] ❌ Missing columns:', missingColumns);
+            return res.status(500).json({
+                success: false,
+                message: `Thiếu các cột trong database: ${missingColumns.join(', ')}. Vui lòng chạy migration script trước.`
+            });
+        }
 
         await client.query('BEGIN');
 
@@ -144,17 +260,37 @@ router.post('/bulk', async (req, res) => {
 
         for (let index = 0; index < employees.length; index++) {
             const empData = employees[index];
+            const savepointName = `sp_employee_${index}`;
+
             if (index < 3) {
                 console.log('[BulkImport] Incoming employee', index + 1, empData);
             }
+
+            // Create savepoint for this employee
+            try {
+                await client.query(`SAVEPOINT ${savepointName}`);
+            } catch (spError) {
+                console.error(`[BulkImport] Error creating savepoint for employee ${index + 1}:`, spError.message);
+                results.failed.push({
+                    data: empData,
+                    error: 'Lỗi khi tạo savepoint: ' + spError.message
+                });
+                continue;
+            }
+
             try {
                 const {
                     maNhanVien,
+                    maChamCong,
                     hoTen,
                     chucDanh,
                     phongBan,
                     boPhan,
                     ngayGiaNhap,
+                    loaiHopDong,
+                    diaDiem,
+                    tinhThue,
+                    capBac,
                     email,
                     chiNhanh,
                     quanLyTrucTiep,
@@ -163,9 +299,22 @@ router.post('/bulk', async (req, res) => {
 
                 // Validation
                 if (!hoTen || !hoTen.trim() || !phongBan || !phongBan.trim()) {
+                    const missingFields = [];
+                    if (!hoTen || !hoTen.trim()) missingFields.push('Họ tên');
+                    if (!phongBan || !phongBan.trim()) missingFields.push('Phòng ban');
+
+                    if (index < 5) {
+                        console.log(`[BulkImport] Validation failed for employee ${index + 1}:`, {
+                            hoTen: hoTen,
+                            phongBan: phongBan,
+                            missingFields: missingFields,
+                            fullData: empData
+                        });
+                    }
+
                     results.failed.push({
                         data: empData,
-                        error: 'Thiếu thông tin bắt buộc (Họ tên, Phòng ban)'
+                        error: `Thiếu thông tin bắt buộc: ${missingFields.join(', ')}`
                     });
                     continue;
                 }
@@ -181,6 +330,11 @@ router.post('/bulk', async (req, res) => {
                     : null;
                 const finalQuanLyTrucTiep = quanLyTrucTiep && quanLyTrucTiep.trim() !== '' ? quanLyTrucTiep.trim() : null;
                 const finalQuanLyGianTiep = quanLyGianTiep && quanLyGianTiep.trim() !== '' ? quanLyGianTiep.trim() : null;
+                const finalMaChamCong = maChamCong && maChamCong.trim() !== '' ? maChamCong.trim() : null;
+                const finalLoaiHopDong = loaiHopDong && loaiHopDong.trim() !== '' ? loaiHopDong.trim() : null;
+                const finalDiaDiem = diaDiem && diaDiem.trim() !== '' ? diaDiem.trim() : null;
+                const finalTinhThue = tinhThue && tinhThue.trim() !== '' ? tinhThue.trim() : null;
+                const finalCapBac = capBac && capBac.trim() !== '' ? capBac.trim() : null;
 
                 // Check email uniqueness (case-insensitive)
                 if (finalEmail) {
@@ -245,49 +399,125 @@ router.post('/bulk', async (req, res) => {
                 const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
 
                 // Insert employee with PENDING status (chờ cập nhật vật dụng)
+                // Đảm bảo số lượng cột và giá trị khớp nhau
                 const insertQuery = `
                     INSERT INTO employees (
-                        ma_nhan_vien, 
+                        ma_nhan_vien,
+                        ma_cham_cong,
                         ho_ten, 
                         chuc_danh, 
                         phong_ban, 
                         bo_phan, 
                         chi_nhanh, 
-                        ngay_gia_nhap, 
+                        ngay_gia_nhap,
+                        loai_hop_dong,
+                        dia_diem,
+                        tinh_thue,
+                        cap_bac,
                         email, 
                         password, 
                         quan_ly_truc_tiep, 
                         quan_ly_gian_tiep, 
                         trang_thai
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'PENDING')
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
                     RETURNING id, ma_nhan_vien, ho_ten, email
                 `;
 
                 const insertResult = await client.query(insertQuery, [
                     maNhanVien && maNhanVien.trim() ? maNhanVien.trim() : null,
+                    finalMaChamCong,
                     hoTen.trim(),
                     finalChucDanh,
                     finalPhongBan,
                     finalBoPhan,
                     finalChiNhanh,
                     finalNgayGiaNhap,
+                    finalLoaiHopDong,
+                    finalDiaDiem,
+                    finalTinhThue,
+                    finalCapBac,
                     finalEmail,
                     hashedPassword,
                     finalQuanLyTrucTiep,
-                    finalQuanLyGianTiep
+                    finalQuanLyGianTiep,
+                    'PENDING'  // trang_thai
                 ]);
+
+                if (index < 3) {
+                    console.log(`[BulkImport] ✅ Successfully inserted employee ${index + 1}:`, {
+                        id: insertResult.rows[0].id,
+                        maNhanVien: insertResult.rows[0].ma_nhan_vien,
+                        hoTen: insertResult.rows[0].ho_ten
+                    });
+                }
 
                 results.success.push(insertResult.rows[0]);
 
             } catch (error) {
+                // Rollback to savepoint to continue with next employee
+                try {
+                    await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+                } catch (rollbackError) {
+                    console.error(`[BulkImport] Error rolling back to savepoint for employee ${index + 1}:`, rollbackError.message);
+                }
+
+                // Enhanced error logging
+                const errorInfo = {
+                    code: error.code,
+                    constraint: error.constraint,
+                    detail: error.detail,
+                    message: error.message,
+                    table: error.table,
+                    column: error.column
+                };
+
+                console.error(`[BulkImport] ❌ Error importing employee ${index + 1} (${empData.hoTen || empData.maNhanVien || 'N/A'}):`, error.message);
+
+                if (index < 10 || error.code) {
+                    console.error(`[BulkImport] Employee data:`, {
+                        maNhanVien: empData.maNhanVien,
+                        hoTen: empData.hoTen,
+                        phongBan: empData.phongBan,
+                        email: empData.email
+                    });
+                    console.error(`[BulkImport] Error details:`, errorInfo);
+                }
+
+                // Create user-friendly error message
+                let userFriendlyError = error.message;
+                if (error.code === '23505') { // Unique violation
+                    if (error.constraint && error.constraint.includes('email')) {
+                        userFriendlyError = 'Email đã tồn tại trong hệ thống';
+                    } else if (error.constraint && error.constraint.includes('ma_nhan_vien')) {
+                        userFriendlyError = 'Mã nhân viên đã tồn tại';
+                    } else {
+                        userFriendlyError = 'Dữ liệu trùng lặp: ' + (error.detail || error.message);
+                    }
+                } else if (error.code === '23502') { // Not null violation
+                    userFriendlyError = 'Thiếu dữ liệu bắt buộc: ' + (error.column || '');
+                } else if (error.code === '23503') { // Foreign key violation
+                    userFriendlyError = 'Dữ liệu tham chiếu không hợp lệ: ' + (error.detail || error.message);
+                } else if (error.code === '22007' || error.code === '22008') { // Invalid date/time
+                    userFriendlyError = 'Định dạng ngày tháng không hợp lệ';
+                }
+
                 results.failed.push({
                     data: empData,
-                    error: error.message
+                    error: userFriendlyError
                 });
+            } finally {
+                // Release savepoint
+                try {
+                    await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+                } catch (releaseError) {
+                    // Ignore if savepoint was already released or doesn't exist
+                }
             }
         }
 
         await client.query('COMMIT');
+
+        console.log(`[BulkImport] ✅ Transaction committed. Success: ${results.success.length}, Failed: ${results.failed.length}`);
 
         res.json({
             success: true,
@@ -304,7 +534,12 @@ router.post('/bulk', async (req, res) => {
 
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error('Error bulk importing employees:', error);
+        console.error('[BulkImport] ❌ Transaction rolled back due to error:', error);
+        console.error('[BulkImport] Error details:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
         res.status(500).json({
             success: false,
             message: 'Lỗi khi import nhân viên: ' + error.message
@@ -322,17 +557,23 @@ router.get('/', async (req, res) => {
         await ensureChiNhanhColumn();
         await ensurePhongBanConstraintDropped();
         await ensureManagerColumns();
+        await ensureAdditionalFields();
 
         const query = `
             SELECT 
                 id, 
                 ma_nhan_vien,
+                ma_cham_cong,
                 ho_ten, 
                 chuc_danh, 
                 phong_ban, 
                 bo_phan, 
                 chi_nhanh,
                 ngay_gia_nhap, 
+                loai_hop_dong,
+                dia_diem,
+                tinh_thue,
+                cap_bac,
                 email, 
                 quan_ly_truc_tiep,
                 quan_ly_gian_tiep,
@@ -361,6 +602,537 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/employees/departments - Lấy danh sách phòng ban (DISTINCT)
+ */
+router.get('/departments', async (req, res) => {
+    try {
+        const query = `
+            SELECT DISTINCT phong_ban as department
+            FROM employees
+            WHERE phong_ban IS NOT NULL AND phong_ban != ''
+            ORDER BY phong_ban ASC
+        `;
+        const result = await pool.query(query);
+        res.json({
+            success: true,
+            data: result.rows.map(row => row.department)
+        });
+    } catch (error) {
+        console.error('Error fetching departments:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách phòng ban: ' + error.message
+        });
+    }
+});
+
+/**
+ * GET /api/employees/departments - Lấy danh sách phòng ban (DISTINCT)
+ * Phải đặt trước route /:id để tránh conflict
+ */
+router.get('/departments', async (req, res) => {
+    try {
+        const query = `
+            SELECT DISTINCT phong_ban as department
+            FROM employees
+            WHERE phong_ban IS NOT NULL AND phong_ban != ''
+            ORDER BY phong_ban ASC
+        `;
+        const result = await pool.query(query);
+        res.json({
+            success: true,
+            data: result.rows.map(row => row.department)
+        });
+    } catch (error) {
+        console.error('Error fetching departments:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách phòng ban: ' + error.message
+        });
+    }
+});
+
+/**
+ * GET /api/employees/bo-phan - Lấy danh sách bộ phận (DISTINCT)
+ * Phải đặt trước route /:id để tránh conflict
+ */
+router.get('/bo-phan', async (req, res) => {
+    try {
+        // Kiểm tra tổng số employees trước
+        const countResult = await pool.query('SELECT COUNT(*) as total FROM employees');
+        console.log(`[API] GET /bo-phan: Total employees in DB: ${countResult.rows[0].total}`);
+
+        // Debug: Kiểm tra tất cả giá trị bo_phan (không filter)
+        const debugQuery = `
+            SELECT bo_phan, COUNT(*) as count
+            FROM employees
+            GROUP BY bo_phan
+            ORDER BY count DESC
+            LIMIT 10
+        `;
+        const debugResult = await pool.query(debugQuery);
+        console.log(`[API] GET /bo-phan: Debug - All bo_phan values (top 10):`, debugResult.rows);
+
+        // Kiểm tra số lượng có bo_phan
+        const withBoPhanResult = await pool.query(`
+            SELECT COUNT(*) as total 
+            FROM employees 
+            WHERE bo_phan IS NOT NULL AND bo_phan != ''
+        `);
+        console.log(`[API] GET /bo-phan: Employees with bo_phan (not null and not empty): ${withBoPhanResult.rows[0].total}`);
+
+        // Kiểm tra số lượng có bo_phan không null (kể cả empty string)
+        const withBoPhanNotNullResult = await pool.query(`
+            SELECT COUNT(*) as total 
+            FROM employees 
+            WHERE bo_phan IS NOT NULL
+        `);
+        console.log(`[API] GET /bo-phan: Employees with bo_phan (not null, including empty): ${withBoPhanNotNullResult.rows[0].total}`);
+
+        // Query đơn giản - chỉ filter NULL và empty string
+        // Không dùng TRIM trong WHERE để tránh loại bỏ dữ liệu hợp lệ
+        // Dùng quotes cho alias để giữ nguyên case
+        const query = `
+            SELECT DISTINCT bo_phan as "boPhan"
+            FROM employees
+            WHERE bo_phan IS NOT NULL 
+              AND bo_phan != ''
+            ORDER BY bo_phan ASC
+        `;
+        const result = await pool.query(query);
+        console.log(`[API] GET /bo-phan: Query returned ${result.rows.length} rows`);
+
+        if (result.rows.length > 0) {
+            console.log(`[API] GET /bo-phan: Sample rows (first 5):`, result.rows.slice(0, 5));
+            console.log(`[API] GET /bo-phan: First row structure:`, JSON.stringify(result.rows[0], null, 2));
+            console.log(`[API] GET /bo-phan: First row keys:`, Object.keys(result.rows[0]));
+        } else {
+            console.warn(`[API] GET /bo-phan: ⚠️ Query returned 0 rows!`);
+            console.warn(`[API] GET /bo-phan: Debug query result:`, debugResult.rows);
+        }
+
+        const finalResult = result;
+
+        console.log(`[API] GET /bo-phan: finalResult.rows.length: ${finalResult.rows.length}`);
+        if (finalResult.rows.length > 0) {
+            console.log(`[API] GET /bo-phan: First row before mapping:`, finalResult.rows[0]);
+            console.log(`[API] GET /bo-phan: First row keys:`, Object.keys(finalResult.rows[0]));
+            console.log(`[API] GET /bo-phan: First row.boPhan:`, finalResult.rows[0].boPhan);
+            console.log(`[API] GET /bo-phan: First row.bo_phan:`, finalResult.rows[0].bo_phan);
+        }
+
+        // PostgreSQL trả về key với case như trong alias (nếu dùng quotes)
+        // Nhưng có thể trả về lowercase nếu không dùng quotes
+        console.log(`[API] GET /bo-phan: Processing ${finalResult.rows.length} rows`);
+        if (finalResult.rows.length > 0) {
+            console.log(`[API] GET /bo-phan: First row keys:`, Object.keys(finalResult.rows[0]));
+            console.log(`[API] GET /bo-phan: First row full:`, finalResult.rows[0]);
+        }
+
+        // Map dữ liệu từ PostgreSQL result
+        // PostgreSQL với quotes trong alias sẽ trả về key đúng case: "boPhan"
+        // Nhưng để an toàn, thử tất cả các biến thể
+        const boPhanList = finalResult.rows
+            .map((row, index) => {
+                // Lấy tất cả keys trong row
+                const keys = Object.keys(row);
+
+                // Thử tất cả các biến thể có thể có (với quotes, PostgreSQL giữ nguyên case)
+                let value = row.boPhan || row.bophan || row.bo_phan ||
+                    row['boPhan'] || row['bophan'] || row['bo_phan'] ||
+                    row['BoPhan'] || row['Bo_Phan'] || row['BO_PHAN'];
+
+                // Nếu vẫn không tìm thấy, lấy giá trị đầu tiên trong object
+                if (!value && keys.length > 0) {
+                    value = row[keys[0]];
+                    console.log(`[API] GET /bo-phan: Row ${index} - Using first key "${keys[0]}" with value:`, value);
+                }
+
+                // Log chi tiết cho 5 rows đầu để debug
+                if (index < 5) {
+                    console.log(`[API] GET /bo-phan: Row ${index}:`, {
+                        keys: keys,
+                        allValues: keys.map(k => ({ key: k, value: row[k] })),
+                        selectedValue: value,
+                        valueType: typeof value
+                    });
+                }
+
+                return value;
+            })
+            .filter(bp => {
+                // Filter: loại bỏ null, undefined, và empty string (sau khi trim)
+                const isValid = bp != null && bp !== undefined && String(bp).trim() !== '';
+                if (!isValid && finalResult.rows.length <= 10) {
+                    console.log(`[API] GET /bo-phan: Filtered out value:`, bp);
+                }
+                return isValid;
+            })
+            .map(bp => String(bp).trim())
+            .filter((bp, index, self) => {
+                // Remove duplicates
+                const isDuplicate = self.indexOf(bp) !== index;
+                if (isDuplicate && finalResult.rows.length <= 10) {
+                    console.log(`[API] GET /bo-phan: Removed duplicate:`, bp);
+                }
+                return !isDuplicate;
+            });
+
+        console.log(`[API] GET /bo-phan: After cleaning: ${boPhanList.length} distinct bo phan values`);
+        if (boPhanList.length > 0) {
+            console.log(`[API] GET /bo-phan: Sample:`, boPhanList.slice(0, 5));
+        } else {
+            console.warn(`[API] GET /bo-phan: ⚠️ No bo phan data found after cleaning!`);
+            console.warn(`[API] GET /bo-phan: Raw rows:`, finalResult.rows.slice(0, 3));
+        }
+
+        res.json({
+            success: true,
+            data: boPhanList
+        });
+    } catch (error) {
+        console.error('[API] GET /bo-phan: Error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách bộ phận: ' + error.message
+        });
+    }
+});
+
+/**
+ * GET /api/employees/job-titles - Lấy danh sách chức danh (DISTINCT)
+ * Phải đặt trước route /:id để tránh conflict
+ */
+router.get('/job-titles', async (req, res) => {
+    try {
+        const query = `
+            SELECT DISTINCT chuc_danh as job_title
+            FROM employees
+            WHERE chuc_danh IS NOT NULL AND chuc_danh != ''
+            ORDER BY chuc_danh ASC
+        `;
+        console.log('[GET /api/employees/job-titles] Executing query...');
+        const result = await pool.query(query);
+        console.log(`[GET /api/employees/job-titles] Found ${result.rows.length} job titles`);
+        const jobTitles = result.rows.map(row => row.job_title).filter(Boolean);
+        console.log(`[GET /api/employees/job-titles] Returning ${jobTitles.length} job titles:`, jobTitles.slice(0, 5));
+        res.json({
+            success: true,
+            data: jobTitles
+        });
+    } catch (error) {
+        console.error('[GET /api/employees/job-titles] Error:', error);
+        console.error('[GET /api/employees/job-titles] Error details:', {
+            message: error.message,
+            code: error.code,
+            detail: error.detail
+        });
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách chức danh: ' + error.message
+        });
+    }
+});
+
+/**
+ * GET /api/employees/branches - Lấy danh sách chi nhánh (DISTINCT)
+ * Phải đặt trước route /:id để tránh conflict
+ */
+router.get('/branches', async (req, res) => {
+    try {
+        const query = `
+            SELECT DISTINCT chi_nhanh as branch
+            FROM employees
+            WHERE chi_nhanh IS NOT NULL AND chi_nhanh != ''
+            ORDER BY chi_nhanh ASC
+        `;
+        const result = await pool.query(query);
+        res.json({
+            success: true,
+            data: result.rows.map(row => row.branch)
+        });
+    } catch (error) {
+        console.error('Error fetching branches:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách chi nhánh: ' + error.message
+        });
+    }
+});
+
+/**
+ * GET /api/employees/contract-types - Lấy danh sách loại hợp đồng (DISTINCT)
+ * Phải đặt trước route /:id để tránh conflict
+ */
+router.get('/contract-types', async (req, res) => {
+    try {
+        const query = `
+            SELECT DISTINCT loai_hop_dong as contract_type
+            FROM employees
+            WHERE loai_hop_dong IS NOT NULL AND loai_hop_dong != ''
+            ORDER BY loai_hop_dong ASC
+        `;
+        const result = await pool.query(query);
+        res.json({
+            success: true,
+            data: result.rows.map(row => row.contract_type)
+        });
+    } catch (error) {
+        console.error('Error fetching contract types:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách loại hợp đồng: ' + error.message
+        });
+    }
+});
+
+/**
+ * GET /api/employees/locations - Lấy danh sách địa điểm (DISTINCT)
+ * Phải đặt trước route /:id để tránh conflict
+ */
+router.get('/locations', async (req, res) => {
+    try {
+        const query = `
+            SELECT DISTINCT dia_diem as location
+            FROM employees
+            WHERE dia_diem IS NOT NULL AND dia_diem != ''
+            ORDER BY dia_diem ASC
+        `;
+        const result = await pool.query(query);
+        res.json({
+            success: true,
+            data: result.rows.map(row => row.location)
+        });
+    } catch (error) {
+        console.error('Error fetching locations:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách địa điểm: ' + error.message
+        });
+    }
+});
+
+/**
+ * GET /api/employees/tax-statuses - Lấy danh sách tính thuế (DISTINCT)
+ * Phải đặt trước route /:id để tránh conflict
+ */
+router.get('/tax-statuses', async (req, res) => {
+    try {
+        const query = `
+            SELECT DISTINCT tinh_thue as tax_status
+            FROM employees
+            WHERE tinh_thue IS NOT NULL AND tinh_thue != ''
+            ORDER BY tinh_thue ASC
+        `;
+        const result = await pool.query(query);
+        res.json({
+            success: true,
+            data: result.rows.map(row => row.tax_status)
+        });
+    } catch (error) {
+        console.error('Error fetching tax statuses:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách tính thuế: ' + error.message
+        });
+    }
+});
+
+/**
+ * GET /api/employees/ranks - Lấy danh sách cấp bậc (DISTINCT)
+ * Phải đặt trước route /:id để tránh conflict
+ */
+router.get('/ranks', async (req, res) => {
+    try {
+        const query = `
+            SELECT DISTINCT cap_bac as rank
+            FROM employees
+            WHERE cap_bac IS NOT NULL AND cap_bac != ''
+            ORDER BY cap_bac ASC
+        `;
+        const result = await pool.query(query);
+        res.json({
+            success: true,
+            data: result.rows.map(row => row.rank)
+        });
+    } catch (error) {
+        console.error('Error fetching ranks:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách cấp bậc: ' + error.message
+        });
+    }
+});
+
+/**
+ * GET /api/employees/managers - Lấy danh sách quản lý trực tiếp (từ cột quan_ly_truc_tiep)
+ * Phải đặt trước route /:id để tránh conflict
+ */
+router.get('/managers', async (req, res) => {
+    try {
+        // Lấy DISTINCT từ cột quan_ly_truc_tiep, normalize ngay trong SQL
+        const query = `
+            SELECT DISTINCT 
+                TRIM(REGEXP_REPLACE(quan_ly_truc_tiep, '\\s+', ' ', 'g')) as manager_name
+            FROM employees
+            WHERE quan_ly_truc_tiep IS NOT NULL 
+              AND TRIM(quan_ly_truc_tiep) != ''
+              AND TRIM(quan_ly_truc_tiep) != 'Chưa cập nhật'
+            ORDER BY manager_name ASC
+        `;
+
+        try {
+            const result = await pool.query(query);
+            // Normalize và loại bỏ duplicate: trim, normalize whitespace, case-insensitive
+            const managerSet = new Set();
+            const managers = [];
+            const seenNames = new Map(); // Map để lưu normalized -> original name (giữ format đẹp nhất)
+
+            for (const row of result.rows) {
+                const name = row.manager_name;
+                if (!name) continue;
+
+                // Normalize mạnh mẽ hơn: trim, normalize whitespace, loại bỏ ký tự đặc biệt thừa
+                const normalized = String(name)
+                    .trim()
+                    .replace(/\s+/g, ' ') // Nhiều space thành 1 space
+                    .replace(/[\u200B-\u200D\uFEFF]/g, '') // Loại bỏ zero-width characters
+                    .trim();
+
+                if (!normalized || normalized === '') continue;
+
+                // Case-insensitive và normalize unicode để so sánh
+                const lowerNormalized = normalized.toLowerCase()
+                    .normalize('NFD') // Decompose unicode
+                    .replace(/[\u0300-\u036f]/g, '') // Loại bỏ dấu để so sánh
+                    .replace(/đ/g, 'd')
+                    .replace(/Đ/g, 'd');
+
+                // Chỉ thêm nếu chưa có
+                if (!managerSet.has(lowerNormalized)) {
+                    managerSet.add(lowerNormalized);
+                    // Giữ format đẹp nhất (ưu tiên format có chữ hoa đúng)
+                    if (!seenNames.has(lowerNormalized) ||
+                        (normalized[0] === normalized[0].toUpperCase() && seenNames.get(lowerNormalized)[0] !== seenNames.get(lowerNormalized)[0].toUpperCase())) {
+                        seenNames.set(lowerNormalized, normalized);
+                    }
+                }
+            }
+
+            // Lấy danh sách từ seenNames và sort
+            const uniqueManagers = Array.from(seenNames.values());
+            uniqueManagers.sort((a, b) => a.localeCompare(b, 'vi', { sensitivity: 'base' }));
+
+            console.log(`✅ Fetched ${uniqueManagers.length} unique managers from quan_ly_truc_tiep column (from ${result.rows.length} rows)`);
+            res.json({
+                success: true,
+                data: uniqueManagers
+            });
+        } catch (dbError) {
+            if (dbError.code === '42P01' || dbError.code === '42703') {
+                console.warn('⚠️ Employees table or columns not found, returning empty array:', dbError.message);
+                res.json({
+                    success: true,
+                    data: []
+                });
+            } else {
+                throw dbError;
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error fetching managers:', error);
+        res.json({
+            success: true,
+            data: [],
+            warning: 'Không thể tải danh sách quản lý: ' + error.message
+        });
+    }
+});
+
+/**
+ * GET /api/employees/indirect-managers - Get list of indirect managers (quan_ly_gian_tiep)
+ */
+router.get('/indirect-managers', async (req, res) => {
+    try {
+        // Lấy DISTINCT từ cột quan_ly_gian_tiep, normalize ngay trong SQL
+        const query = `
+            SELECT DISTINCT 
+                TRIM(REGEXP_REPLACE(quan_ly_gian_tiep, '\\s+', ' ', 'g')) as manager_name
+            FROM employees
+            WHERE quan_ly_gian_tiep IS NOT NULL 
+              AND TRIM(quan_ly_gian_tiep) != ''
+              AND TRIM(quan_ly_gian_tiep) != 'Chưa cập nhật'
+            ORDER BY manager_name ASC
+        `;
+
+        try {
+            const result = await pool.query(query);
+            // Normalize và loại bỏ duplicate: trim, normalize whitespace, case-insensitive
+            const managerSet = new Set();
+            const managers = [];
+            const seenNames = new Map(); // Map để lưu normalized -> original name (giữ format đẹp nhất)
+
+            for (const row of result.rows) {
+                const name = row.manager_name;
+                if (!name) continue;
+
+                // Normalize mạnh mẽ hơn: trim, normalize whitespace, loại bỏ ký tự đặc biệt thừa
+                const normalized = String(name)
+                    .trim()
+                    .replace(/\s+/g, ' ') // Nhiều space thành 1 space
+                    .replace(/[\u200B-\u200D\uFEFF]/g, '') // Loại bỏ zero-width characters
+                    .trim();
+
+                if (!normalized || normalized === '') continue;
+
+                // Case-insensitive và normalize unicode để so sánh
+                const lowerNormalized = normalized.toLowerCase()
+                    .normalize('NFD') // Decompose unicode
+                    .replace(/[\u0300-\u036f]/g, '') // Loại bỏ dấu để so sánh
+                    .replace(/đ/g, 'd')
+                    .replace(/Đ/g, 'd');
+
+                // Chỉ thêm nếu chưa có
+                if (!managerSet.has(lowerNormalized)) {
+                    managerSet.add(lowerNormalized);
+                    // Giữ format đẹp nhất (ưu tiên format có chữ hoa đúng)
+                    if (!seenNames.has(lowerNormalized) ||
+                        (normalized[0] === normalized[0].toUpperCase() && seenNames.get(lowerNormalized)[0] !== seenNames.get(lowerNormalized)[0].toUpperCase())) {
+                        seenNames.set(lowerNormalized, normalized);
+                    }
+                }
+            }
+
+            // Lấy danh sách từ seenNames và sort
+            const uniqueManagers = Array.from(seenNames.values());
+            uniqueManagers.sort((a, b) => a.localeCompare(b, 'vi', { sensitivity: 'base' }));
+
+            console.log(`✅ Fetched ${uniqueManagers.length} unique indirect managers from quan_ly_gian_tiep column (from ${result.rows.length} rows)`);
+            res.json({
+                success: true,
+                data: uniqueManagers
+            });
+        } catch (dbError) {
+            if (dbError.code === '42P01' || dbError.code === '42703') {
+                console.warn('⚠️ Employees table or columns not found, returning empty array:', dbError.message);
+                res.json({
+                    success: true,
+                    data: []
+                });
+            } else {
+                throw dbError;
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error fetching indirect managers:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách quản lý gián tiếp: ' + error.message
+        });
+    }
+});
+
+/**
  * GET /api/employees/:id - Lấy thông tin một nhân viên theo ID
  */
 router.get('/:id', async (req, res) => {
@@ -378,17 +1150,23 @@ router.get('/:id', async (req, res) => {
         await ensureChiNhanhColumn();
         await ensurePhongBanConstraintDropped();
         await ensureManagerColumns();
+        await ensureAdditionalFields();
 
         const query = `
             SELECT 
                 id, 
                 ma_nhan_vien,
+                ma_cham_cong,
                 ho_ten, 
                 chuc_danh, 
                 phong_ban, 
                 bo_phan, 
                 chi_nhanh,
-                ngay_gia_nhap, 
+                ngay_gia_nhap,
+                loai_hop_dong,
+                dia_diem,
+                tinh_thue,
+                cap_bac,
                 email, 
                 quan_ly_truc_tiep,
                 quan_ly_gian_tiep,
@@ -430,11 +1208,28 @@ router.post('/', async (req, res) => {
     const client = await pool.connect();
 
     try {
-        const { maNhanVien, hoTen, chucDanh, phongBan, boPhan, chiNhanh, ngayGiaNhap, email, quanLyTrucTiep, quanLyGianTiep } = req.body;
+        const {
+            maNhanVien,
+            maChamCong,
+            hoTen,
+            chucDanh,
+            phongBan,
+            boPhan,
+            chiNhanh,
+            ngayGiaNhap,
+            loaiHopDong,
+            diaDiem,
+            tinhThue,
+            capBac,
+            email,
+            quanLyTrucTiep,
+            quanLyGianTiep
+        } = req.body;
 
         await ensureChiNhanhColumn();
         await ensurePhongBanConstraintDropped();
         await ensureManagerColumns();
+        await ensureAdditionalFields();
 
         // Validate input
         const required = ['hoTen', 'chucDanh', 'phongBan', 'boPhan', 'ngayGiaNhap'];
@@ -568,29 +1363,40 @@ router.post('/', async (req, res) => {
         const insertQuery = `
             INSERT INTO employees (
                 ma_nhan_vien,
+                ma_cham_cong,
                 ho_ten, 
                 chuc_danh, 
                 phong_ban, 
                 bo_phan, 
                 chi_nhanh,
-                ngay_gia_nhap, 
+                ngay_gia_nhap,
+                loai_hop_dong,
+                dia_diem,
+                tinh_thue,
+                cap_bac,
                 email, 
                 password,
                 quan_ly_truc_tiep,
-                quan_ly_gian_tiep
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-            RETURNING id, ma_nhan_vien, ho_ten, chuc_danh, phong_ban, bo_phan, chi_nhanh, ngay_gia_nhap, email, quan_ly_truc_tiep, quan_ly_gian_tiep, trang_thai
+                quan_ly_gian_tiep,
+                trang_thai
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'PENDING')
+            RETURNING id, ma_nhan_vien, ma_cham_cong, ho_ten, chuc_danh, phong_ban, bo_phan, chi_nhanh, ngay_gia_nhap, loai_hop_dong, dia_diem, tinh_thue, cap_bac, email, quan_ly_truc_tiep, quan_ly_gian_tiep, trang_thai
         `;
 
         const insertResult = await client.query(insertQuery, [
             maNhanVien && maNhanVien.trim() !== '' ? maNhanVien.trim() : null,
-            hoTen,
-            chucDanh || 'Chưa cập nhật',
+            maChamCong && maChamCong.trim() !== '' ? maChamCong.trim() : null,
+            hoTen.trim(),
+            chucDanh.trim(),
             sanitizedPhongBan,
-            boPhan || sanitizedPhongBan,
+            boPhan.trim(),
             chiNhanh && chiNhanh.trim() !== '' ? chiNhanh.trim() : null,
             ngayGiaNhap || new Date().toISOString().split('T')[0],
-            email || null,
+            loaiHopDong && loaiHopDong.trim() !== '' ? loaiHopDong.trim() : null,
+            diaDiem && diaDiem.trim() !== '' ? diaDiem.trim() : null,
+            tinhThue && tinhThue.trim() !== '' ? tinhThue.trim() : null,
+            capBac && capBac.trim() !== '' ? capBac.trim() : null,
+            email && email.trim() !== '' ? email.trim() : null,
             hashedPassword,
             quanLyTrucTiep && quanLyTrucTiep.trim() !== '' ? quanLyTrucTiep.trim() : null,
             quanLyGianTiep && quanLyGianTiep.trim() !== '' ? quanLyGianTiep.trim() : null
@@ -624,11 +1430,28 @@ router.put('/:id', async (req, res) => {
 
     try {
         const { id } = req.params;
-        const { hoTen, chucDanh, phongBan, boPhan, chiNhanh, ngayGiaNhap, email, quanLyTrucTiep, quanLyGianTiep, trang_thai } = req.body;
+        const {
+            hoTen,
+            chucDanh,
+            phongBan,
+            boPhan,
+            chiNhanh,
+            ngayGiaNhap,
+            maChamCong,
+            loaiHopDong,
+            diaDiem,
+            tinhThue,
+            capBac,
+            email,
+            quanLyTrucTiep,
+            quanLyGianTiep,
+            trang_thai
+        } = req.body;
 
         await ensureChiNhanhColumn();
         await ensurePhongBanConstraintDropped();
         await ensureManagerColumns();
+        await ensureAdditionalFields();
 
         // Check employee exists (allow ACTIVE or PENDING)
         const checkEmployeeQuery = 'SELECT id, trang_thai FROM employees WHERE id = $1';
@@ -671,7 +1494,7 @@ router.put('/:id', async (req, res) => {
                 UPDATE employees 
                 SET trang_thai = $1, updated_at = CURRENT_TIMESTAMP
                 WHERE id = $2
-                RETURNING id, ma_nhan_vien, ho_ten, chuc_danh, phong_ban, bo_phan, chi_nhanh, ngay_gia_nhap, email, trang_thai
+                RETURNING id, ma_nhan_vien, ma_cham_cong, ho_ten, chuc_danh, phong_ban, bo_phan, chi_nhanh, ngay_gia_nhap, loai_hop_dong, dia_diem, tinh_thue, cap_bac, email, trang_thai
             `;
 
             const updateResult = await client.query(updateQuery, [trang_thai, id]);
@@ -798,6 +1621,26 @@ router.put('/:id', async (req, res) => {
             updateFields.push(`quan_ly_gian_tiep = $${paramIndex++}`);
             updateValues.push(quanLyGianTiep && quanLyGianTiep.trim() !== '' ? quanLyGianTiep.trim() : null);
         }
+        if (maChamCong !== undefined) {
+            updateFields.push(`ma_cham_cong = $${paramIndex++}`);
+            updateValues.push(maChamCong && maChamCong.trim() !== '' ? maChamCong.trim() : null);
+        }
+        if (loaiHopDong !== undefined) {
+            updateFields.push(`loai_hop_dong = $${paramIndex++}`);
+            updateValues.push(loaiHopDong && loaiHopDong.trim() !== '' ? loaiHopDong.trim() : null);
+        }
+        if (diaDiem !== undefined) {
+            updateFields.push(`dia_diem = $${paramIndex++}`);
+            updateValues.push(diaDiem && diaDiem.trim() !== '' ? diaDiem.trim() : null);
+        }
+        if (tinhThue !== undefined) {
+            updateFields.push(`tinh_thue = $${paramIndex++}`);
+            updateValues.push(tinhThue && tinhThue.trim() !== '' ? tinhThue.trim() : null);
+        }
+        if (capBac !== undefined) {
+            updateFields.push(`cap_bac = $${paramIndex++}`);
+            updateValues.push(capBac && capBac.trim() !== '' ? capBac.trim() : null);
+        }
         if (trang_thai) {
             updateFields.push(`trang_thai = $${paramIndex++}`);
             updateValues.push(trang_thai);
@@ -835,102 +1678,6 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-/**
- * GET /api/employees/departments - Lấy danh sách phòng ban (DISTINCT)
- */
-router.get('/departments', async (req, res) => {
-    try {
-        const query = `
-            SELECT DISTINCT phong_ban as department
-            FROM employees
-            WHERE phong_ban IS NOT NULL AND phong_ban != ''
-            ORDER BY phong_ban ASC
-        `;
-        const result = await pool.query(query);
-        res.json({
-            success: true,
-            data: result.rows.map(row => row.department)
-        });
-    } catch (error) {
-        console.error('Error fetching departments:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi lấy danh sách phòng ban: ' + error.message
-        });
-    }
-});
-
-/**
- * GET /api/employees/job-titles - Lấy danh sách chức danh (DISTINCT)
- */
-router.get('/job-titles', async (req, res) => {
-    try {
-        const query = `
-            SELECT DISTINCT chuc_danh as job_title
-            FROM employees
-            WHERE chuc_danh IS NOT NULL AND chuc_danh != ''
-            ORDER BY chuc_danh ASC
-        `;
-        const result = await pool.query(query);
-        res.json({
-            success: true,
-            data: result.rows.map(row => row.job_title)
-        });
-    } catch (error) {
-        console.error('Error fetching job titles:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi lấy danh sách chức danh: ' + error.message
-        });
-    }
-});
-
-/**
- * GET /api/employees/managers - Lấy danh sách nhân viên có thể làm quản lý
- */
-router.get('/managers', async (req, res) => {
-    try {
-        // Thử query trực tiếp, lấy tất cả nhân viên đang hoạt động
-        // Có thể filter theo chức danh quản lý sau nếu cần
-        const query = `
-            SELECT id, ho_ten, chuc_danh, phong_ban, email
-            FROM employees
-            WHERE (trang_thai = 'ACTIVE' OR trang_thai = 'PENDING' OR trang_thai IS NULL)
-              AND ho_ten IS NOT NULL
-              AND ho_ten != ''
-            ORDER BY ho_ten ASC
-        `;
-        
-        try {
-            const result = await pool.query(query);
-            console.log(`✅ Fetched ${result.rows.length} managers from database`);
-            res.json({
-                success: true,
-                data: result.rows || []
-            });
-        } catch (dbError) {
-            // Nếu lỗi là table không tồn tại hoặc column không tồn tại, trả về empty array
-            if (dbError.code === '42P01' || dbError.code === '42703') {
-                console.warn('⚠️ Employees table or columns not found, returning empty array:', dbError.message);
-                res.json({
-                    success: true,
-                    data: []
-                });
-            } else {
-                // Lỗi khác, throw lại để catch block bên ngoài xử lý
-                throw dbError;
-            }
-        }
-    } catch (error) {
-        console.error('❌ Error fetching managers:', error);
-        // Trả về success với empty array thay vì error để frontend vẫn có thể hoạt động
-        res.json({
-            success: true,
-            data: [],
-            warning: 'Không thể tải danh sách quản lý: ' + error.message
-        });
-    }
-});
 
 /**
  * DELETE /api/employees/:id - Xóa nhân viên (hard delete - xóa hoàn toàn khỏi database)

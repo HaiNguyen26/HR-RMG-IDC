@@ -97,6 +97,12 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
   };
 
   const directManagerName = getValue('quanLyTrucTiep', 'quan_ly_truc_tiep', 'team_lead_name') || 'Chưa cập nhật';
+  
+  // Get employee basic info for read-only fields
+  const employeeCode = getValue('maNhanVien', 'ma_nhan_vien', 'employeeCode') || '';
+  const employeeName = getValue('hoTen', 'ho_ten', 'fullName', 'name') || '';
+  const employeeBranch = getValue('chiNhanh', 'chi_nhanh', 'branch') || '';
+  const employeeDepartment = getValue('phongBan', 'phong_ban', 'department') || '';
 
   // Calculate estimated hours
   useEffect(() => {
@@ -232,7 +238,7 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
         </div>
       </div>
 
-      {/* Form Box */}
+      {/* Form Box - 2 Columns */}
       <div className="overtime-request-form-wrapper">
         <form onSubmit={handleSubmit} className="overtime-request-form">
           {/* Error Message */}
@@ -245,127 +251,195 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
             </div>
           )}
 
-          {/* Form Fields */}
-          <div className="overtime-form-fields">
-            {/* Date Field - Highlighted */}
-            <div className="overtime-form-group overtime-date-group-highlight">
-              <label className="overtime-form-label overtime-date-label-highlight">
-                <svg className="overtime-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                </svg>
-                <span>Ngày tăng ca *</span>
-              </label>
-              <div className="overtime-date-picker-wrapper">
-                <DatePicker
-                  selected={formData.date ? parseISODateString(formData.date) : null}
-                  onChange={handleDateChange}
-                  minDate={today()}
-                  dateFormat="dd/MM/yyyy"
-                  locale={DATE_PICKER_LOCALE}
-                  placeholderText="Chọn ngày tăng ca"
-                  className="overtime-form-datepicker"
+          {/* 2 Columns Layout */}
+          <div className="overtime-form-content">
+            {/* Left Column - I. Thông tin cơ bản + II. Thông tin Duyệt */}
+            <div className="overtime-form-left-column">
+              {/* I. Thông tin cơ bản */}
+              <div className="overtime-form-section">
+                <h2 className="overtime-section-title">I. Thông tin cơ bản</h2>
+                <div className="overtime-form-fields">
+                  {/* Employee Code and Name - Side by Side */}
+                  <div className="overtime-form-row">
+                    <div className="overtime-form-group">
+                      <label className="overtime-form-label">
+                        <span>Mã Nhân Viên *</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="overtime-form-input overtime-form-input-readonly"
+                        value={employeeCode}
+                        readOnly
+                      />
+                    </div>
+                    <div className="overtime-form-group">
+                      <label className="overtime-form-label">
+                        <span>Họ và Tên</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="overtime-form-input overtime-form-input-readonly"
+                        value={employeeName}
+                        readOnly
+                      />
+                    </div>
+                  </div>
+
+                  {/* Branch and Department - Side by Side */}
+                  <div className="overtime-form-row">
+                    <div className="overtime-form-group">
+                      <label className="overtime-form-label">
+                        <span>Chi Nhánh</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="overtime-form-input overtime-form-input-readonly"
+                        value={employeeBranch}
+                        readOnly
+                      />
+                    </div>
+                    <div className="overtime-form-group">
+                      <label className="overtime-form-label">
+                        <span>Bộ phận/Phòng ban</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="overtime-form-input overtime-form-input-readonly"
+                        value={employeeDepartment}
+                        readOnly
+                      />
+                    </div>
+                  </div>
+
+                  {/* Time Fields */}
+                  <div className="overtime-form-row">
+                    <div className="overtime-form-group">
+                      <label className="overtime-form-label">
+                        <svg className="overtime-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>Giờ bắt đầu *</span>
+                      </label>
+                      <div className="overtime-time-picker-wrapper">
+                        <input
+                          type="time"
+                          className="overtime-form-timepicker"
+                          value={formData.startTime}
+                          onChange={handleTimeChange('startTime')}
+                          onClick={(e) => e.target.showPicker?.()}
+                          required
+                        />
+                        <svg className="overtime-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="overtime-form-group">
+                      <label className="overtime-form-label">
+                        <svg className="overtime-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>Giờ kết thúc *</span>
+                      </label>
+                      <div className="overtime-time-picker-wrapper">
+                        <input
+                          type="time"
+                          className="overtime-form-timepicker"
+                          value={formData.endTime}
+                          onChange={handleTimeChange('endTime')}
+                          onClick={(e) => e.target.showPicker?.()}
+                          required
+                        />
+                        <svg className="overtime-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Estimated Hours */}
+                  <div className="overtime-form-group">
+                    <label className="overtime-form-label">Thời lượng dự kiến</label>
+                    <div className="overtime-hours-input-wrapper">
+                      <input
+                        type="text"
+                        className="overtime-form-input overtime-hours-input"
+                        value={formData.estimatedHours}
+                        readOnly
+                        disabled
+                      />
+                      <span className="overtime-hours-tag">giờ</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* II. Thông tin Duyệt */}
+              <div className="overtime-form-section">
+                <h2 className="overtime-section-title">II. Thông tin Duyệt</h2>
+                <div className="overtime-form-fields">
+                  {/* Manager Field */}
+                  <div className="overtime-form-group">
+                    <label className="overtime-form-label">
+                      <svg className="overtime-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                      </svg>
+                      <span>Quản lý trực tiếp *</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="overtime-form-input overtime-form-input-readonly"
+                      value={directManagerName}
+                      readOnly
+                      disabled
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Ngày tăng ca và Lý do */}
+            <div className="overtime-form-right-column">
+              {/* Date Field */}
+              <div className="overtime-form-group">
+                <label className="overtime-form-label">
+                  <svg className="overtime-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                  </svg>
+                  <span>Ngày tăng ca *</span>
+                </label>
+                <div className="overtime-date-picker-wrapper">
+                  <DatePicker
+                    selected={formData.date ? parseISODateString(formData.date) : null}
+                    onChange={handleDateChange}
+                    minDate={today()}
+                    dateFormat="dd/MM/yyyy"
+                    locale={DATE_PICKER_LOCALE}
+                    placeholderText="Chọn ngày tăng ca"
+                    className="overtime-form-datepicker"
+                    required
+                    autoComplete="off"
+                  />
+                  <svg className="overtime-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                  </svg>
+                </div>
+              </div>
+
+              {/* Reason Field */}
+              <div className="overtime-form-group">
+                <label className="overtime-form-label">
+                  <span>Lý do *</span>
+                </label>
+                <textarea
+                  className="overtime-form-textarea"
+                  rows="2"
+                  value={formData.reason || ''}
+                  onChange={(e) => handleInputChange('reason', e.target.value)}
+                  placeholder="Nhập chi tiết lý do cần tăng ca..."
                   required
-                  autoComplete="off"
                 />
-                <svg className="overtime-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                </svg>
               </div>
-            </div>
-
-            {/* Time Fields */}
-            <div className="overtime-form-row">
-              <div className="overtime-form-group">
-                <label className="overtime-form-label">
-                  <svg className="overtime-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <span>Giờ bắt đầu *</span>
-                </label>
-                <div className="overtime-time-picker-wrapper">
-                  <input
-                    type="time"
-                    className="overtime-form-timepicker"
-                    value={formData.startTime}
-                    onChange={handleTimeChange('startTime')}
-                    onClick={(e) => e.target.showPicker?.()}
-                    required
-                  />
-                  <svg className="overtime-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                </div>
-              </div>
-              <div className="overtime-form-group">
-                <label className="overtime-form-label">
-                  <svg className="overtime-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <span>Giờ kết thúc *</span>
-                </label>
-                <div className="overtime-time-picker-wrapper">
-                  <input
-                    type="time"
-                    className="overtime-form-timepicker"
-                    value={formData.endTime}
-                    onChange={handleTimeChange('endTime')}
-                    onClick={(e) => e.target.showPicker?.()}
-                    required
-                  />
-                  <svg className="overtime-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Estimated Hours */}
-            <div className="overtime-form-group">
-              <label className="overtime-form-label">Thời lượng dự kiến</label>
-              <div className="overtime-hours-input-wrapper">
-                <input
-                  type="text"
-                  className="overtime-form-input overtime-hours-input"
-                  value={formData.estimatedHours}
-                  readOnly
-                  disabled
-                />
-                <span className="overtime-hours-tag">giờ</span>
-              </div>
-            </div>
-
-            {/* Manager Field */}
-            <div className="overtime-form-group">
-              <label className="overtime-form-label">
-                <svg className="overtime-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                </svg>
-                <span>Quản lý duyệt/nhận TB *</span>
-              </label>
-              <input
-                type="text"
-                className="overtime-form-input overtime-form-input-readonly"
-                value={directManagerName}
-                readOnly
-                disabled
-              />
-            </div>
-
-            {/* Reason Field */}
-            <div className="overtime-form-group">
-              <label className="overtime-form-label">
-                <svg className="overtime-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <span>Nội dung công việc / Lý do *</span>
-              </label>
-              <textarea
-                className="overtime-form-textarea overtime-form-textarea-large"
-                value={formData.reason}
-                onChange={(e) => handleInputChange('reason', e.target.value)}
-                placeholder="Vui lòng nhập nội dung công việc hoặc lý do xin tăng ca..."
-                required
-              />
             </div>
           </div>
 
@@ -391,6 +465,7 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
           </button>
         </form>
       </div>
+
     </div>
   );
 };

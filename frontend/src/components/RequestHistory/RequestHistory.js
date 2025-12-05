@@ -22,11 +22,11 @@ const RequestHistory = ({ currentUser }) => {
         return;
       }
 
-      // Fetch all types of requests
+      // Fetch all types of requests - dùng mode 'employee' hoặc chỉ cần employeeId
       const [leaveRes, overtimeRes, attendanceRes] = await Promise.all([
         leaveRequestsAPI.getAll({ employeeId: currentUser.id }),
-        overtimeRequestsAPI.getAll({ mode: 'employee', employeeId: currentUser.id }),
-        attendanceAdjustmentsAPI.getAll({ mode: 'employee', employeeId: currentUser.id })
+        overtimeRequestsAPI.getAll({ employeeId: currentUser.id }),
+        attendanceAdjustmentsAPI.getAll({ employeeId: currentUser.id })
       ]);
 
       const allRequests = [];
@@ -47,9 +47,11 @@ const RequestHistory = ({ currentUser }) => {
             requestType: 'leave',
             // Additional fields for detail view
             team_lead_name: req.team_lead_name,
-            branch_manager_name: req.branch_manager_name,
             created_at: req.created_at,
             updated_at: req.updated_at,
+            team_lead_action: req.team_lead_action,
+            team_lead_comment: req.team_lead_comment,
+            team_lead_action_at: req.team_lead_action_at,
             rawData: req
           });
         });
@@ -82,9 +84,11 @@ const RequestHistory = ({ currentUser }) => {
             requestType: 'overtime',
             // Additional fields for detail view
             team_lead_name: req.team_lead_name,
-            branch_manager_name: req.branch_manager_name,
             created_at: req.created_at,
             updated_at: req.updated_at,
+            team_lead_action: req.team_lead_action,
+            team_lead_comment: req.team_lead_comment,
+            team_lead_action_at: req.team_lead_action_at,
             rawData: req
           });
         });
@@ -117,9 +121,11 @@ const RequestHistory = ({ currentUser }) => {
             requestType: 'attendance',
             // Additional fields for detail view
             team_lead_name: req.team_lead_name,
-            branch_manager_name: req.branch_manager_name,
             created_at: req.created_at,
             updated_at: req.updated_at,
+            team_lead_action: req.team_lead_action,
+            team_lead_comment: req.team_lead_comment,
+            team_lead_action_at: req.team_lead_action_at,
             rawData: req
           });
         });
@@ -149,18 +155,22 @@ const RequestHistory = ({ currentUser }) => {
 
   const getStatusLabel = (status) => {
     const statusMap = {
-      'PENDING_TEAM_LEAD': 'Chờ duyệt',
-      'PENDING_DIRECTOR': 'Chờ giám đốc',
-      'PENDING_HR': 'Chờ HR',
+      'PENDING': 'Chờ duyệt',
       'APPROVED': 'Đã duyệt',
-      'REJECTED': 'Đã từ chối'
+      'REJECTED': 'Đã từ chối',
+      'CANCELLED': 'Đã hủy',
+      // Giữ lại các status cũ để tương thích ngược
+      'PENDING_TEAM_LEAD': 'Chờ duyệt',
+      'APPROVED_BY_TEAM_LEAD': 'Đã duyệt',
+      'REJECTED_BY_TEAM_LEAD': 'Đã từ chối'
     };
     return statusMap[status] || status;
   };
 
   const getStatusTagClass = (status) => {
-    if (status === 'APPROVED') return 'request-status-tag--approved';
-    if (status === 'REJECTED') return 'request-status-tag--rejected';
+    if (status === 'APPROVED' || status === 'APPROVED_BY_TEAM_LEAD') return 'request-status-tag--approved';
+    if (status === 'REJECTED' || status === 'REJECTED_BY_TEAM_LEAD') return 'request-status-tag--rejected';
+    if (status === 'CANCELLED') return 'request-status-tag--cancelled';
     return 'request-status-tag--pending';
   };
 
@@ -247,7 +257,7 @@ const RequestHistory = ({ currentUser }) => {
     const timeline = [];
     const createdDate = request.created_at ? new Date(request.created_at) : null;
 
-    // Step 1: Gửi đơn
+    // Step 1: Nhân viên gửi đơn
     timeline.push({
       step: 1,
       title: 'Đã gửi đơn',
@@ -256,40 +266,47 @@ const RequestHistory = ({ currentUser }) => {
       description: 'Đơn từ đã được gửi thành công'
     });
 
-    // Step 2: QLTT duyệt
-    if (request.status === 'PENDING_TEAM_LEAD' || request.status === 'PENDING_DIRECTOR' || request.status === 'APPROVED') {
-      const isPending = request.status === 'PENDING_TEAM_LEAD';
+    // Step 2: Quản lý trực tiếp duyệt/từ chối
+    const isPending = request.status === 'PENDING' || request.status === 'PENDING_TEAM_LEAD';
+    const isApproved = request.status === 'APPROVED' || request.status === 'APPROVED_BY_TEAM_LEAD';
+    const isRejected = request.status === 'REJECTED' || request.status === 'REJECTED_BY_TEAM_LEAD';
+    const isCancelled = request.status === 'CANCELLED';
+
+    if (isPending) {
       timeline.push({
         step: 2,
         title: 'Chờ quản lý trực tiếp duyệt',
-        status: isPending ? 'pending' : 'completed',
-        date: request.updated_at && !isPending ? new Date(request.updated_at) : null,
+        status: 'pending',
+        date: null,
         description: request.team_lead_name ? `Đang chờ ${request.team_lead_name} duyệt` : 'Đang chờ quản lý trực tiếp duyệt'
       });
-    }
-
-    // Step 3: HR/QLGT duyệt
-    if (request.status === 'PENDING_DIRECTOR' || request.status === 'APPROVED') {
-      const isPending = request.status === 'PENDING_DIRECTOR';
+    } else if (isApproved) {
       timeline.push({
-        step: 3,
-        title: request.status === 'PENDING_DIRECTOR' ? 'Chờ giám đốc duyệt' : 'Đã duyệt',
-        status: isPending ? 'pending' : 'completed',
-        date: request.updated_at && !isPending ? new Date(request.updated_at) : null,
-        description: request.branch_manager_name
-          ? (isPending ? `Đang chờ ${request.branch_manager_name} duyệt` : `Đã được ${request.branch_manager_name} duyệt`)
-          : (isPending ? 'Đang chờ giám đốc duyệt' : 'Đã được duyệt')
+        step: 2,
+        title: 'Đã được duyệt',
+        status: 'completed',
+        date: request.team_lead_action_at ? new Date(request.team_lead_action_at) : (request.updated_at ? new Date(request.updated_at) : null),
+        description: request.team_lead_name
+          ? `Đã được ${request.team_lead_name} duyệt${request.team_lead_comment ? `: ${request.team_lead_comment}` : ''}`
+          : 'Đã được quản lý trực tiếp duyệt'
       });
-    }
-
-    // Step 4: Từ chối
-    if (request.status === 'REJECTED') {
+    } else if (isRejected) {
       timeline.push({
-        step: timeline.length + 1,
-        title: 'Đã từ chối',
+        step: 2,
+        title: 'Đã bị từ chối',
         status: 'rejected',
+        date: request.team_lead_action_at ? new Date(request.team_lead_action_at) : (request.updated_at ? new Date(request.updated_at) : null),
+        description: request.team_lead_name
+          ? `Đã bị ${request.team_lead_name} từ chối${request.team_lead_comment ? `: ${request.team_lead_comment}` : ''}`
+          : 'Đã bị quản lý trực tiếp từ chối'
+      });
+    } else if (isCancelled) {
+      timeline.push({
+        step: 2,
+        title: 'Đã hủy',
+        status: 'cancelled',
         date: request.updated_at ? new Date(request.updated_at) : null,
-        description: 'Đơn từ đã bị từ chối'
+        description: 'Đơn từ đã bị hủy'
       });
     }
 

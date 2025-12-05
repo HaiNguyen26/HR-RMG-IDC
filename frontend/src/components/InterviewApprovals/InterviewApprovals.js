@@ -6,6 +6,7 @@ import './InterviewApprovals.css';
 const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [statistics, setStatistics] = useState({
         pending: 0,
+        pendingEvaluation: 0,
         approved: 0,
         rejected: 0,
         total: 0
@@ -39,6 +40,12 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [previewCandidate, setPreviewCandidate] = useState(null);
     const [loadingCandidate, setLoadingCandidate] = useState(false);
     const [isRecruitmentRequestModalOpen, setIsRecruitmentRequestModalOpen] = useState(false);
+    // State for manager's own recruitment requests
+    const [myRecruitmentRequests, setMyRecruitmentRequests] = useState([]);
+    const [loadingMyRecruitmentRequests, setLoadingMyRecruitmentRequests] = useState(false);
+    const [showMyRecruitmentRequests, setShowMyRecruitmentRequests] = useState(false);
+    const [selectedRecruitmentRequest, setSelectedRecruitmentRequest] = useState(null);
+    const [isRecruitmentRequestDetailModalOpen, setIsRecruitmentRequestDetailModalOpen] = useState(false);
     const [recruitmentRequestForm, setRecruitmentRequestForm] = useState({
         chucDanhCanTuyen: '',
         soLuongYeuCau: '',
@@ -95,7 +102,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 kyNangQuanLy: '',
                 yeuCauKhac: ''
             },
-            }
+        }
     });
     const [recruitmentRequestErrors, setRecruitmentRequestErrors] = useState({});
     const [submittingRecruitmentRequest, setSubmittingRecruitmentRequest] = useState(false);
@@ -238,16 +245,35 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
 
             setLoadingStats(true);
             try {
-                const params = {
-                    managerId: currentUser.id
-                };
+                // Không gửi managerId để backend tự động filter theo currentUser (cả direct và indirect manager)
+                const params = {};
 
                 const response = await candidatesAPI.getInterviewRequests(params);
 
                 if (response.data?.success && Array.isArray(response.data.data)) {
                     const allRequests = response.data.data;
+                    const currentUserId = currentUser?.id;
+                    
+                    // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
+                    const pendingEvaluationCount = allRequests.filter(r => {
+                        if (r.status !== 'PENDING_EVALUATION') return false;
+                        
+                        // Nếu là quản lý trực tiếp
+                        if (r.manager_id === currentUserId) {
+                            return !r.direct_manager_evaluated;
+                        }
+                        
+                        // Nếu là quản lý gián tiếp
+                        if (r.indirect_manager_id === currentUserId) {
+                            return !r.indirect_manager_evaluated;
+                        }
+                        
+                        return false;
+                    }).length;
+                    
                     const stats = {
                         pending: allRequests.filter(r => r.status === 'PENDING').length,
+                        pendingEvaluation: pendingEvaluationCount,
                         approved: allRequests.filter(r => r.status === 'APPROVED').length,
                         rejected: allRequests.filter(r => r.status === 'REJECTED').length,
                         total: allRequests.length
@@ -266,9 +292,58 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
 
     // Fetch requests when status changes
     useEffect(() => {
-        fetchRequests();
+        if (!showMyRecruitmentRequests) {
+            fetchRequests();
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedStatus, currentUser]);
+    }, [selectedStatus, currentUser, showMyRecruitmentRequests]);
+
+    // Fetch my recruitment requests (for managers)
+    const fetchMyRecruitmentRequests = async () => {
+        setLoadingMyRecruitmentRequests(true);
+        try {
+            const response = await candidatesAPI.getMyRecruitmentRequests();
+            if (response.data?.success) {
+                setMyRecruitmentRequests(response.data.data || []);
+            } else {
+                throw new Error(response.data?.message || 'Lỗi khi tải danh sách yêu cầu tuyển dụng của tôi');
+            }
+        } catch (error) {
+            console.error('Error fetching my recruitment requests:', error);
+            if (showToast) {
+                const message = error.response?.data?.message || 'Không thể tải danh sách yêu cầu tuyển dụng của tôi';
+                showToast(message, 'error');
+            }
+            setMyRecruitmentRequests([]);
+        } finally {
+            setLoadingMyRecruitmentRequests(false);
+        }
+    };
+
+    // Fetch my recruitment requests when tab is selected
+    useEffect(() => {
+        if (showMyRecruitmentRequests) {
+            fetchMyRecruitmentRequests();
+        }
+    }, [showMyRecruitmentRequests]);
+
+    // Handle view recruitment request details
+    const handleViewRecruitmentRequestDetails = async (requestId) => {
+        try {
+            const response = await candidatesAPI.getRecruitmentRequestById(requestId);
+            if (response.data?.success) {
+                setSelectedRecruitmentRequest(response.data.data);
+                setIsRecruitmentRequestDetailModalOpen(true);
+            } else {
+                throw new Error(response.data?.message || 'Không thể tải chi tiết yêu cầu');
+            }
+        } catch (error) {
+            console.error('Error fetching recruitment request details:', error);
+            if (showToast) {
+                showToast(error.response?.data?.message || 'Không thể tải chi tiết yêu cầu', 'error');
+            }
+        }
+    };
 
     // Handle status filter change
     const handleStatusChange = (status) => {
@@ -538,12 +613,32 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 handleCloseEvaluationModal();
                 // Refresh requests and statistics
                 fetchRequests();
-                // Refetch statistics
-                const statsResponse = await candidatesAPI.getInterviewRequests({ managerId: currentUser.id });
+                // Refetch statistics (không gửi managerId để backend tự động filter theo currentUser - cả direct và indirect)
+                const statsResponse = await candidatesAPI.getInterviewRequests({});
                 if (statsResponse.data?.success && Array.isArray(statsResponse.data.data)) {
                     const allRequests = statsResponse.data.data;
+                    const currentUserId = currentUser.id;
+                    
+                    // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
+                    const pendingEvaluationCount = allRequests.filter(r => {
+                        if (r.status !== 'PENDING_EVALUATION') return false;
+                        
+                        // Nếu là quản lý trực tiếp
+                        if (r.manager_id === currentUserId) {
+                            return !r.direct_manager_evaluated;
+                        }
+                        
+                        // Nếu là quản lý gián tiếp
+                        if (r.indirect_manager_id === currentUserId) {
+                            return !r.indirect_manager_evaluated;
+                        }
+                        
+                        return false;
+                    }).length;
+                    
                     setStatistics({
                         pending: allRequests.filter(r => r.status === 'PENDING').length,
+                        pendingEvaluation: pendingEvaluationCount,
                         approved: allRequests.filter(r => r.status === 'APPROVED').length,
                         rejected: allRequests.filter(r => r.status === 'REJECTED').length,
                         total: allRequests.length
@@ -586,12 +681,32 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 handleCloseModal();
                 // Refresh requests and statistics
                 await fetchRequests();
-                // Refetch statistics
-                const statsResponse = await candidatesAPI.getInterviewRequests({ managerId: currentUser.id });
+                // Refetch statistics (không gửi managerId để backend tự động filter theo currentUser - cả direct và indirect)
+                const statsResponse = await candidatesAPI.getInterviewRequests({});
                 if (statsResponse.data?.success && Array.isArray(statsResponse.data.data)) {
                     const allRequests = statsResponse.data.data;
+                    const currentUserId = currentUser.id;
+                    
+                    // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
+                    const pendingEvaluationCount = allRequests.filter(r => {
+                        if (r.status !== 'PENDING_EVALUATION') return false;
+                        
+                        // Nếu là quản lý trực tiếp
+                        if (r.manager_id === currentUserId) {
+                            return !r.direct_manager_evaluated;
+                        }
+                        
+                        // Nếu là quản lý gián tiếp
+                        if (r.indirect_manager_id === currentUserId) {
+                            return !r.indirect_manager_evaluated;
+                        }
+                        
+                        return false;
+                    }).length;
+                    
                     setStatistics({
                         pending: allRequests.filter(r => r.status === 'PENDING').length,
+                        pendingEvaluation: pendingEvaluationCount,
                         approved: allRequests.filter(r => r.status === 'APPROVED').length,
                         rejected: allRequests.filter(r => r.status === 'REJECTED').length,
                         total: allRequests.length
@@ -629,12 +744,32 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 handleCloseModal();
                 // Refresh requests and statistics
                 fetchRequests();
-                // Refetch statistics
-                const statsResponse = await candidatesAPI.getInterviewRequests({ managerId: currentUser.id });
+                // Refetch statistics (không gửi managerId để backend tự động filter theo currentUser - cả direct và indirect)
+                const statsResponse = await candidatesAPI.getInterviewRequests({});
                 if (statsResponse.data?.success && Array.isArray(statsResponse.data.data)) {
                     const allRequests = statsResponse.data.data;
+                    const currentUserId = currentUser.id;
+                    
+                    // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
+                    const pendingEvaluationCount = allRequests.filter(r => {
+                        if (r.status !== 'PENDING_EVALUATION') return false;
+                        
+                        // Nếu là quản lý trực tiếp
+                        if (r.manager_id === currentUserId) {
+                            return !r.direct_manager_evaluated;
+                        }
+                        
+                        // Nếu là quản lý gián tiếp
+                        if (r.indirect_manager_id === currentUserId) {
+                            return !r.indirect_manager_evaluated;
+                        }
+                        
+                        return false;
+                    }).length;
+                    
                     setStatistics({
                         pending: allRequests.filter(r => r.status === 'PENDING').length,
+                        pendingEvaluation: pendingEvaluationCount,
                         approved: allRequests.filter(r => r.status === 'APPROVED').length,
                         rejected: allRequests.filter(r => r.status === 'REJECTED').length,
                         total: allRequests.length
@@ -685,12 +820,32 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 handleCloseModal();
                 // Refresh requests and statistics
                 fetchRequests();
-                // Refetch statistics
-                const statsResponse = await candidatesAPI.getInterviewRequests({ managerId: currentUser.id });
+                // Refetch statistics (không gửi managerId để backend tự động filter theo currentUser - cả direct và indirect)
+                const statsResponse = await candidatesAPI.getInterviewRequests({});
                 if (statsResponse.data?.success && Array.isArray(statsResponse.data.data)) {
                     const allRequests = statsResponse.data.data;
+                    const currentUserId = currentUser.id;
+                    
+                    // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
+                    const pendingEvaluationCount = allRequests.filter(r => {
+                        if (r.status !== 'PENDING_EVALUATION') return false;
+                        
+                        // Nếu là quản lý trực tiếp
+                        if (r.manager_id === currentUserId) {
+                            return !r.direct_manager_evaluated;
+                        }
+                        
+                        // Nếu là quản lý gián tiếp
+                        if (r.indirect_manager_id === currentUserId) {
+                            return !r.indirect_manager_evaluated;
+                        }
+                        
+                        return false;
+                    }).length;
+                    
                     setStatistics({
                         pending: allRequests.filter(r => r.status === 'PENDING').length,
+                        pendingEvaluation: pendingEvaluationCount,
                         approved: allRequests.filter(r => r.status === 'APPROVED').length,
                         rejected: allRequests.filter(r => r.status === 'REJECTED').length,
                         total: allRequests.length
@@ -784,7 +939,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
     useEffect(() => {
         const fetchFormData = async () => {
             if (!isRecruitmentRequestModalOpen) return;
-            
+
             setLoadingFormData(true);
             try {
                 // Fetch từng API riêng để tránh một API fail làm ảnh hưởng đến các API khác
@@ -992,7 +1147,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                         </svg>
                     </div>
                     <div style={{ flex: 1 }}>
-                        <h1 className="interview-approvals-title">Duyệt Yêu cầu Phỏng vấn</h1>
+                        <h1 className="interview-approvals-title">Phỏng vấn</h1>
                         <p className="interview-approvals-subtitle">
                             Xem và xử lý các yêu cầu phỏng vấn ứng viên được HR gửi đến bạn.
                         </p>
@@ -1018,6 +1173,16 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                         <div className="interview-stat-card-label">Chờ duyệt</div>
                         <div className="interview-stat-card-value">
                             {loadingStats ? '...' : statistics.pending}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Chờ đánh giá Card */}
+                <div className="interview-stat-card interview-stat-card--pending-evaluation">
+                    <div className="interview-stat-card-content">
+                        <div className="interview-stat-card-label">Chờ đánh giá</div>
+                        <div className="interview-stat-card-value">
+                            {loadingStats ? '...' : statistics.pendingEvaluation}
                         </div>
                     </div>
                 </div>
@@ -1057,17 +1222,23 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
             <div className="interview-approvals-filter-tabs">
                 <button
                     type="button"
-                    className={`interview-filter-tab ${selectedStatus === 'PENDING' ? 'active' : ''}`}
+                    className={`interview-filter-tab ${selectedStatus === 'PENDING' ? 'active' : ''} ${statistics.pending > 0 ? 'has-pending' : ''}`}
                     onClick={() => handleStatusChange('PENDING')}
                 >
                     Chờ tôi duyệt
+                    {statistics.pending > 0 && (
+                        <span className="interview-filter-tab-badge">{statistics.pending}</span>
+                    )}
                 </button>
                 <button
                     type="button"
-                    className={`interview-filter-tab ${selectedStatus === 'PENDING_EVALUATION' ? 'active' : ''}`}
+                    className={`interview-filter-tab ${selectedStatus === 'PENDING_EVALUATION' ? 'active' : ''} ${statistics.pendingEvaluation > 0 ? 'has-pending' : ''}`}
                     onClick={() => handleStatusChange('PENDING_EVALUATION')}
                 >
                     Chờ đánh giá
+                    {statistics.pendingEvaluation > 0 && (
+                        <span className="interview-filter-tab-badge">{statistics.pendingEvaluation}</span>
+                    )}
                 </button>
                 <button
                     type="button"
@@ -1075,6 +1246,9 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                     onClick={() => handleStatusChange('APPROVED')}
                 >
                     Đã duyệt
+                    {statistics.approved > 0 && (
+                        <span className="interview-filter-tab-badge">{statistics.approved}</span>
+                    )}
                 </button>
                 <button
                     type="button"
@@ -1082,6 +1256,9 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                     onClick={() => handleStatusChange('REJECTED')}
                 >
                     Đã từ chối
+                    {statistics.rejected > 0 && (
+                        <span className="interview-filter-tab-badge">{statistics.rejected}</span>
+                    )}
                 </button>
                 <button
                     type="button"
@@ -1090,11 +1267,96 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 >
                     Tất cả
                 </button>
+
+                {/* My Recruitment Requests Tab - For managers only, separated */}
+                {currentUser && currentUser.role && currentUser.role !== 'HR' && currentUser.role !== 'ADMIN' && (
+                    <>
+                        <div style={{ width: '1px', height: '2rem', background: '#e5e7eb', margin: '0 0.5rem' }}></div>
+                        <button
+                            type="button"
+                            className={`interview-filter-tab ${showMyRecruitmentRequests ? 'active' : ''}`}
+                            onClick={() => {
+                                setShowMyRecruitmentRequests(!showMyRecruitmentRequests);
+                                if (!showMyRecruitmentRequests) {
+                                    setSelectedStatus(null); // Clear other status selection
+                                }
+                            }}
+                        >
+                            Danh sách yêu cầu tuyển dụng
+                            {myRecruitmentRequests.length > 0 && (
+                                <span style={{ marginLeft: '0.5rem', background: showMyRecruitmentRequests ? '#1e40af' : '#6b7280', color: '#ffffff', padding: '0.125rem 0.5rem', borderRadius: '0.75rem', fontSize: '0.75rem' }}>
+                                    {myRecruitmentRequests.length}
+                                </span>
+                            )}
+                        </button>
+                    </>
+                )}
             </div>
 
             {/* Requests List View */}
             <div className="interview-approvals-list">
-                {loadingRequests ? (
+                {showMyRecruitmentRequests ? (
+                    // Display my recruitment requests for managers
+                    loadingMyRecruitmentRequests ? (
+                        <div className="interview-approvals-loading">
+                            <div className="interview-approvals-spinner"></div>
+                            <span>Đang tải danh sách yêu cầu tuyển dụng...</span>
+                        </div>
+                    ) : myRecruitmentRequests.length === 0 ? (
+                        <div className="interview-approvals-empty">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <p>Chưa có yêu cầu tuyển dụng nào</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            {myRecruitmentRequests.map((request) => {
+                                const statusConfig = {
+                                    'PENDING': { label: 'Chờ duyệt', color: '#f59e0b', bg: '#fef3c7' },
+                                    'APPROVED': { label: 'Đã duyệt', color: '#10b981', bg: '#d1fae5' },
+                                    'REJECTED': { label: 'Từ chối', color: '#ef4444', bg: '#fee2e2' },
+                                    'IN_PROGRESS': { label: 'Đang xử lý', color: '#3b82f6', bg: '#dbeafe' },
+                                    'COMPLETED': { label: 'Hoàn thành', color: '#8b5cf6', bg: '#ede9fe' }
+                                };
+                                const status = statusConfig[request.status] || statusConfig.PENDING;
+                                const createdDate = request.created_at ? formatDateDisplay(request.created_at) : '-';
+
+                                return (
+                                    <div
+                                        key={request.id}
+                                        className="interview-request-card"
+                                        onClick={() => handleViewRecruitmentRequestDetails(request.id)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <div className="interview-request-card-content">
+                                            <div className="interview-request-position">
+                                                {request.chuc_danh_can_tuyen || request.chucDanhCanTuyen || 'Chức danh chưa xác định'}
+                                            </div>
+                                            <div className="interview-request-department">
+                                                Phòng ban: {request.phong_ban || request.phongBan || '-'}
+                                            </div>
+                                            <div className="interview-request-date">
+                                                Ngày gửi: {createdDate}
+                                            </div>
+                                        </div>
+                                        <div style={{
+                                            padding: '0.5rem 1rem',
+                                            background: status.bg,
+                                            color: status.color,
+                                            borderRadius: '0.5rem',
+                                            fontSize: '0.875rem',
+                                            fontWeight: '600',
+                                            marginTop: '0.5rem'
+                                        }}>
+                                            {status.label}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )
+                ) : loadingRequests ? (
                     <div className="interview-approvals-loading">
                         <div className="interview-approvals-spinner"></div>
                         <span>Đang tải danh sách yêu cầu...</span>
@@ -2468,6 +2730,287 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Recruitment Request Detail Modal */}
+            {isRecruitmentRequestDetailModalOpen && selectedRecruitmentRequest && (
+                <div className="candidate-modal-overlay" onClick={() => setIsRecruitmentRequestDetailModalOpen(false)} style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                }}>
+                    <div className="recruitment-request-detail-modal-box" onClick={(e) => e.stopPropagation()} style={{
+                        background: '#ffffff',
+                        borderRadius: '1rem',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                        width: '100%',
+                        maxWidth: '1200px',
+                        maxHeight: '90vh',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden'
+                    }}>
+                        <div className="recruitment-request-detail-modal-header" style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '1.5rem 2rem',
+                            borderBottom: '1px solid #e5e7eb',
+                            background: 'linear-gradient(135deg, #dbeafe 0%, #ecfdf5 50%, #e0e7ff 100%)',
+                            flexShrink: 0
+                        }}>
+                            <h2 className="recruitment-request-detail-modal-title" style={{
+                                fontSize: '1.5rem',
+                                fontWeight: '700',
+                                color: '#1f2937',
+                                margin: 0
+                            }}>Chi tiết yêu cầu tuyển dụng</h2>
+                            <button
+                                type="button"
+                                className="recruitment-request-detail-modal-close-btn"
+                                onClick={() => setIsRecruitmentRequestDetailModalOpen(false)}
+                                style={{
+                                    width: '2rem',
+                                    height: '2rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: '#6b7280',
+                                    cursor: 'pointer',
+                                    borderRadius: '0.5rem',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="recruitment-request-detail-modal-content" style={{
+                            flex: 1,
+                            overflowY: 'auto',
+                            padding: '2rem',
+                            minHeight: 0
+                        }}>
+                            <RecruitmentRequestDetailView request={selectedRecruitmentRequest} />
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Component to display recruitment request details (reused from CandidateManagement)
+const RecruitmentRequestDetailView = ({ request }) => {
+    // Parse JSONB fields if needed
+    const lyDoTuyen = request.ly_do_tuyen || request.lyDoTuyen || {};
+    const tieuChuanTuyenChon = request.tieu_chuan_tuyen_chon || request.tieuChuanTuyenChon || {};
+
+    return (
+        <div className="recruitment-request-detail-view">
+            {/* PHẦN I: VỊ TRÍ TUYỂN DỤNG */}
+            <div className="recruitment-request-section">
+                <div className="recruitment-request-section-header">
+                    <h3 className="recruitment-request-section-title">PHẦN I: VỊ TRÍ TUYỂN DỤNG</h3>
+                    <div className="recruitment-request-section-divider"></div>
+                </div>
+
+                <div className="recruitment-request-form-content">
+                    {/* Display all fields from PHẦN I - Layout 2 cột */}
+                    <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
+                        <div className="recruitment-request-form-field">
+                            <label className="recruitment-request-form-label">Chức danh cần tuyển</label>
+                            <div className="recruitment-request-form-value">{request.chuc_danh_can_tuyen || request.chucDanhCanTuyen || '-'}</div>
+                        </div>
+                        <div className="recruitment-request-form-field">
+                            <label className="recruitment-request-form-label">Số lượng yêu cầu</label>
+                            <div className="recruitment-request-form-value">{request.so_luong_yeu_cau || request.soLuongYeuCau || '-'}</div>
+                        </div>
+                    </div>
+
+                    <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
+                        <div className="recruitment-request-form-field">
+                            <label className="recruitment-request-form-label">Phòng ban</label>
+                            <div className="recruitment-request-form-value">{request.phong_ban || request.phongBan || '-'}</div>
+                        </div>
+                    </div>
+
+                    <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
+                        <div className="recruitment-request-form-field">
+                            <label className="recruitment-request-form-label">Mô tả công việc</label>
+                            <div className="recruitment-request-form-value">{request.mo_ta_cong_viec === 'co' || request.moTaCongViec === 'co' ? 'Có' : request.mo_ta_cong_viec === 'chua_co' || request.moTaCongViec === 'chua_co' ? 'Chưa có' : '-'}</div>
+                        </div>
+                        <div className="recruitment-request-form-field">
+                            <label className="recruitment-request-form-label">Loại lao động</label>
+                            <div className="recruitment-request-form-value">
+                                {request.loai_lao_dong === 'thoi_vu' || request.loaiLaoDong === 'thoi_vu' ? 'Thời vụ' :
+                                    request.loai_lao_dong === 'toan_thoi_gian' || request.loaiLaoDong === 'toan_thoi_gian' ? 'Toàn thời gian' : '-'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="recruitment-request-form-field">
+                        <label className="recruitment-request-form-label">Lý do tuyển</label>
+                        <div className="recruitment-request-form-value">
+                            {lyDoTuyen.tuyenThayThe || lyDoTuyen.tuyen_thay_the ? `Tuyển thay thế: ${lyDoTuyen.tenNguoiThayThe || lyDoTuyen.ten_nguoi_thay_the || ''}` : ''}
+                            {lyDoTuyen.nhuCauTang || lyDoTuyen.nhu_cau_tang ? 'Nhu cầu tăng' : ''}
+                            {lyDoTuyen.viTriCongViecMoi || lyDoTuyen.vi_tri_cong_viec_moi ? 'Vị trí công việc mới' : ''}
+                            {!lyDoTuyen.tuyenThayThe && !lyDoTuyen.nhuCauTang && !lyDoTuyen.viTriCongViecMoi && '-'}
+                        </div>
+                    </div>
+
+                    {request.ly_do_khac_ghi_chu || request.lyDoKhacGhiChu ? (
+                        <div className="recruitment-request-form-field">
+                            <label className="recruitment-request-form-label">Lý do khác / ghi chú</label>
+                            <div className="recruitment-request-form-value">{request.ly_do_khac_ghi_chu || request.lyDoKhacGhiChu}</div>
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+
+            {/* PHẦN II: TIÊU CHUẨN TUYỂN CHỌN */}
+            {tieuChuanTuyenChon && Object.keys(tieuChuanTuyenChon).length > 0 && (
+                <div className="recruitment-request-section">
+                    <div className="recruitment-request-section-header">
+                        <h3 className="recruitment-request-section-title">PHẦN II: TIÊU CHUẨN TUYỂN CHỌN</h3>
+                        <div className="recruitment-request-section-divider"></div>
+                    </div>
+
+                    <div className="recruitment-request-form-content">
+                        {/* Display all fields from PHẦN II - Similar structure to CandidateManagement */}
+                        {/* Giới tính */}
+                        {tieuChuanTuyenChon.gioiTinh && (
+                            <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
+                                <div className="recruitment-request-form-field">
+                                    <label className="recruitment-request-form-label">Giới tính</label>
+                                    <div className="recruitment-request-form-value">
+                                        {tieuChuanTuyenChon.gioiTinh.nam ? 'Nam' : ''}
+                                        {tieuChuanTuyenChon.gioiTinh.nam && tieuChuanTuyenChon.gioiTinh.nu ? ', ' : ''}
+                                        {tieuChuanTuyenChon.gioiTinh.nu ? 'Nữ' : ''}
+                                        {!tieuChuanTuyenChon.gioiTinh.nam && !tieuChuanTuyenChon.gioiTinh.nu ? '-' : ''}
+                                    </div>
+                                </div>
+                                <div className="recruitment-request-form-field">
+                                    <label className="recruitment-request-form-label">Độ tuổi</label>
+                                    <div className="recruitment-request-form-value">{tieuChuanTuyenChon.doTuoi || '-'}</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Trình độ học vấn */}
+                        {tieuChuanTuyenChon.trinhDoHocVan && (
+                            <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
+                                <div className="recruitment-request-form-field">
+                                    <label className="recruitment-request-form-label">Trình độ học vấn</label>
+                                    <div className="recruitment-request-form-value">
+                                        {[
+                                            tieuChuanTuyenChon.trinhDoHocVan.ptth && 'PTTH',
+                                            tieuChuanTuyenChon.trinhDoHocVan.daiHoc && 'Đại học',
+                                            tieuChuanTuyenChon.trinhDoHocVan.trungCapNghe && 'Trung cấp nghề',
+                                            tieuChuanTuyenChon.trinhDoHocVan.caoHocTroLen && 'Cao học trở lên'
+                                        ].filter(Boolean).join(', ') || '-'}
+                                    </div>
+                                </div>
+                                <div className="recruitment-request-form-field">
+                                    <label className="recruitment-request-form-label">Yêu cầu khác</label>
+                                    <div className="recruitment-request-form-value">{tieuChuanTuyenChon.yeuCauKhacHocVan || '-'}</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Kinh nghiệm và Kiến thức */}
+                        {(tieuChuanTuyenChon.kinhNghiem || tieuChuanTuyenChon.kienThuc) && (
+                            <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
+                                {tieuChuanTuyenChon.kinhNghiem && (
+                                    <div className="recruitment-request-form-field">
+                                        <label className="recruitment-request-form-label">Kinh nghiệm</label>
+                                        <div className="recruitment-request-form-value">
+                                            {tieuChuanTuyenChon.kinhNghiem.khong ? 'Không' :
+                                                tieuChuanTuyenChon.kinhNghiem.soNamKinhNghiem && tieuChuanTuyenChon.kinhNghiem.soNam ?
+                                                    `Số năm kinh nghiệm: ${tieuChuanTuyenChon.kinhNghiem.soNam}` : '-'}
+                                        </div>
+                                    </div>
+                                )}
+                                {tieuChuanTuyenChon.kienThuc && (
+                                    <div className="recruitment-request-form-field">
+                                        <label className="recruitment-request-form-label">Kiến thức</label>
+                                        <div className="recruitment-request-form-value">
+                                            {tieuChuanTuyenChon.kienThuc.khong ? 'Không' :
+                                                tieuChuanTuyenChon.kienThuc.nganhNghe && tieuChuanTuyenChon.kienThuc.nganhNgheValue ?
+                                                    `Ngành nghề: ${tieuChuanTuyenChon.kienThuc.nganhNgheValue}` : '-'}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Ngoại ngữ và Vi tính */}
+                        {(tieuChuanTuyenChon.ngoaiNgu || tieuChuanTuyenChon.viTinh) && (
+                            <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
+                                {tieuChuanTuyenChon.ngoaiNgu && (
+                                    <div className="recruitment-request-form-field">
+                                        <label className="recruitment-request-form-label">Ngoại ngữ</label>
+                                        <div className="recruitment-request-form-value">
+                                            {[
+                                                tieuChuanTuyenChon.ngoaiNgu.tiengAnh && `Tiếng Anh${tieuChuanTuyenChon.ngoaiNgu.trinhDoTiengAnh ? ` (${tieuChuanTuyenChon.ngoaiNgu.trinhDoTiengAnh})` : ''}`,
+                                                tieuChuanTuyenChon.ngoaiNgu.ngoaiNguKhac && tieuChuanTuyenChon.ngoaiNgu.tenNgoaiNguKhac &&
+                                                `${tieuChuanTuyenChon.ngoaiNgu.tenNgoaiNguKhac}${tieuChuanTuyenChon.ngoaiNgu.trinhDoNgoaiNguKhac ? ` (${tieuChuanTuyenChon.ngoaiNgu.trinhDoNgoaiNguKhac})` : ''}`
+                                            ].filter(Boolean).join(', ') || '-'}
+                                        </div>
+                                    </div>
+                                )}
+                                {tieuChuanTuyenChon.viTinh && (
+                                    <div className="recruitment-request-form-field">
+                                        <label className="recruitment-request-form-label">Vi tính</label>
+                                        <div className="recruitment-request-form-value">
+                                            {tieuChuanTuyenChon.viTinh.khong ? 'Không' :
+                                                [
+                                                    tieuChuanTuyenChon.viTinh.msOffice && 'MS Office (Word / Excel / Access)',
+                                                    tieuChuanTuyenChon.viTinh.khac && tieuChuanTuyenChon.viTinh.khacValue &&
+                                                    `Khác: ${tieuChuanTuyenChon.viTinh.khacValue}`
+                                                ].filter(Boolean).join(', ') || '-'}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Kỹ năng - Display as table */}
+                        {tieuChuanTuyenChon.kyNang && (
+                            <div className="recruitment-request-form-field">
+                                <div className="recruitment-request-skills-table">
+                                    <div className="recruitment-request-skills-row">
+                                        <label className="recruitment-request-skills-label">Kỹ năng giao tiếp</label>
+                                        <div className="recruitment-request-skills-value">{tieuChuanTuyenChon.kyNang.kyNangGiaoTiep || tieuChuanTuyenChon.kyNang?.ky_nang_giao_tiep || '-'}</div>
+                                    </div>
+                                    <div className="recruitment-request-skills-row">
+                                        <label className="recruitment-request-skills-label">Thái độ làm việc <span className="recruitment-request-skills-note">(Trách nhiệm,...)</span></label>
+                                        <div className="recruitment-request-skills-value">{tieuChuanTuyenChon.kyNang.thaiDoLamViec || tieuChuanTuyenChon.kyNang?.thai_do_lam_viec || '-'}</div>
+                                    </div>
+                                    <div className="recruitment-request-skills-row">
+                                        <label className="recruitment-request-skills-label">Kỹ năng quản lý <span className="recruitment-request-skills-note">(Áp dụng cho Trưởng phòng trở lên)</span></label>
+                                        <div className="recruitment-request-skills-value">{tieuChuanTuyenChon.kyNang.kyNangQuanLy || tieuChuanTuyenChon.kyNang?.ky_nang_quan_ly || '-'}</div>
+                                    </div>
+                                    <div className="recruitment-request-skills-row">
+                                        <label className="recruitment-request-skills-label">Yêu cầu khác</label>
+                                        <div className="recruitment-request-skills-value">{tieuChuanTuyenChon.kyNang.yeuCauKhac || tieuChuanTuyenChon.kyNang?.yeu_cau_khac || '-'}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

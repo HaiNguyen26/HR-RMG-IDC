@@ -6,7 +6,7 @@ import { statisticsAPI, employeesAPI } from '../../services/api';
 import { exportEmployeeTemplate, exportEmployeesToExcel, parseExcelFile } from '../../utils/excelUtils';
 import './Dashboard.css';
 
-const Dashboard = ({ onAddEmployee, employees, onRefreshEmployees, currentUser, showToast, showConfirm, onUpdateEquipment }) => {
+const Dashboard = ({ onAddEmployee, employees, onRefreshEmployees, currentUser, showToast, showConfirm, onUpdateEquipment, onOpenRequestsModal }) => {
   const [isEmployeeFormOpen, setIsEmployeeFormOpen] = useState(false);
   const [statistics, setStatistics] = useState({
     tongNhanVien: 0,
@@ -142,10 +142,49 @@ const Dashboard = ({ onAddEmployee, employees, onRefreshEmployees, currentUser, 
             // Show detailed error message
             let errorMsg = `Đã import thành công ${successCount} nhân viên, ${failedCount} nhân viên thất bại.`;
             if (failed && failed.length > 0) {
-              const firstError = failed[0];
-              errorMsg += `\nVí dụ: ${firstError.data?.hoTen || 'N/A'} - ${firstError.error}`;
+              // Group errors by type
+              const errorGroups = {};
+              failed.slice(0, 10).forEach(f => {
+                const errorType = f.error || 'Lỗi không xác định';
+                if (!errorGroups[errorType]) {
+                  errorGroups[errorType] = 0;
+                }
+                errorGroups[errorType]++;
+              });
+
+              const errorSummary = Object.entries(errorGroups)
+                .map(([error, count]) => `${error}: ${count} dòng`)
+                .join('; ');
+
+              errorMsg += `\n\nCác lỗi phổ biến:\n${errorSummary}`;
+
+              // Show first few detailed errors
+              if (failed.length > 0) {
+                const firstError = failed[0];
+                errorMsg += `\n\nVí dụ lỗi đầu tiên:\n${firstError.data?.hoTen || firstError.data?.maNhanVien || 'N/A'}: ${firstError.error}`;
+              }
             }
             showToast(errorMsg, 'warning');
+
+            // Log to console for debugging
+            console.error('Import failed details:', {
+              total: employeesData.length,
+              success: successCount,
+              failed: failedCount,
+              firstFewErrors: failed.slice(0, 10).map(f => ({
+                hoTen: f.data?.hoTen || f.data?.maNhanVien || 'N/A',
+                error: f.error,
+                data: f.data
+              }))
+            });
+
+            // Log all error types
+            const errorTypes = {};
+            failed.forEach(f => {
+              const errorType = f.error || 'Unknown error';
+              errorTypes[errorType] = (errorTypes[errorType] || 0) + 1;
+            });
+            console.error('Error types summary:', errorTypes);
           }
         }
 
@@ -400,6 +439,20 @@ const Dashboard = ({ onAddEmployee, employees, onRefreshEmployees, currentUser, 
                       onChange={handleFileChange}
                       style={{ display: 'none' }}
                     />
+                    {(currentUser?.role === 'IT' || currentUser?.role === 'HR' || currentUser?.role === 'ACCOUNTING' || currentUser?.role === 'ADMIN') && onOpenRequestsModal && (
+                      <button
+                        className="btn-action-secondary"
+                        onClick={onOpenRequestsModal}
+                        title="Quản lý yêu cầu vật dụng"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                          </path>
+                        </svg>
+                        <span>Yêu cầu vật dụng</span>
+                      </button>
+                    )}
                     <button className="btn-add-employee-header" onClick={() => setIsEmployeeFormOpen(true)}>
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"

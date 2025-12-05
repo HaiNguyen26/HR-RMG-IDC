@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import DatePicker from 'react-datepicker';
-import { formatDateToISO, parseISODateString, today } from '../../utils/dateUtils';
-import { DATE_PICKER_LOCALE } from '../../utils/datepickerLocale';
 import { employeesAPI } from '../../services/api';
 import EquipmentAssignment from '../EquipmentAssignment/EquipmentAssignment';
-import 'react-datepicker/dist/react-datepicker.css';
+import CustomSelect from '../Common/CustomSelect/CustomSelect';
 import './EmployeeForm.css';
 
 // Custom Dropdown Component
@@ -18,7 +15,7 @@ const CustomDropdown = ({ id, name, value, onChange, options, placeholder, error
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
-        dropdownRef.current && 
+        dropdownRef.current &&
         !dropdownRef.current.contains(event.target) &&
         menuRef.current &&
         !menuRef.current.contains(event.target)
@@ -47,18 +44,34 @@ const CustomDropdown = ({ id, name, value, onChange, options, placeholder, error
     if (option.value === '' || option.value === null || option.value === undefined) {
       return; // Prevent selecting placeholder
     }
-    const eventObject = { 
-      target: { 
-        name: name || id, 
-        value: option.value 
-      } 
+    const eventObject = {
+      target: {
+        name: name || id,
+        value: option.value
+      }
     };
     onChange(eventObject);
     setIsOpen(false);
   };
 
   // Filter out placeholder option (empty value) from display
-  const displayOptions = options.filter(opt => opt.value !== '');
+  // Also filter out null/undefined values
+  const displayOptions = options.filter(opt => {
+    if (!opt) return false;
+    // Allow empty string for placeholder, but filter it out from display
+    if (opt.value === '' || opt.value === null || opt.value === undefined) return false;
+    // Ensure label exists
+    if (opt.label === null || opt.label === undefined) return false;
+    return true;
+  });
+
+  // Debug log
+  if (options.length > 0 && displayOptions.length === 0) {
+    console.warn('CustomDropdown (EmployeeForm): All options filtered out!', {
+      totalOptions: options.length,
+      options: options.slice(0, 5)
+    });
+  }
 
   return (
     <div className={`custom-dropdown-wrapper ${className} ${error ? 'error' : ''} ${isOpen ? 'open' : ''}`} ref={dropdownRef}>
@@ -84,14 +97,16 @@ const CustomDropdown = ({ id, name, value, onChange, options, placeholder, error
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
         </svg>
       </button>
-      {isOpen && (
-        <div 
+      {isOpen && displayOptions.length > 0 && (
+        <div
           ref={menuRef}
           className="custom-dropdown-menu"
         >
-          {displayOptions.map((option) => (
+          {displayOptions.map((option, index) => (
             <button
-              key={option.value}
+              key={option.value !== null && option.value !== undefined && option.value !== ''
+                ? String(option.value)
+                : `option-${index}-${String(option.label || 'empty')}`}
               type="button"
               className={`custom-dropdown-option ${String(value) === String(option.value) ? 'selected' : ''}`}
               onMouseDown={(e) => {
@@ -101,9 +116,19 @@ const CustomDropdown = ({ id, name, value, onChange, options, placeholder, error
                 handleSelect(option, e);
               }}
             >
-              {option.label}
+              {option.label || ''}
             </button>
           ))}
+        </div>
+      )}
+      {isOpen && displayOptions.length === 0 && (
+        <div
+          ref={menuRef}
+          className="custom-dropdown-menu"
+        >
+          <div style={{ padding: '0.75rem 1rem', color: '#94a3b8', fontSize: '0.9rem' }}>
+            Không có dữ liệu
+          </div>
         </div>
       )}
     </div>
@@ -113,12 +138,18 @@ const CustomDropdown = ({ id, name, value, onChange, options, placeholder, error
 const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm }) => {
   const [formData, setFormData] = useState({
     maNhanVien: '',
+    maChamCong: '',
     hoTen: '',
     chucDanh: '',
     phongBan: '',
     boPhan: '',
     chiNhanh: '',
     ngayGiaNhap: '',
+    loaiHopDong: '',
+    diaDiem: '',
+    tinhThue: '',
+    capBac: '',
+    email: '',
     quanLyTrucTiep: '',
     quanLyGianTiep: '',
   });
@@ -127,6 +158,16 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
   const [loading, setLoading] = useState(false);
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
   const [createdEmployee, setCreatedEmployee] = useState(null);
+  const [departments, setDepartments] = useState([]);
+  const [boPhanList, setBoPhanList] = useState([]);
+  const [jobTitles, setJobTitles] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [contractTypes, setContractTypes] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [taxStatuses, setTaxStatuses] = useState([]);
+  const [ranks, setRanks] = useState([]);
+  const [managers, setManagers] = useState([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -137,21 +178,123 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
     setError('');
   };
 
-  const handleDateChange = (date) => {
-    if (date) {
-      const isoDate = formatDateToISO(date);
-      setFormData((prev) => ({
-        ...prev,
-        ngayGiaNhap: isoDate,
-      }));
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        ngayGiaNhap: '',
-      }));
-    }
+  const handleDateChange = (e) => {
+    const { value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      ngayGiaNhap: value || '',
+    }));
     setError('');
   };
+
+  // Fetch all options from database
+  useEffect(() => {
+    const fetchOptions = async () => {
+      setLoadingOptions(true);
+      try {
+        const [
+          deptResponse,
+          boPhanResponse,
+          jobTitlesResponse,
+          branchesResponse,
+          contractTypesResponse,
+          locationsResponse,
+          taxStatusesResponse,
+          ranksResponse,
+          managersResponse
+        ] = await Promise.all([
+          employeesAPI.getDepartments(),
+          employeesAPI.getBoPhan(),
+          employeesAPI.getJobTitles(),
+          employeesAPI.getBranches(),
+          employeesAPI.getContractTypes(),
+          employeesAPI.getLocations(),
+          employeesAPI.getTaxStatuses(),
+          employeesAPI.getRanks(),
+          employeesAPI.getManagers()
+        ]);
+
+        // Helper function to clean and deduplicate data
+        const cleanData = (data) => {
+          if (!Array.isArray(data)) return [];
+          return data
+            .filter(item => item != null && String(item).trim() !== '')
+            .map(item => String(item).trim())
+            .filter((item, index, self) => self.indexOf(item) === index);
+        };
+
+        if (deptResponse.data?.success) {
+          setDepartments(cleanData(deptResponse.data.data || []));
+        }
+
+        if (boPhanResponse.data?.success) {
+          setBoPhanList(cleanData(boPhanResponse.data.data || []));
+        }
+
+        if (jobTitlesResponse.data?.success) {
+          const jobTitlesData = jobTitlesResponse.data.data || [];
+          console.log('[EmployeeForm] Job titles response:', jobTitlesData);
+          const cleanedJobTitles = cleanData(jobTitlesData);
+          setJobTitles(cleanedJobTitles);
+          console.log('[EmployeeForm] ✅ Job titles loaded:', cleanedJobTitles.length, 'items');
+          if (cleanedJobTitles.length > 0) {
+            console.log('[EmployeeForm] Job titles sample:', cleanedJobTitles.slice(0, 5));
+          } else {
+            console.warn('[EmployeeForm] ⚠️ No job titles after cleaning!');
+          }
+        } else {
+          console.warn('[EmployeeForm] ❌ Job titles response not successful:', jobTitlesResponse.data);
+          console.warn('[EmployeeForm] Full job titles response:', jobTitlesResponse);
+        }
+
+        if (branchesResponse.data?.success) {
+          setBranches(cleanData(branchesResponse.data.data || []));
+        }
+
+        if (contractTypesResponse.data?.success) {
+          setContractTypes(cleanData(contractTypesResponse.data.data || []));
+        }
+
+        if (locationsResponse.data?.success) {
+          setLocations(cleanData(locationsResponse.data.data || []));
+        }
+
+        if (taxStatusesResponse.data?.success) {
+          setTaxStatuses(cleanData(taxStatusesResponse.data.data || []));
+        }
+
+        if (ranksResponse.data?.success) {
+          setRanks(cleanData(ranksResponse.data.data || []));
+        }
+
+        if (managersResponse.data?.success) {
+          const managersData = managersResponse.data.data || [];
+          console.log('[EmployeeForm] Managers response:', managersData.length, 'items');
+          console.log('[EmployeeForm] Managers sample:', managersData.slice(0, 3));
+
+          // Managers giờ là array of strings (tên quản lý trực tiếp)
+          const managerNames = cleanData(managersData);
+
+          console.log('[EmployeeForm] Manager names extracted:', managerNames.length, 'items');
+          if (managerNames.length > 0) {
+            console.log('[EmployeeForm] Manager names sample:', managerNames.slice(0, 5));
+          }
+          setManagers(managerNames);
+        } else {
+          console.warn('[EmployeeForm] Managers response not successful:', managersResponse.data);
+        }
+      } catch (error) {
+        console.error('Error fetching options:', error);
+        if (showToast) {
+          showToast('Không thể tải danh sách tùy chọn', 'error');
+        }
+      } finally {
+        setLoadingOptions(false);
+      }
+    };
+
+    fetchOptions();
+  }, [showToast]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -169,12 +312,18 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
       // Bước 1: Tạo nhân viên trong database
       const createResponse = await employeesAPI.create({
         maNhanVien: formData.maNhanVien || null,
+        maChamCong: formData.maChamCong || null,
         hoTen: formData.hoTen,
         chucDanh: formData.chucDanh,
         phongBan: formData.phongBan,
         boPhan: formData.boPhan,
         chiNhanh: formData.chiNhanh || null,
         ngayGiaNhap: formData.ngayGiaNhap,
+        loaiHopDong: formData.loaiHopDong || null,
+        diaDiem: formData.diaDiem || null,
+        tinhThue: formData.tinhThue || null,
+        capBac: formData.capBac || null,
+        email: formData.email || null,
         quanLyTrucTiep: formData.quanLyTrucTiep || null,
         quanLyGianTiep: formData.quanLyGianTiep || null,
       });
@@ -277,6 +426,21 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
               </div>
 
               <div className="form-group">
+                <label htmlFor="maChamCong" className="form-label">
+                  Mã chấm công
+                </label>
+                <input
+                  type="text"
+                  id="maChamCong"
+                  name="maChamCong"
+                  value={formData.maChamCong}
+                  onChange={handleChange}
+                  className="form-input"
+                  placeholder="VD: CC001"
+                />
+              </div>
+
+              <div className="form-group">
                 <label htmlFor="hoTen" className="form-label">
                   Họ tên *
                 </label>
@@ -293,18 +457,31 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
               </div>
 
               <div className="form-group">
+                <label htmlFor="email" className="form-label">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="form-input"
+                  placeholder="VD: nv@example.com"
+                />
+              </div>
+
+              <div className="form-group">
                 <label htmlFor="ngayGiaNhap" className="form-label">
                   Ngày nhận việc *
                 </label>
-                <DatePicker
+                <input
+                  type="date"
                   id="ngayGiaNhap"
-                  selected={formData.ngayGiaNhap ? parseISODateString(formData.ngayGiaNhap) : null}
+                  name="ngayGiaNhap"
+                  value={formData.ngayGiaNhap || ''}
                   onChange={handleDateChange}
-                  dateFormat="dd/MM/yyyy"
-                  locale={DATE_PICKER_LOCALE}
-                  className="form-input employee-form-datepicker"
-                  placeholderText="Chọn ngày nhận việc"
-                  withPortal
+                  className="form-input"
                   autoComplete="off"
                   required
                 />
@@ -314,14 +491,19 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
                 <label htmlFor="chiNhanh" className="form-label">
                   Chi nhánh
                 </label>
-                <input
-                  type="text"
+                <CustomSelect
                   id="chiNhanh"
                   name="chiNhanh"
                   value={formData.chiNhanh}
                   onChange={handleChange}
-                  className="form-input"
-                  placeholder="VD: Hồ Chí Minh, Hà Nội..."
+                  placeholder="Chọn chi nhánh"
+                  options={[
+                    { value: '', label: 'Chọn chi nhánh' },
+                    ...branches.map((branch) => ({
+                      value: branch,
+                      label: branch
+                    }))
+                  ]}
                 />
               </div>
             </div>
@@ -339,15 +521,20 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
                 <label htmlFor="chucDanh" className="form-label">
                   Chức danh *
                 </label>
-                <input
-                  type="text"
+                <CustomSelect
                   id="chucDanh"
                   name="chucDanh"
                   value={formData.chucDanh}
                   onChange={handleChange}
+                  placeholder="Chọn chức danh"
                   required
-                  className="form-input"
-                  placeholder="Nhập chức danh"
+                  options={[
+                    { value: '', label: 'Chọn chức danh' },
+                    ...jobTitles.map((title) => ({
+                      value: title,
+                      label: title
+                    }))
+                  ]}
                 />
               </div>
 
@@ -355,20 +542,22 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
                 <label htmlFor="phongBan" className="form-label">
                   Phòng ban *
                 </label>
-                <CustomDropdown
+                <CustomSelect
                   id="phongBan"
                   name="phongBan"
                   value={formData.phongBan}
                   onChange={handleChange}
+                  placeholder="Chọn phòng ban"
+                  required
                   options={[
                     { value: '', label: 'Chọn phòng ban' },
-                    { value: 'IT', label: 'Phòng IT' },
-                    { value: 'HR', label: 'Hành chính nhân sự' },
-                    { value: 'ACCOUNTING', label: 'Kế toán' },
-                    { value: 'OTHER', label: 'Phòng ban khác' }
+                    ...departments
+                      .filter(dept => dept && String(dept).trim() !== '')
+                      .map((dept) => {
+                        const value = String(dept).trim();
+                        return { value, label: value };
+                      })
                   ]}
-                  placeholder="Chọn phòng ban"
-                  className="form-input-custom-dropdown"
                 />
               </div>
 
@@ -376,15 +565,107 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
                 <label htmlFor="boPhan" className="form-label">
                   Bộ phận *
                 </label>
-                <input
-                  type="text"
+                <CustomSelect
                   id="boPhan"
                   name="boPhan"
                   value={formData.boPhan}
                   onChange={handleChange}
+                  placeholder="Chọn bộ phận"
                   required
-                  className="form-input"
-                  placeholder="Nhập bộ phận"
+                  options={[
+                    { value: '', label: 'Chọn bộ phận' },
+                    ...(boPhanList && boPhanList.length > 0
+                      ? boPhanList.map((bp) => {
+                        const value = String(bp).trim();
+                        return { value, label: value };
+                      })
+                      : [])
+                  ]}
+                />
+                {boPhanList && boPhanList.length === 0 && !loadingOptions && (
+                  <p className="form-help-text" style={{ color: '#ef4444', marginTop: '6px' }}>
+                    Không có dữ liệu bộ phận. Vui lòng kiểm tra database.
+                  </p>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="loaiHopDong" className="form-label">
+                  Loại hợp đồng
+                </label>
+                <CustomSelect
+                  id="loaiHopDong"
+                  name="loaiHopDong"
+                  value={formData.loaiHopDong}
+                  onChange={handleChange}
+                  placeholder="Chọn loại hợp đồng"
+                  options={[
+                    { value: '', label: 'Chọn loại hợp đồng' },
+                    ...contractTypes.map((type) => ({
+                      value: type,
+                      label: type
+                    }))
+                  ]}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="diaDiem" className="form-label">
+                  Địa điểm
+                </label>
+                <CustomSelect
+                  id="diaDiem"
+                  name="diaDiem"
+                  value={formData.diaDiem}
+                  onChange={handleChange}
+                  placeholder="Chọn địa điểm"
+                  options={[
+                    { value: '', label: 'Chọn địa điểm' },
+                    ...locations.map((location) => ({
+                      value: location,
+                      label: location
+                    }))
+                  ]}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="tinhThue" className="form-label">
+                  Tính thuế
+                </label>
+                <CustomSelect
+                  id="tinhThue"
+                  name="tinhThue"
+                  value={formData.tinhThue}
+                  onChange={handleChange}
+                  placeholder="Chọn tính thuế"
+                  options={[
+                    { value: '', label: 'Chọn tính thuế' },
+                    ...taxStatuses.map((status) => ({
+                      value: status,
+                      label: status
+                    }))
+                  ]}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="capBac" className="form-label">
+                  Cấp bậc
+                </label>
+                <CustomSelect
+                  id="capBac"
+                  name="capBac"
+                  value={formData.capBac}
+                  onChange={handleChange}
+                  placeholder="Chọn cấp bậc"
+                  options={[
+                    { value: '', label: 'Chọn cấp bậc' },
+                    ...ranks.map((rank) => ({
+                      value: rank,
+                      label: rank
+                    }))
+                  ]}
                 />
               </div>
 
@@ -392,14 +673,19 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
                 <label htmlFor="quanLyTrucTiep" className="form-label">
                   Quản lý trực tiếp
                 </label>
-                <input
-                  type="text"
+                <CustomSelect
                   id="quanLyTrucTiep"
                   name="quanLyTrucTiep"
                   value={formData.quanLyTrucTiep}
                   onChange={handleChange}
-                  className="form-input"
-                  placeholder="Ví dụ: Nguyễn Văn A"
+                  placeholder="Chọn quản lý trực tiếp"
+                  options={[
+                    { value: '', label: 'Chọn quản lý trực tiếp' },
+                    ...managers.map((manager) => ({
+                      value: manager,
+                      label: manager
+                    }))
+                  ]}
                 />
               </div>
 
@@ -407,52 +693,57 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
                 <label htmlFor="quanLyGianTiep" className="form-label">
                   Quản lý gián tiếp
                 </label>
-                <input
-                  type="text"
+                <CustomSelect
                   id="quanLyGianTiep"
                   name="quanLyGianTiep"
                   value={formData.quanLyGianTiep}
                   onChange={handleChange}
-                  className="form-input"
-                  placeholder="Ví dụ: Trần Thị B"
+                  placeholder="Chọn quản lý gián tiếp"
+                  options={[
+                    { value: '', label: 'Chọn quản lý gián tiếp' },
+                    ...managers.map((manager) => ({
+                      value: manager,
+                      label: manager
+                    }))
+                  ]}
                 />
               </div>
 
               {/* Form Actions - Nằm cùng hàng với Quản lý gián tiếp */}
               <div className="form-group form-actions-inline">
                 <label className="form-label" style={{ visibility: 'hidden' }}>Actions</label>
-                    <div className="form-actions">
-                      <button type="button" onClick={onCancel} className="btn-cancel" disabled={loading}>
-                        Hủy
-                      </button>
-                      <button type="submit" className="btn-submit" disabled={loading}>
-                        {loading ? (
-                          <>
-                            <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                              ></path>
-                            </svg>
-                            <span>Đang xử lý...</span>
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M5 13l4 4L19 7"
-                              ></path>
-                            </svg>
-                            <span>Lưu lại</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
+                <div className="form-actions">
+                  <button type="button" onClick={onCancel} className="btn-cancel" disabled={loading}>
+                    Hủy
+                  </button>
+                  <button type="submit" className="btn-submit" disabled={loading}>
+                    {loading ? (
+                      <>
+                        <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                          ></path>
+                        </svg>
+                        <span>Đang xử lý...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M5 13l4 4L19 7"
+                          ></path>
+                        </svg>
+                        <span>Lưu lại</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

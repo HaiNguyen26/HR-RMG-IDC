@@ -22,13 +22,15 @@
 }
 
 .interview-approvals-container::-webkit-scrollbar-track {
-    background: rgba(224, 242, 254, 0.3); /* Sky blue nhạt với transparency */
+    background: rgba(224, 242, 254, 0.3);
+    /* Sky blue nhạt với transparency */
     border-radius: 4px;
     backdrop-filter: blur(5px);
 }
 
 .interview-approvals-container::-webkit-scrollbar-thumb {
-    background: rgba(14, 165, 233, 0.4); /* Sky blue với transparency */
+    background: rgba(14, 165, 233, 0.4);
+    /* Sky blue với transparency */
     border-radius: 4px;
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -79,10 +81,13 @@
 .interview-approvals-icon-wrapper {
     width: 4rem;
     height: 4rem;
-    background: rgba(255, 255, 255, 0.9); /* bg-white/90 */
+    background: rgba(255, 255, 255, 0.9);
+    /* bg-white/90 */
     padding: 1rem;
-    border-radius: 0.75rem; /* rounded-xl */
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+    border-radius: 0.75rem;
+    /* rounded-xl */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    /* shadow-md */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -99,15 +104,19 @@
 .interview-approvals-icon {
     width: 2rem;
     height: 2rem;
-    color: #3b82f6; /* text-blue-500 hoặc #3b82f6 */
+    color: #3b82f6;
+    /* text-blue-500 hoặc #3b82f6 */
     stroke-width: 2;
 }
 
 /* Tiêu đề - Xám Đậm */
 .interview-approvals-title {
-    font-size: 1.5rem; /* text-2xl */
-    font-weight: 700; /* font-bold */
-    color: #000000; /* Màu đen */
+    font-size: 1.5rem;
+    /* text-2xl */
+    font-weight: 700;
+    /* font-bold */
+    color: #000000;
+    /* Màu đen */
     margin: 0 0 0.375rem 0;
     line-height: 1.2;
     text-transform: uppercase;
@@ -115,8 +124,10 @@
 
 /* Mô tả - Màu đen */
 .interview-approvals-subtitle {
-    font-size: 0.875rem; /* text-sm */
-    color: #000000; /* Màu đen */
+    font-size: 0.875rem;
+    /* text-sm */
+    color: #000000;
+    /* Màu đen */
     margin: 0;
     line-height: 1.5;
 }
@@ -147,11 +158,11 @@
 
 /* Statistics Cards Container */
 .interview-approvals-statistics {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    display: flex;
     gap: 1.25rem;
     margin-bottom: 2rem;
     flex-shrink: 0;
+    flex-wrap: nowrap;
 }
 
 /* Statistics Card - Base Styles */
@@ -163,6 +174,8 @@
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
+    flex: 1 1 0;
+    min-width: 0;
 }
 
 .interview-stat-card:hover {
@@ -200,6 +213,19 @@
 
 .interview-stat-card--pending .interview-stat-card-value {
     color: #1f2937;
+}
+
+/* Chờ đánh giá - Nền Tím Pastel, chữ Tím Đậm */
+.interview-stat-card--pending-evaluation {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(167, 139, 250, 0.1));
+}
+
+.interview-stat-card--pending-evaluation .interview-stat-card-label {
+    color: #6b21a8;
+}
+
+.interview-stat-card--pending-evaluation .interview-stat-card-value {
+    color: #7e22ce;
 }
 
 /* Đã duyệt - Nền Xanh Lá Tươi Sáng Pastel, chữ Xanh Lá Đậm */
@@ -270,6 +296,58 @@
     white-space: nowrap;
     position: relative;
     overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Badge for count */
+.interview-filter-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    padding: 0 0.375rem;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 0.75rem;
+    line-height: 1;
+}
+
+/* Animation for pending tabs */
+.interview-filter-tab.has-pending {
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    50% {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 4px rgba(239, 68, 68, 0.2);
+    }
+}
+
+.interview-filter-tab.has-pending.active {
+    animation: pulse-glow-active 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow-active {
+
+    0%,
+    100% {
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2), 0 1px 4px rgba(59, 130, 246, 0.15);
+    }
+
+    50% {
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2), 0 1px 4px rgba(59, 130, 246, 0.15), 0 0 0 4px rgba(239, 68, 68, 0.3);
+    }
 }
 
 /* Hover Effect - Lift và Soft Shadow rõ hơn */
@@ -1332,6 +1410,7 @@
         transform: scale(0.9) translateY(20px);
         opacity: 0;
     }
+
     to {
         transform: scale(1) translateY(0);
         opacity: 1;
@@ -1625,7 +1704,8 @@
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    max-height: calc(90vh - 120px); /* Trừ đi chiều cao header và actions */
+    max-height: calc(90vh - 120px);
+    /* Trừ đi chiều cao header và actions */
     padding: 0;
 }
 

@@ -880,6 +880,55 @@
     /* Transform rất nhẹ cho final status */
 }
 
+/* Đang thử việc - Animation nhấp nháy vừa phải */
+.candidate-status-tag--probation {
+    animation: pulse-probation 3s ease-in-out infinite;
+}
+
+@keyframes pulse-probation {
+
+    0%,
+    100% {
+        opacity: 1;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    50% {
+        opacity: 0.92;
+        box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2), 0 2px 4px -1px rgba(16, 185, 129, 0.15), 0 0 6px rgba(16, 185, 129, 0.15);
+    }
+}
+
+.candidate-status-tag--probation::before {
+    background: rgba(16, 185, 129, 0.25);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.25), 0 0 20px rgba(16, 185, 129, 0.12);
+    opacity: 0.5;
+    animation: pulse-glow-probation 3s ease-in-out infinite;
+}
+
+@keyframes pulse-glow-probation {
+
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+
+    50% {
+        opacity: 0.75;
+    }
+}
+
+/* Table row style for PROBATION status - Disable editing indication */
+.candidate-table-row--probation {
+    opacity: 0.85;
+    cursor: default !important;
+}
+
+.candidate-table-row--probation:hover {
+    background: #f8fafc !important;
+    transform: none !important;
+}
+
 /* Actions Cell */
 .candidate-actions-cell {
     text-align: center;
@@ -2933,6 +2982,180 @@ select {
     font-size: 0.875rem;
     color: #94a3b8;
     font-style: italic;
+}
+
+/* Đồng hồ đếm ngược 45 ngày thử việc */
+.candidate-probation-countdown {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 197, 253, 0.05) 100%);
+    border-radius: 0.75rem;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+}
+
+.candidate-probation-countdown-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.candidate-probation-countdown-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: #2563eb;
+}
+
+.candidate-probation-countdown-title {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #1e40af;
+}
+
+.candidate-probation-countdown-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.candidate-probation-countdown-days {
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    padding: 0.75rem 1.5rem;
+    background: #ffffff;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.candidate-probation-countdown-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2563eb;
+    line-height: 1;
+}
+
+.candidate-probation-countdown-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #64748b;
+}
+
+.candidate-probation-countdown-days--today {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 2px solid #f59e0b;
+}
+
+.candidate-probation-countdown-days--today .candidate-probation-countdown-number {
+    color: #d97706;
+}
+
+.candidate-probation-countdown-days--overdue {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    border: 2px solid #ef4444;
+}
+
+.candidate-probation-countdown-days--overdue .candidate-probation-countdown-number {
+    color: #dc2626;
+}
+
+.candidate-probation-countdown-text {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #475569;
+    text-align: center;
+}
+
+.candidate-probation-countdown-text--urgent {
+    color: #d97706;
+    font-weight: 600;
+}
+
+.candidate-probation-countdown-text--overdue {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+.candidate-probation-countdown-date {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: #64748b;
+    text-align: center;
+}
+
+/* Đồng hồ điện tử đếm ngược theo thời gian thực */
+.candidate-probation-countdown-digital-clock {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.candidate-probation-countdown-digital-clock--today {
+    background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+}
+
+.candidate-probation-countdown-digital-time {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.125rem;
+}
+
+.candidate-probation-countdown-digit {
+    display: inline-block;
+    padding: 0.5rem 0.75rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 0.375rem;
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(10px);
+    min-width: 1.5rem;
+    text-align: center;
+}
+
+.candidate-probation-countdown-separator {
+    display: inline-block;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 400;
+    padding: 0 0.25rem;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 50% {
+        opacity: 1;
+    }
+    51%, 100% {
+        opacity: 0.3;
+    }
+}
+
+.candidate-probation-countdown-digital-labels {
+    display: flex;
+    gap: 2.5rem;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05rem;
+}
+
+.candidate-probation-countdown-digital-labels span {
+    min-width: 3rem;
+    text-align: center;
 }
 
 /* ============================================

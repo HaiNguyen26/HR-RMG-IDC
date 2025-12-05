@@ -488,6 +488,12 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Căn giữa cho cột Trạng thái và Hành động */
+.leave-approvals-table th.text-center {
+  text-align: center;
 }
 
 .leave-approvals-table tbody {
@@ -497,6 +503,10 @@
 .leave-approvals-table tbody tr {
   border-bottom: 1px solid rgba(226, 232, 240, 0.5);
   transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.leave-approvals-table tbody tr.leave-request-row {
+  cursor: pointer;
 }
 
 .leave-approvals-table tbody tr:hover {
@@ -931,5 +941,291 @@
   .btn-fast-reject svg {
     width: 1rem;
     height: 1rem;
+  }
+}
+
+/* Detail Modal */
+.leave-approvals-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  padding: 1rem;
+}
+
+.leave-approvals-modal-content {
+  background: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 800px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.leave-approvals-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(to right, #e0f2fe, #ecfdf5);
+  flex-shrink: 0;
+}
+
+.leave-approvals-modal-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.leave-approvals-modal-close {
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.leave-approvals-modal-close:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.leave-approvals-modal-close svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.leave-approvals-modal-body {
+  padding: 1.5rem;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.leave-approvals-modal-section {
+  margin-bottom: 1.5rem;
+}
+
+.leave-approvals-modal-section:last-child {
+  margin-bottom: 0;
+}
+
+.leave-approvals-modal-section-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #6366f1;
+  margin: 0 0 1rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #6366f1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.leave-approvals-modal-section-title .section-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+.leave-approvals-modal-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.leave-approvals-modal-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.leave-approvals-modal-info-item .info-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.25rem;
+}
+
+.leave-approvals-modal-info-item .info-label .info-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: #9ca3af;
+}
+
+.leave-approvals-modal-info-item .info-value {
+  font-size: 0.9375rem;
+  color: #1f2937;
+  font-weight: 500;
+  padding-left: 1.375rem;
+}
+
+.leave-approvals-modal-info-item .info-value-highlight {
+  color: #6366f1;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.leave-approvals-modal-actions {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.leave-approvals-modal-actions .leave-approvals-actions-row {
+  margin: 0;
+}
+
+/* Reason Section */
+.leave-approvals-reason-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.leave-approvals-reason-text,
+.leave-approvals-notes-text,
+.leave-approvals-manager-comment-text {
+  background: #f7f9fc;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border-left: 3px solid #6366f1;
+  color: #1f2937;
+  line-height: 1.6;
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.leave-approvals-notes,
+.leave-approvals-manager-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.leave-approvals-notes .info-label,
+.leave-approvals-manager-comment .info-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.leave-approvals-notes .info-label .info-icon,
+.leave-approvals-manager-comment .info-label .info-icon {
+  width: 1rem;
+  height: 1rem;
+  color: #9ca3af;
+}
+
+.leave-approvals-manager-comment-text {
+  border-left-color: #10b981;
+  background: #f0fdf4;
+}
+
+/* Decision Trace Steps */
+.leave-approvals-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.leave-approvals-steps .step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f7f9fc;
+  border-radius: 0.5rem;
+  border-left: 3px solid #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+.leave-approvals-steps .step.completed {
+  background: #f0fdf4;
+  border-left-color: #10b981;
+}
+
+.leave-approvals-steps .step-icon {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.leave-approvals-steps .step.completed .step-icon {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.leave-approvals-steps .step-icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.leave-approvals-steps .step-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.leave-approvals-steps .step-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.leave-approvals-steps .step-date {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.leave-approvals-steps .step.completed .step-title {
+  color: #059669;
+}
+
+/* Responsive modal */
+@media (max-width: 768px) {
+  .leave-approvals-modal-content {
+    max-width: 100%;
+    max-height: 95vh;
+  }
+
+  .leave-approvals-modal-info-grid {
+    grid-template-columns: 1fr;
   }
 }

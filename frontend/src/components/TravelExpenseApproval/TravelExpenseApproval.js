@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './TravelExpenseApproval.css';
-import { travelExpensesAPI } from '../../services/api';
+import { travelExpensesAPI, employeesAPI } from '../../services/api';
 
 const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
   const [loading, setLoading] = useState(false);
@@ -9,21 +9,104 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [approvalNote, setApprovalNote] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [employeesList, setEmployeesList] = useState([]);
+
+  // Helper function to normalize Vietnamese names (remove accents, lowercase, trim)
+  const normalizeName = (name) => {
+    if (!name) return '';
+    return name
+      .toString()
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D');
+  };
+
+  // Helper function to check if two names match (fuzzy matching)
+  const namesMatch = (name1, name2) => {
+    const normalized1 = normalizeName(name1);
+    const normalized2 = normalizeName(name2);
+    return normalized1 === normalized2 || 
+           normalized1.includes(normalized2) || 
+           normalized2.includes(normalized1);
+  };
+
+  // Function to determine actorRole based on currentUser and request status
+  const determineActorRole = async (request) => {
+    if (!currentUser || !request) return null;
+
+    const currentUserName = (currentUser.hoTen || currentUser.username || '').trim();
+    const currentUserChucDanh = (currentUser.chucDanh || '').trim();
+
+    // 1. Check if user is CEO (Tổng giám đốc)
+    if (namesMatch(currentUserName, 'Lê Thanh Tùng')) {
+      return 'CEO';
+    }
+
+    // 2. Check if user is Finance (Kế toán)
+    if (namesMatch(currentUserName, 'Nguyễn Thị Ngọc Thúy') && 
+        (currentUserChucDanh.includes('Kế toán Trưởng') || currentUserChucDanh.includes('Kế toán'))) {
+      return 'FINANCE';
+    }
+
+    // 3. Check if user is Branch Director (Giám đốc chi nhánh) - based on chuc_danh
+    if (currentUserChucDanh && (
+        currentUserChucDanh.includes('Giám đốc') || 
+        currentUserChucDanh.includes('Giam doc')
+      )) {
+      return 'MANAGER'; // Giám đốc chi nhánh cũng là MANAGER
+    }
+
+    // 4. Check if user is Direct Manager (Quản lý trực tiếp)
+    // Fetch employee info to check quan_ly_truc_tiep
+    if (request.employee_id && employeesList.length > 0) {
+      const requestEmployee = employeesList.find(emp => emp.id === request.employee_id);
+      if (requestEmployee && requestEmployee.quan_ly_truc_tiep) {
+        const managerName = requestEmployee.quan_ly_truc_tiep.trim();
+        if (namesMatch(currentUserName, managerName)) {
+          return 'MANAGER';
+        }
+      }
+    }
+
+    // Default: return null if cannot determine
+    return null;
+  };
+
+  // Fetch employees list for checking quan_ly_truc_tiep
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const response = await employeesAPI.getAll();
+        if (response.data && response.data.success) {
+          setEmployeesList(response.data.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+      }
+    };
+
+    if (currentUser) {
+      fetchEmployees();
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     const fetchPendingRequests = async () => {
       setLoading(true);
       try {
         // Fetch requests pending approval (status PENDING_LEVEL_1 or PENDING_LEVEL_2)
-        const response = await travelExpensesAPI.getAll({ 
-          status: 'PENDING_LEVEL_1,PENDING_LEVEL_2' 
+        const response = await travelExpensesAPI.getAll({
+          status: 'PENDING_LEVEL_1,PENDING_LEVEL_2'
         });
-        
+
         if (response.data && response.data.success) {
           const formattedRequests = response.data.data.map(req => {
             const startDate = req.start_time ? new Date(req.start_time) : null;
             const endDate = req.end_time ? new Date(req.end_time) : null;
-            
+
             return {
               id: req.id,
               code: `CTX-${req.id}`,
@@ -64,6 +147,23 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
 
   return (
     <div className="travel-expense-approval">
+      {/* Header với tiêu đề chính */}
+      <div className="travel-expense-approval-header">
+        <div className="travel-expense-approval-header-content">
+          <div className="travel-expense-approval-icon-wrapper">
+            <svg className="travel-expense-approval-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+          </div>
+          <div>
+            <h1 className="travel-expense-approval-title">Phê duyệt công tác</h1>
+            <p className="travel-expense-approval-subtitle">
+              Xem và phê duyệt các yêu cầu kinh phí công tác từ nhân viên trong bộ phận của bạn.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Main Container: Glass Card lớn ở trung tâm */}
       <div className="travel-expense-approval-main-container">
         {/* Bố cục 2 cột */}
@@ -96,35 +196,35 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
                   <div className="travel-expense-approval-empty">Không có yêu cầu chờ duyệt</div>
                 ) : (
                   filteredRequests.map((request) => (
-                  <div
-                    key={request.id}
-                    className={`travel-expense-approval-list-item ${selectedRequestId === request.id ? 'active' : ''}`}
-                    onClick={() => setSelectedRequestId(request.id)}
-                  >
-                    {/* Cột trái: Mã yêu cầu và Tên nhân viên */}
-                    <div className="travel-expense-approval-item-left">
-                      {/* Mã yêu cầu */}
-                      <div className="travel-expense-approval-request-code">
-                        {request.code}
+                    <div
+                      key={request.id}
+                      className={`travel-expense-approval-list-item ${selectedRequestId === request.id ? 'active' : ''}`}
+                      onClick={() => setSelectedRequestId(request.id)}
+                    >
+                      {/* Cột trái: Mã yêu cầu và Tên nhân viên */}
+                      <div className="travel-expense-approval-item-left">
+                        {/* Mã yêu cầu */}
+                        <div className="travel-expense-approval-request-code">
+                          {request.code}
+                        </div>
+                        {/* Tên nhân viên */}
+                        <div className="travel-expense-approval-employee-name">
+                          {request.employeeName}
+                        </div>
+                        {/* Chi nhánh */}
+                        <div className="travel-expense-approval-branch">
+                          {request.branch}
+                        </div>
                       </div>
-                      {/* Tên nhân viên */}
-                      <div className="travel-expense-approval-employee-name">
-                        {request.employeeName}
-                      </div>
-                      {/* Chi nhánh */}
-                      <div className="travel-expense-approval-branch">
-                        {request.branch}
-                      </div>
-                    </div>
 
-                    {/* Cột phải: Thẻ phân loại */}
-                    <div className="travel-expense-approval-item-right">
-                      {/* Thẻ phân loại: NĐ (Nội địa - Teal) hoặc NN (Nước ngoài - Amber) */}
-                      <div className={`travel-expense-approval-scope-badge ${request.scope === 'NĐ' ? 'domestic' : 'foreign'}`}>
-                        {request.scope}
+                      {/* Cột phải: Thẻ phân loại */}
+                      <div className="travel-expense-approval-item-right">
+                        {/* Thẻ phân loại: NĐ (Nội địa - Teal) hoặc NN (Nước ngoài - Amber) */}
+                        <div className={`travel-expense-approval-scope-badge ${request.scope === 'NĐ' ? 'domestic' : 'foreign'}`}>
+                          {request.scope}
+                        </div>
                       </div>
                     </div>
-                  </div>
                   ))
                 )}
               </div>
@@ -248,27 +348,37 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
                             showToast && showToast('Vui lòng chọn yêu cầu cần duyệt.', 'warning');
                             return;
                           }
-                          
+
                           setIsProcessing(true);
                           try {
+                            // Determine actorRole
+                            const actorRole = await determineActorRole(selectedRequest);
+                            if (!actorRole) {
+                              showToast?.('Không thể xác định vai trò của bạn. Vui lòng liên hệ quản trị viên.', 'error');
+                              setIsProcessing(false);
+                              return;
+                            }
+
                             await travelExpensesAPI.decide(selectedRequestId, {
+                              actorRole: actorRole,
+                              actorId: currentUser.id,
                               decision: 'APPROVE',
                               notes: approvalNote
                             });
-                            
+
                             showToast && showToast('Yêu cầu đã được duyệt thành công!', 'success');
                             setSelectedRequestId(null);
                             setApprovalNote('');
-                            
+
                             // Refresh requests list
-                            const response = await travelExpensesAPI.getAll({ 
-                              status: 'PENDING_LEVEL_1,PENDING_LEVEL_2' 
+                            const response = await travelExpensesAPI.getAll({
+                              status: 'PENDING_LEVEL_1,PENDING_LEVEL_2'
                             });
                             if (response.data && response.data.success) {
                               const formattedRequests = response.data.data.map(req => {
                                 const startDate = req.start_time ? new Date(req.start_time) : null;
                                 const endDate = req.end_time ? new Date(req.end_time) : null;
-                                
+
                                 return {
                                   id: req.id,
                                   code: `CTX-${req.id}`,
@@ -312,27 +422,37 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
                             showToast && showToast('Vui lòng chọn yêu cầu cần từ chối.', 'warning');
                             return;
                           }
-                          
+
                           setIsProcessing(true);
                           try {
+                            // Determine actorRole
+                            const actorRole = await determineActorRole(selectedRequest);
+                            if (!actorRole) {
+                              showToast?.('Không thể xác định vai trò của bạn. Vui lòng liên hệ quản trị viên.', 'error');
+                              setIsProcessing(false);
+                              return;
+                            }
+
                             await travelExpensesAPI.decide(selectedRequestId, {
+                              actorRole: actorRole,
+                              actorId: currentUser.id,
                               decision: 'REJECT',
                               notes: approvalNote
                             });
-                            
+
                             showToast && showToast('Yêu cầu đã bị từ chối.', 'info');
                             setSelectedRequestId(null);
                             setApprovalNote('');
-                            
+
                             // Refresh requests list
-                            const response = await travelExpensesAPI.getAll({ 
-                              status: 'PENDING_LEVEL_1,PENDING_LEVEL_2' 
+                            const response = await travelExpensesAPI.getAll({
+                              status: 'PENDING_LEVEL_1,PENDING_LEVEL_2'
                             });
                             if (response.data && response.data.success) {
                               const formattedRequests = response.data.data.map(req => {
                                 const startDate = req.start_time ? new Date(req.start_time) : null;
                                 const endDate = req.end_time ? new Date(req.end_time) : null;
-                                
+
                                 return {
                                   id: req.id,
                                   code: `CTX-${req.id}`,

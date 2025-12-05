@@ -316,7 +316,8 @@
   background: rgba(15, 23, 42, 0.5);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  padding: 0.5rem; /* Giảm padding để modal cao hơn */
+  padding: 0.5rem;
+  /* Giảm padding để modal cao hơn */
   animation: detailModalOverlayFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 }
@@ -327,6 +328,7 @@
     backdrop-filter: blur(0px);
     -webkit-backdrop-filter: blur(0px);
   }
+
   to {
     opacity: 1;
     backdrop-filter: blur(12px);
@@ -335,15 +337,19 @@
 }
 
 .detail-modal-container {
-  background: #ffffff; /* Clean White */
-  border-radius: 1.5rem; /* Góc bo tròn mềm mại */
+  background: #ffffff;
+  /* Clean White */
+  border-radius: 1.5rem;
+  /* Góc bo tròn mềm mại */
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 25px 70px rgba(0, 0, 0, 0.35),
-              0 10px 30px rgba(0, 0, 0, 0.2),
-              0 0 0 1px rgba(255, 255, 255, 0.1),
-              inset 0 1px 0 rgba(255, 255, 255, 0.6); /* Soft Shadow lớn - Glassmorphism */
+    0 10px 30px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  /* Soft Shadow lớn - Glassmorphism */
   width: min(960px, 95vw);
-  max-height: 98vh; /* Tăng chiều cao để vừa nội dung */
+  max-height: 98vh;
+  /* Tăng chiều cao để vừa nội dung */
   display: flex;
   flex-direction: column;
   color: #0f172a;
@@ -360,6 +366,7 @@
     opacity: 0;
     transform: scale(0.85) translateY(30px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -370,7 +377,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.25rem 1.75rem 1rem; /* Giảm padding */
+  padding: 1.25rem 1.75rem 1rem;
+  /* Giảm padding */
   border-bottom: 1px solid rgba(226, 232, 240, 0.8);
   flex-shrink: 0;
 }
@@ -382,7 +390,8 @@
 }
 
 .detail-modal-icon-edit {
-  width: 3rem; /* Giảm kích thước */
+  width: 3rem;
+  /* Giảm kích thước */
   height: 3rem;
   border-radius: 0.75rem;
   background: linear-gradient(135deg, #0096FF 0%, #0066FF 50%, #0096FF 100%);
@@ -392,7 +401,7 @@
   justify-content: center;
   color: #ffffff;
   box-shadow: 0 8px 20px rgba(0, 150, 255, 0.3),
-              0 0 0 4px rgba(0, 150, 255, 0.1);
+    0 0 0 4px rgba(0, 150, 255, 0.1);
   flex-shrink: 0;
   position: relative;
   animation: detailIconGradientPulse 3s ease-in-out infinite;
@@ -400,11 +409,14 @@
 }
 
 @keyframes detailIconGradientPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     background-position: 0% 50%;
     filter: drop-shadow(0 0 8px rgba(0, 150, 255, 0.4)) drop-shadow(0 0 12px rgba(0, 150, 255, 0.2));
     transform: scale(1);
   }
+
   50% {
     background-position: 100% 50%;
     filter: drop-shadow(0 0 12px rgba(0, 150, 255, 0.6)) drop-shadow(0 0 16px rgba(0, 150, 255, 0.3));
@@ -427,10 +439,13 @@
 }
 
 @keyframes detailAmbientLight {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.5;
     transform: translate(-50%, -50%) scale(1);
   }
+
   50% {
     opacity: 0.8;
     transform: translate(-50%, -50%) scale(1.2);
@@ -438,14 +453,16 @@
 }
 
 .detail-modal-icon-svg {
-  width: 1.5rem; /* Giảm kích thước */
+  width: 1.5rem;
+  /* Giảm kích thước */
   height: 1.5rem;
   position: relative;
   z-index: 1;
 }
 
 .detail-modal-title {
-  font-size: 1.375rem; /* Giảm font-size */
+  font-size: 1.375rem;
+  /* Giảm font-size */
   font-weight: 700;
   margin: 0;
   letter-spacing: 0.01em;
@@ -470,11 +487,14 @@
 }
 
 .detail-modal-body {
-  padding: 1.25rem 1.75rem 1.5rem; /* Giảm padding */
-  overflow: hidden; /* Loại bỏ scroll */
+  padding: 1.25rem 1.75rem 1.5rem;
+  /* Giảm padding */
+  overflow: hidden;
+  /* Loại bỏ scroll */
   display: flex;
   flex-direction: column;
-  gap: 1.25rem; /* Giảm gap */
+  gap: 1.25rem;
+  /* Giảm gap */
   flex: 1;
   min-height: 0;
 }
@@ -482,7 +502,8 @@
 .detail-form {
   display: flex;
   flex-direction: column;
-  gap: 1.125rem; /* Giảm gap */
+  gap: 1.125rem;
+  /* Giảm gap */
   background: transparent;
   border: none;
   border-radius: 0;
@@ -495,15 +516,18 @@
 .detail-form-section {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem; /* Giảm gap */
+  gap: 0.75rem;
+  /* Giảm gap */
   flex-shrink: 0;
 }
 
 .detail-section-header {
   display: flex;
   align-items: center;
-  gap: 0.625rem; /* Giảm gap */
-  margin-bottom: 0.125rem; /* Giảm margin */
+  gap: 0.625rem;
+  /* Giảm gap */
+  margin-bottom: 0.125rem;
+  /* Giảm margin */
 }
 
 .detail-section-badge {
@@ -514,16 +538,19 @@
   height: 2rem;
   border-radius: 0.5rem;
   background: rgba(0, 150, 255, 0.12);
-  color: #0096FF; /* Electric Blue */
+  color: #0096FF;
+  /* Electric Blue */
   font-weight: 700;
   font-size: 0.875rem;
   flex-shrink: 0;
 }
 
 .detail-section-title {
-  font-size: 1rem; /* Giảm font-size */
+  font-size: 1rem;
+  /* Giảm font-size */
   font-weight: 700;
-  color: #0096FF; /* Electric Blue */
+  color: #0096FF;
+  /* Electric Blue */
   margin: 0;
   line-height: 1.3;
   position: relative;
@@ -545,6 +572,7 @@
   from {
     width: 0;
   }
+
   to {
     width: 100%;
   }
@@ -553,7 +581,8 @@
 .detail-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem 1.25rem; /* Giảm gap */
+  gap: 0.75rem 1.25rem;
+  /* Giảm gap */
 }
 
 .detail-info-card {
@@ -656,30 +685,39 @@
 .detail-form .form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem; /* Giảm gap */
+  gap: 0.35rem;
+  /* Giảm gap */
 }
 
 .detail-form label {
-  font-size: 0.8125rem; /* Giảm font-size */
+  font-size: 0.8125rem;
+  /* Giảm font-size */
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: #475569; /* Xám đậm */
-  margin-bottom: 0.125rem; /* Giảm margin */
+  color: #475569;
+  /* Xám đậm */
+  margin-bottom: 0.125rem;
+  /* Giảm margin */
   transition: color 0.3s ease;
 }
 
 .detail-form .form-group:focus-within label {
-  color: #0096FF; /* Electric Blue khi focus */
+  color: #0096FF;
+  /* Electric Blue khi focus */
 }
 
 .detail-form input,
 .detail-form select {
-  border: 1px solid #e2e8f0; /* Viền mảnh 1px Xám Rất Nhạt */
+  border: 1px solid #e2e8f0;
+  /* Viền mảnh 1px Xám Rất Nhạt */
   border-radius: 0.875rem;
-  background: #ffffff; /* Trắng tinh */
+  background: #ffffff;
+  /* Trắng tinh */
   color: #0f172a;
-  padding: 0.625rem 0.875rem; /* Giảm padding */
-  font-size: 0.875rem; /* Giảm font-size */
+  padding: 0.625rem 0.875rem;
+  /* Giảm padding */
+  font-size: 0.875rem;
+  /* Giảm font-size */
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   outline: none;
   font-family: inherit;
@@ -690,7 +728,8 @@
 /* Read-only fields (Mã NV) */
 .detail-form input[readonly],
 .detail-form input:disabled {
-  background: #f1f5f9; /* Nền Xám Rất Nhạt - Disable/Read-only Look */
+  background: #f1f5f9;
+  /* Nền Xám Rất Nhạt - Disable/Read-only Look */
   color: #64748b;
   cursor: not-allowed;
   border-color: #e2e8f0;
@@ -699,7 +738,8 @@
 .detail-form input[readonly]:focus,
 .detail-form input:disabled:focus {
   border-color: #e2e8f0;
-  box-shadow: none; /* Không có hiệu ứng Focus Glow */
+  box-shadow: none;
+  /* Không có hiệu ứng Focus Glow */
 }
 
 .detail-form select {
@@ -738,23 +778,28 @@
 /* Focus/Chỉnh sửa - Electric Blue với Subtle Glow */
 .detail-form input:focus:not([readonly]):not(:disabled),
 .detail-form select:focus:not(:disabled) {
-  border-color: #0096FF; /* Electric Blue */
+  border-color: #0096FF;
+  /* Electric Blue */
   box-shadow: 0 0 0 3px rgba(0, 150, 255, 0.15),
-              0 4px 12px rgba(0, 150, 255, 0.2),
-              0 2px 6px rgba(0, 150, 255, 0.1); /* Subtle Glow - ánh sáng mờ nhẹ */
+    0 4px 12px rgba(0, 150, 255, 0.2),
+    0 2px 6px rgba(0, 150, 255, 0.1);
+  /* Subtle Glow - ánh sáng mờ nhẹ */
   animation: detailInputGlowPulse 2s ease-in-out infinite;
 }
 
 @keyframes detailInputGlowPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 0 3px rgba(0, 150, 255, 0.15),
-                0 4px 12px rgba(0, 150, 255, 0.2),
-                0 2px 6px rgba(0, 150, 255, 0.1);
+      0 4px 12px rgba(0, 150, 255, 0.2),
+      0 2px 6px rgba(0, 150, 255, 0.1);
   }
+
   50% {
     box-shadow: 0 0 0 3px rgba(0, 150, 255, 0.2),
-                0 6px 16px rgba(0, 150, 255, 0.3),
-                0 3px 8px rgba(0, 150, 255, 0.15);
+      0 6px 16px rgba(0, 150, 255, 0.3),
+      0 3px 8px rgba(0, 150, 255, 0.15);
   }
 }
 
@@ -767,13 +812,17 @@
 
 .detail-form-custom-dropdown .custom-dropdown-trigger {
   width: 100%;
-  padding: 0.625rem 0.875rem; /* Giảm padding */
+  padding: 0.625rem 0.875rem;
+  /* Giảm padding */
   padding-right: 2.25rem;
-  border: 1px solid #e2e8f0; /* Viền mảnh 1px Xám Rất Nhạt */
+  border: 1px solid #e2e8f0;
+  /* Viền mảnh 1px Xám Rất Nhạt */
   border-radius: 0.875rem;
-  background: #ffffff; /* Trắng tinh */
+  background: #ffffff;
+  /* Trắng tinh */
   color: #1e293b;
-  font-size: 0.875rem; /* Giảm font-size */
+  font-size: 0.875rem;
+  /* Giảm font-size */
   text-align: left;
   cursor: pointer;
   display: flex;
@@ -792,10 +841,12 @@
 }
 
 .detail-form-custom-dropdown .custom-dropdown-trigger.open {
-  border-color: #0096FF; /* Electric Blue */
+  border-color: #0096FF;
+  /* Electric Blue */
   box-shadow: 0 0 0 3px rgba(0, 150, 255, 0.15),
-              0 4px 12px rgba(0, 150, 255, 0.2),
-              0 2px 6px rgba(0, 150, 255, 0.1); /* Subtle Glow */
+    0 4px 12px rgba(0, 150, 255, 0.2),
+    0 2px 6px rgba(0, 150, 255, 0.1);
+  /* Subtle Glow */
 }
 
 .detail-form-custom-dropdown .custom-dropdown-trigger.error {
@@ -804,7 +855,7 @@
 
 .detail-form-custom-dropdown .custom-dropdown-trigger.error.open {
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15),
-              0 0 20px rgba(239, 68, 68, 0.2);
+    0 0 20px rgba(239, 68, 68, 0.2);
 }
 
 .detail-form-custom-dropdown .custom-dropdown-value {
@@ -839,8 +890,14 @@
   border: 1.5px solid #e2e8f0;
   border-radius: 0.875rem;
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.15),
-              0 4px 12px rgba(0, 0, 0, 0.1);
+    0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 1003;
+  max-height: 12rem;
+  /* Giảm từ mặc định xuống 12rem (192px) */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.25rem;
+  /* Giảm padding */
   max-height: 20rem;
   min-height: auto;
   overflow-y: auto;
@@ -856,6 +913,7 @@
     opacity: 0;
     transform: translateY(-8px) scale(0.96);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -864,12 +922,14 @@
 
 .detail-form-custom-dropdown .custom-dropdown-option {
   width: 100%;
-  padding: 0.625rem 0.875rem; /* Giảm padding */
+  padding: 0.625rem 0.875rem;
+  /* Giảm padding */
   border: none;
   border-radius: 0.5rem;
   background: transparent;
   color: #1e293b;
-  font-size: 0.875rem; /* Giảm font-size */
+  font-size: 0.875rem;
+  /* Giảm font-size */
   font-weight: 500;
   text-align: left;
   cursor: pointer;
@@ -920,8 +980,10 @@
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
-  padding: 1rem 0 0; /* Giảm padding */
-  margin-top: 0.5rem; /* Thêm margin-top */
+  padding: 1rem 0 0;
+  /* Giảm padding */
+  margin-top: 0.5rem;
+  /* Thêm margin-top */
   border-top: 1px solid rgba(226, 232, 240, 0.8);
   flex-shrink: 0;
 }
@@ -948,7 +1010,8 @@
 }
 
 .save-btn svg {
-  color: #ffffff; /* Bright White */
+  color: #ffffff;
+  /* Bright White */
 }
 
 .edit-btn {
@@ -963,20 +1026,24 @@
 }
 
 .save-btn {
-  background: linear-gradient(135deg, #0096FF 0%, #0066FF 50%, #0096FF 100%); /* Electric Blue Gradient */
+  background: linear-gradient(135deg, #0096FF 0%, #0066FF 50%, #0096FF 100%);
+  /* Electric Blue Gradient */
   background-size: 200% 200%;
-  color: #ffffff; /* Bright White */
+  color: #ffffff;
+  /* Bright White */
   border: none;
   box-shadow: 0 8px 20px rgba(0, 150, 255, 0.3),
-              0 4px 12px rgba(0, 150, 255, 0.2);
+    0 4px 12px rgba(0, 150, 255, 0.2);
   position: relative;
   overflow: hidden;
 }
 
 .save-btn:hover:not(:disabled) {
-  transform: translateY(-3px); /* Lift effect */
+  transform: translateY(-3px);
+  /* Lift effect */
   box-shadow: 0 12px 28px rgba(0, 150, 255, 0.4),
-              0 6px 16px rgba(0, 150, 255, 0.3); /* Soft Shadow rõ hơn */
+    0 6px 16px rgba(0, 150, 255, 0.3);
+  /* Soft Shadow rõ hơn */
   background-position: 100% 50%;
 }
 
@@ -1004,8 +1071,10 @@
 }
 
 .cancel-btn {
-  background: #f8fafc; /* Very Light Gray */
-  color: #475569; /* Dark Gray */
+  background: #f8fafc;
+  /* Very Light Gray */
+  color: #475569;
+  /* Dark Gray */
   border: 1px solid #e2e8f0;
   box-shadow: none;
 }
@@ -1507,6 +1576,13 @@
   table-layout: auto;
 }
 
+/* Ensure table cells show full content without wrapping */
+.table-wrapper td {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
 /* Custom Scrollbar for Table Wrapper */
 .table-wrapper::-webkit-scrollbar {
   width: 8px;
@@ -1587,9 +1663,9 @@
   font-size: 0.875rem;
   color: #374151;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
+  overflow: visible;
+  text-overflow: clip;
+  min-width: 120px;
 }
 
 .employee-table-empty {

@@ -41,25 +41,25 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
         if (!currentUser || currentUser.role !== 'HR') return;
 
         try {
-            // Fetch recent leave requests (all pending statuses, approved, rejected)
+            // Fetch recent leave requests (new simplified workflow statuses)
             const leaveResponse = await leaveRequestsAPI.getAll({
                 mode: 'hr',
                 hrUserId: currentUser.id,
-                status: 'PENDING_TEAM_LEAD,PENDING_BRANCH,PENDING_DIRECTOR,PENDING_HR,APPROVED,REJECTED'
+                status: 'PENDING_TEAM_LEAD,APPROVED_BY_TEAM_LEAD,REJECTED_BY_TEAM_LEAD,CANCELLED'
             });
 
-            // Fetch recent overtime requests (all pending statuses, approved, rejected)
+            // Fetch recent overtime requests (new simplified workflow statuses)
             const overtimeResponse = await overtimeRequestsAPI.getAll({
                 mode: 'hr',
                 hrUserId: currentUser.id,
-                status: 'PENDING_TEAM_LEAD,PENDING_BRANCH,PENDING_DIRECTOR,PENDING_HR,APPROVED,REJECTED'
+                status: 'PENDING_TEAM_LEAD,APPROVED_BY_TEAM_LEAD,REJECTED_BY_TEAM_LEAD,CANCELLED'
             });
 
-            // Fetch recent attendance adjustment requests (all pending statuses, approved, rejected)
+            // Fetch recent attendance adjustment requests (new simplified workflow statuses)
             const attendanceResponse = await attendanceAdjustmentsAPI.getAll({
                 mode: 'hr',
                 hrUserId: currentUser.id,
-                status: 'PENDING_TEAM_LEAD,PENDING_BRANCH,PENDING_DIRECTOR,PENDING_HR,APPROVED,REJECTED'
+                status: 'PENDING_TEAM_LEAD,APPROVED_BY_TEAM_LEAD,REJECTED_BY_TEAM_LEAD,CANCELLED'
             });
 
             // Fetch candidates with status PASSED or FAILED (approved/rejected by manager)
@@ -98,33 +98,30 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                 ...leaveRequests
                     .filter(req => {
                         // Show all pending statuses immediately
-                        const isPending = req.status === 'PENDING_TEAM_LEAD' || req.status === 'PENDING_BRANCH' ||
-                            req.status === 'PENDING_DIRECTOR' || req.status === 'PENDING_HR';
+                        const isPending = req.status === 'PENDING_TEAM_LEAD';
                         if (isPending) return true;
                         // Show approved/rejected within last 7 days
-                        const updatedAt = new Date(req.updated_at || req.team_lead_action_at || req.branch_manager_action_at || 0);
+                        const updatedAt = new Date(req.updated_at || req.team_lead_action_at || 0);
                         return updatedAt >= sevenDaysAgo;
                     })
                     .map(req => ({ ...req, notificationId: `leave:${req.id}:${req.status || 'UNKNOWN'}`, notificationType: 'leave' })),
                 ...overtimeRequests
                     .filter(req => {
                         // Show all pending statuses immediately
-                        const isPending = req.status === 'PENDING_TEAM_LEAD' || req.status === 'PENDING_BRANCH' ||
-                            req.status === 'PENDING_DIRECTOR' || req.status === 'PENDING_HR';
+                        const isPending = req.status === 'PENDING_TEAM_LEAD';
                         if (isPending) return true;
                         // Show approved/rejected within last 7 days
-                        const updatedAt = new Date(req.updated_at || req.team_lead_action_at || req.branch_manager_action_at || 0);
+                        const updatedAt = new Date(req.updated_at || req.team_lead_action_at || 0);
                         return updatedAt >= sevenDaysAgo;
                     })
                     .map(req => ({ ...req, notificationId: `overtime:${req.id}:${req.status || 'UNKNOWN'}`, notificationType: 'overtime' })),
                 ...attendanceRequests
                     .filter(req => {
                         // Show all pending statuses immediately
-                        const isPending = req.status === 'PENDING_TEAM_LEAD' || req.status === 'PENDING_BRANCH' ||
-                            req.status === 'PENDING_DIRECTOR' || req.status === 'PENDING_HR';
+                        const isPending = req.status === 'PENDING_TEAM_LEAD';
                         if (isPending) return true;
                         // Show approved/rejected within last 7 days
-                        const updatedAt = new Date(req.updated_at || req.team_lead_action_at || req.branch_manager_action_at || 0);
+                        const updatedAt = new Date(req.updated_at || req.team_lead_action_at || 0);
                         return updatedAt >= sevenDaysAgo;
                     })
                     .map(req => ({ ...req, notificationId: `attendance:${req.id}:${req.status || 'UNKNOWN'}`, notificationType: 'attendance' })),
@@ -197,25 +194,25 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
 
         setLoading(true);
         try {
-            // Fetch leave requests (all pending statuses, approved, rejected)
+            // Fetch leave requests (new simplified workflow statuses)
             const leaveResponse = await leaveRequestsAPI.getAll({
                 mode: 'hr',
                 hrUserId: currentUser.id,
-                status: 'PENDING_TEAM_LEAD,PENDING_BRANCH,PENDING_DIRECTOR,PENDING_HR,APPROVED,REJECTED'
+                status: 'PENDING_TEAM_LEAD,APPROVED_BY_TEAM_LEAD,REJECTED_BY_TEAM_LEAD,CANCELLED'
             });
 
-            // Fetch overtime requests (all pending statuses, approved, rejected)
+            // Fetch overtime requests (new simplified workflow statuses)
             const overtimeResponse = await overtimeRequestsAPI.getAll({
                 mode: 'hr',
                 hrUserId: currentUser.id,
-                status: 'PENDING_TEAM_LEAD,PENDING_BRANCH,PENDING_DIRECTOR,PENDING_HR,APPROVED,REJECTED'
+                status: 'PENDING_TEAM_LEAD,APPROVED_BY_TEAM_LEAD,REJECTED_BY_TEAM_LEAD,CANCELLED'
             });
 
-            // Fetch attendance adjustment requests (all pending statuses, approved, rejected)
+            // Fetch attendance adjustment requests (new simplified workflow statuses)
             const attendanceResponse = await attendanceAdjustmentsAPI.getAll({
                 mode: 'hr',
                 hrUserId: currentUser.id,
-                status: 'PENDING_TEAM_LEAD,PENDING_BRANCH,PENDING_DIRECTOR,PENDING_HR,APPROVED,REJECTED'
+                status: 'PENDING_TEAM_LEAD,APPROVED_BY_TEAM_LEAD,REJECTED_BY_TEAM_LEAD,CANCELLED'
             });
 
             // Fetch candidates with status PASSED or FAILED (approved/rejected by manager)
@@ -254,11 +251,10 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                 ...leaveRequests
                     .filter(req => {
                         // Show all pending statuses immediately
-                        const isPending = req.status === 'PENDING_TEAM_LEAD' || req.status === 'PENDING_BRANCH' ||
-                            req.status === 'PENDING_DIRECTOR' || req.status === 'PENDING_HR';
+                        const isPending = req.status === 'PENDING_TEAM_LEAD';
                         if (isPending) return true;
                         // Show approved/rejected within last 7 days
-                        const updatedAt = new Date(req.updated_at || req.team_lead_action_at || req.branch_manager_action_at || 0);
+                        const updatedAt = new Date(req.updated_at || req.team_lead_action_at || 0);
                         return updatedAt >= sevenDaysAgo;
                     })
                     .map(req => ({
@@ -270,11 +266,10 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                 ...overtimeRequests
                     .filter(req => {
                         // Show all pending statuses immediately
-                        const isPending = req.status === 'PENDING_TEAM_LEAD' || req.status === 'PENDING_BRANCH' ||
-                            req.status === 'PENDING_DIRECTOR' || req.status === 'PENDING_HR';
+                        const isPending = req.status === 'PENDING_TEAM_LEAD';
                         if (isPending) return true;
                         // Show approved/rejected within last 7 days
-                        const updatedAt = new Date(req.updated_at || req.team_lead_action_at || req.branch_manager_action_at || 0);
+                        const updatedAt = new Date(req.updated_at || req.team_lead_action_at || 0);
                         return updatedAt >= sevenDaysAgo;
                     })
                     .map(req => ({
@@ -286,11 +281,10 @@ const FloatingNotificationBell = ({ currentUser, showToast }) => {
                 ...attendanceRequests
                     .filter(req => {
                         // Show all pending statuses immediately
-                        const isPending = req.status === 'PENDING_TEAM_LEAD' || req.status === 'PENDING_BRANCH' ||
-                            req.status === 'PENDING_DIRECTOR' || req.status === 'PENDING_HR';
+                        const isPending = req.status === 'PENDING_TEAM_LEAD';
                         if (isPending) return true;
                         // Show approved/rejected within last 7 days
-                        const updatedAt = new Date(req.updated_at || req.team_lead_action_at || req.branch_manager_action_at || 0);
+                        const updatedAt = new Date(req.updated_at || req.team_lead_action_at || 0);
                         return updatedAt >= sevenDaysAgo;
                     })
                     .map(req => ({

@@ -60,7 +60,8 @@
     /* (Nền Ngoại vi: Sky Blue 50 → White → Indigo 50) */
     background: linear-gradient(135deg, #dbeafe 0%, #ecfdf5 50%, #e0e7ff 100%);
     padding: 1.25rem 1.75rem;
-    border-radius: 1rem; /* Bo tròn 4 góc */
+    border-radius: 1rem;
+    /* Bo tròn 4 góc */
     box-shadow: 0 4px 12px rgba(14, 165, 233, 0.08);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -73,10 +74,14 @@
 .attendance-request-icon-wrapper {
     width: 4rem;
     height: 4rem;
-    background: rgba(255, 255, 255, 0.9); /* bg-white/90 */
-    padding: 1rem; /* p-4 */
-    border-radius: 0.75rem; /* rounded-xl */
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+    background: rgba(255, 255, 255, 0.9);
+    /* bg-white/90 */
+    padding: 1rem;
+    /* p-4 */
+    border-radius: 0.75rem;
+    /* rounded-xl */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    /* shadow-md */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -93,37 +98,39 @@
 .attendance-request-icon {
     width: 2rem;
     height: 2rem;
-    color: #3b82f6; /* text-blue-500 hoặc #3b82f6 */
+    color: #3b82f6;
+    /* text-blue-500 hoặc #3b82f6 */
     stroke-width: 2;
 }
 
-/* Tiêu đề - Xám Đậm */
+/* Tiêu đề - Dark Blue (#1f2937 / Gray-800) */
 .attendance-request-title {
     font-size: 1.5rem;
-    /* text-2xl */
     font-weight: 700;
-    /* font-bold */
-    color: #000000; /* Màu đen */
+    color: #1f2937;
+    /* Gray-800 for titles */
     margin: 0 0 0.375rem 0;
     line-height: 1.2;
     text-transform: uppercase;
 }
 
-/* Mô tả - Màu đen */
+/* Mô tả - Neutral Gray (#6b7280 / Gray-500) */
 .attendance-request-subtitle {
     font-size: 0.875rem;
-    /* text-sm */
-    color: #000000; /* Màu đen */
+    color: #6b7280;
+    /* Gray-500 for detail text */
     margin: 0;
     line-height: 1.5;
 }
 
-/* I. THẺ FORM CONTAINER (Form Card Container) - Glass Card */
+/* I. THẺ FORM CONTAINER (Form Card Container) - Soft Shadow Floating Effect */
 .attendance-request-form-wrapper {
-    background: rgba(255, 255, 255, 0.85); /* bg-white/85 */
-    backdrop-filter: blur(24px); /* backdrop-blur-2xl */
-    border-radius: 1.5rem; /* rounded-3xl */
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(59, 130, 246, 0.05); /* shadow-2xl shadow-blue-100/50 */
+    background: #ffffff;
+    /* White background for card */
+    border-radius: 1rem;
+    /* rounded-xl (12px) */
+    /* Soft shadow for floating effect: 0 10px 30px rgba(0, 0, 0, 0.08) */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
     overflow: hidden;
     flex: 1;
     min-height: 0;
@@ -184,118 +191,130 @@
     flex-shrink: 0;
 }
 
-/* Form Content - 2 Columns */
+/* Form Content - 2 Columns Layout */
 .attendance-form-content {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
     gap: 1.5rem;
     flex: 1;
     min-height: 0;
-    align-items: start;
+    overflow: hidden;
 }
 
-/* Form Column */
-.attendance-form-column {
+/* Left Column */
+.attendance-form-left-column {
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 1rem;
+}
+
+.attendance-form-left-column::-webkit-scrollbar {
+    width: 6px;
+}
+
+.attendance-form-left-column::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.attendance-form-left-column::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+.attendance-form-left-column::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* Right Column */
+.attendance-form-right-column {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-left: 1rem;
+    border-left: 1px solid #e5e7eb;
 }
 
 /* Form Section */
 .attendance-form-section {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 0.75rem;
+    /* Reduced gap to save space */
+}
+
+/* Approver Box (II. Thông tin Duyệt): Light gray background to separate from input fields */
+.attendance-approver-section {
+    background: #edf2f7 !important;
+    /* Light gray background for approver section */
+    padding: 1rem;
+    border-radius: 0.75rem;
+    /* rounded-xl */
+    margin-top: 1rem;
 }
 
 .attendance-section-title {
     font-size: 1.125rem;
-    /* text-lg */
-    font-weight: 600;
-    /* font-semibold */
-    color: #1f2937;
-    /* text-gray-800 */
+    font-weight: 700;
+    color: #6366f1;
+    /* Indigo-500 for section titles */
     margin: 0;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #6366f1;
+    /* Indigo-500 for section title underline - thinner */
 }
 
+/* Form Fields */
+.attendance-form-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    /* Reduced gap to save space */
+}
+
+/* Form Row - For side-by-side fields */
+.attendance-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    /* Reduced gap to save space */
+    align-items: start;
+}
 
 .attendance-form-group {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.375rem;
+    /* Reduced gap to save space */
     flex-shrink: 0;
 }
 
 /* III. TRƯỜNG NHẬP DỮ LIỆU (INPUT FIELDS) */
-/* Tiêu đề Field (Label) - Màu đen, gạch chân màu xanh đậm */
+/* Tiêu đề Field (Label) - Không có gạch dưới */
 .attendance-form-label {
     font-size: 0.875rem;
-    font-weight: 600; /* font-semibold */
-    color: #000000; /* Màu đen */
+    font-weight: 600;
+    color: #1f2937;
+    /* Gray-800 for labels */
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    position: relative;
-    padding-bottom: 0.25rem;
     cursor: default;
     width: fit-content;
 }
 
-/* Animated Underline Indicator for Labels - Chạy khi mở module */
-.attendance-form-label::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 2px;
-    background: linear-gradient(to right, #3b82f6, #2563eb);
-    border-radius: 2px;
-    transform: scaleX(0);
-    transform-origin: left;
-    animation: labelUnderlineSlide 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+/* Required field asterisk - Red (#ef4444 / Red-500) */
+.attendance-form-label span:has-text("*")::after,
+.attendance-form-label:has-text("*")::after {
+    content: '*';
+    color: #ef4444;
+    /* Red-500 for required field indicator */
+    margin-left: 0.25rem;
 }
 
-/* Delay animation cho từng label để tạo hiệu ứng tuần tự */
-.attendance-form-group:nth-child(1) .attendance-form-label::after {
-    animation-delay: 0.1s;
-}
-
-.attendance-form-group:nth-child(2) .attendance-form-label::after {
-    animation-delay: 0.2s;
-}
-
-.attendance-form-group:nth-child(3) .attendance-form-label::after {
-    animation-delay: 0.3s;
-}
-
-.attendance-form-group:nth-child(4) .attendance-form-label::after {
-    animation-delay: 0.4s;
-}
-
-.attendance-form-group:nth-child(5) .attendance-form-label::after {
-    animation-delay: 0.5s;
-}
-
-.attendance-form-group:nth-child(6) .attendance-form-label::after {
-    animation-delay: 0.6s;
-}
-
-.attendance-form-group:nth-child(7) .attendance-form-label::after {
-    animation-delay: 0.7s;
-}
-
-@keyframes labelUnderlineSlide {
-    from {
-        transform: scaleX(0);
-    }
-    to {
-        transform: scaleX(1);
-    }
-}
 
 .attendance-label-icon {
     width: 1rem;
@@ -309,51 +328,44 @@
 .attendance-form-input {
     width: 100%;
     padding: 0.75rem 1rem;
-    border: 1px solid #f3f4f6;
-    border-radius: 0.5rem;
-    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    /* rounded-xl (12px) */
+    background: #f7f9fc;
+    /* Light gray background */
     font-size: 0.875rem;
     color: #1f2937;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
+    /* Smooth transition */
     outline: none;
     box-shadow: none;
     position: relative;
-    border-bottom: 2px solid transparent;
 }
 
+/* Input Focus State: Border Indigo, outer blurred border, background to white */
 .attendance-form-input:focus {
-    border-color: #3b82f6;
-    border-bottom-color: transparent;
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15), 0 0 0 1px #3b82f6, 0 0 12px rgba(59, 130, 246, 0.12);
+    border-color: #6366f1;
+    /* Indigo border */
+    background: #ffffff;
+    /* White background when focused */
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    /* Outer blurred border */
+    outline: none;
 }
 
 .attendance-form-input-wrapper {
     position: relative;
 }
 
-.attendance-form-input-wrapper:not(:has(.attendance-form-input-readonly))::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 0;
-    height: 2px;
-    background: linear-gradient(to right, #3b82f6, #2563eb);
-    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 2;
-    border-radius: 2px 2px 0 0;
-}
-
-.attendance-form-input-wrapper:not(:has(.attendance-form-input-readonly)):focus-within::after {
-    width: 100%;
-}
-
 .attendance-form-input-readonly {
-    background: #f3f4f6 !important;
-    color: #3b82f6 !important;
-    font-weight: 600;
+    background: #f7f9fc !important;
+    /* Light gray background */
+    color: #6b7280 !important;
+    /* Gray-500 for readonly text */
+    font-weight: 400;
+    /* Normal weight */
     cursor: not-allowed;
-    border: 1px solid #f3f4f6 !important;
+    border: 1px solid #e5e7eb !important;
 }
 
 .attendance-form-input-readonly:focus {
@@ -366,23 +378,6 @@
     position: relative;
 }
 
-.attendance-date-picker-wrapper::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 0;
-    height: 2px;
-    background: linear-gradient(to right, #3b82f6, #2563eb);
-    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 2;
-    border-radius: 2px 2px 0 0;
-}
-
-.attendance-date-picker-wrapper:focus-within::after {
-    width: 100%;
-}
-
 /* Icon Lịch/Đồng hồ - Xám/Xanh nhạt */
 .attendance-date-icon {
     position: absolute;
@@ -391,7 +386,8 @@
     transform: translateY(-50%);
     width: 1.25rem;
     height: 1.25rem;
-    color: #93c5fd; /* text-blue-300 hoặc text-gray-400 */
+    color: #93c5fd;
+    /* text-blue-300 hoặc text-gray-400 */
     pointer-events: none;
     z-index: 1;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -402,33 +398,76 @@
     transform: translateY(-50%) scale(0.95);
 }
 
-/* Datepicker - Trắng Tinh Khiết với Shadow Inner */
+/* Datepicker - Light gray background */
 .attendance-form-datepicker {
     width: 100%;
     padding: 0.75rem 3rem 0.75rem 1rem;
-    border: 1px solid #e5e7eb; /* border-gray-200 */
-    border-radius: 0.5rem; /* rounded-lg */
-    background: #ffffff; /* bg-white */
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    /* rounded-xl (12px) */
+    background: #f7f9fc;
+    /* Light gray background */
     font-size: 0.9375rem;
     color: #1f2937;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
     outline: none;
-    /* Shadow Inner */
-    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); /* shadow-inner */
-    border-bottom: 2px solid transparent;
 }
 
-/* Datepicker Focus - Fluent Blue Accent */
+/* Datepicker Focus - Border Indigo, outer blurred border, background to white */
 .attendance-form-datepicker:focus {
-    border-color: #3b82f6; /* focus:border-blue-500 */
-    box-shadow: 
-        0 0 0 2px rgba(147, 197, 253, 0.5), /* focus:ring-2 focus:ring-blue-200 */
-        inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); /* shadow-inner */
+    border-color: #6366f1;
+    /* Indigo border */
+    background: #ffffff;
+    /* White background when focused */
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    /* Outer blurred border */
     outline: none;
-    border-bottom-color: #3b82f6;
 }
 
 /* Toggle Buttons for Check Type */
+/* Mục cần bổ sung - Buttons */
+.attendance-items-buttons {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.attendance-item-button {
+    flex: 1;
+    min-width: 120px;
+    padding: 0.75rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    /* rounded-xl (12px) */
+    background: #f7f9fc;
+    /* Light gray background when not selected */
+    color: #4b5563;
+    /* Dark gray text when not selected */
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    /* Smooth transition */
+}
+
+.attendance-item-button:hover:not(.active) {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+/* Toggle Button Active State: Complete change to Indigo background with white text */
+.attendance-item-button.active {
+    background: #4f46e5;
+    /* Indigo-600 */
+    color: #ffffff;
+    /* White text */
+    border-color: #4f46e5;
+}
+
+.attendance-item-button:active {
+    transform: translateY(0);
+}
+
 .attendance-type-toggle-buttons {
     display: flex;
     flex-direction: column;
@@ -484,23 +523,6 @@
     position: relative;
 }
 
-.attendance-time-picker-wrapper::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 0;
-    height: 2px;
-    background: linear-gradient(to right, #3b82f6, #2563eb);
-    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 2;
-    border-radius: 2px 2px 0 0;
-}
-
-.attendance-time-picker-wrapper:focus-within::after {
-    width: 100%;
-}
-
 .attendance-time-icon {
     position: absolute;
     right: 1rem;
@@ -508,7 +530,8 @@
     transform: translateY(-50%);
     width: 1.25rem;
     height: 1.25rem;
-    color: #93c5fd; /* text-blue-300 hoặc text-gray-400 */
+    color: #93c5fd;
+    /* text-blue-300 hoặc text-gray-400 */
     pointer-events: none;
     z-index: 1;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -523,16 +546,20 @@
 .attendance-form-timepicker {
     width: 100%;
     padding: 0.75rem 3rem 0.75rem 1rem;
-    border: 1px solid #e5e7eb; /* border-gray-200 */
-    border-radius: 0.5rem; /* rounded-lg */
-    background: #ffffff; /* bg-white */
+    border: 1px solid #e5e7eb;
+    /* border-gray-200 */
+    border-radius: 0.5rem;
+    /* rounded-lg */
+    background: #ffffff;
+    /* bg-white */
     font-size: 0.9375rem;
     color: #1f2937;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     outline: none;
     cursor: pointer;
     /* Shadow Inner */
-    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); /* shadow-inner */
+    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+    /* shadow-inner */
     border-bottom: 2px solid transparent;
 }
 
@@ -542,10 +569,13 @@
 
 /* Timepicker Focus - Fluent Blue Accent */
 .attendance-form-timepicker:focus {
-    border-color: #3b82f6; /* focus:border-blue-500 */
-    box-shadow: 
-        0 0 0 2px rgba(147, 197, 253, 0.5), /* focus:ring-2 focus:ring-blue-200 */
-        inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); /* shadow-inner */
+    border-color: #3b82f6;
+    /* focus:border-blue-500 */
+    box-shadow:
+        0 0 0 2px rgba(147, 197, 253, 0.5),
+        /* focus:ring-2 focus:ring-blue-200 */
+        inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+    /* shadow-inner */
     outline: none;
     border-bottom-color: #3b82f6;
 }
@@ -567,52 +597,51 @@
 /* Textarea - Trắng Tinh Khiết với Shadow Inner */
 .attendance-form-textarea {
     width: 100%;
-    padding: 0.75rem 1rem;
-    border: 1px solid #e5e7eb; /* border-gray-200 */
-    border-radius: 0.5rem; /* rounded-lg */
-    background: #ffffff; /* bg-white */
-    font-size: 0.9375rem;
+    padding: 0.625rem 0.875rem;
+    /* Reduced padding to save space */
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    /* rounded-xl (12px) */
+    background: #f7f9fc;
+    /* Light gray background */
+    font-size: 0.875rem;
+    /* Slightly smaller font */
     color: #1f2937;
     font-family: inherit;
-    line-height: 1.5;
+    line-height: 1.4;
+    /* Tighter line height */
     resize: none;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
     outline: none;
-    /* Shadow Inner */
-    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); /* shadow-inner */
-    border-bottom: 2px solid transparent;
     position: relative;
+}
+
+/* Textarea Focus State: Border Indigo, outer blurred border, background to white */
+.attendance-form-textarea:focus {
+    border-color: #6366f1;
+    /* Indigo border */
+    background: #ffffff;
+    /* White background when focused */
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    /* Outer blurred border */
+    outline: none;
 }
 
 /* Textarea Focus - Fluent Blue Accent */
 .attendance-form-textarea:focus {
-    border-color: #3b82f6; /* focus:border-blue-500 */
-    box-shadow: 
-        0 0 0 2px rgba(147, 197, 253, 0.5), /* focus:ring-2 focus:ring-blue-200 */
-        inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); /* shadow-inner */
+    border-color: #3b82f6;
+    /* focus:border-blue-500 */
+    box-shadow:
+        0 0 0 2px rgba(147, 197, 253, 0.5),
+        /* focus:ring-2 focus:ring-blue-200 */
+        inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+    /* shadow-inner */
     outline: none;
     border-bottom-color: #3b82f6;
 }
 
 .attendance-form-textarea-wrapper {
     position: relative;
-}
-
-.attendance-form-textarea-wrapper::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 0;
-    height: 2px;
-    background: linear-gradient(to right, #3b82f6, #2563eb);
-    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 2;
-    border-radius: 2px 2px 0 0;
-}
-
-.attendance-form-textarea-wrapper:focus-within::after {
-    width: 100%;
 }
 
 /* Large Textarea for Reason */
@@ -639,21 +668,23 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
-    padding: 1rem 1.75rem;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
     border: none;
     border-radius: 0.75rem;
-    /* bg-gradient-to-r from-blue-500 to-blue-700 */
-    background: linear-gradient(to right, #3b82f6, #1d4ed8);
+    /* Primary Button Gradient: #4c77a8 to #68a0d4 */
+    background: linear-gradient(to right, #4c77a8, #68a0d4);
     /* Chữ & Icon - Trắng Tinh Khiết */
-    color: #ffffff; /* text-white */
-    font-size: 0.9375rem;
+    color: #ffffff;
+    /* text-white */
+    font-size: 0.875rem;
     font-weight: 700;
     letter-spacing: 0.025em;
     text-transform: uppercase;
     cursor: pointer;
     /* Shadow - Đổ bóng rực rỡ (Glow) */
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(96, 165, 250, 0.5); /* shadow-xl shadow-blue-400/50 */
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(96, 165, 250, 0.5);
+    /* shadow-xl shadow-blue-400/50 */
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     outline: none;
     flex-shrink: 0;
@@ -661,7 +692,6 @@
     will-change: transform, box-shadow;
     position: relative;
     overflow: hidden;
-    grid-column: 1 / -1;
 }
 
 .attendance-submit-button::before {
@@ -679,12 +709,14 @@
     left: 100%;
 }
 
-/* Hiệu ứng Hover - Fluent Lift */
+/* Primary Button Hover: translateY(-1px) and deeper shadow */
 .attendance-submit-button:hover:not(:disabled) {
-    transform: translateY(-2px); /* hover:translate-y-[-2px] */
-    /* hover:shadow-2xl */
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(96, 165, 250, 0.6);
-    background: linear-gradient(to right, #2563eb, #1e40af);
+    transform: translateY(-1px);
+    /* Subtle lift on hover */
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
+    /* Deeper shadow */
+    background: linear-gradient(to right, #5a8bc4, #7ab0e0);
+    /* Slightly lighter gradient on hover */
 }
 
 .attendance-submit-button:active:not(:disabled) {
@@ -701,8 +733,8 @@
 
 .attendance-submit-button svg,
 .attendance-submit-icon {
-    width: 1.375rem;
-    height: 1.375rem;
+    width: 1.125rem;
+    height: 1.125rem;
     color: #ffffff;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
     flex-shrink: 0;
@@ -721,6 +753,314 @@
     to {
         transform: rotate(360deg);
     }
+}
+
+/* Modal cho Mục cần bổ sung */
+.attendance-item-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.attendance-item-modal-content {
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.attendance-item-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.attendance-item-modal-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+.attendance-item-modal-close {
+    width: 2rem;
+    height: 2rem;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    cursor: pointer;
+    border-radius: 0.375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.attendance-item-modal-close:hover {
+    background: #f3f4f6;
+    color: #1f2937;
+}
+
+.attendance-item-modal-close svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.attendance-item-modal-body {
+    padding: 1.5rem;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.attendance-item-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.attendance-item-modal-cancel {
+    padding: 0.625rem 1.25rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #ffffff;
+    color: #6b7280;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.attendance-item-modal-cancel:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    color: #1f2937;
+}
+
+.attendance-item-modal-save {
+    padding: 0.625rem 1.25rem;
+    border: none;
+    border-radius: 0.5rem;
+    background: linear-gradient(to right, #3b82f6, #1d4ed8);
+    color: #ffffff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.attendance-item-modal-save:hover {
+    background: linear-gradient(to right, #2563eb, #1e40af);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+.attendance-item-modal-save:active {
+    transform: translateY(0);
+}
+
+/* Form trong modal */
+.attendance-item-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.attendance-item-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.attendance-item-form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.attendance-item-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+
+.attendance-item-button.filled {
+    position: relative;
+}
+
+.attendance-item-button.filled::after {
+    content: '';
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    width: 0.5rem;
+    height: 0.5rem;
+    background: #10b981;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+}
+
+/* Form chi tiết trong cột phải */
+.attendance-item-detail-form {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #ffffff;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.attendance-item-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    background: #4f46e5;
+    /* Indigo-600 - Primary color */
+    color: #ffffff;
+}
+
+.attendance-item-detail-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0;
+    color: #ffffff;
+}
+
+.attendance-item-detail-close {
+    padding: 0.25rem;
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    cursor: pointer;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.attendance-item-detail-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.attendance-item-detail-close svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.attendance-item-detail-body {
+    flex: 1;
+    padding: 1.5rem;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.attendance-item-detail-body .attendance-item-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    /* Reduced gap to match main form */
+}
+
+.attendance-item-detail-body .attendance-item-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    /* Reduced gap to match main form */
+}
+
+.attendance-item-detail-body .attendance-item-form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1f2937;
+    /* Gray-800 for labels */
+}
+
+.attendance-item-detail-body .attendance-item-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    /* Reduced gap to match main form */
+}
+
+.attendance-item-detail-body .attendance-form-input,
+.attendance-item-detail-body .attendance-form-textarea,
+.attendance-item-detail-body .attendance-form-timepicker {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    /* Match main form padding */
+    border: 1px solid #e5e7eb;
+    /* Match main form border */
+    border-radius: 0.75rem;
+    /* rounded-xl (12px) */
+    background: #f7f9fc;
+    /* Light gray background like main form */
+    font-size: 0.875rem;
+    color: #1f2937;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+/* Focus State: Border Indigo, outer blurred border, background to white */
+.attendance-item-detail-body .attendance-form-input:focus,
+.attendance-item-detail-body .attendance-form-textarea:focus,
+.attendance-item-detail-body .attendance-form-timepicker:focus {
+    outline: none;
+    border-color: #6366f1;
+    /* Indigo border */
+    background: #ffffff;
+    /* White background when focused */
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    /* Outer blurred border */
+}
+
+.attendance-item-detail-body .attendance-form-textarea {
+    resize: vertical;
+    min-height: 80px;
+    line-height: 1.4;
+    /* Tighter line height */
+}
+
+.attendance-item-detail-body .attendance-form-textarea::placeholder {
+    color: #9ca3af;
+    /* Gray-400 for placeholder */
+}
+
+.attendance-item-detail-body .attendance-time-picker-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.attendance-item-detail-body .attendance-time-icon {
+    position: absolute;
+    right: 0.875rem;
+    width: 1rem;
+    height: 1rem;
+    color: #6b7280;
+    pointer-events: none;
 }
 
 /* Responsive */

@@ -50,23 +50,23 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
         const fetchRequests = async () => {
             setLoading(true);
             try {
-                // Fetch requests with status PENDING_LEVEL_1 or PENDING_LEVEL_2 (approved by manager/CEO, waiting for budget allocation)
+                // Fetch requests with status PENDING_LEVEL_1, PENDING_LEVEL_2, or PENDING_FINANCE (approved by manager/CEO, waiting for budget allocation or already have budget)
                 const response = await travelExpensesAPI.getAll({
-                    status: 'PENDING_LEVEL_1,PENDING_LEVEL_2'
+                    status: 'PENDING_LEVEL_1,PENDING_LEVEL_2,PENDING_FINANCE'
                 });
 
                 if (response.data && response.data.success) {
                     const formattedRequests = response.data.data.map(req => ({
                         id: req.id,
                         code: `CTX-${req.id}`,
-                        employeeName: req.employee_name || 'N/A',
+                        employeeName: req.employee_name || req.employeeName || 'N/A',
                         location: req.location || '',
-                        isDomestic: req.location_type === 'DOMESTIC',
+                        isDomestic: req.locationType === 'DOMESTIC',
                         purpose: req.purpose || '',
-                        startDate: req.start_time ? new Date(req.start_time).toLocaleDateString('vi-VN') : '',
-                        endDate: req.end_time ? new Date(req.end_time).toLocaleDateString('vi-VN') : '',
+                        startDate: req.startTime ? new Date(req.startTime).toLocaleDateString('vi-VN') : '',
+                        endDate: req.endTime ? new Date(req.endTime).toLocaleDateString('vi-VN') : '',
                         status: req.status || '',
-                        employee_id: req.employee_id
+                        employee_id: req.employeeId
                     }));
                     setRequests(formattedRequests);
                 }
@@ -96,25 +96,6 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
         bankAccount: '' // TODO: Fetch from employee profile using employee_id
     } : null;
 
-    // Fetch employee bank account when request is selected
-    useEffect(() => {
-        const fetchEmployeeBankAccount = async () => {
-            if (selectedRequest?.employee_id) {
-                try {
-                    // TODO: Add API endpoint to fetch employee bank account
-                    // For now, using placeholder
-                    const bankAccount = `970422 - 1234567890 - ${selectedRequest.employeeName}`;
-                    setTabBForm(prev => ({
-                        ...prev,
-                        bankAccount: bankAccount
-                    }));
-                } catch (error) {
-                    console.error('Error fetching employee bank account:', error);
-                }
-            }
-        };
-        fetchEmployeeBankAccount();
-    }, [selectedRequest]);
 
 
     // Format currency input
@@ -387,20 +368,61 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     {/* hover:translate-y-[-2px], shadow-lg shadow-blue-400/50 */}
                                                     <button
                                                         className="travel-expense-primary-button"
-                                                        onClick={() => {
+                                                        onClick={async () => {
                                                             if (!tabAForm.budgetAmount || !tabAForm.exchangeRate) {
                                                                 showToast?.('Vui lòng nhập đầy đủ thông tin', 'warning');
                                                                 return;
                                                             }
-                                                            // Lưu thông tin ngân sách đã được cấp
-                                                            setApprovedBudget({
-                                                                amount: getConvertedAmount(),
-                                                                originalAmount: tabAForm.budgetAmount,
-                                                                currency: tabAForm.currencyType,
-                                                                exchangeRate: tabAForm.exchangeRate
-                                                            });
-                                                            showToast?.('Đã lưu ngân sách', 'success');
-                                                            // TODO: Logic lưu ngân sách
+                                                            if (!selectedRequestId) {
+                                                                showToast?.('Vui lòng chọn yêu cầu cần cấp ngân sách', 'warning');
+                                                                return;
+                                                            }
+
+                                                            try {
+                                                                const response = await travelExpensesAPI.approveBudget(selectedRequestId, {
+                                                                    budgetAmount: tabAForm.budgetAmount,
+                                                                    currencyType: tabAForm.currencyType,
+                                                                    exchangeRate: tabAForm.exchangeRate,
+                                                                    approvedBy: currentUser?.id || null
+                                                                });
+
+                                                                if (response.data && response.data.success) {
+                                                                    // Lưu thông tin ngân sách đã được cấp
+                                                                    setApprovedBudget({
+                                                                        amount: getConvertedAmount(),
+                                                                        originalAmount: tabAForm.budgetAmount,
+                                                                        currency: tabAForm.currencyType,
+                                                                        exchangeRate: tabAForm.exchangeRate
+                                                                    });
+                                                                    showToast?.('Đã cấp ngân sách thành công!', 'success');
+                                                                    
+                                                                    // Reset form
+                                                                    setTabAForm({ budgetAmount: '', currencyType: 'VND', exchangeRate: '1' });
+                                                                    
+                                                                    // Refresh requests list
+                                                                    const refreshResponse = await travelExpensesAPI.getAll({
+                                                                        status: 'PENDING_LEVEL_1,PENDING_LEVEL_2'
+                                                                    });
+                                                                    if (refreshResponse.data && refreshResponse.data.success) {
+                                                                        const formattedRequests = refreshResponse.data.data.map(req => ({
+                                                                            id: req.id,
+                                                                            code: `CTX-${req.id}`,
+                                                                            employeeName: req.employee_name || req.employeeName || 'N/A',
+                                                                            location: req.location || '',
+                                                                            isDomestic: req.locationType === 'DOMESTIC',
+                                                                            purpose: req.purpose || '',
+                                                                            startDate: req.startTime ? new Date(req.startTime).toLocaleDateString('vi-VN') : '',
+                                                                            endDate: req.endTime ? new Date(req.endTime).toLocaleDateString('vi-VN') : '',
+                                                                            status: req.status || '',
+                                                                            employee_id: req.employeeId
+                                                                        }));
+                                                                        setRequests(formattedRequests);
+                                                                    }
+                                                                }
+                                                            } catch (error) {
+                                                                console.error('Error approving budget:', error);
+                                                                showToast?.('Lỗi khi cấp ngân sách: ' + (error.response?.data?.message || error.message), 'error');
+                                                            }
                                                         }}
                                                     >
                                                         💾 Xác Nhận Cấp Ngân Sách

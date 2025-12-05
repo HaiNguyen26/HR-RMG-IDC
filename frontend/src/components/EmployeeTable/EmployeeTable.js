@@ -1,74 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { employeesAPI, requestsAPI, equipmentAPI } from '../../services/api';
+import CustomSelect from '../Common/CustomSelect/CustomSelect';
 import './EmployeeTable.css';
 
-// Custom Dropdown Component
-const CustomDropdown = ({ id, value, onChange, options, placeholder, error, className = '' }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  const selectedOption = options.find(opt => opt.value === value) || null;
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen]);
-
-  const handleSelect = (option) => {
-    if (option.value === '') return; // Prevent selecting placeholder
-    onChange({ target: { value: option.value } });
-    setIsOpen(false);
-  };
-
-  // Filter out placeholder option (empty value) from display
-  const displayOptions = options.filter(opt => opt.value !== '');
-
-  return (
-    <div className={`custom-dropdown-wrapper ${className} ${error ? 'error' : ''}`} ref={dropdownRef}>
-      <button
-        id={id}
-        type="button"
-        className={`custom-dropdown-trigger ${isOpen ? 'open' : ''} ${error ? 'error' : ''}`}
-        onClick={() => setIsOpen(!isOpen)}
-        onBlur={() => setTimeout(() => setIsOpen(false), 200)}
-        aria-labelledby={id ? `${id}-label` : undefined}
-      >
-        <span className="custom-dropdown-value">
-          {selectedOption && selectedOption.value !== '' ? selectedOption.label : placeholder}
-        </span>
-        <svg className="custom-dropdown-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-        </svg>
-      </button>
-      {isOpen && (
-        <div className="custom-dropdown-menu">
-          {displayOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`custom-dropdown-option ${value === option.value ? 'selected' : ''}`}
-              onClick={() => handleSelect(option)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
+// CustomDropdown đã được thay thế bằng HTML select - component này không còn được sử dụng
 
 const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfirm, onUpdateEquipment, branchFilter }) => {
   const [loading, setLoading] = useState(false);
@@ -87,13 +23,157 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
     phongBan: '',
     boPhan: '',
     ngayGiaNhap: '',
+    maChamCong: '',
+    loaiHopDong: '',
+    diaDiem: '',
+    tinhThue: '',
+    capBac: '',
+    email: '',
     quanLyTrucTiep: '',
     quanLyGianTiep: ''
   });
   const [formError, setFormError] = useState('');
+  const [departments, setDepartments] = useState([]);
+  const [boPhanList, setBoPhanList] = useState([]);
+  const [jobTitles, setJobTitles] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [contractTypes, setContractTypes] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [taxStatuses, setTaxStatuses] = useState([]);
+  const [ranks, setRanks] = useState([]);
+  const [managersList, setManagersList] = useState([]);
+  const [indirectManagersList, setIndirectManagersList] = useState([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
 
   const userRole = currentUser?.role?.toUpperCase();
   const canManage = userRole === 'HR' || userRole === 'ADMIN';
+
+  // Fetch all options from database
+  useEffect(() => {
+    const fetchOptions = async () => {
+      console.log('[EmployeeTable] Bắt đầu fetch tất cả options...');
+      setLoadingOptions(true);
+      try {
+        const [
+          deptResponse,
+          boPhanResponse,
+          jobTitlesResponse,
+          branchesResponse,
+          contractTypesResponse,
+          locationsResponse,
+          taxStatusesResponse,
+          ranksResponse,
+          managersResponse,
+          indirectManagersResponse
+        ] = await Promise.all([
+          employeesAPI.getDepartments(),
+          employeesAPI.getBoPhan(),
+          employeesAPI.getJobTitles(),
+          employeesAPI.getBranches(),
+          employeesAPI.getContractTypes(),
+          employeesAPI.getLocations(),
+          employeesAPI.getTaxStatuses(),
+          employeesAPI.getRanks(),
+          employeesAPI.getManagers(),
+          employeesAPI.getManagers() // Tạm thời dùng cùng API, có thể tách sau
+        ]);
+
+        // Helper function to clean and deduplicate data
+        const cleanData = (data) => {
+          if (!Array.isArray(data)) return [];
+          return data
+            .filter(item => item != null && String(item).trim() !== '')
+            .map(item => String(item).trim())
+            .filter((item, index, self) => self.indexOf(item) === index);
+        };
+
+        console.log('[EmployeeTable] Departments response:', deptResponse);
+        console.log('[EmployeeTable] Bo phan response:', boPhanResponse);
+
+        if (deptResponse.data?.success) {
+          const deptData = deptResponse.data.data || [];
+          console.log('[EmployeeTable] Raw departments data:', deptData);
+          // Lọc và làm sạch dữ liệu - chỉ giữ strings không rỗng
+          const cleanedDepts = deptData
+            .filter(dept => dept != null && String(dept).trim() !== '')
+            .map(dept => String(dept).trim())
+            .filter((dept, index, self) => self.indexOf(dept) === index); // Remove duplicates
+          setDepartments(cleanedDepts);
+          console.log('[EmployeeTable] ✅ Departments loaded:', cleanedDepts.length, 'items');
+          if (cleanedDepts.length > 0) {
+            console.log('[EmployeeTable] Departments sample:', cleanedDepts.slice(0, 5));
+          } else {
+            console.warn('[EmployeeTable] ⚠️ No departments after cleaning!');
+          }
+        } else {
+          console.warn('[EmployeeTable] ❌ Departments response not successful:', deptResponse.data);
+        }
+
+        if (boPhanResponse.data?.success) {
+          setBoPhanList(cleanData(boPhanResponse.data.data || []));
+        }
+
+        if (jobTitlesResponse.data?.success) {
+          const jobTitlesData = jobTitlesResponse.data.data || [];
+          console.log('[EmployeeTable] Job titles response:', jobTitlesData);
+          const cleanedJobTitles = cleanData(jobTitlesData);
+          setJobTitles(cleanedJobTitles);
+          console.log('[EmployeeTable] ✅ Job titles loaded:', cleanedJobTitles.length, 'items');
+          if (cleanedJobTitles.length > 0) {
+            console.log('[EmployeeTable] Job titles sample:', cleanedJobTitles.slice(0, 5));
+          } else {
+            console.warn('[EmployeeTable] ⚠️ No job titles after cleaning!');
+          }
+        } else {
+          console.warn('[EmployeeTable] ❌ Job titles response not successful:', jobTitlesResponse.data);
+          console.warn('[EmployeeTable] Full job titles response:', jobTitlesResponse);
+        }
+
+        if (branchesResponse.data?.success) {
+          setBranches(cleanData(branchesResponse.data.data || []));
+        }
+
+        if (contractTypesResponse.data?.success) {
+          setContractTypes(cleanData(contractTypesResponse.data.data || []));
+        }
+
+        if (locationsResponse.data?.success) {
+          setLocations(cleanData(locationsResponse.data.data || []));
+        }
+
+        if (taxStatusesResponse.data?.success) {
+          setTaxStatuses(cleanData(taxStatusesResponse.data.data || []));
+        }
+
+        if (ranksResponse.data?.success) {
+          setRanks(cleanData(ranksResponse.data.data || []));
+        }
+
+        if (managersResponse.data?.success) {
+          const managersData = managersResponse.data.data || [];
+          const managerNames = cleanData(managersData);
+          setManagersList(managerNames);
+          console.log('[EmployeeTable] Manager names loaded:', managerNames.length, 'items');
+        }
+
+        // Quản lý gián tiếp có thể lấy từ quan_ly_gian_tiep hoặc dùng cùng danh sách managers
+        if (indirectManagersResponse.data?.success) {
+          const indirectManagersData = indirectManagersResponse.data.data || [];
+          const indirectManagerNames = cleanData(indirectManagersData);
+          setIndirectManagersList(indirectManagerNames);
+        }
+      } catch (error) {
+        console.error('[EmployeeTable] ❌ Error fetching options:', error);
+        if (showToast) {
+          showToast('Không thể tải danh sách tùy chọn', 'error');
+        }
+      } finally {
+        setLoadingOptions(false);
+      }
+    };
+
+    fetchOptions();
+  }, [showToast]);
 
   const getDepartmentLabel = (dept) => {
     const labels = {
@@ -205,6 +285,12 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
       phongBan: '',
       boPhan: '',
       ngayGiaNhap: '',
+      maChamCong: '',
+      loaiHopDong: '',
+      diaDiem: '',
+      tinhThue: '',
+      capBac: '',
+      email: '',
       quanLyTrucTiep: '',
       quanLyGianTiep: ''
     });
@@ -221,6 +307,12 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
       phongBan: emp.phong_ban || '',
       boPhan: emp.bo_phan || '',
       ngayGiaNhap: normalizeDateForInput(emp.ngay_gia_nhap),
+      maChamCong: emp.ma_cham_cong || '',
+      loaiHopDong: emp.loai_hop_dong || '',
+      diaDiem: emp.dia_diem || '',
+      tinhThue: emp.tinh_thue || '',
+      capBac: emp.cap_bac || '',
+      email: emp.email || '',
       quanLyTrucTiep: emp.quan_ly_truc_tiep || emp.quanLyTrucTiep || '',
       quanLyGianTiep: emp.quan_ly_gian_tiep || emp.quanLyGianTiep || ''
     });
@@ -432,20 +524,26 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
           <thead className="employee-table-thead">
             <tr>
               <th>Mã Nhân Viên</th>
+              <th>Mã Chấm Công</th>
               <th>Họ Và Tên</th>
               <th>Chi Nhánh</th>
               <th>Phòng Ban</th>
               <th>Bộ Phận</th>
               <th>Chức Danh</th>
               <th>Ngày Nhận Việc</th>
+              <th>Loại Hợp Đồng</th>
+              <th>Địa điểm</th>
+              <th>Tính Thuế</th>
+              <th>Cấp Bậc</th>
               <th>Quản Lý Trực Tiếp</th>
               <th>Quản Lý Gián Tiếp</th>
+              <th>Email</th>
             </tr>
           </thead>
           <tbody className="employee-table-tbody">
             {!filteredEmployees || filteredEmployees.length === 0 ? (
               <tr>
-                <td colSpan={9} className="employee-table-empty">
+                <td colSpan={15} className="employee-table-empty">
                   <div className="empty-state-content">
                     <div className="empty-state-icon">
                       <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -469,6 +567,7 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                 return (
                   <tr key={employee.id} onClick={() => handleRowClick(employee)}>
                     <td>{employee.ma_nhan_vien || '-'}</td>
+                    <td>{employee.ma_cham_cong || '-'}</td>
                     <td>
                       <span>{employee.ho_ten}</span>
                       {isPendingEquipment && (
@@ -480,8 +579,13 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                     <td>{employee.bo_phan || '-'}</td>
                     <td>{employee.chuc_danh}</td>
                     <td>{formatDateShort(employee.ngay_gia_nhap)}</td>
+                    <td>{employee.loai_hop_dong || '-'}</td>
+                    <td>{employee.dia_diem || '-'}</td>
+                    <td>{employee.tinh_thue || '-'}</td>
+                    <td>{employee.cap_bac || '-'}</td>
                     <td>{employee.quan_ly_truc_tiep || employee.quanLyTrucTiep || '-'}</td>
                     <td>{employee.quan_ly_gian_tiep || employee.quanLyGianTiep || '-'}</td>
+                    <td>{employee.email || '-'}</td>
                   </tr>
                 );
               })
@@ -505,8 +609,8 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                     </div>
                   )}
                   <h2 className="detail-modal-title">
-                    {detailModal.mode === 'view' 
-                      ? 'Thông tin nhân viên' 
+                    {detailModal.mode === 'view'
+                      ? 'Thông tin nhân viên'
                       : `Chỉnh sửa Hồ sơ ${detailModal.employee?.ho_ten || detailModal.employee?.hoTen || 'Nhân viên'}`}
                   </h2>
                 </div>
@@ -539,13 +643,19 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                         </div>
                         <div className="form-group">
                           <label htmlFor="chiNhanh">Chi nhánh</label>
-                          <input
-                            type="text"
+                          <CustomSelect
                             id="chiNhanh"
                             name="chiNhanh"
                             value={editForm.chiNhanh}
                             onChange={handleEditChange}
-                            placeholder="VD: Hà Nội, Hồ Chí Minh..."
+                            placeholder="Chọn chi nhánh"
+                            options={[
+                              { value: '', label: 'Chọn chi nhánh' },
+                              ...branches.map((branch) => ({
+                                value: branch,
+                                label: branch
+                              }))
+                            ]}
                           />
                         </div>
                         <div className="form-group">
@@ -557,6 +667,17 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                             value={editForm.ngayGiaNhap}
                             onChange={handleEditChange}
                             required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label htmlFor="email">Email</label>
+                          <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            value={editForm.email}
+                            onChange={handleEditChange}
+                            placeholder="VD: nv@example.com"
                           />
                         </div>
                       </div>
@@ -571,63 +692,178 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                       <div className="detail-form-grid">
                         <div className="form-group">
                           <label htmlFor="chucDanh">Chức danh *</label>
-                          <input
-                            type="text"
+                          <CustomSelect
                             id="chucDanh"
                             name="chucDanh"
                             value={editForm.chucDanh}
                             onChange={handleEditChange}
+                            placeholder="Chọn chức danh"
                             required
+                            options={[
+                              { value: '', label: 'Chọn chức danh' },
+                              ...jobTitles.map((title) => ({
+                                value: title,
+                                label: title
+                              }))
+                            ]}
                           />
                         </div>
                         <div className="form-group">
                           <label htmlFor="phongBan">Phòng ban *</label>
-                          <CustomDropdown
+                          <CustomSelect
                             id="phongBan"
+                            name="phongBan"
                             value={editForm.phongBan}
                             onChange={handleEditChange}
+                            placeholder="Chọn phòng ban"
+                            required
                             options={[
                               { value: '', label: 'Chọn phòng ban' },
-                              { value: 'IT', label: 'Phòng IT' },
-                              { value: 'HR', label: 'Hành chính nhân sự' },
-                              { value: 'ACCOUNTING', label: 'Kế toán' },
-                              { value: 'OTHER', label: 'Phòng ban khác' }
+                              ...departments
+                                .filter(dept => dept && String(dept).trim() !== '')
+                                .map((dept) => {
+                                  const value = String(dept).trim();
+                                  return { value, label: value };
+                                })
                             ]}
-                            placeholder="Chọn phòng ban"
-                            className="detail-form-custom-dropdown"
                           />
                         </div>
                         <div className="form-group">
                           <label htmlFor="boPhan">Bộ phận *</label>
-                          <input
-                            type="text"
+                          <CustomSelect
                             id="boPhan"
                             name="boPhan"
                             value={editForm.boPhan}
                             onChange={handleEditChange}
+                            placeholder="Chọn bộ phận"
                             required
+                            options={[
+                              { value: '', label: 'Chọn bộ phận' },
+                              ...(boPhanList && boPhanList.length > 0
+                                ? boPhanList.map((bp) => {
+                                  const value = String(bp).trim();
+                                  return { value, label: value };
+                                })
+                                : [])
+                            ]}
+                          />
+                          {boPhanList && boPhanList.length === 0 && (
+                            <p style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem' }}>
+                              Không có dữ liệu bộ phận. Vui lòng kiểm tra database.
+                            </p>
+                          )}
+                        </div>
+                        <div className="form-group">
+                          <label htmlFor="maChamCong">Mã chấm công</label>
+                          <input
+                            type="text"
+                            id="maChamCong"
+                            name="maChamCong"
+                            value={editForm.maChamCong}
+                            onChange={handleEditChange}
+                            placeholder="VD: CC001"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label htmlFor="loaiHopDong">Loại hợp đồng</label>
+                          <CustomSelect
+                            id="loaiHopDong"
+                            name="loaiHopDong"
+                            value={editForm.loaiHopDong}
+                            onChange={handleEditChange}
+                            placeholder="Chọn loại hợp đồng"
+                            options={[
+                              { value: '', label: 'Chọn loại hợp đồng' },
+                              ...contractTypes.map((type) => ({
+                                value: type,
+                                label: type
+                              }))
+                            ]}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label htmlFor="diaDiem">Địa điểm</label>
+                          <CustomSelect
+                            id="diaDiem"
+                            name="diaDiem"
+                            value={editForm.diaDiem}
+                            onChange={handleEditChange}
+                            placeholder="Chọn địa điểm"
+                            options={[
+                              { value: '', label: 'Chọn địa điểm' },
+                              ...locations.map((location) => ({
+                                value: location,
+                                label: location
+                              }))
+                            ]}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label htmlFor="tinhThue">Tính thuế</label>
+                          <CustomSelect
+                            id="tinhThue"
+                            name="tinhThue"
+                            value={editForm.tinhThue}
+                            onChange={handleEditChange}
+                            placeholder="Chọn tính thuế"
+                            options={[
+                              { value: '', label: 'Chọn tính thuế' },
+                              ...taxStatuses.map((status) => ({
+                                value: status,
+                                label: status
+                              }))
+                            ]}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label htmlFor="capBac">Cấp bậc</label>
+                          <CustomSelect
+                            id="capBac"
+                            name="capBac"
+                            value={editForm.capBac}
+                            onChange={handleEditChange}
+                            placeholder="Chọn cấp bậc"
+                            options={[
+                              { value: '', label: 'Chọn cấp bậc' },
+                              ...ranks.map((rank) => ({
+                                value: rank,
+                                label: rank
+                              }))
+                            ]}
                           />
                         </div>
                         <div className="form-group">
                           <label htmlFor="quanLyTrucTiep">Quản lý trực tiếp</label>
-                          <input
-                            type="text"
+                          <CustomSelect
                             id="quanLyTrucTiep"
                             name="quanLyTrucTiep"
                             value={editForm.quanLyTrucTiep}
                             onChange={handleEditChange}
-                            placeholder="Ví dụ: Nguyễn Văn A"
+                            placeholder="Chọn quản lý trực tiếp"
+                            options={[
+                              { value: '', label: 'Chọn quản lý trực tiếp' },
+                              ...managersList.map((manager) => ({
+                                value: manager,
+                                label: manager
+                              }))
+                            ]}
                           />
                         </div>
                         <div className="form-group">
                           <label htmlFor="quanLyGianTiep">Quản lý gián tiếp</label>
-                          <input
-                            type="text"
+                          <CustomSelect
                             id="quanLyGianTiep"
                             name="quanLyGianTiep"
                             value={editForm.quanLyGianTiep}
                             onChange={handleEditChange}
-                            placeholder="Ví dụ: Trần Thị B"
+                            placeholder="Chọn quản lý gián tiếp"
+                            options={[
+                              { value: '', label: 'Chọn quản lý gián tiếp' },
+                              ...indirectManagersList.map((manager) => ({
+                                value: manager,
+                                label: manager
+                              }))
+                            ]}
                           />
                         </div>
                       </div>
@@ -696,6 +932,10 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                           <p>{detailModal.employee.ma_nhan_vien || '-'}</p>
                         </div>
                         <div className="detail-info-item">
+                          <span className="detail-info-label">Mã chấm công</span>
+                          <p>{detailModal.employee.ma_cham_cong || '-'}</p>
+                        </div>
+                        <div className="detail-info-item">
                           <span className="detail-info-label">Chi nhánh</span>
                           <p>{detailModal.employee.chi_nhanh || detailModal.employee.chiNhanh || '-'}</p>
                         </div>
@@ -714,6 +954,26 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                         <div className="detail-info-item">
                           <span className="detail-info-label">Ngày nhận việc</span>
                           <p>{formatDateShort(detailModal.employee.ngay_gia_nhap)}</p>
+                        </div>
+                        <div className="detail-info-item">
+                          <span className="detail-info-label">Loại hợp đồng</span>
+                          <p>{detailModal.employee.loai_hop_dong || '-'}</p>
+                        </div>
+                        <div className="detail-info-item">
+                          <span className="detail-info-label">Địa điểm</span>
+                          <p>{detailModal.employee.dia_diem || '-'}</p>
+                        </div>
+                        <div className="detail-info-item">
+                          <span className="detail-info-label">Tính thuế</span>
+                          <p>{detailModal.employee.tinh_thue || '-'}</p>
+                        </div>
+                        <div className="detail-info-item">
+                          <span className="detail-info-label">Cấp bậc</span>
+                          <p>{detailModal.employee.cap_bac || '-'}</p>
+                        </div>
+                        <div className="detail-info-item">
+                          <span className="detail-info-label">Email</span>
+                          <p>{detailModal.employee.email || '-'}</p>
                         </div>
                         <div className="detail-info-item">
                           <span className="detail-info-label">Quản lý trực tiếp</span>

@@ -172,13 +172,14 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
     const [importFile, setImportFile] = useState(null);
     const [importing, setImporting] = useState(false);
     const [importResults, setImportResults] = useState(null);
+    const fileInputRef = useRef(null);
     const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [editingCandidateId, setEditingCandidateId] = useState(null);
     const [isManagerSelectModalOpen, setIsManagerSelectModalOpen] = useState(false);
-    const [managers, setManagers] = useState([]);
-    const [selectedManagerId, setSelectedManagerId] = useState('');
-    const [indirectManagers, setIndirectManagers] = useState([]);
-    const [selectedIndirectManagerId, setSelectedIndirectManagerId] = useState('');
+    const [managers, setManagers] = useState([]); // Array of strings (manager names)
+    const [selectedManagerName, setSelectedManagerName] = useState('');
+    const [indirectManagers, setIndirectManagers] = useState([]); // Array of strings (manager names)
+    const [selectedIndirectManagerName, setSelectedIndirectManagerName] = useState('');
     const [interviewDate, setInterviewDate] = useState('');
     const [interviewTime, setInterviewTime] = useState('');
     const [interviewFormErrors, setInterviewFormErrors] = useState({});
@@ -187,6 +188,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
     const [isSavingNotes, setIsSavingNotes] = useState(false);
     const [interviewRequest, setInterviewRequest] = useState(null);
     const [loadingInterviewRequest, setLoadingInterviewRequest] = useState(false);
+    const [currentTime, setCurrentTime] = useState(new Date());
     const [isEvaluationDetailModalOpen, setIsEvaluationDetailModalOpen] = useState(false);
     const [evaluationDetails, setEvaluationDetails] = useState(null);
     const [loadingEvaluationDetails, setLoadingEvaluationDetails] = useState(false);
@@ -215,8 +217,6 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
         // Section 4: Mô tả Công việc Chính
         jobDuties: ['', '']
     });
-    const [showPreview, setShowPreview] = useState(false);
-    const [formattedLetter, setFormattedLetter] = useState('');
     const [generatingPDF, setGeneratingPDF] = useState(false);
     const [jobOfferFormErrors, setJobOfferFormErrors] = useState({});
     const [formData, setFormData] = useState({
@@ -429,6 +429,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
         fetchRecruitmentRequests();
     }, []);
 
+
     // Fetch khi status filter thay đổi (silent if has data)
     useEffect(() => {
         if (!isInitialMount.current) {
@@ -457,8 +458,8 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
             fetchManagers();
             fetchIndirectManagers();
             // Reset form when modal opens
-            setSelectedManagerId('');
-            setSelectedIndirectManagerId('');
+            setSelectedManagerName('');
+            setSelectedIndirectManagerName('');
             setInterviewDate('');
             setInterviewTime('');
             setInterviewFormErrors({});
@@ -560,7 +561,30 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
             bgColor: '#e5e7eb', // bg-gray-200
             textColor: '#6b7280', // text-gray-500
             borderColor: '#d1d5db' // gray-300
+        },
+        /* Đang thử việc - Nền Xanh Lá Pastel, chữ Xanh Lá Đậm, có animation nhấp nháy nhẹ */
+        PROBATION: {
+            label: 'Đang thử việc',
+            bgColor: '#d1fae5', // bg-green-100
+            textColor: '#065f46', // text-green-800
+            borderColor: '#10b981' // green-500
         }
+    };
+
+    // Format currency input (add commas as user types)
+    const formatCurrencyInput = (value) => {
+        if (!value) return '';
+        // Remove all non-digit characters
+        const numbers = value.toString().replace(/\D/g, '');
+        if (!numbers) return '';
+        // Add commas for thousands separator
+        return numbers.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    };
+
+    // Get numeric value from formatted currency string
+    const getNumericValue = (formattedValue) => {
+        if (!formattedValue) return '';
+        return formattedValue.toString().replace(/\D/g, '');
     };
 
     const formatDateDisplay = (value) => {
@@ -593,8 +617,8 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
     const handleExportTemplate = async () => {
         try {
             const response = await candidatesAPI.exportTemplate();
-            const blob = new Blob([response.data], { 
-                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+            const blob = new Blob([response.data], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -616,7 +640,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
     };
 
     // Handle import file selection
-    const handleImportFileChange = (e) => {
+    const handleImportFileChange = async (e) => {
         const file = e.target.files?.[0];
         if (file) {
             const allowedTypes = [
@@ -627,9 +651,63 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                 if (showToast) {
                     showToast('Chỉ chấp nhận file Excel (.xlsx, .xls)', 'error');
                 }
+                // Reset input
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
                 return;
             }
             setImportFile(file);
+            // Auto import immediately
+            await handleBulkImportDirect(file);
+        }
+        // Reset input after processing
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    // Handle bulk import directly (without modal)
+    const handleBulkImportDirect = async (file) => {
+        if (!file) {
+            if (showToast) {
+                showToast('Vui lòng chọn file Excel để import', 'error');
+            }
+            return;
+        }
+
+        setImporting(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await candidatesAPI.bulkImport(formData);
+
+            setImportResults(response.data.results);
+            setIsImportModalOpen(true); // Show modal only to display results
+
+            if (showToast) {
+                showToast(response.data.message, response.data.results.failed > 0 ? 'warning' : 'success');
+            }
+
+            // Reload candidates list
+            await fetchCandidates();
+
+            // Close modal after 3 seconds if successful
+            if (response.data.results.failed === 0) {
+                setTimeout(() => {
+                    setIsImportModalOpen(false);
+                    setImportFile(null);
+                    setImportResults(null);
+                }, 3000);
+            }
+        } catch (error) {
+            console.error('Error importing candidates:', error);
+            if (showToast) {
+                showToast('Lỗi khi import: ' + (error.response?.data?.message || error.message), 'error');
+            }
+        } finally {
+            setImporting(false);
         }
     };
 
@@ -648,9 +726,9 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
             formData.append('file', importFile);
 
             const response = await candidatesAPI.bulkImport(formData);
-            
+
             setImportResults(response.data.results);
-            
+
             if (showToast) {
                 showToast(response.data.message, response.data.results.failed > 0 ? 'warning' : 'success');
             }
@@ -799,6 +877,14 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
     };
 
     const handleEditCandidate = async (candidate) => {
+        // Prevent editing if candidate is in PROBATION status
+        if (candidate.status === 'PROBATION') {
+            if (showToast) {
+                showToast('Không thể chỉnh sửa ứng viên đang trong thời gian thử việc', 'warning');
+            }
+            return;
+        }
+
         try {
             // Fetch full candidate data
             const response = await candidatesAPI.getAll({});
@@ -808,7 +894,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                     const targetId = parseInt(candidate.id, 10);
                     return candidateId === targetId;
                 });
-                
+
                 if (fullCandidate) {
                     // Normalize and load data into form
                     setFormData({
@@ -841,11 +927,11 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                     let kinhNghiemData = [];
                     if (fullCandidate.kinhNghiemLamViec || fullCandidate.kinh_nghiem_lam_viec) {
                         try {
-                            const data = typeof fullCandidate.kinhNghiemLamViec === 'string' 
-                                ? JSON.parse(fullCandidate.kinhNghiemLamViec) 
-                                : (fullCandidate.kinh_nghiem_lam_viec 
-                                    ? (typeof fullCandidate.kinh_nghiem_lam_viec === 'string' 
-                                        ? JSON.parse(fullCandidate.kinh_nghiem_lam_viec) 
+                            const data = typeof fullCandidate.kinhNghiemLamViec === 'string'
+                                ? JSON.parse(fullCandidate.kinhNghiemLamViec)
+                                : (fullCandidate.kinh_nghiem_lam_viec
+                                    ? (typeof fullCandidate.kinh_nghiem_lam_viec === 'string'
+                                        ? JSON.parse(fullCandidate.kinh_nghiem_lam_viec)
                                         : fullCandidate.kinh_nghiem_lam_viec)
                                     : fullCandidate.kinhNghiemLamViec);
                             kinhNghiemData = Array.isArray(data) && data.length > 0 ? data : [{ ngayBatDau: '', ngayKetThuc: '', congTy: '', chucDanh: '' }];
@@ -860,11 +946,11 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                     let quaTrinhData = [];
                     if (fullCandidate.quaTrinhDaoTao || fullCandidate.qua_trinh_dao_tao) {
                         try {
-                            const data = typeof fullCandidate.quaTrinhDaoTao === 'string' 
-                                ? JSON.parse(fullCandidate.quaTrinhDaoTao) 
-                                : (fullCandidate.qua_trinh_dao_tao 
-                                    ? (typeof fullCandidate.qua_trinh_dao_tao === 'string' 
-                                        ? JSON.parse(fullCandidate.qua_trinh_dao_tao) 
+                            const data = typeof fullCandidate.quaTrinhDaoTao === 'string'
+                                ? JSON.parse(fullCandidate.quaTrinhDaoTao)
+                                : (fullCandidate.qua_trinh_dao_tao
+                                    ? (typeof fullCandidate.qua_trinh_dao_tao === 'string'
+                                        ? JSON.parse(fullCandidate.qua_trinh_dao_tao)
                                         : fullCandidate.qua_trinh_dao_tao)
                                     : fullCandidate.quaTrinhDaoTao);
                             quaTrinhData = Array.isArray(data) && data.length > 0 ? data : [{ ngayBatDau: '', ngayKetThuc: '', truongDaoTao: '', chuyenNganhDaoTao: '', vanBangChungChi: '' }];
@@ -879,11 +965,11 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                     let ngoaiNguData = [];
                     if (fullCandidate.trinhDoNgoaiNgu || fullCandidate.trinh_do_ngoai_ngu) {
                         try {
-                            const data = typeof fullCandidate.trinhDoNgoaiNgu === 'string' 
-                                ? JSON.parse(fullCandidate.trinhDoNgoaiNgu) 
-                                : (fullCandidate.trinh_do_ngoai_ngu 
-                                    ? (typeof fullCandidate.trinh_do_ngoai_ngu === 'string' 
-                                        ? JSON.parse(fullCandidate.trinh_do_ngoai_ngu) 
+                            const data = typeof fullCandidate.trinhDoNgoaiNgu === 'string'
+                                ? JSON.parse(fullCandidate.trinhDoNgoaiNgu)
+                                : (fullCandidate.trinh_do_ngoai_ngu
+                                    ? (typeof fullCandidate.trinh_do_ngoai_ngu === 'string'
+                                        ? JSON.parse(fullCandidate.trinh_do_ngoai_ngu)
                                         : fullCandidate.trinh_do_ngoai_ngu)
                                     : fullCandidate.trinhDoNgoaiNgu);
                             ngoaiNguData = Array.isArray(data) && data.length > 0 ? data : [{ ngoaiNgu: '', chungChi: '', diem: '', khaNangSuDung: '' }];
@@ -920,6 +1006,15 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
     };
 
     // Fetch interview request when candidate modal opens
+    // Update currentTime every second for countdown timer
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, []);
+
     useEffect(() => {
         const fetchInterviewRequest = async () => {
             if (selectedCandidate && isActionModalOpen && (selectedCandidate.status === 'PENDING_MANAGER' || selectedCandidate.status === 'PASSED')) {
@@ -1102,36 +1197,27 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
     const fetchManagers = async () => {
         try {
-            const response = await candidatesAPI.getManagers();
-            if (response.data.success) {
-                setManagers(response.data.data || []);
+            const response = await employeesAPI.getManagers();
+            if (response.data?.success) {
+                const managerNames = response.data.data || [];
+                console.log('[CandidateManagement] Fetched direct managers:', managerNames);
+                setManagers(managerNames);
             }
         } catch (error) {
             console.error('Error fetching managers:', error);
             if (showToast) {
-                showToast('Không thể tải danh sách quản lý', 'error');
+                showToast('Không thể tải danh sách quản lý trực tiếp', 'error');
             }
         }
     };
 
     const fetchIndirectManagers = async () => {
         try {
-            const response = await employeesAPI.getAll();
-            if (response.data.success) {
-                // Lấy danh sách nhân viên có quan_ly_gian_tiep (quản lý gián tiếp)
-                // Filter để chỉ lấy những người là quản lý gián tiếp của ai đó
-                const employees = response.data.data || [];
-                // Lấy unique danh sách quản lý gián tiếp từ quan_ly_gian_tiep
-                const indirectManagerNames = [...new Set(employees
-                    .map(emp => emp.quan_ly_gian_tiep || emp.quanLyGianTiep)
-                    .filter(name => name && name.trim()))];
-
-                // Tìm các nhân viên có tên trong danh sách quản lý gián tiếp
-                const indirectManagerList = employees.filter(emp =>
-                    indirectManagerNames.includes(emp.ho_ten || emp.hoTen)
-                );
-
-                setIndirectManagers(indirectManagerList);
+            const response = await employeesAPI.getIndirectManagers();
+            if (response.data?.success) {
+                const indirectManagerNames = response.data.data || [];
+                console.log('[CandidateManagement] Fetched indirect managers:', indirectManagerNames);
+                setIndirectManagers(indirectManagerNames);
             }
         } catch (error) {
             console.error('Error fetching indirect managers:', error);
@@ -1142,8 +1228,8 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
     const validateInterviewForm = () => {
         const errors = {};
 
-        if (!selectedManagerId) {
-            errors.selectedManagerId = 'Vui lòng chọn quản lý trực tiếp';
+        if (!selectedManagerName) {
+            errors.selectedManagerName = 'Vui lòng chọn quản lý trực tiếp';
         }
 
         if (!interviewDate) {
@@ -1173,23 +1259,11 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
             return;
         }
 
-        const selectedManager = managers.find(m => m.id === parseInt(selectedManagerId));
-        if (!selectedManager) {
+        if (!selectedManagerName || !managers.includes(selectedManagerName)) {
             if (showToast) {
                 showToast('Quản lý trực tiếp không hợp lệ', 'error');
             }
             return;
-        }
-
-        let indirectManagerName = null;
-        if (selectedIndirectManagerId) {
-            const selectedIndirectManager = indirectManagers.find(m =>
-                m.id === parseInt(selectedIndirectManagerId) ||
-                String(m.id) === String(selectedIndirectManagerId)
-            );
-            if (selectedIndirectManager) {
-                indirectManagerName = selectedIndirectManager.ho_ten || selectedIndirectManager.hoTen;
-            }
         }
 
         // Format date and time
@@ -1199,10 +1273,8 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
         try {
             const response = await candidatesAPI.createInterviewRequest(selectedCandidate.id, {
-                managerId: selectedManager.id,
-                managerName: selectedManager.ho_ten,
-                indirectManagerId: selectedIndirectManagerId ? parseInt(selectedIndirectManagerId) : null,
-                indirectManagerName: indirectManagerName,
+                managerName: selectedManagerName,
+                indirectManagerName: selectedIndirectManagerName || null,
                 interviewDate: interviewDate,
                 interviewTime: interviewTime,
                 interviewDateTime: interviewDateTime,
@@ -1214,8 +1286,8 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                     showToast('Đã gửi yêu cầu phỏng vấn thành công!', 'success');
                 }
                 setIsManagerSelectModalOpen(false);
-                setSelectedManagerId('');
-                setSelectedIndirectManagerId('');
+                setSelectedManagerName('');
+                setSelectedIndirectManagerName('');
                 setInterviewDate('');
                 setInterviewTime('');
                 setInterviewFormErrors({});
@@ -1522,10 +1594,19 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                             </svg>
                             <span>Xuất mẫu</span>
                         </button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".xlsx,.xls"
+                            onChange={handleImportFileChange}
+                            style={{ display: 'none' }}
+                            disabled={importing}
+                        />
                         <button
                             type="button"
                             className="candidate-management-import-btn"
-                            onClick={() => setIsImportModalOpen(true)}
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={importing}
                             title="Import hàng loạt từ Excel"
                         >
                             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px' }}>
@@ -1583,27 +1664,32 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                             </button>
                         );
                     })}
-                    
-                    {/* Recruitment Requests Tag - Separate but on same row */}
-                    <div className="candidate-management-filters-separator"></div>
-                    <button
-                        type="button"
-                        className="candidate-management-recruitment-requests-btn"
-                        onClick={() => {
-                            setIsRecruitmentRequestsModalOpen(true);
-                            fetchRecruitmentRequests();
-                        }}
-                    >
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-                        </svg>
-                        <span>Yêu cầu tuyển nhân viên</span>
-                        {recruitmentRequests.length > 0 && (
-                            <span className="candidate-management-recruitment-requests-count">
-                                {recruitmentRequests.length}
-                            </span>
-                        )}
-                    </button>
+
+                    {/* Recruitment Requests Tag - Separate but on same row (for HR only) */}
+                    {currentUser?.role === 'HR' && (
+                        <>
+                            <div className="candidate-management-filters-separator"></div>
+                            <button
+                                type="button"
+                                className="candidate-management-recruitment-requests-btn"
+                                onClick={() => {
+                                    setIsRecruitmentRequestsModalOpen(true);
+                                    fetchRecruitmentRequests();
+                                }}
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                                <span>Yêu cầu tuyển nhân viên</span>
+                                {recruitmentRequests.length > 0 && (
+                                    <span className="candidate-management-recruitment-requests-count">
+                                        {recruitmentRequests.length}
+                                    </span>
+                                )}
+                            </button>
+                        </>
+                    )}
+
                 </div>
             </div>
 
@@ -1704,12 +1790,14 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                     status: candidate.status,
                                     cvFilePath: candidate.cvFilePath || candidate.cv_file_path || '',
                                     cvFileName: candidate.cvFileName || candidate.cv_file_name || '',
-                                    notes: candidate.notes || ''
+                                    notes: candidate.notes || '',
+                                    jobOfferSentDate: candidate.jobOfferSentDate || candidate.job_offer_sent_date || null,
+                                    job_offer_sent_date: candidate.job_offer_sent_date || candidate.jobOfferSentDate || null
                                 };
                                 return (
                                     <tr
                                         key={normalized.id}
-                                        className="candidate-table-row"
+                                        className={`candidate-table-row ${normalized.status === 'PROBATION' ? 'candidate-table-row--probation' : ''}`}
                                         onClick={() => {
                                             setSelectedCandidate(normalized);
                                             setIsActionModalOpen(true);
@@ -1726,7 +1814,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                         <td>{formatDateDisplay(normalized.ngayGuiCV)}</td>
                                         <td className="candidate-status-cell">
                                             <span
-                                                className="candidate-status-tag"
+                                                className={`candidate-status-tag ${candidate.status === 'PROBATION' ? 'candidate-status-tag--probation' : ''}`}
                                                 style={{
                                                     backgroundColor: statusInfo.bgColor,
                                                     color: statusInfo.textColor,
@@ -1814,7 +1902,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                         <div className="candidate-info-label">Trạng thái</div>
                                         <div className="candidate-info-value">
                                             <span
-                                                className="candidate-status-tag"
+                                                className={`candidate-status-tag ${selectedCandidate.status === 'PROBATION' ? 'candidate-status-tag--probation' : ''}`}
                                                 style={{
                                                     backgroundColor: statusConfig[selectedCandidate.status]?.bgColor || 'rgba(255, 107, 53, 0.15)',
                                                     color: statusConfig[selectedCandidate.status]?.textColor || '#FF6B35',
@@ -1835,19 +1923,21 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                             <div className="candidate-action-modal-actions">
                                 <h3 className="candidate-action-modal-section-title">Thao tác</h3>
                                 <div className="candidate-action-buttons">
-                                    {/* Nút Chỉnh sửa - Hiển thị cho tất cả trạng thái */}
-                                    <button
-                                        type="button"
-                                        className="candidate-action-modal-btn candidate-action-modal-edit"
-                                        onClick={() => {
-                                            handleEditCandidate(selectedCandidate);
-                                        }}
-                                    >
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                        </svg>
-                                        <span>Chỉnh sửa hồ sơ</span>
-                                    </button>
+                                    {/* Nút Chỉnh sửa - Không hiển thị khi đang thử việc */}
+                                    {selectedCandidate.status !== 'PROBATION' && (
+                                        <button
+                                            type="button"
+                                            className="candidate-action-modal-btn candidate-action-modal-edit"
+                                            onClick={() => {
+                                                handleEditCandidate(selectedCandidate);
+                                            }}
+                                        >
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                            </svg>
+                                            <span>Chỉnh sửa hồ sơ</span>
+                                        </button>
+                                    )}
 
                                     {/* Nút Chi tiết nhân viên - Hiển thị cho tất cả trạng thái */}
                                     <button
@@ -2030,8 +2120,6 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                                         annualLeaveDays: '12',
                                                         jobDuties: ['', '']
                                                     });
-                                                    setShowPreview(false);
-                                                    setFormattedLetter('');
                                                     setIsJobOfferModalOpen(true);
                                                 }}
                                             >
@@ -2126,7 +2214,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                 <div className="candidate-notes-section">
                                     <div className="candidate-notes-header">
                                         <h4 className="candidate-notes-title">Ghi chú</h4>
-                                        {!isEditingNotes && (
+                                        {!isEditingNotes && selectedCandidate.status !== 'PROBATION' && (
                                             <button
                                                 type="button"
                                                 className="candidate-notes-edit-btn"
@@ -2176,6 +2264,120 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                             )}
                                         </div>
                                     )}
+
+                                    {/* Đồng hồ đếm ngược 45 ngày cho ứng viên đang thử việc */}
+                                    {selectedCandidate.status === 'PROBATION' && (() => {
+                                        const jobOfferDateStr = selectedCandidate.job_offer_sent_date || selectedCandidate.jobOfferSentDate;
+                                        if (!jobOfferDateStr) return null;
+
+                                        const jobOfferDate = new Date(jobOfferDateStr);
+                                        if (isNaN(jobOfferDate.getTime())) {
+                                            console.warn('Invalid job_offer_sent_date:', jobOfferDateStr, 'for candidate:', selectedCandidate.id);
+                                            return null;
+                                        }
+
+                                        // Đặt thời gian về 00:00:00 của ngày xuất thư để tính chính xác
+                                        const jobOfferDateStart = new Date(jobOfferDate);
+                                        jobOfferDateStart.setHours(0, 0, 0, 0);
+
+                                        // Tính ngày đánh giá: 45 ngày sau ngày xuất thư, vào lúc 00:00:00
+                                        const targetDate = new Date(jobOfferDateStart);
+                                        targetDate.setDate(targetDate.getDate() + 45);
+                                        targetDate.setHours(23, 59, 59, 999); // Đặt về cuối ngày đánh giá để đếm ngược chính xác
+
+                                        // Tính thời gian còn lại chính xác
+                                        const diffTime = targetDate.getTime() - currentTime.getTime();
+                                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+                                        // Tính toán thời gian còn lại chính xác đến giây
+                                        const totalSeconds = Math.max(0, Math.floor(diffTime / 1000));
+                                        const hours = Math.floor(totalSeconds / 3600);
+                                        const minutes = Math.floor((totalSeconds % 3600) / 60);
+                                        const seconds = totalSeconds % 60;
+                                        const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+                                        // Tính ngày đánh giá để hiển thị (00:00:00 của ngày đánh giá)
+                                        const evaluationDateDisplay = new Date(jobOfferDateStart);
+                                        evaluationDateDisplay.setDate(evaluationDateDisplay.getDate() + 45);
+                                        evaluationDateDisplay.setHours(0, 0, 0, 0);
+
+                                        return (
+                                            <div className="candidate-probation-countdown" style={{ marginTop: '1.5rem' }}>
+                                                <div className="candidate-probation-countdown-header">
+                                                    <svg className="candidate-probation-countdown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                    </svg>
+                                                    <h4 className="candidate-probation-countdown-title">Thời gian thử việc</h4>
+                                                </div>
+                                                <div className="candidate-probation-countdown-content">
+                                                    {diffDays > 0 ? (
+                                                        <>
+                                                            <div className="candidate-probation-countdown-days">
+                                                                <span className="candidate-probation-countdown-number">{diffDays}</span>
+                                                                <span className="candidate-probation-countdown-label">ngày</span>
+                                                            </div>
+                                                            {/* Đồng hồ điện tử đếm ngược theo thời gian thực */}
+                                                            <div className="candidate-probation-countdown-digital-clock">
+                                                                <div className="candidate-probation-countdown-digital-time">
+                                                                    {formattedTime.split('').map((char, index) => (
+                                                                        <span key={index} className={char === ':' ? 'candidate-probation-countdown-separator' : 'candidate-probation-countdown-digit'}>
+                                                                            {char}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                                <div className="candidate-probation-countdown-digital-labels">
+                                                                    <span>Giờ</span>
+                                                                    <span>Phút</span>
+                                                                    <span>Giây</span>
+                                                                </div>
+                                                            </div>
+                                                            <p className="candidate-probation-countdown-text">
+                                                                Còn lại đến ngày đánh giá thử việc
+                                                            </p>
+                                                            <p className="candidate-probation-countdown-date">
+                                                                Ngày đánh giá: {targetDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                            </p>
+                                                        </>
+                                                    ) : diffDays === 0 ? (
+                                                        <>
+                                                            <div className="candidate-probation-countdown-days candidate-probation-countdown-days--today">
+                                                                <span className="candidate-probation-countdown-number">0</span>
+                                                                <span className="candidate-probation-countdown-label">ngày</span>
+                                                            </div>
+                                                            {/* Đồng hồ điện tử cho ngày đánh giá */}
+                                                            <div className="candidate-probation-countdown-digital-clock candidate-probation-countdown-digital-clock--today">
+                                                                <div className="candidate-probation-countdown-digital-time">
+                                                                    {formattedTime.split('').map((char, index) => (
+                                                                        <span key={index} className={char === ':' ? 'candidate-probation-countdown-separator' : 'candidate-probation-countdown-digit'}>
+                                                                            {char}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                                <div className="candidate-probation-countdown-digital-labels">
+                                                                    <span>Giờ</span>
+                                                                    <span>Phút</span>
+                                                                    <span>Giây</span>
+                                                                </div>
+                                                            </div>
+                                                            <p className="candidate-probation-countdown-text candidate-probation-countdown-text--urgent">
+                                                                Hôm nay là ngày đánh giá thử việc
+                                                            </p>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <div className="candidate-probation-countdown-days candidate-probation-countdown-days--overdue">
+                                                                <span className="candidate-probation-countdown-number">{Math.abs(diffDays)}</span>
+                                                                <span className="candidate-probation-countdown-label">ngày</span>
+                                                            </div>
+                                                            <p className="candidate-probation-countdown-text candidate-probation-countdown-text--overdue">
+                                                                Đã quá hạn đánh giá thử việc
+                                                            </p>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         </div>
@@ -2347,8 +2549,6 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
             {isJobOfferModalOpen && selectedCandidate && (
                 <div className="job-offer-modal-overlay" onClick={() => {
                     setIsJobOfferModalOpen(false);
-                    setShowPreview(false);
-                    setFormattedLetter('');
                 }}>
                     <div className="job-offer-modal-container" onClick={(e) => e.stopPropagation()}>
                         {/* Modal Header */}
@@ -2366,8 +2566,6 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                 className="job-offer-modal-close"
                                 onClick={() => {
                                     setIsJobOfferModalOpen(false);
-                                    setShowPreview(false);
-                                    setFormattedLetter('');
                                 }}
                             >
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2566,9 +2764,12 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                                 id="probation-gross-salary"
                                                 type="text"
                                                 className="job-offer-form-input"
-                                                value={jobOfferFormData.probationGrossSalary}
-                                                onChange={(e) => setJobOfferFormData({ ...jobOfferFormData, probationGrossSalary: e.target.value })}
-                                                placeholder="Ví dụ: 20000000"
+                                                value={formatCurrencyInput(jobOfferFormData.probationGrossSalary)}
+                                                onChange={(e) => {
+                                                    const numericValue = getNumericValue(e.target.value);
+                                                    setJobOfferFormData({ ...jobOfferFormData, probationGrossSalary: numericValue });
+                                                }}
+                                                placeholder="Ví dụ: 20,000,000"
                                                 required
                                             />
                                         </div>
@@ -2580,9 +2781,12 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                                 id="official-gross-salary"
                                                 type="text"
                                                 className="job-offer-form-input"
-                                                value={jobOfferFormData.officialGrossSalary}
-                                                onChange={(e) => setJobOfferFormData({ ...jobOfferFormData, officialGrossSalary: e.target.value })}
-                                                placeholder="Ví dụ: 25000000"
+                                                value={formatCurrencyInput(jobOfferFormData.officialGrossSalary)}
+                                                onChange={(e) => {
+                                                    const numericValue = getNumericValue(e.target.value);
+                                                    setJobOfferFormData({ ...jobOfferFormData, officialGrossSalary: numericValue });
+                                                }}
+                                                placeholder="Ví dụ: 25,000,000"
                                                 required
                                             />
                                         </div>
@@ -2601,9 +2805,12 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                                 id="phone-allowance"
                                                 type="text"
                                                 className="job-offer-form-input"
-                                                value={jobOfferFormData.phoneAllowance}
-                                                onChange={(e) => setJobOfferFormData({ ...jobOfferFormData, phoneAllowance: e.target.value })}
-                                                placeholder="Ví dụ: 200000"
+                                                value={formatCurrencyInput(jobOfferFormData.phoneAllowance)}
+                                                onChange={(e) => {
+                                                    const numericValue = getNumericValue(e.target.value);
+                                                    setJobOfferFormData({ ...jobOfferFormData, phoneAllowance: numericValue });
+                                                }}
+                                                placeholder="Ví dụ: 200,000"
                                             />
                                         </div>
                                         <div className="job-offer-form-group">
@@ -2686,11 +2893,31 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                             return;
                                         }
 
+                                        // Show confirmation dialog
+                                        let confirmed = false;
+                                        if (showConfirm) {
+                                            confirmed = await showConfirm({
+                                                title: 'Xác nhận xuất thư tuyển dụng',
+                                                message: 'Bạn có chắc chắn muốn xuất thư tuyển dụng không? Sau khi xuất thư, ứng viên sẽ được chuyển trạng thái thành "Đang thử việc" ngay lập tức.',
+                                                confirmText: 'Xác nhận',
+                                                cancelText: 'Hủy',
+                                                type: 'warning'
+                                            });
+                                        } else {
+                                            // Fallback to window.confirm if showConfirm is not available
+                                            confirmed = window.confirm('Bạn có chắc chắn muốn xuất thư tuyển dụng không? Sau khi xuất thư, ứng viên sẽ được chuyển trạng thái thành "Đang thử việc" ngay lập tức.');
+                                        }
+
+                                        if (!confirmed) {
+                                            return; // User cancelled
+                                        }
+
                                         try {
                                             setGeneratingPDF(true);
 
                                             // Call API to generate PDF
                                             const response = await candidatesAPI.generateJobOfferPDFFromForm({
+                                                candidateId: selectedCandidate?.id,
                                                 applicantName: jobOfferFormData.applicantName,
                                                 dateOfBirth: jobOfferFormData.dateOfBirth,
                                                 position: jobOfferFormData.position,
@@ -2722,76 +2949,46 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                             document.body.removeChild(link);
                                             window.URL.revokeObjectURL(url);
 
-                                            // Also show preview for reference
-                                            const formatDate = (dateString) => {
-                                                if (!dateString) return '';
-                                                const date = new Date(dateString);
-                                                return date.toLocaleDateString('vi-VN', {
-                                                    day: '2-digit',
-                                                    month: '2-digit',
-                                                    year: 'numeric'
-                                                });
-                                            };
-
-                                            const formatCurrency = (amount) => {
-                                                if (!amount) return '';
-                                                const num = amount.toString().replace(/\D/g, '');
-                                                return num.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                                            };
-
-                                            let letterContent = `THƯ MỜI NHẬN VIỆC\n\n`;
-                                            letterContent += `Kính gửi: ${jobOfferFormData.applicantName}\n\n`;
-                                            letterContent += `Chúng tôi rất vui mừng thông báo rằng bạn đã được chọn cho vị trí ${getViTriLabel(jobOfferFormData.position)}.\n\n`;
-                                            letterContent += `1. Thông tin vị trí:\n`;
-                                            letterContent += `   - Chức danh/Vị trí: ${getViTriLabel(jobOfferFormData.position)}\n`;
-                                            letterContent += `   - Phòng ban: ${getPhongBanLabel(jobOfferFormData.department)}\n`;
-                                            if (jobOfferFormData.directReportTo) {
-                                                letterContent += `   - Báo cáo trực tiếp cho: ${jobOfferFormData.directReportTo}\n`;
-                                            }
-                                            if (jobOfferFormData.indirectReportTo) {
-                                                letterContent += `   - Báo cáo gián tiếp cho: ${jobOfferFormData.indirectReportTo}\n`;
-                                            }
-                                            letterContent += `   - Địa điểm làm việc: ${jobOfferFormData.workLocation}\n`;
-                                            if (jobOfferFormData.diaChiTamTru) {
-                                                letterContent += `   - Địa chỉ tạm trú: ${jobOfferFormData.diaChiTamTru}\n`;
-                                            }
-                                            letterContent += `\n`;
-                                            letterContent += `2. Thời gian làm việc:\n`;
-                                            letterContent += `   - Ngày bắt đầu làm việc: ${formatDate(jobOfferFormData.startDate)}\n`;
-                                            letterContent += `   - Thời gian thử việc: ${jobOfferFormData.probationDays} ngày\n`;
-                                            if (jobOfferFormData.workingHours) {
-                                                letterContent += `   - Thời gian làm việc: ${jobOfferFormData.workingHours}\n`;
-                                            }
-                                            letterContent += `\n`;
-                                            letterContent += `3. Mức lương Gộp (Gross):\n`;
-                                            letterContent += `   - Trong thời gian thử việc: <span class="currency-value">${formatCurrency(jobOfferFormData.probationGrossSalary)} VNĐ/tháng</span>\n`;
-                                            letterContent += `   - Sau thời gian thử việc: <span class="currency-value">${formatCurrency(jobOfferFormData.officialGrossSalary)} VNĐ/tháng</span>\n\n`;
-
-                                            const phoneAllowanceValue = jobOfferFormData.phoneAllowance || '200000';
-                                            letterContent += `4. Chính sách Phụ cấp:\n`;
-                                            letterContent += `   - Hỗ trợ cơm trưa: Theo chính sách công ty\n`;
-                                            letterContent += `   - Phụ cấp điện thoại: <span class="currency-value">${formatCurrency(phoneAllowanceValue)} VNĐ/tháng</span>\n\n`;
-
-                                            if (jobOfferFormData.annualLeaveDays) {
-                                                letterContent += `5. Ngày nghỉ phép năm: ${jobOfferFormData.annualLeaveDays} ngày\n\n`;
-                                            }
-
-                                            if (jobOfferFormData.jobDuties && jobOfferFormData.jobDuties.some(d => d.trim())) {
-                                                letterContent += `6. Mô tả công việc chính:\n`;
-                                                jobOfferFormData.jobDuties.forEach((duty, index) => {
-                                                    if (duty.trim()) {
-                                                        const labelLetter = String.fromCharCode(97 + index);
-                                                        letterContent += `   ${labelLetter}. ${duty}\n`;
+                                            // Update candidate status to PROBATION after successful PDF download
+                                            if (selectedCandidate?.id) {
+                                                try {
+                                                    await candidatesAPI.updateStatus(selectedCandidate.id, { status: 'PROBATION' });
+                                                    // Refresh candidates list
+                                                    fetchCandidates();
+                                                    if (showToast) {
+                                                        showToast('Đã gửi thư tuyển dụng và cập nhật trạng thái ứng viên thành "Đang thử việc"', 'success');
                                                     }
-                                                });
-                                                letterContent += `\n`;
+                                                } catch (statusError) {
+                                                    console.error('Error updating candidate status:', statusError);
+                                                    if (showToast) {
+                                                        showToast('Lỗi khi cập nhật trạng thái ứng viên sau khi gửi thư tuyển dụng.', 'error');
+                                                    }
+                                                }
                                             }
 
-                                            letterContent += `Chúng tôi mong muốn được chào đón bạn gia nhập đội ngũ của chúng tôi.\n\n`;
-                                            letterContent += `Trân trọng,\nPhòng Nhân Sự`;
-
-                                            setFormattedLetter(letterContent);
-                                            setShowPreview(true);
+                                            // Close modal after successful PDF generation
+                                            setIsJobOfferModalOpen(false);
+                                            // Reset form data
+                                            setJobOfferFormData({
+                                                applicantName: '',
+                                                dateOfBirth: '',
+                                                position: '',
+                                                department: '',
+                                                directReportTo: '',
+                                                indirectReportTo: '',
+                                                workLocation: '',
+                                                ngayCapCCCD: '',
+                                                noiCapCCCD: '',
+                                                diaChiTamTru: '',
+                                                startDate: '',
+                                                probationDays: '',
+                                                workingHours: '',
+                                                probationGrossSalary: '',
+                                                officialGrossSalary: '',
+                                                phoneAllowance: '',
+                                                annualLeaveDays: '12',
+                                                jobDuties: ['', '']
+                                            });
                                         } catch (error) {
                                             console.error('Error generating PDF:', error);
                                             alert('Lỗi khi tạo file PDF. Vui lòng thử lại.');
@@ -2805,78 +3002,6 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                     </svg>
                                     <span>{generatingPDF ? 'Đang tạo PDF...' : 'Xuất PDF'}</span>
                                 </button>
-
-                                {/* Preview Area - Initially Hidden */}
-                                {showPreview && formattedLetter && (
-                                    <div className="job-offer-preview-area">
-                                        <div className="job-offer-preview-header">
-                                            <h3 className="job-offer-preview-title">Xem trước Thư Mời Nhận Việc</h3>
-                                        </div>
-                                        <div className="job-offer-preview-content">
-                                            <div className="job-offer-letter-content">
-                                                {formattedLetter.split('\n').map((line, index) => {
-                                                    // Check if line contains currency value
-                                                    if (line.includes('<span class="currency-value">')) {
-                                                        const parts = line.split(/<span class="currency-value">|<\/span>/);
-                                                        return (
-                                                            <div key={index} className="job-offer-letter-line">
-                                                                {parts[0]}
-                                                                <span className="currency-value">{parts[1]}</span>
-                                                                {parts[2]}
-                                                            </div>
-                                                        );
-                                                    }
-                                                    // Check if line starts with number (numbered list)
-                                                    const numberedMatch = line.match(/^(\s*)(\d+)\.\s*(.+)$/);
-                                                    if (numberedMatch) {
-                                                        return (
-                                                            <div key={index} className="job-offer-letter-line job-offer-letter-numbered">
-                                                                {numberedMatch[1]}
-                                                                <strong>{numberedMatch[2]}. </strong>
-                                                                {numberedMatch[3]}
-                                                            </div>
-                                                        );
-                                                    }
-                                                    // Check if line contains bold markers
-                                                    if (line.includes('**')) {
-                                                        const parts = line.split('**');
-                                                        return (
-                                                            <div key={index} className="job-offer-letter-line">
-                                                                {parts.map((part, i) => i % 2 === 1 ? <strong key={i}>{part}</strong> : part)}
-                                                            </div>
-                                                        );
-                                                    }
-                                                    // Regular line
-                                                    const isBold = line.trim() === line.toUpperCase() && line.trim().length > 0;
-                                                    return (
-                                                        <div key={index} className={`job-offer-letter-line ${isBold ? 'job-offer-letter-bold' : ''}`}>
-                                                            {line || '\u00A0'}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                        <div className="job-offer-preview-actions">
-                                            <button
-                                                type="button"
-                                                className="job-offer-copy-btn"
-                                                onClick={() => {
-                                                    const textToCopy = formattedLetter.replace(/<span class="currency-value">|<\/span>/g, '');
-                                                    navigator.clipboard.writeText(textToCopy).then(() => {
-                                                        alert('Đã sao chép nội dung vào clipboard!');
-                                                    }).catch(err => {
-                                                        console.error('Failed to copy:', err);
-                                                    });
-                                                }}
-                                            >
-                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                                                </svg>
-                                                <span>Sao chép nội dung</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -3993,29 +4118,29 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                         </label>
                                         <CustomDropdown
                                             id="manager-select"
-                                            value={selectedManagerId}
+                                            value={selectedManagerName}
                                             onChange={(e) => {
-                                                setSelectedManagerId(e.target.value);
-                                                if (interviewFormErrors.selectedManagerId) {
+                                                setSelectedManagerName(e.target.value);
+                                                if (interviewFormErrors.selectedManagerName) {
                                                     setInterviewFormErrors(prev => ({
                                                         ...prev,
-                                                        selectedManagerId: ''
+                                                        selectedManagerName: ''
                                                     }));
                                                 }
                                             }}
                                             options={[
                                                 { value: '', label: 'Chọn quản lý trực tiếp' },
-                                                ...managers.map(manager => ({
-                                                    value: String(manager.id),
-                                                    label: `${manager.ho_ten}${manager.chuc_danh ? ` - ${manager.chuc_danh}` : ''}${manager.phong_ban ? ` (${manager.phong_ban})` : ''}`
+                                                ...managers.map(managerName => ({
+                                                    value: managerName,
+                                                    label: managerName
                                                 }))
                                             ]}
                                             placeholder="Chọn quản lý trực tiếp"
-                                            className={`candidate-modal-form-input ${interviewFormErrors.selectedManagerId ? 'error' : ''}`}
-                                            error={interviewFormErrors.selectedManagerId}
+                                            className={`candidate-modal-form-input ${interviewFormErrors.selectedManagerName ? 'error' : ''}`}
+                                            error={interviewFormErrors.selectedManagerName}
                                         />
-                                        {interviewFormErrors.selectedManagerId && (
-                                            <span className="candidate-modal-form-error">{interviewFormErrors.selectedManagerId}</span>
+                                        {interviewFormErrors.selectedManagerName && (
+                                            <span className="candidate-modal-form-error">{interviewFormErrors.selectedManagerName}</span>
                                         )}
                                     </div>
 
@@ -4026,15 +4151,15 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                         </label>
                                         <CustomDropdown
                                             id="indirect-manager-select"
-                                            value={selectedIndirectManagerId}
+                                            value={selectedIndirectManagerName}
                                             onChange={(e) => {
-                                                setSelectedIndirectManagerId(e.target.value);
+                                                setSelectedIndirectManagerName(e.target.value);
                                             }}
                                             options={[
                                                 { value: '', label: 'Chọn quản lý gián tiếp (Tùy chọn)' },
-                                                ...indirectManagers.map(manager => ({
-                                                    value: String(manager.id),
-                                                    label: `${manager.ho_ten || manager.hoTen}${manager.chuc_danh || manager.chucDanh ? ` - ${manager.chuc_danh || manager.chucDanh}` : ''}${manager.phong_ban || manager.phongBan ? ` (${manager.phong_ban || manager.phongBan})` : ''}`
+                                                ...indirectManagers.map(managerName => ({
+                                                    value: managerName,
+                                                    label: managerName
                                                 }))
                                             ]}
                                             placeholder="Chọn quản lý gián tiếp (Tùy chọn)"
@@ -4098,8 +4223,8 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                         className="candidate-action-modal-btn candidate-action-modal-reject"
                                         onClick={() => {
                                             setIsManagerSelectModalOpen(false);
-                                            setSelectedManagerId('');
-                                            setSelectedIndirectManagerId('');
+                                            setSelectedManagerName('');
+                                            setSelectedIndirectManagerName('');
                                             setInterviewDate('');
                                             setInterviewTime('');
                                             setInterviewFormErrors({});
@@ -4111,7 +4236,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                         type="button"
                                         className="candidate-action-modal-btn candidate-action-modal-primary"
                                         onClick={handleCreateInterviewRequest}
-                                        disabled={!selectedManagerId || !interviewDate || !interviewTime}
+                                        disabled={!selectedManagerName || !interviewDate || !interviewTime}
                                     >
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -4155,7 +4280,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                 {/* Section I: THÔNG TIN CÁ NHÂN */}
                                 <div className="candidate-preview-section">
                                     <h3 className="candidate-preview-section-title">I. THÔNG TIN CÁ NHÂN</h3>
-                                    
+
                                     <div className="candidate-preview-table">
                                         <table className="candidate-preview-info-table">
                                             <tbody>
@@ -4248,7 +4373,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                             (Nhập thông tin 05 kinh nghiệm gần nhất từ mới đến cũ)
                                         </span>
                                     </h3>
-                                    
+
                                     <div className="candidate-preview-table">
                                         <table className="candidate-preview-data-table">
                                             <thead>
@@ -4295,7 +4420,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                             (Nhập thông tin 05 văn bằng/ chứng chỉ chính từ mới đến cũ)
                                         </span>
                                     </h3>
-                                    
+
                                     <div className="candidate-preview-table">
                                         <table className="candidate-preview-data-table">
                                             <thead>
@@ -4344,7 +4469,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                             (Đánh giá Khả năng sử dụng theo mức độ: A: Giỏi, B: Khá, C: Trung bình, D: Kém)
                                         </span>
                                     </h3>
-                                    
+
                                     <div className="candidate-preview-table">
                                         <table className="candidate-preview-data-table">
                                             <thead>
@@ -4384,6 +4509,120 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                 </div>
                             </div>
                         </div>
+
+                        {/* Đồng hồ đếm ngược 45 ngày cho ứng viên đang thử việc */}
+                        {selectedCandidate.status === 'PROBATION' && (selectedCandidate.job_offer_sent_date || selectedCandidate.jobOfferSentDate) && (() => {
+                            const jobOfferDateStr = selectedCandidate.job_offer_sent_date || selectedCandidate.jobOfferSentDate;
+                            if (!jobOfferDateStr) return null;
+
+                            const jobOfferDate = new Date(jobOfferDateStr);
+                            if (isNaN(jobOfferDate.getTime())) {
+                                console.warn('Invalid job_offer_sent_date:', jobOfferDateStr, 'for candidate:', selectedCandidate.id);
+                                return null;
+                            }
+
+                            // Đặt thời gian về 00:00:00 của ngày xuất thư để tính chính xác
+                            const jobOfferDateStart = new Date(jobOfferDate);
+                            jobOfferDateStart.setHours(0, 0, 0, 0);
+
+                            // Tính ngày đánh giá: 45 ngày sau ngày xuất thư, vào lúc 00:00:00
+                            const targetDate = new Date(jobOfferDateStart);
+                            targetDate.setDate(targetDate.getDate() + 45);
+                            targetDate.setHours(23, 59, 59, 999); // Đặt về cuối ngày đánh giá để đếm ngược chính xác
+
+                            // Tính thời gian còn lại chính xác
+                            const diffTime = targetDate.getTime() - currentTime.getTime();
+                            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+                            // Tính toán thời gian còn lại chính xác đến giây
+                            const totalSeconds = Math.max(0, Math.floor(diffTime / 1000));
+                            const hours = Math.floor(totalSeconds / 3600);
+                            const minutes = Math.floor((totalSeconds % 3600) / 60);
+                            const seconds = totalSeconds % 60;
+                            const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+                            // Tính ngày đánh giá để hiển thị (00:00:00 của ngày đánh giá)
+                            const evaluationDateDisplay = new Date(jobOfferDateStart);
+                            evaluationDateDisplay.setDate(evaluationDateDisplay.getDate() + 45);
+                            evaluationDateDisplay.setHours(0, 0, 0, 0);
+
+                            return (
+                                <div className="candidate-probation-countdown" style={{ marginTop: '2rem', marginBottom: '1rem', padding: '0 1.5rem' }}>
+                                    <div className="candidate-probation-countdown-header">
+                                        <svg className="candidate-probation-countdown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <h4 className="candidate-probation-countdown-title">Thời gian thử việc</h4>
+                                    </div>
+                                    <div className="candidate-probation-countdown-content">
+                                        {diffDays > 0 ? (
+                                            <>
+                                                <div className="candidate-probation-countdown-days">
+                                                    <span className="candidate-probation-countdown-number">{diffDays}</span>
+                                                    <span className="candidate-probation-countdown-label">ngày</span>
+                                                </div>
+                                                {/* Đồng hồ điện tử đếm ngược theo thời gian thực */}
+                                                <div className="candidate-probation-countdown-digital-clock">
+                                                    <div className="candidate-probation-countdown-digital-time">
+                                                        {formattedTime.split('').map((char, index) => (
+                                                            <span key={index} className={char === ':' ? 'candidate-probation-countdown-separator' : 'candidate-probation-countdown-digit'}>
+                                                                {char}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                    <div className="candidate-probation-countdown-digital-labels">
+                                                        <span>Giờ</span>
+                                                        <span>Phút</span>
+                                                        <span>Giây</span>
+                                                    </div>
+                                                </div>
+                                                <p className="candidate-probation-countdown-text">
+                                                    Còn lại đến ngày đánh giá thử việc
+                                                </p>
+                                                <p className="candidate-probation-countdown-date">
+                                                    Ngày đánh giá: {evaluationDateDisplay.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                </p>
+                                            </>
+                                        ) : diffDays === 0 ? (
+                                            <>
+                                                <div className="candidate-probation-countdown-days candidate-probation-countdown-days--today">
+                                                    <span className="candidate-probation-countdown-number">0</span>
+                                                    <span className="candidate-probation-countdown-label">ngày</span>
+                                                </div>
+                                                {/* Đồng hồ điện tử cho ngày đánh giá */}
+                                                <div className="candidate-probation-countdown-digital-clock candidate-probation-countdown-digital-clock--today">
+                                                    <div className="candidate-probation-countdown-digital-time">
+                                                        {formattedTime.split('').map((char, index) => (
+                                                            <span key={index} className={char === ':' ? 'candidate-probation-countdown-separator' : 'candidate-probation-countdown-digit'}>
+                                                                {char}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                    <div className="candidate-probation-countdown-digital-labels">
+                                                        <span>Giờ</span>
+                                                        <span>Phút</span>
+                                                        <span>Giây</span>
+                                                    </div>
+                                                </div>
+                                                <p className="candidate-probation-countdown-text candidate-probation-countdown-text--urgent">
+                                                    Hôm nay là ngày đánh giá thử việc
+                                                </p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="candidate-probation-countdown-days candidate-probation-countdown-days--overdue">
+                                                    <span className="candidate-probation-countdown-number">{Math.abs(diffDays)}</span>
+                                                    <span className="candidate-probation-countdown-label">ngày</span>
+                                                </div>
+                                                <p className="candidate-probation-countdown-text candidate-probation-countdown-text--overdue">
+                                                    Đã quá hạn đánh giá thử việc
+                                                </p>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         {/* Preview Actions */}
                         <div className="candidate-preview-actions">
@@ -4510,18 +4749,65 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                         <div className="recruitment-request-detail-modal-content">
                             {/* Render form details - PHẦN I and PHẦN II */}
                             {/* This will reuse the same form structure from InterviewApprovals but in read-only mode */}
-                            <RecruitmentRequestDetailView request={selectedRecruitmentRequest} />
+                            <RecruitmentRequestDetailView
+                                request={selectedRecruitmentRequest}
+                                currentUser={currentUser}
+                                onApprove={async () => {
+                                    try {
+                                        await candidatesAPI.updateRecruitmentRequestStatus(selectedRecruitmentRequest.id, {
+                                            status: 'APPROVED'
+                                        });
+                                        if (showToast) {
+                                            showToast('Đã duyệt yêu cầu tuyển dụng thành công!', 'success');
+                                        }
+                                        setIsRecruitmentRequestDetailModalOpen(false);
+                                        fetchRecruitmentRequests();
+                                    } catch (error) {
+                                        console.error('Error approving recruitment request:', error);
+                                        if (showToast) {
+                                            showToast(error.response?.data?.message || 'Lỗi khi duyệt yêu cầu', 'error');
+                                        }
+                                    }
+                                }}
+                                onReject={async () => {
+                                    if (showConfirm) {
+                                        const confirmed = await showConfirm({
+                                            title: 'Xác nhận từ chối',
+                                            message: 'Bạn có chắc chắn muốn từ chối và xóa yêu cầu tuyển dụng này? Hành động này không thể hoàn tác.',
+                                            confirmText: 'Xác nhận',
+                                            cancelText: 'Hủy',
+                                            type: 'warning'
+                                        });
+
+                                        if (confirmed) {
+                                            try {
+                                                await candidatesAPI.deleteRecruitmentRequest(selectedRecruitmentRequest.id);
+                                                if (showToast) {
+                                                    showToast('Đã từ chối và xóa yêu cầu tuyển dụng', 'success');
+                                                }
+                                                setIsRecruitmentRequestDetailModalOpen(false);
+                                                fetchRecruitmentRequests();
+                                            } catch (error) {
+                                                console.error('Error rejecting recruitment request:', error);
+                                                if (showToast) {
+                                                    showToast(error.response?.data?.message || 'Lỗi khi từ chối yêu cầu', 'error');
+                                                }
+                                            }
+                                        }
+                                    }
+                                }}
+                            />
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Import Modal */}
-            {isImportModalOpen && (
+            {/* Import Modal - Only show results */}
+            {isImportModalOpen && importResults && (
                 <div className="modal-overlay" onClick={() => !importing && setIsImportModalOpen(false)}>
                     <div className="modal-content candidate-form-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2>Import Ứng viên hàng loạt</h2>
+                            <h2>Kết quả Import Ứng viên</h2>
                             <button
                                 type="button"
                                 className="modal-close-btn"
@@ -4541,54 +4827,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                         </div>
 
                         <div className="modal-body">
-                            {!importResults ? (
-                                <>
-                                    <div style={{ marginBottom: '1.5rem' }}>
-                                        <p style={{ marginBottom: '1rem', color: '#64748b' }}>
-                                            Vui lòng chọn file Excel để import. File phải theo đúng định dạng mẫu.
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={handleExportTemplate}
-                                            style={{
-                                                padding: '0.5rem 1rem',
-                                                background: '#f1f5f9',
-                                                border: '1px solid #cbd5e1',
-                                                borderRadius: '0.5rem',
-                                                color: '#475569',
-                                                cursor: 'pointer',
-                                                fontSize: '0.875rem'
-                                            }}
-                                        >
-                                            📥 Tải file mẫu
-                                        </button>
-                                    </div>
-
-                                    <div style={{ marginBottom: '1.5rem' }}>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#334155' }}>
-                                            Chọn file Excel
-                                        </label>
-                                        <input
-                                            type="file"
-                                            accept=".xlsx,.xls"
-                                            onChange={handleImportFileChange}
-                                            disabled={importing}
-                                            style={{
-                                                width: '100%',
-                                                padding: '0.75rem',
-                                                border: '1px solid #cbd5e1',
-                                                borderRadius: '0.5rem',
-                                                fontSize: '0.875rem'
-                                            }}
-                                        />
-                                        {importFile && (
-                                            <p style={{ marginTop: '0.5rem', color: '#059669', fontSize: '0.875rem' }}>
-                                                ✓ Đã chọn: {importFile.name}
-                                            </p>
-                                        )}
-                                    </div>
-                                </>
-                            ) : (
+                            {importResults && (
                                 <div>
                                     <div style={{
                                         padding: '1rem',
@@ -4649,18 +4888,8 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                 }}
                                 disabled={importing}
                             >
-                                {importResults ? 'Đóng' : 'Hủy'}
+                                Đóng
                             </button>
-                            {!importResults && (
-                                <button
-                                    type="button"
-                                    className="modal-submit-btn"
-                                    onClick={handleBulkImport}
-                                    disabled={!importFile || importing}
-                                >
-                                    {importing ? 'Đang import...' : 'Import'}
-                                </button>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -4670,7 +4899,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 };
 
 // Component to display recruitment request details
-const RecruitmentRequestDetailView = ({ request }) => {
+const RecruitmentRequestDetailView = ({ request, currentUser, onApprove, onReject }) => {
     // Parse JSONB fields if needed
     const lyDoTuyen = request.ly_do_tuyen || request.lyDoTuyen || {};
     const tieuChuanTuyenChon = request.tieu_chuan_tuyen_chon || request.tieuChuanTuyenChon || {};
@@ -4712,8 +4941,8 @@ const RecruitmentRequestDetailView = ({ request }) => {
                         <div className="recruitment-request-form-field">
                             <label className="recruitment-request-form-label">Loại lao động</label>
                             <div className="recruitment-request-form-value">
-                                {request.loai_lao_dong === 'thoi_vu' || request.loaiLaoDong === 'thoi_vu' ? 'Thời vụ' : 
-                                 request.loai_lao_dong === 'toan_thoi_gian' || request.loaiLaoDong === 'toan_thoi_gian' ? 'Toàn thời gian' : '-'}
+                                {request.loai_lao_dong === 'thoi_vu' || request.loaiLaoDong === 'thoi_vu' ? 'Thời vụ' :
+                                    request.loai_lao_dong === 'toan_thoi_gian' || request.loaiLaoDong === 'toan_thoi_gian' ? 'Toàn thời gian' : '-'}
                             </div>
                         </div>
                     </div>
@@ -4795,8 +5024,8 @@ const RecruitmentRequestDetailView = ({ request }) => {
                                         <label className="recruitment-request-form-label">Kinh nghiệm</label>
                                         <div className="recruitment-request-form-value">
                                             {tieuChuanTuyenChon.kinhNghiem.khong ? 'Không' :
-                                             tieuChuanTuyenChon.kinhNghiem.soNamKinhNghiem && tieuChuanTuyenChon.kinhNghiem.soNam ? 
-                                             `Số năm kinh nghiệm: ${tieuChuanTuyenChon.kinhNghiem.soNam}` : '-'}
+                                                tieuChuanTuyenChon.kinhNghiem.soNamKinhNghiem && tieuChuanTuyenChon.kinhNghiem.soNam ?
+                                                    `Số năm kinh nghiệm: ${tieuChuanTuyenChon.kinhNghiem.soNam}` : '-'}
                                         </div>
                                     </div>
                                 )}
@@ -4805,8 +5034,8 @@ const RecruitmentRequestDetailView = ({ request }) => {
                                         <label className="recruitment-request-form-label">Kiến thức</label>
                                         <div className="recruitment-request-form-value">
                                             {tieuChuanTuyenChon.kienThuc.khong ? 'Không' :
-                                             tieuChuanTuyenChon.kienThuc.nganhNghe && tieuChuanTuyenChon.kienThuc.nganhNgheValue ? 
-                                             `Ngành nghề: ${tieuChuanTuyenChon.kienThuc.nganhNgheValue}` : '-'}
+                                                tieuChuanTuyenChon.kienThuc.nganhNghe && tieuChuanTuyenChon.kienThuc.nganhNgheValue ?
+                                                    `Ngành nghề: ${tieuChuanTuyenChon.kienThuc.nganhNgheValue}` : '-'}
                                         </div>
                                     </div>
                                 )}
@@ -4822,7 +5051,7 @@ const RecruitmentRequestDetailView = ({ request }) => {
                                         <div className="recruitment-request-form-value">
                                             {[
                                                 tieuChuanTuyenChon.ngoaiNgu.tiengAnh && `Tiếng Anh${tieuChuanTuyenChon.ngoaiNgu.trinhDoTiengAnh ? ` (${tieuChuanTuyenChon.ngoaiNgu.trinhDoTiengAnh})` : ''}`,
-                                                tieuChuanTuyenChon.ngoaiNgu.ngoaiNguKhac && tieuChuanTuyenChon.ngoaiNgu.tenNgoaiNguKhac && 
+                                                tieuChuanTuyenChon.ngoaiNgu.ngoaiNguKhac && tieuChuanTuyenChon.ngoaiNgu.tenNgoaiNguKhac &&
                                                 `${tieuChuanTuyenChon.ngoaiNgu.tenNgoaiNguKhac}${tieuChuanTuyenChon.ngoaiNgu.trinhDoNgoaiNguKhac ? ` (${tieuChuanTuyenChon.ngoaiNgu.trinhDoNgoaiNguKhac})` : ''}`
                                             ].filter(Boolean).join(', ') || '-'}
                                         </div>
@@ -4833,11 +5062,11 @@ const RecruitmentRequestDetailView = ({ request }) => {
                                         <label className="recruitment-request-form-label">Vi tính</label>
                                         <div className="recruitment-request-form-value">
                                             {tieuChuanTuyenChon.viTinh.khong ? 'Không' :
-                                             [
-                                                 tieuChuanTuyenChon.viTinh.msOffice && 'MS Office (Word / Excel / Access)',
-                                                 tieuChuanTuyenChon.viTinh.khac && tieuChuanTuyenChon.viTinh.khacValue && 
-                                                 `Khác: ${tieuChuanTuyenChon.viTinh.khacValue}`
-                                             ].filter(Boolean).join(', ') || '-'}
+                                                [
+                                                    tieuChuanTuyenChon.viTinh.msOffice && 'MS Office (Word / Excel / Access)',
+                                                    tieuChuanTuyenChon.viTinh.khac && tieuChuanTuyenChon.viTinh.khacValue &&
+                                                    `Khác: ${tieuChuanTuyenChon.viTinh.khacValue}`
+                                                ].filter(Boolean).join(', ') || '-'}
                                         </div>
                                     </div>
                                 )}
@@ -4868,6 +5097,69 @@ const RecruitmentRequestDetailView = ({ request }) => {
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+
+            {/* Action buttons for HR */}
+            {currentUser?.role === 'HR' && request.status === 'PENDING' && (
+                <div className="recruitment-request-detail-actions" style={{
+                    marginTop: '2rem',
+                    paddingTop: '1.5rem',
+                    borderTop: '1px solid #e5e7eb',
+                    display: 'flex',
+                    gap: '1rem',
+                    justifyContent: 'flex-end'
+                }}>
+                    <button
+                        type="button"
+                        onClick={onReject}
+                        style={{
+                            padding: '0.75rem 1.5rem',
+                            background: '#fee2e2',
+                            color: '#dc2626',
+                            border: '1px solid #fca5a5',
+                            borderRadius: '0.5rem',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            fontSize: '0.875rem',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.background = '#fecaca';
+                            e.target.style.borderColor = '#f87171';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.background = '#fee2e2';
+                            e.target.style.borderColor = '#fca5a5';
+                        }}
+                    >
+                        Từ chối
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onApprove}
+                        style={{
+                            padding: '0.75rem 1.5rem',
+                            background: '#d1fae5',
+                            color: '#059669',
+                            border: '1px solid #6ee7b7',
+                            borderRadius: '0.5rem',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            fontSize: '0.875rem',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.background = '#a7f3d0';
+                            e.target.style.borderColor = '#34d399';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.background = '#d1fae5';
+                            e.target.style.borderColor = '#6ee7b7';
+                        }}
+                    >
+                        Duyệt
+                    </button>
                 </div>
             )}
         </div>

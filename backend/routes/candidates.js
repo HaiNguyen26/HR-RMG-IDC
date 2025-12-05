@@ -124,8 +124,9 @@ const ensureCandidatesTable = async () => {
             ngay_gui_cv DATE,
             cv_file_path VARCHAR(500),
             cv_file_name VARCHAR(255),
-            status VARCHAR(50) DEFAULT 'PENDING_INTERVIEW' CHECK (status IN ('PENDING_INTERVIEW', 'PENDING_MANAGER', 'PASSED', 'FAILED')),
+            status VARCHAR(50) DEFAULT 'PENDING_INTERVIEW' CHECK (status IN ('PENDING_INTERVIEW', 'PENDING_MANAGER', 'PASSED', 'FAILED', 'PROBATION')),
             notes TEXT,
+            job_offer_sent_date TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -189,6 +190,9 @@ const ensureCandidatesTable = async () => {
             IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='trinh_do_ngoai_ngu') THEN
                 ALTER TABLE candidates ADD COLUMN trinh_do_ngoai_ngu JSONB;
             END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='job_offer_sent_date') THEN
+                ALTER TABLE candidates ADD COLUMN job_offer_sent_date TIMESTAMP;
+            END IF;
         END $$;
 
         -- Allow ho_ten to be NULL for bulk import
@@ -221,9 +225,9 @@ const ensureCandidatesTable = async () => {
             BEGIN
                 -- Drop old constraint if exists
                 ALTER TABLE candidates DROP CONSTRAINT IF EXISTS candidates_status_check;
-                -- Add new constraint with PENDING_MANAGER
+                -- Add new constraint with PENDING_MANAGER and PROBATION
                 ALTER TABLE candidates ADD CONSTRAINT candidates_status_check 
-                    CHECK (status IN ('PENDING_INTERVIEW', 'PENDING_MANAGER', 'PASSED', 'FAILED'));
+                    CHECK (status IN ('PENDING_INTERVIEW', 'PENDING_MANAGER', 'PASSED', 'FAILED', 'PROBATION'));
             EXCEPTION
                 WHEN OTHERS THEN
                     -- If constraint doesn't exist, ignore
@@ -684,6 +688,7 @@ router.get('/', async (req, res) => {
                 c.cv_file_name,
                 c.status,
                 c.notes,
+                c.job_offer_sent_date,
                 c.created_at,
                 c.updated_at,
                 ir.manager_name,
@@ -783,6 +788,8 @@ router.get('/', async (req, res) => {
                 cvFileName: row.cv_file_name,
                 status: row.status,
                 notes: row.notes,
+                jobOfferSentDate: row.job_offer_sent_date,
+                job_offer_sent_date: row.job_offer_sent_date,
                 createdAt: row.created_at,
                 managerName: row.manager_name,
                 manager_name: row.manager_name, // Keep snake_case for backward compatibility
@@ -1051,7 +1058,7 @@ router.put('/:id', upload.single('cvFile'), async (req, res) => {
         // Handle CV file update
         let cvFilePath = checkResult.rows[0].cv_file_path;
         let cvFileName = null;
-        
+
         if (req.file) {
             // Delete old CV file if exists
             if (cvFilePath && fs.existsSync(cvFilePath)) {
@@ -1191,23 +1198,41 @@ router.put('/:id/status', async (req, res) => {
         const { id } = req.params;
         const { status, notes } = req.body;
 
-        if (!status || !['PENDING_INTERVIEW', 'PENDING_MANAGER', 'PASSED', 'FAILED'].includes(status)) {
+        if (!status || !['PENDING_INTERVIEW', 'PENDING_MANAGER', 'PASSED', 'FAILED', 'PROBATION'].includes(status)) {
             return res.status(400).json({
                 success: false,
                 message: 'Trạng thái không hợp lệ'
             });
         }
 
-        const updateQuery = `
-            UPDATE candidates
-            SET status = $1,
-                notes = $2,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = $3
-            RETURNING *
-        `;
+        // If updating to PROBATION, also set job_offer_sent_date
+        let updateQuery;
+        let updateParams;
 
-        const result = await pool.query(updateQuery, [status, notes || null, id]);
+        if (status === 'PROBATION') {
+            updateQuery = `
+                UPDATE candidates
+                SET status = $1,
+                    notes = $2,
+                    job_offer_sent_date = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $3
+                RETURNING *
+            `;
+            updateParams = [status, notes || null, id];
+        } else {
+            updateQuery = `
+                UPDATE candidates
+                SET status = $1,
+                    notes = $2,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $3
+                RETURNING *
+            `;
+            updateParams = [status, notes || null, id];
+        }
+
+        const result = await pool.query(updateQuery, updateParams);
 
         if (result.rows.length === 0) {
             return res.status(404).json({
@@ -1272,6 +1297,133 @@ router.put('/:id/notes', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Lỗi khi cập nhật ghi chú: ' + error.message
+        });
+    }
+});
+
+// GET /api/candidates/probation - Lấy danh sách ứng viên đang thử việc
+router.get('/probation', async (req, res) => {
+    try {
+        await ensureCandidatesTable();
+
+        const query = `
+            SELECT 
+                id,
+                ho_ten,
+                vi_tri_ung_tuyen,
+                phong_ban,
+                so_dien_thoai,
+                email,
+                status,
+                job_offer_sent_date,
+                updated_at,
+                created_at
+            FROM candidates
+            WHERE status = 'PROBATION'
+            ORDER BY job_offer_sent_date DESC, created_at DESC
+        `;
+
+        const result = await pool.query(query);
+
+        res.json({
+            success: true,
+            message: 'Danh sách ứng viên đang thử việc',
+            data: result.rows
+        });
+    } catch (error) {
+        console.error('Error fetching probation candidates:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách ứng viên đang thử việc: ' + error.message
+        });
+    }
+});
+
+// PUT /api/candidates/:id/probation-evaluation - Đánh giá quá trình thử việc
+router.put('/:id/probation-evaluation', async (req, res) => {
+    try {
+        await ensureCandidatesTable();
+
+        const { id } = req.params;
+        const { result: evaluationResult, notes } = req.body; // 'PASSED' or 'FAILED'
+        const currentUserId = req.user?.id;
+
+        if (!evaluationResult || !['PASSED', 'FAILED'].includes(evaluationResult)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Kết quả đánh giá không hợp lệ. Phải là PASSED hoặc FAILED'
+            });
+        }
+
+        // Get candidate info
+        const candidateResult = await pool.query(
+            'SELECT * FROM candidates WHERE id = $1',
+            [id]
+        );
+
+        if (candidateResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy ứng viên'
+            });
+        }
+
+        const candidate = candidateResult.rows[0];
+
+        if (candidate.status !== 'PROBATION') {
+            return res.status(400).json({
+                success: false,
+                message: 'Ứng viên không ở trạng thái đang thử việc'
+            });
+        }
+
+        // Check if 45 days have passed since job offer sent
+        if (!candidate.job_offer_sent_date) {
+            return res.status(400).json({
+                success: false,
+                message: 'Không tìm thấy ngày xuất thư tuyển dụng'
+            });
+        }
+
+        const jobOfferDate = new Date(candidate.job_offer_sent_date);
+        const today = new Date();
+        const daysDiff = Math.floor((today - jobOfferDate) / (1000 * 60 * 60 * 24));
+
+        if (daysDiff < 45) {
+            return res.status(400).json({
+                success: false,
+                message: `Chưa đủ 45 ngày kể từ ngày xuất thư tuyển dụng. Còn ${45 - daysDiff} ngày nữa.`
+            });
+        }
+
+        // Update candidate status based on evaluation result
+        const newStatus = evaluationResult === 'PASSED' ? 'PASSED' : 'FAILED';
+
+        const updateQuery = `
+            UPDATE candidates
+            SET status = $1,
+                notes = $2,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $3
+            RETURNING *
+        `;
+
+        const result = await pool.query(updateQuery, [newStatus, notes || null, id]);
+
+        res.json({
+            success: true,
+            message: `Đã đánh giá quá trình thử việc: ${evaluationResult === 'PASSED' ? 'Đạt' : 'Không đạt'}`,
+            data: {
+                id: result.rows[0].id,
+                status: result.rows[0].status,
+                notes: result.rows[0].notes
+            }
+        });
+    } catch (error) {
+        console.error('Error evaluating probation:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi đánh giá quá trình thử việc: ' + error.message
         });
     }
 });
@@ -1369,9 +1521,7 @@ router.post('/:id/interview-request', async (req, res) => {
 
         const { id } = req.params;
         const {
-            managerId,
             managerName,
-            indirectManagerId,
             indirectManagerName,
             interviewDate,
             interviewTime,
@@ -1379,7 +1529,7 @@ router.post('/:id/interview-request', async (req, res) => {
         } = req.body;
         const createdBy = req.user?.id || null;
 
-        if (!managerId || !managerName) {
+        if (!managerName) {
             return res.status(400).json({
                 success: false,
                 message: 'Vui lòng chọn quản lý trực tiếp'
@@ -1409,13 +1559,26 @@ router.post('/:id/interview-request', async (req, res) => {
             });
         }
 
-        // Check if manager exists
-        const managerCheck = await pool.query('SELECT id, ho_ten FROM employees WHERE id = $1', [managerId]);
-        if (managerCheck.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy quản lý trực tiếp'
-            });
+        // Find manager by name (optional - for manager_id if exists)
+        let managerId = null;
+        const managerCheck = await pool.query(
+            'SELECT id, ho_ten FROM employees WHERE LOWER(TRIM(ho_ten)) = LOWER(TRIM($1))',
+            [managerName]
+        );
+        if (managerCheck.rows.length > 0) {
+            managerId = managerCheck.rows[0].id;
+        }
+
+        // Find indirect manager by name (optional)
+        let indirectManagerId = null;
+        if (indirectManagerName) {
+            const indirectManagerCheck = await pool.query(
+                'SELECT id, ho_ten FROM employees WHERE LOWER(TRIM(ho_ten)) = LOWER(TRIM($1))',
+                [indirectManagerName]
+            );
+            if (indirectManagerCheck.rows.length > 0) {
+                indirectManagerId = indirectManagerCheck.rows[0].id;
+            }
         }
 
         // Check if there's already a pending request for this candidate
@@ -2218,10 +2381,12 @@ router.post('/generate-job-offer-pdf', async (req, res) => {
             currentY = doc.y + 15; // More spacing before section 1
 
             // Helper function to add text with red color for monetary values
+            // Now includes /tháng in the pattern to keep it on the same line
             const addTextWithRed = (text, x, y, options = {}) => {
                 const fontSize = options.fontSize || 10;
                 doc.fontSize(fontSize);
-                const regex = /(\d[\d,.\s]*\s*VNĐ)/g;
+                // Updated regex to include /tháng after VNĐ
+                const regex = /(\d[\d,.\s]*\s*VNĐ\/tháng)/g;
                 let lastIndex = 0;
                 let match;
                 let currentX = x;
@@ -2236,7 +2401,7 @@ router.post('/generate-job-offer-pdf', async (req, res) => {
                         currentX += doc.widthOfString(beforeText, { fontSize });
                     }
 
-                    // Add monetary value in red
+                    // Add monetary value in red (including /tháng)
                     doc.fillColor('red');
                     setVietnameseFont(false);
                     doc.text(match[0], currentX, y, { width: options.width || 460, continued: true });
@@ -2244,14 +2409,59 @@ router.post('/generate-job-offer-pdf', async (req, res) => {
                     lastIndex = regex.lastIndex;
                 }
 
-                // Add remaining text
-                if (lastIndex < text.length) {
+                // Add remaining text (if no match found, try old pattern without /tháng)
+                if (lastIndex === 0) {
+                    const regexOld = /(\d[\d,.\s]*\s*VNĐ)/g;
+                    let matchOld;
+                    let lastIndexOld = 0;
+                    let currentXOld = x;
+
+                    while ((matchOld = regexOld.exec(text)) !== null) {
+                        if (matchOld.index > lastIndexOld) {
+                            const beforeText = text.substring(lastIndexOld, matchOld.index);
+                            doc.fillColor('black');
+                            setVietnameseFont(false);
+                            doc.text(beforeText, currentXOld, y, { width: options.width || 460, continued: true });
+                            currentXOld += doc.widthOfString(beforeText, { fontSize });
+                        }
+
+                        doc.fillColor('red');
+                        setVietnameseFont(false);
+                        doc.text(matchOld[0], currentXOld, y, { width: options.width || 460, continued: true });
+                        currentXOld += doc.widthOfString(matchOld[0], { fontSize });
+                        lastIndexOld = regexOld.lastIndex;
+                    }
+
+                    if (lastIndexOld < text.length) {
+                        const afterText = text.substring(lastIndexOld);
+                        doc.fillColor('black');
+                        setVietnameseFont(false);
+                        doc.text(afterText, currentXOld, y, { width: options.width || 460 });
+                    }
+                } else if (lastIndex < text.length) {
                     const afterText = text.substring(lastIndex);
                     doc.fillColor('black');
                     setVietnameseFont(false);
                     doc.text(afterText, currentX, y, { width: options.width || 460 });
                 }
                 doc.fillColor('black'); // Reset to black
+            };
+
+            // Helper function to add monetary value aligned at fixed X position
+            const addAlignedRedValue = (label, value, labelX, valueX, y, options = {}) => {
+                const fontSize = options.fontSize || 10;
+                doc.fontSize(fontSize);
+                setVietnameseFont(false);
+
+                // Write label in black
+                doc.fillColor('black');
+                doc.text(label, labelX, y);
+
+                // Write value in red at fixed X position
+                doc.fillColor('red');
+                const formattedValue = value ? formatCurrency(value) : '';
+                doc.text(`${formattedValue} VNĐ/tháng`, valueX, y);
+                doc.fillColor('black');
             };
 
             // tableLeft and currentY are already set from header section above
@@ -2398,11 +2608,19 @@ router.post('/generate-job-offer-pdf', async (req, res) => {
             currentY += 15;
             doc.fontSize(10);
             setVietnameseFont(false);
-            const probationSalaryText = `a. Trong thời gian thử việc : ${formatCurrency(probationGrossSalary)} VNĐ/tháng.`;
-            addTextWithRed(probationSalaryText, tableLeft + 20, currentY, { width: 460 });
+            // Fixed X position for all red monetary values to align them
+            const salaryValueX = tableLeft + 200; // Fixed position for all salary values
+            // a. Trong thời gian thử việc
+            doc.text('a. Trong thời gian thử việc : ', tableLeft + 20, currentY);
+            doc.fillColor('red');
+            doc.text(`${formatCurrency(probationGrossSalary)} VNĐ/tháng.`, salaryValueX, currentY);
+            doc.fillColor('black');
             currentY += 15;
-            const officialSalaryText = `b. Sau thời gian thử việc : ${formatCurrency(officialGrossSalary)} VNĐ/tháng.`;
-            addTextWithRed(officialSalaryText, tableLeft + 20, currentY, { width: 460 });
+            // b. Sau thời gian thử việc
+            doc.text('b. Sau thời gian thử việc : ', tableLeft + 20, currentY);
+            doc.fillColor('red');
+            doc.text(`${formatCurrency(officialGrossSalary)} VNĐ/tháng.`, salaryValueX, currentY);
+            doc.fillColor('black');
             currentY += 15;
             setVietnameseFont(false);
             doc.text('Trong đó 80% là mức lương cơ bản và 20% là phụ cấp lương.', tableLeft + 20, currentY, { width: 460, align: 'justify' });
@@ -2429,28 +2647,29 @@ router.post('/generate-job-offer-pdf', async (req, res) => {
             currentY += 15;
             doc.fontSize(10);
             setVietnameseFont(false);
+            // Fixed X position for all allowance values to align them
+            const allowanceValueX = tableLeft + 165; // Fixed position for alignment
             // a. Hỗ trợ cơm trưa - always "Theo chính sách công ty" in red
-            doc.text('a. Hỗ trợ cơm trưa : ', tableLeft + 20, currentY, { width: 460 });
+            doc.text('a. Hỗ trợ cơm trưa : ', tableLeft + 20, currentY);
             doc.fillColor('red');
-            doc.text('Theo chính sách công ty', tableLeft + 165, currentY, { width: 295 });
+            doc.text('Theo chính sách công ty', allowanceValueX, currentY);
             doc.fillColor('black');
             currentY += 15;
-            // b. Phụ cấp điện thoại
+            // b. Phụ cấp điện thoại - Use same fixed X position for alignment
+            doc.text('b. Phụ cấp điện thoại : ', tableLeft + 20, currentY);
+            doc.fillColor('red');
             if (phoneAllowance) {
-                const phoneText = `b. Phụ cấp điện thoại : ${formatCurrency(phoneAllowance)} VNĐ/tháng`;
-                addTextWithRed(phoneText, tableLeft + 20, currentY, { width: 460 });
+                doc.text(`${formatCurrency(phoneAllowance)} VNĐ/tháng`, allowanceValueX, currentY);
             } else {
-                doc.text('b. Phụ cấp điện thoại : ', tableLeft + 20, currentY, { width: 460 });
-                doc.fillColor('red');
-                doc.text('200.000 VNĐ/tháng', tableLeft + 170, currentY, { width: 290 });
-                doc.fillColor('black');
+                doc.text('200.000 VNĐ/tháng', allowanceValueX, currentY);
             }
+            doc.fillColor('black');
             currentY += 15;
             doc.moveDown(0.5);
 
             // Section 12: Bảo hiểm Tai nạn
             doc.fontSize(10).font(vietnameseFonts.bold).text('12. Bảo hiểm Tai nạn :', tableLeft, currentY);
-            doc.fontSize(10).font(vietnameseFonts.regular).text('theo chính sách công ty', tableLeft + 180, currentY);
+            doc.fontSize(10).font(vietnameseFonts.regular).text('Theo chính sách công ty', tableLeft + 180, currentY);
             currentY += 15;
             doc.moveDown(0.5);
 
@@ -2458,10 +2677,10 @@ router.post('/generate-job-offer-pdf', async (req, res) => {
             doc.fontSize(10).font(vietnameseFonts.bold).text('13. Chính sách tiền thưởng', tableLeft, currentY);
             currentY += 15;
             doc.y = currentY; // Sync doc.y with currentY
-            doc.fontSize(10).font(vietnameseFonts.regular).text('a. Thưởng tháng lương thứ 13: theo chính sách công ty hiện hành.', tableLeft + 20, currentY, { width: 460 });
+            doc.fontSize(10).font(vietnameseFonts.regular).text('a. Thưởng tháng lương thứ 13: Theo chính sách công ty hiện hành.', tableLeft + 20, currentY, { width: 460 });
             currentY = doc.y + 10; // Update from actual text position
             doc.y = currentY;
-            doc.text('b. Thưởng theo đánh giá hoàn thành mục tiêu cuối năm và các khoản thưởng khác: theo chính sách công ty hiện hành.', tableLeft + 20, currentY, { width: 460, align: 'justify' });
+            doc.text('b. Thưởng theo đánh giá hoàn thành mục tiêu cuối năm và các khoản thưởng khác: Theo chính sách công ty hiện hành.', tableLeft + 20, currentY, { width: 460, align: 'justify' });
             // Update currentY from doc.y (actual text height) + spacing
             currentY = doc.y + 10;
             doc.y = currentY;
@@ -2471,22 +2690,39 @@ router.post('/generate-job-offer-pdf', async (req, res) => {
             currentY += 15;
             doc.fontSize(10).font(vietnameseFonts.regular).text('a. Phương tiện đi làm: tự túc', tableLeft + 20, currentY, { width: 460 });
             currentY += 15;
-            doc.text('b. Phương tiện đi công tác trong thời gian làm việc: theo chính sách công ty.', tableLeft + 20, currentY, { width: 460, align: 'justify' });
-            currentY += 20;
-            doc.moveDown(0.5);
+            doc.text('b. Phương tiện đi công tác trong thời gian làm việc: Theo chính sách công ty.', tableLeft + 20, currentY, { width: 460, align: 'justify' });
+            currentY = doc.y + 10; // Use doc.y instead of fixed increment
+            doc.y = currentY;
+
+            // Check if we need to move Section 15 to next page
+            // A4 page height is approximately 842 points, with margins we have about 742 points usable
+            // If currentY is close to bottom (within 150 points), add page break
+            const pageHeight = doc.page.height;
+            const bottomMargin = 50;
+            const section15Height = 80; // Estimated height for section 15 content
+
+            if (currentY + section15Height > pageHeight - bottomMargin) {
+                doc.addPage();
+                currentY = 50; // Top margin
+                doc.y = currentY;
+            } else {
+                // Add some spacing to push section 15 down a bit
+                currentY += 20;
+                doc.y = currentY;
+            }
 
             // Section 15: Số ngày nghỉ trong năm
             doc.fontSize(10).font(vietnameseFonts.bold).text('15. Số ngày nghỉ trong năm:', tableLeft, currentY);
-            currentY += 15;
+            currentY += 15; // Increased spacing to avoid sticking to title
             doc.y = currentY; // Sync doc.y with currentY
             doc.fontSize(10).font(vietnameseFonts.regular).text(`a. Nghỉ phép năm: ${annualLeaveDays || 12} ngày trong một năm.`, tableLeft + 20, currentY, { width: 460 });
-            currentY = doc.y + 10; // Update from actual text position
+            currentY = doc.y + 8; // Reduced from 10 to 8 for tighter spacing
             doc.y = currentY;
             doc.text('Phép năm được tính từ ngày Anh/Chị bắt đầu làm việc tại công ty và chỉ được sử dụng sau thời hạn thử việc.', tableLeft + 20, currentY, { width: 460, align: 'justify' });
-            currentY = doc.y + 10; // Update from actual text position
+            currentY = doc.y + 8; // Reduced from 10 to 8 for tighter spacing
             doc.y = currentY;
             doc.text('b. Nghỉ lễ, nghỉ chế độ: áp dụng theo Luật lao động Việt Nam và Chính sách công ty.', tableLeft + 20, currentY, { width: 460, align: 'justify' });
-            currentY = doc.y + 10; // Update from actual text position + spacing
+            currentY = doc.y + 10; // Keep normal spacing before next section
             doc.y = currentY;
 
             // Section 16: Hình thức trả lương
@@ -3197,6 +3433,53 @@ router.get('/recruitment-requests', async (req, res) => {
     }
 });
 
+// GET /api/candidates/recruitment-requests/my-requests - Get recruitment requests of current manager
+router.get('/recruitment-requests/my-requests', async (req, res) => {
+    try {
+        await ensureRecruitmentRequestsTable();
+
+        const currentUserId = req.user?.id;
+        if (!currentUserId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Chưa đăng nhập'
+            });
+        }
+
+        const query = `
+            SELECT 
+                rr.*,
+                e.ho_ten as manager_name,
+                e.email as manager_email,
+                e.phong_ban as manager_department
+            FROM recruitment_requests rr
+            LEFT JOIN employees e ON rr.manager_id = e.id
+            WHERE rr.manager_id = $1
+            ORDER BY rr.created_at DESC
+        `;
+
+        const result = await pool.query(query, [currentUserId]);
+
+        // Parse JSONB fields
+        const requests = result.rows.map(row => ({
+            ...row,
+            ly_do_tuyen: row.ly_do_tuyen ? (typeof row.ly_do_tuyen === 'string' ? JSON.parse(row.ly_do_tuyen) : row.ly_do_tuyen) : null,
+            tieu_chuan_tuyen_chon: row.tieu_chuan_tuyen_chon ? (typeof row.tieu_chuan_tuyen_chon === 'string' ? JSON.parse(row.tieu_chuan_tuyen_chon) : row.tieu_chuan_tuyen_chon) : null
+        }));
+
+        res.json({
+            success: true,
+            data: requests
+        });
+    } catch (error) {
+        console.error('Error fetching my recruitment requests:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách yêu cầu tuyển dụng: ' + error.message
+        });
+    }
+});
+
 // GET /api/candidates/recruitment-requests/:id - Get recruitment request details
 router.get('/recruitment-requests/:id', async (req, res) => {
     try {
@@ -3250,7 +3533,7 @@ router.put('/recruitment-requests/:id/status', async (req, res) => {
         const { id } = req.params;
         const { status, notes } = req.body;
 
-        if (!status || !['PENDING', 'APPROVED', 'REJECTED', 'IN_PROGRESS', 'COMPLETED'].includes(status)) {
+        if (!status || !['PENDING', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'].includes(status)) {
             return res.status(400).json({
                 success: false,
                 message: 'Trạng thái không hợp lệ'
@@ -3283,6 +3566,49 @@ router.put('/recruitment-requests/:id/status', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Lỗi khi cập nhật trạng thái: ' + error.message
+        });
+    }
+});
+
+// DELETE /api/candidates/recruitment-requests/:id - Delete recruitment request (when rejected)
+router.delete('/recruitment-requests/:id', async (req, res) => {
+    try {
+        await ensureRecruitmentRequestsTable();
+
+        const { id } = req.params;
+
+        // Check if request exists
+        const checkQuery = `
+            SELECT id FROM recruitment_requests WHERE id = $1
+        `;
+        const checkResult = await pool.query(checkQuery, [id]);
+
+        if (checkResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy yêu cầu tuyển dụng'
+            });
+        }
+
+        // Delete the request
+        const deleteQuery = `
+            DELETE FROM recruitment_requests
+            WHERE id = $1
+            RETURNING id
+        `;
+
+        const result = await pool.query(deleteQuery, [id]);
+
+        res.json({
+            success: true,
+            message: 'Đã xóa yêu cầu tuyển dụng',
+            data: { id: result.rows[0].id }
+        });
+    } catch (error) {
+        console.error('Error deleting recruitment request:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi xóa yêu cầu tuyển dụng: ' + error.message
         });
     }
 });
@@ -3400,7 +3726,7 @@ router.get('/departments', async (req, res) => {
             ORDER BY phong_ban ASC
         `;
         const result = await pool.query(query);
-        
+
         // Lọc bỏ các giá trị code cũ (enum values - chứa dấu gạch dưới và chữ in hoa)
         // Ví dụ: TAPVU_NAUAN, HANHCHINH
         const departments = result.rows
@@ -3408,22 +3734,22 @@ router.get('/departments', async (req, res) => {
             .filter(dept => {
                 // Loại bỏ các giá trị code enum (chứa dấu gạch dưới và toàn chữ in hoa hoặc chữ in hoa + số)
                 if (!dept || dept.trim() === '') return false;
-                
+
                 // Loại bỏ các giá trị code enum cụ thể đã biết
-                const excludedCodes = ['TAPVU_NAUAN', 'HANHCHINH', 'MUAHANG', 'HAN_BOMACH', 
-                    'CHATLUONG', 'KHAOSAT_THIETKE', 'ADMIN_DUAN', 'LAPRAP', 
+                const excludedCodes = ['TAPVU_NAUAN', 'HANHCHINH', 'MUAHANG', 'HAN_BOMACH',
+                    'CHATLUONG', 'KHAOSAT_THIETKE', 'ADMIN_DUAN', 'LAPRAP',
                     'LAPRAP_JIG_PALLET', 'DIEN_LAPTRINH_PLC', 'THIETKE_MAY_TUDONG',
                     'VANHANH_MAY_CNC', 'DICHVU_KYTHUAT', 'KETOAN_NOIBO', 'KETOAN_BANHANG'];
-                
+
                 if (excludedCodes.includes(dept.toUpperCase())) {
                     return false;
                 }
-                
+
                 // Nếu có dấu gạch dưới và toàn chữ in hoa/số, thì là code enum cũ
                 if (dept.includes('_') && /^[A-Z0-9_]+$/.test(dept)) {
                     return false;
                 }
-                
+
                 // Loại bỏ các giá trị chỉ có chữ in hoa không có khoảng trắng (có thể là code)
                 // Ví dụ: HANHCHINH, DVĐT (nhưng DVĐT có thể hợp lệ, nên kiểm tra kỹ hơn)
                 const deptUpper = dept.toUpperCase();
@@ -3431,10 +3757,10 @@ router.get('/departments', async (req, res) => {
                     // Loại bỏ các giá trị toàn chữ in hoa và số, không có ký tự đặc biệt Việt Nam
                     return false;
                 }
-                
+
                 return true;
             });
-        
+
         res.json({
             success: true,
             data: departments
@@ -3466,7 +3792,7 @@ router.get('/positions', async (req, res) => {
             ORDER BY vi_tri_ung_tuyen ASC
         `;
         const result = await pool.query(query);
-        
+
         // Lọc bỏ các giá trị code cũ (enum values - chứa dấu gạch dưới và chữ in hoa)
         // Ví dụ: TAPVU_NAUAN
         const positions = result.rows
@@ -3480,7 +3806,7 @@ router.get('/positions', async (req, res) => {
                 }
                 return true;
             });
-        
+
         res.json({
             success: true,
             data: positions
@@ -3500,7 +3826,7 @@ router.get('/positions', async (req, res) => {
 router.get('/cv/:id', async (req, res) => {
     try {
         const candidateId = parseInt(req.params.id, 10);
-        
+
         if (isNaN(candidateId) || candidateId <= 0) {
             return res.status(400).json({
                 success: false,
@@ -3533,8 +3859,8 @@ router.get('/cv/:id', async (req, res) => {
         }
 
         // Kiểm tra file có tồn tại không
-        const fullPath = path.isAbsolute(cvFilePath) 
-            ? cvFilePath 
+        const fullPath = path.isAbsolute(cvFilePath)
+            ? cvFilePath
             : path.join(__dirname, '..', cvFilePath);
 
         if (!fs.existsSync(fullPath)) {
@@ -3562,7 +3888,7 @@ router.get('/cv/:id', async (req, res) => {
         // Trả về file
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(downloadFileName)}"`);
-        
+
         // Stream file về client
         const fileStream = fs.createReadStream(fullPath);
         fileStream.pipe(res);
@@ -3593,7 +3919,7 @@ router.get('/export-template', async (req, res) => {
     try {
         // Tạo workbook mới
         const workbook = XLSX.utils.book_new();
-        
+
         // Định nghĩa các cột với tên tiếng Việt
         const headers = [
             'Họ tên*',
@@ -3625,7 +3951,7 @@ router.get('/export-template', async (req, res) => {
 
         // Tạo worksheet với headers
         const worksheet = XLSX.utils.aoa_to_sheet([headers]);
-        
+
         // Đặt độ rộng cột
         const colWidths = [
             { wch: 25 }, // Họ tên
@@ -3719,11 +4045,91 @@ router.post('/bulk-import', uploadExcel.single('file'), async (req, res) => {
             });
         }
 
-        // Đọc file Excel
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        // Hàm helper để chuyển đổi Excel serial date hoặc string date sang YYYY-MM-DD
+        const parseDateValue = (value) => {
+            if (!value || value === '') return null;
+
+            // Nếu là số (Excel serial date)
+            if (typeof value === 'number') {
+                // Excel epoch: 1899-12-30 (Excel tính từ 1900-01-01 nhưng có bug với năm 1900)
+                const excelEpoch = new Date(1899, 11, 30);
+                const date = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000);
+
+                if (!isNaN(date.getTime())) {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                }
+                return null;
+            }
+
+            // Nếu là string, thử parse
+            if (typeof value === 'string') {
+                const trimmed = value.trim();
+                if (!trimmed) return null;
+
+                // Thử parse nếu là số dạng string (Excel serial date dạng text)
+                const numValue = parseFloat(trimmed);
+                if (!isNaN(numValue) && numValue > 0 && numValue < 100000) {
+                    const excelEpoch = new Date(1899, 11, 30);
+                    const date = new Date(excelEpoch.getTime() + numValue * 24 * 60 * 60 * 1000);
+
+                    if (!isNaN(date.getTime())) {
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        return `${year}-${month}-${day}`;
+                    }
+                }
+
+                // Thử parse định dạng dd/mm/yyyy hoặc dd-mm-yyyy
+                const parts = trimmed.split(/[/-]/);
+                if (parts.length === 3) {
+                    const day = parseInt(parts[0], 10);
+                    const month = parseInt(parts[1], 10);
+                    const year = parseInt(parts[2], 10);
+
+                    if (!isNaN(day) && !isNaN(month) && !isNaN(year) &&
+                        day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+                        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    }
+                }
+
+                // Thử parse định dạng YYYY-MM-DD
+                const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (isoMatch) {
+                    return trimmed.substring(0, 10);
+                }
+
+                // Thử parse với Date object
+                const date = new Date(trimmed);
+                if (!isNaN(date.getTime())) {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                }
+            }
+
+            // Nếu là Date object
+            if (value instanceof Date) {
+                if (!isNaN(value.getTime())) {
+                    const year = value.getFullYear();
+                    const month = String(value.getMonth() + 1).padStart(2, '0');
+                    const day = String(value.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                }
+            }
+
+            return null;
+        };
+
+        // Đọc file Excel với raw: false để lấy formatted values
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+        const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', raw: false, dateNF: 'yyyy-mm-dd' });
 
         if (data.length < 2) {
             return res.status(400).json({
@@ -3734,7 +4140,7 @@ router.post('/bulk-import', uploadExcel.single('file'), async (req, res) => {
 
         // Lấy header (dòng đầu tiên)
         const headers = data[0].map(h => String(h).trim());
-        
+
         // Map header tiếng Việt sang tên field
         const headerMap = {
             'Họ tên*': 'hoTen',
@@ -3782,7 +4188,7 @@ router.post('/bulk-import', uploadExcel.single('file'), async (req, res) => {
         // Xử lý từng dòng (bỏ qua dòng đầu tiên - header)
         for (let i = 1; i < data.length; i++) {
             const row = data[i];
-            
+
             // Bỏ qua dòng trống
             if (!row || row.every(cell => !cell || String(cell).trim() === '')) {
                 continue;
@@ -3791,11 +4197,23 @@ router.post('/bulk-import', uploadExcel.single('file'), async (req, res) => {
             try {
                 // Map dữ liệu từ row sang object
                 const candidateData = {};
+                // Danh sách các trường ngày tháng
+                const dateFields = ['ngaySinh', 'ngayCapCCCD', 'ngayGuiCV'];
+
                 Object.keys(columnMap).forEach(colIndex => {
                     const fieldName = columnMap[colIndex];
                     const value = row[parseInt(colIndex)];
+
                     if (value !== undefined && value !== null && String(value).trim() !== '') {
-                        candidateData[fieldName] = String(value).trim();
+                        // Xử lý đặc biệt cho các trường ngày tháng
+                        if (dateFields.includes(fieldName)) {
+                            const parsedDate = parseDateValue(value);
+                            if (parsedDate) {
+                                candidateData[fieldName] = parsedDate;
+                            }
+                        } else {
+                            candidateData[fieldName] = String(value).trim();
+                        }
                     }
                 });
 

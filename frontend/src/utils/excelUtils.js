@@ -40,17 +40,23 @@ export const exportEmployeeTemplate = () => {
   // Create workbook and worksheet
   const wb = XLSX.utils.book_new();
 
-  // Define headers
+  // Define headers - khớp với file Excel
   const headers = [
     'Mã Nhân Viên',
+    'Mã Chấm Công',
     'Họ Và Tên',
     'Chi Nhánh',
     'Phòng Ban',
     'Bộ Phận',
     'Chức Danh',
     'Ngày Nhận Việc',
+    'Loại Hợp Đồng',
+    'Địa điểm',
+    'Tính Thuế',
+    'Cấp Bậc',
     'Quản Lý Trực Tiếp',
     'Quản Lý Gián Tiếp',
+    'Email',
   ];
 
   // Create worksheet with headers
@@ -59,14 +65,20 @@ export const exportEmployeeTemplate = () => {
   // Set column widths
   ws['!cols'] = [
     { wch: 14 }, // Mã Nhân Viên
+    { wch: 16 }, // Mã Chấm Công
     { wch: 26 }, // Họ Và Tên
     { wch: 20 }, // Chi Nhánh
     { wch: 20 }, // Phòng Ban
     { wch: 22 }, // Bộ Phận
     { wch: 20 }, // Chức Danh
     { wch: 18 }, // Ngày Nhận Việc
+    { wch: 18 }, // Loại Hợp Đồng
+    { wch: 18 }, // Địa điểm
+    { wch: 14 }, // Tính Thuế
+    { wch: 16 }, // Cấp Bậc
     { wch: 24 }, // Quản Lý Trực Tiếp
     { wch: 24 }, // Quản Lý Gián Tiếp
+    { wch: 25 }, // Email
   ];
 
   // Add worksheet to workbook
@@ -89,27 +101,38 @@ export const exportEmployeesToExcel = (employees) => {
   // Define headers
   const headers = [
     'Mã Nhân Viên',
+    'Mã Chấm Công',
     'Họ Và Tên',
     'Chi Nhánh',
     'Phòng Ban',
     'Bộ Phận',
     'Chức Danh',
     'Ngày Nhận Việc',
+    'Loại Hợp Đồng',
+    'Địa điểm',
+    'Tính Thuế',
+    'Cấp Bậc',
     'Quản Lý Trực Tiếp',
     'Quản Lý Gián Tiếp',
   ];
 
-  // Convert employees to rows
+  // Convert employees to rows - khớp với headers
   const rows = employees.map(emp => [
     emp.ma_nhan_vien || '',
+    emp.ma_cham_cong || '',
     emp.ho_ten || '',
     emp.chi_nhanh || emp.chiNhanh || '',
     emp.phong_ban || '',
     emp.bo_phan || '',
     emp.chuc_danh || '',
     emp.ngay_gia_nhap ? new Date(emp.ngay_gia_nhap).toLocaleDateString('vi-VN') : '',
+    emp.loai_hop_dong || '',
+    emp.dia_diem || '',
+    emp.tinh_thue || '',
+    emp.cap_bac || '',
     emp.quan_ly_truc_tiep || emp.quanLyTrucTiep || '',
     emp.quan_ly_gian_tiep || emp.quanLyGianTiep || '',
+    emp.email || '',
   ]);
 
   // Combine headers and rows
@@ -121,12 +144,17 @@ export const exportEmployeesToExcel = (employees) => {
   // Set column widths
   ws['!cols'] = [
     { wch: 14 }, // Mã Nhân Viên
+    { wch: 16 }, // Mã Chấm Công
     { wch: 26 }, // Họ Và Tên
     { wch: 20 }, // Chi Nhánh
     { wch: 20 }, // Phòng Ban
     { wch: 22 }, // Bộ Phận
     { wch: 20 }, // Chức Danh
     { wch: 18 }, // Ngày Nhận Việc
+    { wch: 18 }, // Loại Hợp Đồng
+    { wch: 18 }, // Địa điểm
+    { wch: 14 }, // Tính Thuế
+    { wch: 16 }, // Cấp Bậc
     { wch: 24 }, // Quản Lý Trực Tiếp
     { wch: 24 }, // Quản Lý Gián Tiếp
   ];
@@ -179,17 +207,24 @@ export const parseExcelFile = (file) => {
         }
 
         console.log('Headers found in Excel:', headers);
+        console.log('Total rows in Excel:', jsonData.length);
 
         const defaultOrder = [
           'maNhanVien',
+          'maChamCong',
           'hoTen',
           'chiNhanh',
           'phongBan',
           'boPhan',
           'chucDanh',
           'ngayGiaNhap',
+          'loaiHopDong',
+          'diaDiem',
+          'tinhThue',
+          'capBac',
           'quanLyTrucTiep',
-          'quanLyGianTiep'
+          'quanLyGianTiep',
+          'email'
         ];
         const codePattern = /^[A-Za-z]{2,}\d+$/;
 
@@ -198,6 +233,9 @@ export const parseExcelFile = (file) => {
           'mã nv': 'maNhanVien',
           'mã nhân viên': 'maNhanVien',
           'manv': 'maNhanVien',
+          'mã chấm công': 'maChamCong',
+          'ma cham cong': 'maChamCong',
+          'machamcong': 'maChamCong',
           'họ tên': 'hoTen',
           'họ và tên': 'hoTen',
           'ho va ten': 'hoTen',
@@ -208,8 +246,6 @@ export const parseExcelFile = (file) => {
           'chi nhánh': 'chiNhanh',
           'chi nhanh': 'chiNhanh',
           'chinhanh': 'chiNhanh',
-          'địa điểm': 'chiNhanh',
-          'dia diem': 'chiNhanh',
           'phòng ban': 'phongBan',
           'phongban': 'phongBan',
           'phòng': 'phongBan',
@@ -222,6 +258,18 @@ export const parseExcelFile = (file) => {
           'ngayvaolam': 'ngayGiaNhap',
           'ngày nhận việc': 'ngayGiaNhap',
           'ngay nhan viec': 'ngayGiaNhap',
+          'loại hợp đồng': 'loaiHopDong',
+          'loai hop dong': 'loaiHopDong',
+          'loaihopdong': 'loaiHopDong',
+          'địa điểm': 'diaDiem',
+          'dia diem': 'diaDiem',
+          'diadiem': 'diaDiem',
+          'tính thuế': 'tinhThue',
+          'tinh thue': 'tinhThue',
+          'tinhthue': 'tinhThue',
+          'cấp bậc': 'capBac',
+          'cap bac': 'capBac',
+          'capbac': 'capBac',
           'quản lý trực tiếp': 'quanLyTrucTiep',
           'quan ly truc tiep': 'quanLyTrucTiep',
           'quanlytructiep': 'quanLyTrucTiep',
@@ -230,18 +278,29 @@ export const parseExcelFile = (file) => {
           'quan ly gian tiep': 'quanLyGianTiep',
           'quanlygiantep': 'quanLyGianTiep',
           'qly gian tiep': 'quanLyGianTiep',
+          'email': 'email',
+          'e-mail': 'email',
         };
 
         const fieldIndexes = {};
+        const unmappedHeaders = [];
+
         headers.forEach((header, index) => {
           const headerLower = header.toLowerCase().trim();
           const fieldName = headerMap[headerLower];
           if (fieldName) {
             fieldIndexes[fieldName] = index;
+          } else if (header && header.trim() !== '') {
+            unmappedHeaders.push({ index, header, headerLower });
           }
         });
 
         console.log('Mapped fields:', fieldIndexes);
+        console.log('Field indexes detail:', Object.entries(fieldIndexes).map(([field, idx]) => `${field}: column ${idx} (${headers[idx]})`));
+
+        if (unmappedHeaders.length > 0) {
+          console.warn('⚠️ Unmapped headers (sẽ bị bỏ qua):', unmappedHeaders.map(h => `Column ${h.index}: "${h.header}" (${h.headerLower})`));
+        }
 
         const requiredFields = ['hoTen', 'phongBan'];
         let startRow = 1;
@@ -348,16 +407,34 @@ export const parseExcelFile = (file) => {
             }
           });
 
-          if (employee.hoTen) {
-            employee.hoTen = employee.hoTen.trim();
-          }
-          if (employee.phongBan) {
-            employee.phongBan = employee.phongBan.trim();
+          // Trim string values
+          Object.keys(employee).forEach(key => {
+            if (typeof employee[key] === 'string') {
+              employee[key] = employee[key].trim();
+            }
+          });
+
+          // Debug first few employees
+          if (employees.length < 3) {
+            console.log(`Parsed employee ${employees.length + 1}:`, {
+              hoTen: employee.hoTen,
+              phongBan: employee.phongBan,
+              maNhanVien: employee.maNhanVien,
+              allFields: employee
+            });
           }
 
-          if (employee.hoTen && employee.phongBan) {
-            employees.push(employee);
+          // Validate required fields
+          if (!employee.hoTen || !employee.hoTen.trim()) {
+            console.warn(`Row ${i + 1}: Missing hoTen`, employee);
+            continue;
           }
+          if (!employee.phongBan || !employee.phongBan.trim()) {
+            console.warn(`Row ${i + 1}: Missing phongBan`, employee);
+            continue;
+          }
+
+          employees.push(employee);
         }
 
         if (employees.length === 0) {

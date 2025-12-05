@@ -71,8 +71,15 @@ export const employeesAPI = {
   },
   bulkCreate: (employees) => api.post('/employees/bulk', { employees }),
   getDepartments: () => api.get('/employees/departments'),
+  getBoPhan: () => api.get('/employees/bo-phan'),
   getJobTitles: () => api.get('/employees/job-titles'),
+  getBranches: () => api.get('/employees/branches'),
+  getContractTypes: () => api.get('/employees/contract-types'),
+  getLocations: () => api.get('/employees/locations'),
+  getTaxStatuses: () => api.get('/employees/tax-statuses'),
+  getRanks: () => api.get('/employees/ranks'),
   getManagers: () => api.get('/employees/managers'),
+  getIndirectManagers: () => api.get('/employees/indirect-managers'),
 };
 
 // Equipment API
@@ -112,11 +119,8 @@ export const requestsAPI = {
 // Leave Requests API
 export const leaveRequestsAPI = {
   create: (data) => api.post('/leave-requests', data),
-  getManagers: (params) => api.get('/leave-requests/managers', { params }),
   getAll: (params) => api.get('/leave-requests', { params }),
   decide: (id, data) => api.post(`/leave-requests/${id}/decision`, data),
-  escalate: (id, data) => api.post(`/leave-requests/${id}/escalate`, data),
-  processOverdue: () => api.post('/leave-requests/overdue/process'),
   remove: (id, data) => api.delete(`/leave-requests/${id}`, { data }),
 };
 
@@ -143,6 +147,7 @@ export const travelExpensesAPI = {
   getAll: (params) => api.get('/travel-expenses', { params }),
   getById: (id) => api.get(`/travel-expenses/${id}`),
   decide: (id, data) => api.post(`/travel-expenses/${id}/decision`, data),
+  approveBudget: (id, data) => api.post(`/travel-expenses/${id}/budget`, data),
 };
 
 // Candidates API
@@ -174,11 +179,15 @@ export const candidatesAPI = {
   generateJobOfferPDFFromForm: (data) => {
     return api.post('/candidates/generate-job-offer-pdf', data, { responseType: 'blob' });
   },
+  getProbationCandidates: () => api.get('/candidates/probation'),
+  evaluateProbation: (id, data) => api.put(`/candidates/${id}/probation-evaluation`, data),
   // Recruitment Requests API
   createRecruitmentRequest: (data) => api.post('/candidates/recruitment-requests', data),
   getAllRecruitmentRequests: (params) => api.get('/candidates/recruitment-requests', { params }),
+  getMyRecruitmentRequests: () => api.get('/candidates/recruitment-requests/my-requests'),
   getRecruitmentRequestById: (id) => api.get(`/candidates/recruitment-requests/${id}`),
   updateRecruitmentRequestStatus: (id, data) => api.put(`/candidates/recruitment-requests/${id}/status`, data),
+  deleteRecruitmentRequest: (id) => api.delete(`/candidates/recruitment-requests/${id}`),
   // Candidate metadata API
   getDepartments: () => api.get('/candidates/departments'),
   getPositions: () => api.get('/candidates/positions'),

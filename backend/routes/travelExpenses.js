@@ -33,6 +33,11 @@ const ensureTable = async () => {
             finance_decision VARCHAR(20),
             finance_notes TEXT,
             finance_decision_at TIMESTAMP WITHOUT TIME ZONE,
+            approved_budget_amount NUMERIC(12, 2),
+            approved_budget_currency VARCHAR(10),
+            approved_budget_exchange_rate NUMERIC(10, 4),
+            budget_approved_at TIMESTAMP WITHOUT TIME ZONE,
+            budget_approved_by INTEGER,
             created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
@@ -49,6 +54,29 @@ const ensureTable = async () => {
     await pool.query(createTableQuery);
     await pool.query(createStatusIndex);
     await pool.query(createEmployeeIndex);
+
+    // Add budget fields if they don't exist (for existing databases)
+    const addBudgetFields = `
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='approved_budget_amount') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN approved_budget_amount NUMERIC(12, 2);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='approved_budget_currency') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN approved_budget_currency VARCHAR(10);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='approved_budget_exchange_rate') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN approved_budget_exchange_rate NUMERIC(10, 4);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='budget_approved_at') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN budget_approved_at TIMESTAMP WITHOUT TIME ZONE;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='budget_approved_by') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN budget_approved_by INTEGER;
+            END IF;
+        END $$;
+    `;
+    await pool.query(addBudgetFields);
 };
 
 ensureTable().catch((error) => {
@@ -177,6 +205,8 @@ const mapRowToResponse = (row) => {
     return {
         id: row.id,
         employeeId: row.employee_id,
+        employee_name: row.employee_name || null,
+        employee_branch: row.employee_branch || null,
         title: row.title,
         purpose: row.purpose,
         location: row.location,
@@ -189,6 +219,13 @@ const mapRowToResponse = (row) => {
         currentStep: row.current_step,
         estimatedCost: row.estimated_cost ? Number(row.estimated_cost) : null,
         requestedBy: row.requested_by,
+        approvedBudget: row.approved_budget_amount ? {
+            amount: Number(row.approved_budget_amount),
+            currency: row.approved_budget_currency,
+            exchangeRate: row.approved_budget_exchange_rate ? Number(row.approved_budget_exchange_rate) : null,
+            approvedAt: row.budget_approved_at,
+            approvedBy: row.budget_approved_by,
+        } : null,
         decisions: {
             manager: {
                 actorId: row.manager_id,
@@ -223,27 +260,55 @@ router.get('/', async (req, res) => {
 
         if (employeeId) {
             params.push(employeeId);
-            conditions.push(`employee_id = $${params.length}`);
+            conditions.push(`ter.employee_id = $${params.length}`);
         }
 
+        // Xử lý status filter nếu có nhiều status (comma-separated)
         if (status) {
-            params.push(status);
-            conditions.push(`status = $${params.length}`);
+            const statusList = status.split(',').map(s => s.trim());
+            if (statusList.length > 1) {
+                params.push(statusList);
+                conditions.push(`ter.status = ANY($${params.length}::text[])`);
+            } else {
+                params.push(status);
+                conditions.push(`ter.status = $${params.length}`);
+            }
         }
 
         const query = `
-            SELECT *
-            FROM travel_expense_requests
+            SELECT 
+                ter.*,
+                e.ho_ten as employee_name,
+                e.chi_nhanh as employee_branch
+            FROM travel_expense_requests ter
+            LEFT JOIN employees e ON ter.employee_id = e.id
             ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
-            ORDER BY created_at DESC
+            ORDER BY ter.created_at DESC
         `;
 
         const result = await pool.query(query, params);
 
+        // Tự động sửa location_type nếu phát hiện sai
+        const correctedRows = result.rows.map(row => {
+            // Nếu location_type là INTERNATIONAL nhưng location là địa điểm Việt Nam
+            if (row.location_type === 'INTERNATIONAL') {
+                const detectedType = detectLocationTypeFromText(row.location);
+                if (detectedType === 'DOMESTIC') {
+                    // Tự động sửa trong database
+                    pool.query(
+                        'UPDATE travel_expense_requests SET location_type = $1 WHERE id = $2',
+                        ['DOMESTIC', row.id]
+                    ).catch(err => console.error('Error auto-fixing location_type:', err));
+                    row.location_type = 'DOMESTIC';
+                }
+            }
+            return row;
+        });
+
         res.json({
             success: true,
             message: 'Danh sách yêu cầu chi phí công tác',
-            data: result.rows.map(mapRowToResponse),
+            data: correctedRows.map(mapRowToResponse),
         });
     } catch (error) {
         console.error('Error fetching travel expenses:', error);
@@ -257,7 +322,15 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('SELECT * FROM travel_expense_requests WHERE id = $1', [id]);
+        const result = await pool.query(`
+            SELECT 
+                ter.*,
+                e.ho_ten as employee_name,
+                e.chi_nhanh as employee_branch
+            FROM travel_expense_requests ter
+            LEFT JOIN employees e ON ter.employee_id = e.id
+            WHERE ter.id = $1
+        `, [id]);
 
         if (!result.rows.length) {
             return res.status(404).json({
@@ -580,6 +653,118 @@ router.post('/:id/decision', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Lỗi khi cập nhật phê duyệt chi phí công tác: ' + error.message,
+        });
+    } finally {
+        client.release();
+    }
+});
+
+// POST /api/travel-expenses/:id/budget - HR cấp ngân sách
+router.post('/:id/budget', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const { budgetAmount, currencyType, exchangeRate, approvedBy } = req.body;
+
+        if (!budgetAmount || !currencyType) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu thông tin bắt buộc (budgetAmount, currencyType)',
+            });
+        }
+
+        const budgetAmountNum = parseFloat(budgetAmount);
+        const exchangeRateNum = exchangeRate ? parseFloat(exchangeRate) : 1;
+
+        if (isNaN(budgetAmountNum) || budgetAmountNum <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Số tiền ngân sách không hợp lệ',
+            });
+        }
+
+        if (isNaN(exchangeRateNum) || exchangeRateNum <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Tỷ giá không hợp lệ',
+            });
+        }
+
+        await client.query('BEGIN');
+
+        // Check if request exists and is in correct status
+        const requestResult = await client.query(
+            'SELECT * FROM travel_expense_requests WHERE id = $1 FOR UPDATE',
+            [id]
+        );
+
+        if (!requestResult.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy yêu cầu chi phí công tác',
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Only allow budget approval if request is approved by manager/CEO
+        if (!['PENDING_FINANCE', 'PENDING_LEVEL_1', 'PENDING_LEVEL_2', 'PENDING_CEO'].includes(request.status)) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Yêu cầu không ở trạng thái phù hợp để cấp ngân sách',
+            });
+        }
+
+        const timestamp = new Date().toISOString();
+
+        // Update budget fields and status
+        const updateQuery = `
+            UPDATE travel_expense_requests
+            SET 
+                approved_budget_amount = $1,
+                approved_budget_currency = $2,
+                approved_budget_exchange_rate = $3,
+                budget_approved_at = $4,
+                budget_approved_by = $5,
+                status = CASE 
+                    WHEN status = 'PENDING_CEO' THEN 'PENDING_FINANCE'
+                    WHEN status IN ('PENDING_LEVEL_1', 'PENDING_LEVEL_2') THEN 'PENDING_FINANCE'
+                    ELSE status
+                END,
+                current_step = CASE 
+                    WHEN current_step = 'CEO' THEN 'FINANCE'
+                    WHEN current_step IN ('LEVEL_1', 'LEVEL_2') THEN 'FINANCE'
+                    ELSE current_step
+                END,
+                updated_at = $4
+            WHERE id = $6
+            RETURNING *
+        `;
+
+        const updateResult = await client.query(updateQuery, [
+            budgetAmountNum,
+            currencyType.toUpperCase(),
+            exchangeRateNum,
+            timestamp,
+            approvedBy || null,
+            id
+        ]);
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Đã cấp ngân sách thành công',
+            data: mapRowToResponse(updateResult.rows[0]),
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error approving budget:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi cấp ngân sách: ' + error.message,
         });
     } finally {
         client.release();

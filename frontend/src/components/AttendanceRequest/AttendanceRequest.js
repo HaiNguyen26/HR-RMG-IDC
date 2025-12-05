@@ -5,35 +5,41 @@ import { formatDateToISO, parseISODateString, today } from '../../utils/dateUtil
 import { DATE_PICKER_LOCALE } from '../../utils/datepickerLocale';
 import './AttendanceRequest.css';
 
-const ATTENDANCE_TYPE_OPTIONS = [
+const ATTENDANCE_ITEMS = [
   {
-    value: 'CHECK_IN',
-    label: 'Quên giờ vào',
-    icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6'
+    id: 1,
+    label: 'Quên Chấm Công',
+    type: 'FORGOT_CHECK'
   },
   {
-    value: 'CHECK_OUT',
-    label: 'Quên giờ ra',
-    icon: 'M11 17l8-8m0 0V3m0 8H7'
+    id: 2,
+    label: 'Đi Công Trình',
+    type: 'CONSTRUCTION_SITE'
   },
   {
-    value: 'BOTH',
-    label: 'Quên cả giờ vào và ra',
-    icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'
+    id: 3,
+    label: 'Làm việc bên ngoài',
+    type: 'OUTSIDE_WORK'
   }
 ];
 
 const AttendanceRequest = ({ currentUser, showToast }) => {
   const [formData, setFormData] = useState({
     date: '',
-    checkType: '',
-    checkInTime: '',
-    checkOutTime: '',
-    reason: ''
+    reason: '',
+    attendanceItems: [] // Danh sách mục cần bổ sung
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [employeeProfile, setEmployeeProfile] = useState(null);
+  const [selectedAttendanceItem, setSelectedAttendanceItem] = useState(null);
+  
+  // State cho từng mục chi tiết
+  const [itemDetails, setItemDetails] = useState({
+    item1: { checkInTime: '', checkOutTime: '', reason: '' }, // Quên Chấm Công
+    item2: { location: '', startTime: '', endTime: '', reason: '' }, // Đi Công Trình
+    item3: { location: '', startTime: '', endTime: '', reason: '' } // Làm việc bên ngoài
+  });
 
   // Fetch employee profile to get manager info
   useEffect(() => {
@@ -115,22 +121,18 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
   };
 
   const directManagerName = getValue('quanLyTrucTiep', 'quan_ly_truc_tiep', 'team_lead_name') || 'Chưa cập nhật';
+  
+  // Get employee basic info for read-only fields
+  const employeeCode = getValue('maNhanVien', 'ma_nhan_vien', 'employeeCode') || '';
+  const employeeName = getValue('hoTen', 'ho_ten', 'fullName', 'name') || '';
+  const employeeBranch = getValue('chiNhanh', 'chi_nhanh', 'branch') || '';
+  const employeeDepartment = getValue('phongBan', 'phong_ban', 'department') || '';
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => {
-      const next = { ...prev, [field]: value };
-
-      // Clear time fields when checkType changes
-      if (field === 'checkType') {
-        if (value === 'CHECK_OUT') {
-          next.checkInTime = '';
-        } else if (value === 'CHECK_IN') {
-          next.checkOutTime = '';
-        }
-      }
-
-      return next;
-    });
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
     setError('');
   };
 
@@ -155,29 +157,50 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
     setError('');
 
     // Validation
-    if (!formData.date || !formData.checkType || !formData.reason) {
-      setError('Vui lòng điền đầy đủ thông tin bắt buộc.');
+    if (!formData.date) {
+      setError('Vui lòng chọn ngày cần bổ sung.');
       return;
     }
 
-    if (formData.checkType !== 'CHECK_OUT' && !formData.checkInTime) {
-      setError('Vui lòng nhập giờ vào thực tế.');
+    if (!formData.reason || formData.reason.trim() === '') {
+      setError('Vui lòng nhập lý do.');
       return;
     }
 
-    if (formData.checkType !== 'CHECK_IN' && !formData.checkOutTime) {
-      setError('Vui lòng nhập giờ ra thực tế.');
+    if (!selectedAttendanceItem) {
+      setError('Vui lòng chọn loại bổ sung chấm công.');
       return;
     }
 
-    if (formData.checkType === 'BOTH' && formData.checkInTime && formData.checkOutTime) {
-      const [inHour, inMin] = formData.checkInTime.split(':').map(Number);
-      const [outHour, outMin] = formData.checkOutTime.split(':').map(Number);
-      const inMinutes = inHour * 60 + (inMin || 0);
-      const outMinutes = outHour * 60 + (outMin || 0);
+    if (!formData.attendanceItems || formData.attendanceItems.length === 0) {
+      setError('Vui lòng chọn loại bổ sung chấm công.');
+      return;
+    }
 
-      if (outMinutes <= inMinutes) {
-        setError('Giờ ra phải sau giờ vào.');
+    // Chỉ validate cho item đang được chọn (chỉ có 1 item)
+    const selectedItem = formData.attendanceItems[0];
+    if (!selectedItem) {
+      setError('Vui lòng chọn loại bổ sung chấm công.');
+      return;
+    }
+
+    // Validate chi tiết của item được chọn
+    if (selectedItem.id === 1) {
+      // Quên Chấm Công: cần checkInTime và checkOutTime
+      if (!selectedItem.details?.checkInTime || !selectedItem.details?.checkOutTime) {
+        setError('Vui lòng nhập đầy đủ giờ vào và giờ ra cho mục "Quên Chấm Công".');
+        return;
+      }
+    } else if (selectedItem.id === 2) {
+      // Đi Công Trình: cần location, startTime, endTime
+      if (!selectedItem.details?.location || !selectedItem.details?.startTime || !selectedItem.details?.endTime) {
+        setError('Vui lòng nhập đầy đủ thông tin cho mục "Đi Công Trình" (Địa điểm, Giờ bắt đầu, Giờ kết thúc).');
+        return;
+      }
+    } else if (selectedItem.id === 3) {
+      // Làm việc bên ngoài: cần location, startTime, endTime
+      if (!selectedItem.details?.location || !selectedItem.details?.startTime || !selectedItem.details?.endTime) {
+        setError('Vui lòng nhập đầy đủ thông tin cho mục "Làm việc bên ngoài" (Địa điểm, Giờ bắt đầu, Giờ kết thúc).');
         return;
       }
     }
@@ -192,10 +215,13 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
       const payload = {
         employeeId: currentUser.id,
         adjustmentDate: formData.date,
-        checkType: formData.checkType,
-        checkInTime: formData.checkInTime || null,
-        checkOutTime: formData.checkOutTime || null,
-        reason: formData.reason
+        reason: formData.reason,
+        attendanceItems: formData.attendanceItems.map(item => ({
+          id: item.id,
+          type: item.type,
+          label: item.label,
+          details: item.details || {}
+        }))
       };
 
       const response = await attendanceAdjustmentsAPI.create(payload);
@@ -208,10 +234,14 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
         // Reset form
         setFormData({
           date: '',
-          checkType: '',
-          checkInTime: '',
-          checkOutTime: '',
-          reason: ''
+          reason: '',
+          attendanceItems: []
+        });
+        setSelectedAttendanceItem(null);
+        setItemDetails({
+          item1: { checkInTime: '', checkOutTime: '', reason: '' },
+          item2: { location: '', startTime: '', endTime: '', reason: '' },
+          item3: { location: '', startTime: '', endTime: '', reason: '' }
         });
       } else {
         throw new Error(response.data?.message || 'Không thể gửi đơn. Vui lòng thử lại.');
@@ -261,161 +291,392 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
 
           {/* Form Content - 2 Columns */}
           <div className="attendance-form-content">
-            {/* Left Column - Cột 1: Thông tin Ngày/Giờ */}
-            <div className="attendance-form-column">
-              {/* Section I: Thông tin cơ bản */}
+            {/* Left Column - I. Thông tin cơ bản + II. Thông tin Duyệt */}
+            <div className="attendance-form-left-column">
+              {/* I. Thông tin cơ bản */}
               <div className="attendance-form-section">
-                <h3 className="attendance-section-title">I. Thông tin cơ bản</h3>
-
-                {/* Date Field */}
-                <div className="attendance-form-group">
-                  <label className="attendance-form-label">
-                    <svg className="attendance-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
-                    <span>Ngày cần bổ sung *</span>
-                  </label>
-                  <div className="attendance-date-picker-wrapper">
-                    <DatePicker
-                      selected={formData.date ? parseISODateString(formData.date) : null}
-                      onChange={handleDateChange}
-                      minDate={today()}
-                      dateFormat="dd/MM/yyyy"
-                      locale={DATE_PICKER_LOCALE}
-                      placeholderText="Chọn ngày cần bổ sung"
-                      className="attendance-form-datepicker"
-                      required
-                      autoComplete="off"
-                    />
-                    <svg className="attendance-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
+                <h2 className="attendance-section-title">I. Thông tin cơ bản</h2>
+                <div className="attendance-form-fields">
+                  {/* Employee Code and Name - Side by Side */}
+                  <div className="attendance-form-row">
+                    <div className="attendance-form-group">
+                      <label className="attendance-form-label">
+                        <span>Mã Nhân Viên *</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="attendance-form-input attendance-form-input-readonly"
+                        value={employeeCode}
+                        readOnly
+                      />
+                    </div>
+                    <div className="attendance-form-group">
+                      <label className="attendance-form-label">
+                        <span>Họ và Tên</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="attendance-form-input attendance-form-input-readonly"
+                        value={employeeName}
+                        readOnly
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {/* Check Type - Toggle Buttons */}
-                <div className="attendance-form-group">
-                  <label className="attendance-form-label">
-                    <svg className="attendance-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                    </svg>
-                    <span>Mục cần bổ sung *</span>
-                  </label>
-                  <div className="attendance-type-toggle-buttons">
-                    {ATTENDANCE_TYPE_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={`attendance-type-toggle-btn ${formData.checkType === option.value ? 'active' : ''}`}
-                        onClick={() => handleInputChange('checkType', option.value)}
-                      >
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="attendance-type-icon">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={option.icon}></path>
+                  {/* Branch and Department - Side by Side */}
+                  <div className="attendance-form-row">
+                    <div className="attendance-form-group">
+                      <label className="attendance-form-label">
+                        <span>Chi Nhánh</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="attendance-form-input attendance-form-input-readonly"
+                        value={employeeBranch}
+                        readOnly
+                      />
+                    </div>
+                    <div className="attendance-form-group">
+                      <label className="attendance-form-label">
+                        <span>Bộ phận/Phòng ban</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="attendance-form-input attendance-form-input-readonly"
+                        value={employeeDepartment}
+                        readOnly
+                      />
+                    </div>
+                  </div>
+
+                  {/* Date and Loại bổ sung - Side by Side */}
+                  <div className="attendance-form-row">
+                    <div className="attendance-form-group">
+                      <label className="attendance-form-label">
+                        <svg className="attendance-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                         </svg>
-                        <span>{option.label}</span>
-                      </button>
-                    ))}
+                        <span>Ngày cần bổ sung *</span>
+                      </label>
+                      <div className="attendance-date-picker-wrapper">
+                        <DatePicker
+                          selected={formData.date ? parseISODateString(formData.date) : null}
+                          onChange={handleDateChange}
+                          minDate={today()}
+                          dateFormat="dd/MM/yyyy"
+                          locale={DATE_PICKER_LOCALE}
+                          placeholderText="dd/mm/yyyy"
+                          className="attendance-form-datepicker"
+                          required
+                          autoComplete="off"
+                        />
+                        <svg className="attendance-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="attendance-form-group">
+                      <label className="attendance-form-label">
+                        <span>Loại bổ sung *</span>
+                      </label>
+                      <div className="attendance-items-buttons">
+                        {ATTENDANCE_ITEMS.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className={`attendance-item-button ${selectedAttendanceItem === item.id ? 'active' : ''} ${formData.attendanceItems.some(i => i.id === item.id) ? 'filled' : ''}`}
+                            onClick={() => {
+                              // Chỉ cho phép chọn 1 loại tại một thời điểm
+                              if (selectedAttendanceItem === item.id) {
+                                // Nếu đã chọn rồi, có thể bỏ chọn
+                                setSelectedAttendanceItem(null);
+                                setFormData(prev => ({
+                                  ...prev,
+                                  attendanceItems: prev.attendanceItems.filter(i => i.id !== item.id)
+                                }));
+                              } else {
+                                // Chọn loại mới, xóa các loại khác
+                                setSelectedAttendanceItem(item.id);
+                                const itemKey = `item${item.id}`;
+                                const currentDetails = itemDetails[itemKey] || {};
+                                setFormData(prev => ({
+                                  ...prev,
+                                  attendanceItems: [{
+                                    id: item.id,
+                                    type: item.type,
+                                    label: item.label,
+                                    details: currentDetails
+                                  }]
+                                }));
+                              }
+                            }}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Reason Field */}
+                  <div className="attendance-form-group">
+                    <label className="attendance-form-label">
+                      <span>Lý do *</span>
+                    </label>
+                    <textarea
+                      className="attendance-form-textarea"
+                      rows="2"
+                      value={formData.reason || ''}
+                      onChange={(e) => handleInputChange('reason', e.target.value)}
+                      placeholder="Nhập chi tiết lý do cần bổ sung chấm công..."
+                      required
+                    />
                   </div>
                 </div>
+              </div>
 
-                {/* Time Fields - Progressive Disclosure */}
-                {(formData.checkType === 'CHECK_IN' || formData.checkType === 'BOTH') && (
+              {/* II. Thông tin Duyệt */}
+              <div className="attendance-form-section attendance-approver-section">
+                <h2 className="attendance-section-title">II. Thông tin Duyệt</h2>
+                <div className="attendance-form-fields">
+                  {/* Manager Field */}
                   <div className="attendance-form-group">
                     <label className="attendance-form-label">
                       <svg className="attendance-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                       </svg>
-                      <span>Giờ vào thực tế *</span>
+                      <span>Quản lý trực tiếp *</span>
                     </label>
-                    <div className="attendance-time-picker-wrapper">
+                    <div className="attendance-form-input-wrapper">
                       <input
-                        type="time"
-                        className="attendance-form-timepicker"
-                        value={formData.checkInTime}
-                        onChange={handleTimeChange('checkInTime')}
-                        onClick={(e) => e.target.showPicker?.()}
-                        required
+                        type="text"
+                        className="attendance-form-input attendance-form-input-readonly"
+                        value={directManagerName}
+                        readOnly
+                        disabled
                       />
-                      <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                      </svg>
                     </div>
                   </div>
-                )}
-
-                {(formData.checkType === 'CHECK_OUT' || formData.checkType === 'BOTH') && (
-                  <div className="attendance-form-group">
-                    <label className="attendance-form-label">
-                      <svg className="attendance-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                      </svg>
-                      <span>Giờ ra thực tế *</span>
-                    </label>
-                    <div className="attendance-time-picker-wrapper">
-                      <input
-                        type="time"
-                        className="attendance-form-timepicker"
-                        value={formData.checkOutTime}
-                        onChange={handleTimeChange('checkOutTime')}
-                        onClick={(e) => e.target.showPicker?.()}
-                        required
-                      />
-                      <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                      </svg>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             </div>
 
-            {/* Right Column - Cột 2: Thông tin Duyệt/Lý do */}
-            <div className="attendance-form-column">
-              {/* Section II: Thông tin Duyệt */}
-              <div className="attendance-form-section">
-                <h3 className="attendance-section-title">II. Thông tin Duyệt</h3>
+            {/* Right Column - Form chi tiết mục được chọn */}
+            <div className="attendance-form-right-column">
+              {selectedAttendanceItem && (() => {
+                const currentItem = ATTENDANCE_ITEMS.find(item => item.id === selectedAttendanceItem);
+                const itemKey = `item${selectedAttendanceItem}`;
+                const currentDetails = itemDetails[itemKey] || {};
+                const savedItem = formData.attendanceItems.find(item => item.id === selectedAttendanceItem);
+                const displayDetails = savedItem?.details || currentDetails;
 
-                <div className="attendance-form-group">
-                  <label className="attendance-form-label">
-                    <svg className="attendance-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                    </svg>
-                    <span>Quản lý trực tiếp *</span>
-                  </label>
-                  <div className="attendance-form-input-wrapper">
-                    <input
-                      type="text"
-                      className="attendance-form-input attendance-form-input-readonly"
-                      value={directManagerName}
-                      readOnly
-                      disabled
-                    />
+                const handleItemDetailChange = (field, value) => {
+                  setItemDetails(prev => ({
+                    ...prev,
+                    [itemKey]: {
+                      ...prev[itemKey],
+                      [field]: value
+                    }
+                  }));
+
+                  // Auto-save vào attendanceItems
+                  const updatedDetails = {
+                    ...displayDetails,
+                    [field]: value
+                  };
+
+                  const newItem = {
+                    id: currentItem.id,
+                    type: currentItem.type,
+                    label: currentItem.label,
+                    details: updatedDetails
+                  };
+
+                  setFormData(prev => {
+                    // Chỉ giữ lại item đang được chọn, cập nhật details của nó
+                    return {
+                      ...prev,
+                      attendanceItems: [newItem] // Chỉ có 1 item được chọn tại một thời điểm
+                    };
+                  });
+                };
+
+                return (
+                  <div className="attendance-item-detail-form">
+                    <div className="attendance-item-detail-header">
+                      <h3 className="attendance-item-detail-title">{currentItem.label}</h3>
+                      <button
+                        type="button"
+                        className="attendance-item-detail-close"
+                        onClick={() => setSelectedAttendanceItem(null)}
+                      >
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="attendance-item-detail-body">
+                      {selectedAttendanceItem === 1 ? (
+                        /* Mục 1: Quên Chấm Công */
+                        <div className="attendance-item-form">
+                          <div className="attendance-item-form-group">
+                            <label className="attendance-item-form-label">Giờ vào *</label>
+                            <div className="attendance-time-picker-wrapper">
+                              <input
+                                type="time"
+                                className="attendance-form-timepicker"
+                                value={displayDetails.checkInTime || ''}
+                                onChange={(e) => handleItemDetailChange('checkInTime', e.target.value)}
+                                onClick={(e) => e.target.showPicker?.()}
+                              />
+                              <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                              </svg>
+                            </div>
+                          </div>
+                          <div className="attendance-item-form-group">
+                            <label className="attendance-item-form-label">Giờ ra *</label>
+                            <div className="attendance-time-picker-wrapper">
+                              <input
+                                type="time"
+                                className="attendance-form-timepicker"
+                                value={displayDetails.checkOutTime || ''}
+                                onChange={(e) => handleItemDetailChange('checkOutTime', e.target.value)}
+                                onClick={(e) => e.target.showPicker?.()}
+                              />
+                              <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                              </svg>
+                            </div>
+                          </div>
+                          <div className="attendance-item-form-group">
+                            <label className="attendance-item-form-label">Lý do *</label>
+                            <textarea
+                              className="attendance-form-textarea"
+                              rows="3"
+                              value={displayDetails.reason || ''}
+                              onChange={(e) => handleItemDetailChange('reason', e.target.value)}
+                              placeholder="Nhập lý do quên chấm công..."
+                            />
+                          </div>
+                        </div>
+                      ) : selectedAttendanceItem === 2 ? (
+                        /* Mục 2: Đi Công Trình */
+                        <div className="attendance-item-form">
+                          <div className="attendance-item-form-group">
+                            <label className="attendance-item-form-label">Địa điểm công trình *</label>
+                            <input
+                              type="text"
+                              className="attendance-form-input"
+                              value={displayDetails.location || ''}
+                              onChange={(e) => handleItemDetailChange('location', e.target.value)}
+                              placeholder="Nhập địa điểm công trình..."
+                            />
+                          </div>
+                          <div className="attendance-item-form-row">
+                            <div className="attendance-item-form-group">
+                              <label className="attendance-item-form-label">Giờ bắt đầu *</label>
+                              <div className="attendance-time-picker-wrapper">
+                                <input
+                                  type="time"
+                                  className="attendance-form-timepicker"
+                                  value={displayDetails.startTime || ''}
+                                  onChange={(e) => handleItemDetailChange('startTime', e.target.value)}
+                                  onClick={(e) => e.target.showPicker?.()}
+                                />
+                                <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                              </div>
+                            </div>
+                            <div className="attendance-item-form-group">
+                              <label className="attendance-item-form-label">Giờ kết thúc *</label>
+                              <div className="attendance-time-picker-wrapper">
+                                <input
+                                  type="time"
+                                  className="attendance-form-timepicker"
+                                  value={displayDetails.endTime || ''}
+                                  onChange={(e) => handleItemDetailChange('endTime', e.target.value)}
+                                  onClick={(e) => e.target.showPicker?.()}
+                                />
+                                <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="attendance-item-form-group">
+                            <label className="attendance-item-form-label">Lý do *</label>
+                            <textarea
+                              className="attendance-form-textarea"
+                              rows="3"
+                              value={displayDetails.reason || ''}
+                              onChange={(e) => handleItemDetailChange('reason', e.target.value)}
+                              placeholder="Nhập lý do đi công trình..."
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        /* Mục 3: Làm việc bên ngoài */
+                        <div className="attendance-item-form">
+                          <div className="attendance-item-form-group">
+                            <label className="attendance-item-form-label">Địa điểm làm việc *</label>
+                            <input
+                              type="text"
+                              className="attendance-form-input"
+                              value={displayDetails.location || ''}
+                              onChange={(e) => handleItemDetailChange('location', e.target.value)}
+                              placeholder="Nhập địa điểm làm việc bên ngoài..."
+                            />
+                          </div>
+                          <div className="attendance-item-form-row">
+                            <div className="attendance-item-form-group">
+                              <label className="attendance-item-form-label">Giờ bắt đầu *</label>
+                              <div className="attendance-time-picker-wrapper">
+                                <input
+                                  type="time"
+                                  className="attendance-form-timepicker"
+                                  value={displayDetails.startTime || ''}
+                                  onChange={(e) => handleItemDetailChange('startTime', e.target.value)}
+                                  onClick={(e) => e.target.showPicker?.()}
+                                />
+                                <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                              </div>
+                            </div>
+                            <div className="attendance-item-form-group">
+                              <label className="attendance-item-form-label">Giờ kết thúc *</label>
+                              <div className="attendance-time-picker-wrapper">
+                                <input
+                                  type="time"
+                                  className="attendance-form-timepicker"
+                                  value={displayDetails.endTime || ''}
+                                  onChange={(e) => handleItemDetailChange('endTime', e.target.value)}
+                                  onClick={(e) => e.target.showPicker?.()}
+                                />
+                                <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="attendance-item-form-group">
+                            <label className="attendance-item-form-label">Lý do *</label>
+                            <textarea
+                              className="attendance-form-textarea"
+                              rows="3"
+                              value={displayDetails.reason || ''}
+                              onChange={(e) => handleItemDetailChange('reason', e.target.value)}
+                              placeholder="Nhập lý do làm việc bên ngoài..."
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </div>
-
-              {/* Section III: Chi tiết Giờ & Lý do */}
-              <div className="attendance-form-section">
-                <h3 className="attendance-section-title">III. Chi tiết Giờ & Lý do</h3>
-
-                <div className="attendance-form-group">
-                  <label className="attendance-form-label">
-                    <svg className="attendance-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    <span>Lý do bổ sung *</span>
-                  </label>
-                  <div className="attendance-form-textarea-wrapper">
-                    <textarea
-                      className="attendance-form-textarea attendance-form-textarea-large"
-                      value={formData.reason}
-                      onChange={(e) => handleInputChange('reason', e.target.value)}
-                      placeholder="Mô tả lý do quên chấm công, xác nhận của khách hàng, đồng nghiệp..."
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           </div>
 

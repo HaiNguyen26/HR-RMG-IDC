@@ -3,11 +3,12 @@ import Sidebar from './components/Sidebar/Sidebar';
 import Dashboard from './components/Dashboard/Dashboard';
 import EmployeeDashboard from './components/EmployeeDashboard/EmployeeDashboard';
 import EmployeeForm from './components/EmployeeForm/EmployeeForm';
-import EquipmentAssignment from './components/EquipmentAssignment/EquipmentAssignment';
-import RequestsManagement from './components/RequestsManagement/RequestsManagement';
+import EquipmentAssignmentModal from './components/EquipmentAssignment/EquipmentAssignmentModal';
+import RequestsManagementModal from './components/RequestsManagement/RequestsManagementModal';
 import LeaveRequest from './components/LeaveRequest/LeaveRequest';
 import LeaveApprovals from './components/LeaveApprovals/LeaveApprovals';
 import InterviewApprovals from './components/InterviewApprovals/InterviewApprovals';
+import ProbationList from './components/ProbationList/ProbationList';
 import OvertimeRequest from './components/OvertimeRequest/OvertimeRequest';
 import AttendanceRequest from './components/AttendanceRequest/AttendanceRequest';
 import RequestHistory from './components/RequestHistory/RequestHistory';
@@ -35,6 +36,9 @@ function App() {
   const [confirmModal, setConfirmModal] = useState({ isOpen: false });
   const [showIntroOverlay, setShowIntroOverlay] = useState(false);
   const [introUser, setIntroUser] = useState(null);
+  const [isRequestsModalOpen, setIsRequestsModalOpen] = useState(false);
+  const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
+  const [equipmentModalEmployee, setEquipmentModalEmployee] = useState(null);
 
   // Toast management
   const showToast = (message, type = 'info', duration = 3000) => {
@@ -144,8 +148,8 @@ function App() {
 
   const handleUpdateEquipment = (employee) => {
     // Employee đã tồn tại trong database, có trạng thái PENDING
-    setSelectedEmployee(employee);
-    setCurrentView('equipment');
+    setEquipmentModalEmployee(employee);
+    setIsEquipmentModalOpen(true);
   };
 
   const handleEmployeeFormSuccess = (formData) => {
@@ -166,8 +170,8 @@ function App() {
   };
 
   const handleEquipmentComplete = () => {
-    setCurrentView('dashboard');
-    setSelectedEmployee(null);
+    setIsEquipmentModalOpen(false);
+    setEquipmentModalEmployee(null);
     fetchEmployees(); // Refresh employee list (sẽ trigger useEffect trong EmployeeTable để fetch lại equipment)
   };
 
@@ -228,6 +232,13 @@ function App() {
               showConfirm={showConfirm}
             />
           );
+        case 'probation-list':
+          return (
+            <ProbationList
+              currentUser={currentUser}
+              showToast={showToast}
+            />
+          );
         case 'overtime-request':
           return (
             <OvertimeRequest
@@ -277,25 +288,6 @@ function App() {
 
     // Admin/HR view - giao diện quản trị
     switch (currentView) {
-      case 'equipment':
-        if (!selectedEmployee) {
-          return <div>Không tìm thấy thông tin nhân viên</div>;
-        }
-        return (
-          <EquipmentAssignment
-            employee={selectedEmployee}
-            onComplete={handleEquipmentComplete}
-            onCancel={handleCancel}
-            currentUser={currentUser}
-          />
-        );
-      case 'requests':
-        return (
-          <RequestsManagement
-            currentUser={currentUser}
-            showConfirm={showConfirm}
-          />
-        );
       case 'leave-approvals':
         return (
           <LeaveApprovals
@@ -309,6 +301,13 @@ function App() {
           <InterviewApprovals
             currentUser={currentUser}
             showConfirm={showConfirm}
+          />
+        );
+      case 'probation-list':
+        return (
+          <ProbationList
+            currentUser={currentUser}
+            showToast={showToast}
           />
         );
       case 'candidate-management':
@@ -338,6 +337,7 @@ function App() {
             currentUser={currentUser}
             showConfirm={showConfirm}
             onUpdateEquipment={handleUpdateEquipment}
+            onOpenRequestsModal={() => setIsRequestsModalOpen(true)}
           />
         );
     }
@@ -391,6 +391,28 @@ function App() {
           showToast={showToast}
         />
       )}
+
+      {/* Requests Management Modal */}
+      <RequestsManagementModal
+        isOpen={isRequestsModalOpen}
+        onClose={() => setIsRequestsModalOpen(false)}
+        currentUser={currentUser}
+        showToast={showToast}
+        showConfirm={showConfirm}
+      />
+
+      {/* Equipment Assignment Modal */}
+      <EquipmentAssignmentModal
+        isOpen={isEquipmentModalOpen}
+        onClose={() => {
+          setIsEquipmentModalOpen(false);
+          setEquipmentModalEmployee(null);
+        }}
+        employee={equipmentModalEmployee}
+        onComplete={handleEquipmentComplete}
+        currentUser={currentUser}
+        showToast={showToast}
+      />
 
     </div>
   );
