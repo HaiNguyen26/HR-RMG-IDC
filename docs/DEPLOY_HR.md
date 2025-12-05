@@ -31,6 +31,11 @@ Triển khai HR Management System lên server `27.71.16.15` cùng với IT-Reque
 
 Trước khi deploy, **BẮT BUỘC** phải backup database từ local để restore lên server.
 
+⚠️ **QUAN TRỌNG:** 
+- File backup **KHÔNG được commit lên GitHub** (đã được ignore trong `.gitignore`)
+- File backup sẽ được **upload trực tiếp lên server** qua SCP/SFTP
+- Trên server, backup sẽ được restore bằng user `hr_user` (không dùng `postgres`)
+
 ### Windows
 ```bash
 # Chạy script backup
@@ -38,8 +43,7 @@ scripts\backup-hr-database.bat
 ```
 
 **Kết quả:**
-- File backup sẽ được lưu tại: `database\backup_HR_Management_System_MMDDYY_HHMMAM.sql`
-- Ví dụ: `database\backup_HR_Management_System_122025_02040PM.sql`
+- File backup sẽ được lưu tại: `database\backup_HR_Management_System_122025_02200PM.sql`
 - Script sẽ yêu cầu nhập password PostgreSQL (password không hiển thị khi gõ)
 
 ### Linux/Mac
@@ -52,18 +56,17 @@ chmod +x scripts/backup-hr-database.sh
 ```
 
 **Kết quả:**
-- File backup sẽ được lưu tại: `database/backup_HR_Management_System_YYYYMMDD_HHMMSS.sql`
-- Ví dụ: `database/backup_HR_Management_System_20251220_144000.sql`
+- File backup sẽ được lưu tại: `database/backup_HR_Management_System_122025_02200PM.sql`
 
 ### Kiểm tra Backup thành công
 
 Sau khi backup, kiểm tra:
 ```bash
 # Windows
-dir database\backup_HR_Management_System_*.sql
+dir database\backup_HR_Management_System_122025_02200PM.sql
 
 # Linux/Mac
-ls -lh database/backup_HR_Management_System_*.sql
+ls -lh database/backup_HR_Management_System_122025_02200PM.sql
 ```
 
 File backup phải có kích thước > 0 KB. Nếu file = 0 KB hoặc không tồn tại, backup đã thất bại.
@@ -84,34 +87,36 @@ ssh root@27.71.16.15
 
 **Windows PowerShell:**
 ```powershell
-# Tìm file backup mới nhất
-$backupFile = Get-ChildItem -Path "database" -Filter "backup_HR_Management_System_*.sql" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-
-# Upload lên server
-scp $backupFile.FullName root@27.71.16.15:/tmp/
+# Upload file backup lên server
+scp database\backup_HR_Management_System_122025_02200PM.sql root@27.71.16.15:/tmp/
 ```
 
 **Windows Git Bash hoặc Linux/Mac:**
 ```bash
-# Upload file backup mới nhất
-scp database/backup_HR_Management_System_*.sql root@27.71.16.15:/tmp/
-
-# Hoặc upload file cụ thể
-scp database/backup_HR_Management_System_122025_02040PM.sql root@27.71.16.15:/tmp/
+# Upload file backup lên server
+scp database/backup_HR_Management_System_122025_02200PM.sql root@27.71.16.15:/tmp/
 ```
 
 **Lưu ý:** 
 - Lần đầu kết nối SSH sẽ hỏi xác nhận fingerprint, gõ `yes`
 - Cần nhập password SSH của server
 
-### Option 2: Upload qua GitHub (Không khuyến nghị)
+### Option 2: Upload qua GitHub (KHÔNG ĐƯỢC KHUYẾN NGHỊ - KHÔNG DÙNG)
 
-⚠️ **Cảnh báo:** File backup có thể chứa dữ liệu nhạy cảm, không nên commit vào GitHub.
+❌ **KHÔNG NÊN:** File backup chứa dữ liệu nhạy cảm và đã được ignore trong `.gitignore`.
 
-Nếu vẫn muốn dùng cách này:
-1. Tạm thời commit file backup vào repo
-2. Pull trên server
-3. **Xóa file backup khỏi repo ngay sau khi deploy**
+**Lý do không nên:**
+- File backup chứa dữ liệu nhân viên nhạy cảm
+- File backup có thể rất lớn
+- `.gitignore` đã ignore `*.sql` và `backup_*.sql`
+- Upload trực tiếp qua SCP/SFTP an toàn và nhanh hơn
+
+**Nếu bắt buộc phải dùng (KHÔNG KHUYẾN NGHỊ):**
+1. Tạm thời force add: `git add -f database/backup_HR_Management_System_122025_02200PM.sql`
+2. Commit và push
+3. Pull trên server
+4. **Xóa file backup khỏi repo ngay sau khi deploy**
+5. **Xóa file backup khỏi Git history** (nếu cần)
 
 ### Option 3: Upload thủ công qua SFTP
 
@@ -120,14 +125,16 @@ Dùng FileZilla, WinSCP hoặc SFTP client:
 - **User**: `root`
 - **Protocol**: SFTP
 - **Remote path**: `/tmp/`
-- **Local file**: `database/backup_HR_Management_System_*.sql`
+- **Local file**: `database/backup_HR_Management_System_122025_02200PM.sql`
 
 ### Kiểm tra file đã upload
 
 Trên server:
 ```bash
-ls -lh /tmp/backup_HR_Management_System_*.sql
+ls -lh /tmp/backup_HR_Management_System_122025_02200PM.sql
 ```
+
+File phải tồn tại và có kích thước > 0 KB.
 
 ---
 
@@ -197,16 +204,32 @@ sudo -u postgres psql -c "CREATE DATABASE HR_Management_System OWNER hr_user;" 2
 # Cấp quyền owner nếu database đã tồn tại
 sudo -u postgres psql -c "ALTER DATABASE HR_Management_System OWNER TO hr_user;" 2>/dev/null || true
 
-# Restore từ backup (NẾU CÓ) - Làm TRƯỚC khi import schema
-if [ -f /tmp/backup_HR_Management_System_*.sql ]; then
+# Restore từ backup - Làm TRƯỚC khi import schema
+BACKUP_FILE="/tmp/backup_HR_Management_System_122025_02200PM.sql"
+
+if [ -f "$BACKUP_FILE" ]; then
+    echo "Found backup: $BACKUP_FILE"
     echo "Restoring from backup..."
-    PGPASSWORD=Hainguyen261097 psql -h localhost -U hr_user -d HR_Management_System < /tmp/backup_HR_Management_System_*.sql
-    echo "✓ Database restored from backup"
+    
+    # Bước 1: Restore bằng postgres user (vì backup có thể có owner là postgres)
+    sudo -u postgres psql -d HR_Management_System < "$BACKUP_FILE" 2>&1 | grep -v "ERROR:" | grep -v "WARNING:" || true
+    
+    echo "Transferring ownership to hr_user..."
+    
+    # Bước 2: Chuyển ownership sang hr_user
+    if [ -f "database/transfer_ownership_to_hr_user.sql" ]; then
+        sudo -u postgres psql -d HR_Management_System -f database/transfer_ownership_to_hr_user.sql
+    else
+        # Chuyển ownership thủ công
+        sudo -u postgres psql -d HR_Management_System -c "ALTER DATABASE HR_Management_System OWNER TO hr_user;"
+        sudo -u postgres psql -d HR_Management_System -c "ALTER SCHEMA public OWNER TO hr_user;"
+    fi
+    
+    echo "✓ Database restored from backup and ownership transferred to hr_user"
 else
-    echo "No backup found, importing schema..."
-    # Chỉ import schema nếu không có backup
-    PGPASSWORD=Hainguyen261097 psql -h localhost -U hr_user -d HR_Management_System < database/database_schema_postgresql.sql
-    echo "✓ Schema imported"
+    echo "Backup file not found: $BACKUP_FILE"
+    echo "Please upload backup file first!"
+    exit 1
 fi
 
 # Kiểm tra database
@@ -214,8 +237,12 @@ PGPASSWORD=Hainguyen261097 psql -h localhost -U hr_user -d HR_Management_System 
 ```
 
 **Lưu ý:**
-- Nếu restore từ backup, KHÔNG cần import schema nữa (backup đã có đầy đủ)
-- Nếu không có backup, chỉ import schema (database trống)
+- ✅ Backup đã có đầy đủ schema và dữ liệu, KHÔNG cần import schema nữa
+- ✅ **QUAN TRỌNG:** 
+  - Restore backup bằng `postgres` user trước (vì backup có owner là postgres)
+  - Sau đó chuyển ownership tất cả objects sang `hr_user` để app có thể sử dụng
+  - App sẽ kết nối database bằng `hr_user` với password `Hainguyen261097`
+- ✅ File backup được upload trực tiếp từ local lên server qua SCP/SFTP (KHÔNG qua Git)
 
 #### 4.7. Build frontend
 ```bash
@@ -372,33 +399,58 @@ Nếu đã upload backup ở Bước 3, restore sẽ được thực hiện tự
 Nếu cần restore lại database sau khi đã deploy:
 
 ```bash
-# 1. Upload backup lên server (nếu chưa có)
-scp database/backup_HR_Management_System_*.sql root@27.71.16.15:/tmp/
+# 1. Upload backup lên server từ local (nếu chưa có)
+# Từ máy local:
+scp database/backup_HR_Management_System_122025_02200PM.sql root@27.71.16.15:/tmp/
 
 # 2. Trên server - Dừng app tạm thời (optional)
 pm2 stop hr-management-api
 
-# 3. Restore database
-PGPASSWORD=Hainguyen261097 psql -h localhost -U hr_user -d HR_Management_System < /tmp/backup_HR_Management_System_*.sql
+# 3. Restore database (dùng postgres để restore, sau đó chuyển ownership)
+# Bước 3a: Restore bằng postgres user
+sudo -u postgres psql -d HR_Management_System < /tmp/backup_HR_Management_System_122025_02200PM.sql 2>&1 | grep -v "ERROR:" | grep -v "WARNING:" || true
 
-# 4. Kiểm tra restore thành công
+# Bước 3b: Chuyển ownership sang hr_user
+if [ -f "database/transfer_ownership_to_hr_user.sql" ]; then
+    sudo -u postgres psql -d HR_Management_System -f database/transfer_ownership_to_hr_user.sql
+else
+    sudo -u postgres psql -d HR_Management_System -c "ALTER DATABASE HR_Management_System OWNER TO hr_user;"
+    sudo -u postgres psql -d HR_Management_System -c "ALTER SCHEMA public OWNER TO hr_user;"
+fi
+
+# 5. Kiểm tra restore thành công
 PGPASSWORD=Hainguyen261097 psql -h localhost -U hr_user -d HR_Management_System -c "SELECT COUNT(*) FROM employees;"
 
-# 5. Khởi động lại app
+# 6. Khởi động lại app
 pm2 start hr-management-api
 ```
 
+**Lưu ý quan trọng:**
+- ✅ Luôn dùng user `hr_user` để restore (KHÔNG dùng `postgres`)
+- ✅ File backup được upload trực tiếp từ local lên server (KHÔNG qua Git)
+- ✅ File backup KHÔNG được commit lên GitHub
+
 ### Restore từ backup khác
 
-Nếu có nhiều file backup và muốn chọn file cụ thể:
+Nếu cần restore từ file backup khác:
 
 ```bash
-# Liệt kê các file backup
-ls -lh /tmp/backup_HR_Management_System_*.sql
+# Bước 1: Restore bằng postgres user (vì backup có owner là postgres)
+sudo -u postgres psql -d HR_Management_System < /tmp/backup_HR_Management_System_122025_02200PM.sql 2>&1 | grep -v "ERROR:" | grep -v "WARNING:" || true
 
-# Restore file cụ thể
-sudo -u postgres psql -d HR_Management_System < /tmp/backup_HR_Management_System_122025_02040PM.sql
+# Bước 2: Chuyển ownership sang hr_user
+if [ -f "database/transfer_ownership_to_hr_user.sql" ]; then
+    sudo -u postgres psql -d HR_Management_System -f database/transfer_ownership_to_hr_user.sql
+else
+    sudo -u postgres psql -d HR_Management_System -c "ALTER DATABASE HR_Management_System OWNER TO hr_user;"
+    sudo -u postgres psql -d HR_Management_System -c "ALTER SCHEMA public OWNER TO hr_user;"
+fi
 ```
+
+**Lưu ý:** 
+- Restore bằng `postgres` user trước (vì backup có owner là postgres)
+- Sau đó chuyển ownership sang `hr_user` để app có thể sử dụng
+- Thay tên file backup trong lệnh trên nếu dùng file khác
 
 ### Lưu ý khi restore
 
@@ -518,12 +570,14 @@ Nếu gặp vấn đề:
 - [ ] Có quyền truy cập SSH vào server
 
 ### Trong quá trình Deploy
-- [ ] Upload backup database lên server
-- [ ] Clone repository thành công
+- [ ] Upload backup database lên server qua SCP/SFTP (KHÔNG qua Git)
+- [ ] Clone repository thành công (từ GitHub, KHÔNG có file backup)
 - [ ] Install dependencies thành công
-- [ ] Tạo database và restore backup
+- [ ] Tạo user `hr_user` với password `Hainguyen261097`
+- [ ] Tạo database với owner là `hr_user`
+- [ ] Restore backup bằng user `hr_user` (KHÔNG dùng `postgres`)
 - [ ] Build frontend thành công
-- [ ] PM2 process chạy thành công
+- [ ] PM2 process chạy thành công với `hr_user` trong `.env`
 - [ ] Cấu hình Nginx đúng
 
 ### Sau khi Deploy

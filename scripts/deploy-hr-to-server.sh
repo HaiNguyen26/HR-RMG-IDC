@@ -142,8 +142,20 @@ if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
         fi
         if [ -f "$BACKUP_FILE" ]; then
             echo -e "${YELLOW}Restoring database from backup...${NC}"
-            PGPASSWORD="$DB_PASSWORD" psql -h localhost -U "$DB_USER" -d "$DB_NAME" < "$BACKUP_FILE" || sudo -u postgres psql -d "$DB_NAME" < "$BACKUP_FILE"
-            echo -e "${GREEN}✓ Database restored from backup${NC}"
+            # Restore bằng postgres user trước (vì backup có thể có owner là postgres)
+            sudo -u postgres psql -d "$DB_NAME" < "$BACKUP_FILE" 2>&1 | grep -v "ERROR:" | grep -v "WARNING:" || true
+            
+            echo -e "${YELLOW}Transferring ownership to hr_user...${NC}"
+            # Chuyển ownership sang hr_user
+            if [ -f "database/transfer_ownership_to_hr_user.sql" ]; then
+                sudo -u postgres psql -d "$DB_NAME" -f database/transfer_ownership_to_hr_user.sql
+            else
+                # Chuyển ownership thủ công nếu không có script
+                sudo -u postgres psql -d "$DB_NAME" -c "ALTER DATABASE ${DB_NAME} OWNER TO ${DB_USER};"
+                sudo -u postgres psql -d "$DB_NAME" -c "ALTER SCHEMA public OWNER TO ${DB_USER};"
+            fi
+            
+            echo -e "${GREEN}✓ Database restored from backup and ownership transferred${NC}"
         else
             echo -e "${RED}✗ Backup file not found: ${BACKUP_FILE}${NC}"
         fi
@@ -161,7 +173,18 @@ else
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 echo -e "${YELLOW}Restoring database from backup...${NC}"
-                PGPASSWORD="$DB_PASSWORD" psql -h localhost -U "$DB_USER" -d "$DB_NAME" < "$BACKUP_FILE" || sudo -u postgres psql -d "$DB_NAME" < "$BACKUP_FILE"
+                # Restore bằng postgres user trước (vì backup có thể có owner là postgres)
+                sudo -u postgres psql -d "$DB_NAME" < "$BACKUP_FILE" 2>&1 | grep -v "ERROR:" | grep -v "WARNING:" || true
+                
+                echo -e "${YELLOW}Transferring ownership to hr_user...${NC}"
+                # Chuyển ownership sang hr_user
+                if [ -f "database/transfer_ownership_to_hr_user.sql" ]; then
+                    sudo -u postgres psql -d "$DB_NAME" -f database/transfer_ownership_to_hr_user.sql
+                else
+                    sudo -u postgres psql -d "$DB_NAME" -c "ALTER DATABASE ${DB_NAME} OWNER TO ${DB_USER};"
+                    sudo -u postgres psql -d "$DB_NAME" -c "ALTER SCHEMA public OWNER TO ${DB_USER};"
+                fi
+                
                 echo -e "${GREEN}✓ Database created and restored from backup${NC}"
             else
                 # Import schema nếu không restore từ backup
