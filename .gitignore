@@ -33,6 +33,9 @@ backups/
 !scripts/*.sql
 !database/*.sql
 
+# Loại trừ file backup cụ thể (KHÔNG commit)
+database/backup_HR_Management_System_*.sql
+
 # OS
 .DS_Store
 Thumbs.db
