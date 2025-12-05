@@ -260,7 +260,22 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                             </path>
                                         </svg>
                                     </span>
-                                    <span className="nav-label">Xin nghỉ phép / Nghỉ việc</span>
+                                    <span className="nav-label">Xin nghỉ phép</span>
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => onNavigate('resign-request')}
+                                    className={`nav-item ${currentView === 'resign-request' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                                            </path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Xin nghỉ việc</span>
                                 </button>
                             </li>
                             <li>

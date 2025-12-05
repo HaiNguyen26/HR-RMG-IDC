@@ -26,7 +26,6 @@ const ATTENDANCE_ITEMS = [
 const AttendanceRequest = ({ currentUser, showToast }) => {
   const [formData, setFormData] = useState({
     date: '',
-    reason: '',
     attendanceItems: [] // Danh sách mục cần bổ sung
   });
   const [loading, setLoading] = useState(false);
@@ -36,9 +35,9 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
   
   // State cho từng mục chi tiết
   const [itemDetails, setItemDetails] = useState({
-    item1: { checkInTime: '', checkOutTime: '', reason: '' }, // Quên Chấm Công
-    item2: { location: '', startTime: '', endTime: '', reason: '' }, // Đi Công Trình
-    item3: { location: '', startTime: '', endTime: '', reason: '' } // Làm việc bên ngoài
+    item1: { checkInTime: '', checkOutTime: '' }, // Quên Chấm Công
+    item2: { location: '', startTime: '', endTime: '' }, // Đi Công Trình
+    item3: { location: '', startTime: '', endTime: '' } // Làm việc bên ngoài
   });
 
   // Fetch employee profile to get manager info
@@ -162,10 +161,6 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
       return;
     }
 
-    if (!formData.reason || formData.reason.trim() === '') {
-      setError('Vui lòng nhập lý do.');
-      return;
-    }
 
     if (!selectedAttendanceItem) {
       setError('Vui lòng chọn loại bổ sung chấm công.');
@@ -215,7 +210,7 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
       const payload = {
         employeeId: currentUser.id,
         adjustmentDate: formData.date,
-        reason: formData.reason,
+        reason: '', // Không cần lý do cho các loại bổ sung công
         attendanceItems: formData.attendanceItems.map(item => ({
           id: item.id,
           type: item.type,
@@ -239,9 +234,9 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
         });
         setSelectedAttendanceItem(null);
         setItemDetails({
-          item1: { checkInTime: '', checkOutTime: '', reason: '' },
-          item2: { location: '', startTime: '', endTime: '', reason: '' },
-          item3: { location: '', startTime: '', endTime: '', reason: '' }
+          item1: { checkInTime: '', checkOutTime: '' },
+          item2: { location: '', startTime: '', endTime: '' },
+          item3: { location: '', startTime: '', endTime: '' }
         });
       } else {
         throw new Error(response.data?.message || 'Không thể gửi đơn. Vui lòng thử lại.');
@@ -418,20 +413,6 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                     </div>
                   </div>
 
-                  {/* Reason Field */}
-                  <div className="attendance-form-group">
-                    <label className="attendance-form-label">
-                      <span>Lý do *</span>
-                    </label>
-                    <textarea
-                      className="attendance-form-textarea"
-                      rows="2"
-                      value={formData.reason || ''}
-                      onChange={(e) => handleInputChange('reason', e.target.value)}
-                      placeholder="Nhập chi tiết lý do cần bổ sung chấm công..."
-                      required
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -549,16 +530,6 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                               </svg>
                             </div>
                           </div>
-                          <div className="attendance-item-form-group">
-                            <label className="attendance-item-form-label">Lý do *</label>
-                            <textarea
-                              className="attendance-form-textarea"
-                              rows="3"
-                              value={displayDetails.reason || ''}
-                              onChange={(e) => handleItemDetailChange('reason', e.target.value)}
-                              placeholder="Nhập lý do quên chấm công..."
-                            />
-                          </div>
                         </div>
                       ) : selectedAttendanceItem === 2 ? (
                         /* Mục 2: Đi Công Trình */
@@ -605,16 +576,6 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                               </div>
                             </div>
                           </div>
-                          <div className="attendance-item-form-group">
-                            <label className="attendance-item-form-label">Lý do *</label>
-                            <textarea
-                              className="attendance-form-textarea"
-                              rows="3"
-                              value={displayDetails.reason || ''}
-                              onChange={(e) => handleItemDetailChange('reason', e.target.value)}
-                              placeholder="Nhập lý do đi công trình..."
-                            />
-                          </div>
                         </div>
                       ) : (
                         /* Mục 3: Làm việc bên ngoài */
@@ -660,16 +621,6 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                                 </svg>
                               </div>
                             </div>
-                          </div>
-                          <div className="attendance-item-form-group">
-                            <label className="attendance-item-form-label">Lý do *</label>
-                            <textarea
-                              className="attendance-form-textarea"
-                              rows="3"
-                              value={displayDetails.reason || ''}
-                              onChange={(e) => handleItemDetailChange('reason', e.target.value)}
-                              placeholder="Nhập lý do làm việc bên ngoài..."
-                            />
                           </div>
                         </div>
                       )}

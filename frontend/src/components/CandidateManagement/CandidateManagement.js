@@ -424,6 +424,92 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Fetch departments from employees
+    useEffect(() => {
+        const fetchDepartments = async () => {
+            try {
+                const response = await employeesAPI.getAll();
+                if (response.data?.success) {
+                    const employees = response.data.data || [];
+
+                    // Mapping table for department normalization
+                    const departmentMapping = {
+                        'muahang': 'Mua hàng',
+                        'hanhchinh': 'Hành chính',
+                        'dvdt': 'DVĐT',
+                        'qa': 'QA',
+                        'khaosat_thietke': 'Khảo sát thiết kế',
+                        'khaosat thiết kế': 'Khảo sát thiết kế',
+                        'tudong': 'Tự động',
+                        'cnc': 'CNC',
+                        'dichvu_kythuat': 'Dịch vụ kỹ thuật',
+                        'dịch vụ kỹ thuật': 'Dịch vụ kỹ thuật',
+                        'ketoan': 'Kế toán',
+                        'ketoan_noibo': 'Kế toán nội bộ',
+                        'ketoan_banhang': 'Kế toán bán hàng'
+                    };
+
+                    // Normalize function: lowercase, trim, remove extra spaces
+                    const normalizeDepartment = (dept) => {
+                        if (!dept) return null;
+                        return dept.trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                    };
+
+                    // Map to store normalized -> original (best version)
+                    const departmentMap = new Map();
+
+                    employees.forEach(emp => {
+                        const dept = emp.phongBan || emp.phong_ban || emp.department;
+                        if (dept && dept.trim()) {
+                            const normalized = normalizeDepartment(dept);
+                            if (normalized) {
+                                // Check if we have a mapping for this normalized name
+                                const mappedName = departmentMapping[normalized];
+                                const displayName = mappedName || dept.trim();
+
+                                // Use the longest/most complete version if multiple exist
+                                if (!departmentMap.has(normalized) ||
+                                    displayName.length > departmentMap.get(normalized).length) {
+                                    departmentMap.set(normalized, displayName);
+                                }
+                            }
+                        }
+                    });
+
+                    // Convert to options array, sorted alphabetically
+                    const departmentOptions = [
+                        { value: '', label: 'Chọn phòng ban' },
+                        ...Array.from(departmentMap.values())
+                            .sort((a, b) => a.localeCompare(b, 'vi'))
+                            .map(dept => ({
+                                value: dept,
+                                label: dept
+                            }))
+                    ];
+
+                    setPhongBanOptions(departmentOptions);
+                }
+            } catch (error) {
+                console.error('Error fetching departments from employees:', error);
+                // Fallback to default options if API fails
+                setPhongBanOptions([
+                    { value: '', label: 'Chọn phòng ban' },
+                    { value: 'MUAHANG', label: 'Mua hàng' },
+                    { value: 'HANHCHINH', label: 'Hành chính' },
+                    { value: 'DVDT', label: 'DVĐT' },
+                    { value: 'QA', label: 'QA' },
+                    { value: 'KHAOSAT_THIETKE', label: 'Khảo sát thiết kế' },
+                    { value: 'TUDONG', label: 'Tự động' },
+                    { value: 'CNC', label: 'CNC' },
+                    { value: 'DICHVU_KYTHUAT', label: 'Dịch vụ kỹ thuật' },
+                    { value: 'KETOAN', label: 'Kế toán' }
+                ]);
+            }
+        };
+
+        fetchDepartments();
+    }, []);
+
     // Fetch recruitment requests count on mount
     useEffect(() => {
         fetchRecruitmentRequests();
@@ -520,18 +606,9 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
         { value: 'KETOAN_BANHANG', label: 'Kế toán bán hàng' }
     ];
 
-    const phongBanOptions = [
-        { value: '', label: 'Chọn phòng ban' },
-        { value: 'MUAHANG', label: 'Mua hàng' },
-        { value: 'HANHCHINH', label: 'Hành chính' },
-        { value: 'DVDT', label: 'DVĐT' },
-        { value: 'QA', label: 'QA' },
-        { value: 'KHAOSAT_THIETKE', label: 'Khảo sát thiết kế' },
-        { value: 'TUDONG', label: 'Tự động' },
-        { value: 'CNC', label: 'CNC' },
-        { value: 'DICHVU_KYTHUAT', label: 'Dịch vụ kỹ thuật' },
-        { value: 'KETOAN', label: 'Kế toán' }
-    ];
+    const [phongBanOptions, setPhongBanOptions] = useState([
+        { value: '', label: 'Chọn phòng ban' }
+    ]);
 
     /* I. MÀU ACCENT VÀ PHÂN CẤP (Color Hierarchy) */
     const statusConfig = {
@@ -1444,46 +1521,16 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
     };
 
     const validateModalForm = () => {
+        // Chỉ validate format nếu có giá trị, không yêu cầu đầy đủ thông tin
         const newErrors = {};
 
-        if (!formData.hoTen.trim()) {
-            newErrors.hoTen = 'Vui lòng nhập họ tên';
-        }
-
-        if (!formData.ngaySinh) {
-            newErrors.ngaySinh = 'Vui lòng chọn ngày sinh';
-        }
-
-        if (!formData.viTriUngTuyen) {
-            newErrors.viTriUngTuyen = 'Vui lòng chọn vị trí ứng tuyển';
-        }
-
-        if (!formData.phongBan) {
-            newErrors.phongBan = 'Vui lòng chọn phòng ban';
-        }
-
-        if (!formData.soDienThoai.trim()) {
-            newErrors.soDienThoai = 'Vui lòng nhập số điện thoại';
-        } else if (!/^[0-9]{10,11}$/.test(formData.soDienThoai.replace(/\s/g, ''))) {
+        // Chỉ validate format nếu có giá trị
+        if (formData.soDienThoai && formData.soDienThoai.trim() && !/^[0-9]{10,11}$/.test(formData.soDienThoai.replace(/\s/g, ''))) {
             newErrors.soDienThoai = 'Số điện thoại không hợp lệ';
         }
 
-        if (!formData.cccd.trim()) {
-            newErrors.cccd = 'Vui lòng nhập số CCCD';
-        } else if (!/^[0-9]{9,12}$/.test(formData.cccd.replace(/\s/g, ''))) {
+        if (formData.cccd && formData.cccd.trim() && !/^[0-9]{9,12}$/.test(formData.cccd.replace(/\s/g, ''))) {
             newErrors.cccd = 'Số CCCD không hợp lệ';
-        }
-
-        if (!formData.ngayCapCCCD) {
-            newErrors.ngayCapCCCD = 'Vui lòng chọn ngày cấp CCCD';
-        }
-
-        if (!formData.noiCapCCCD.trim()) {
-            newErrors.noiCapCCCD = 'Vui lòng nhập nơi cấp CCCD';
-        }
-
-        if (!formData.ngayGuiCV) {
-            newErrors.ngayGuiCV = 'Vui lòng chọn ngày gửi CV';
         }
 
         setFormErrors(newErrors);
@@ -1493,10 +1540,8 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
     const handleModalSubmit = async (e) => {
         e.preventDefault();
 
+        // Chỉ validate format, không yêu cầu đầy đủ thông tin
         if (!validateModalForm()) {
-            if (showToast) {
-                showToast('Vui lòng điền đầy đủ thông tin bắt buộc', 'error');
-            }
             return;
         }
 
@@ -2624,7 +2669,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                         </div>
                                         <div className="job-offer-form-group">
                                             <label htmlFor="department" className="job-offer-form-label">
-                                                Phòng ban <span className="required">*</span>
+                                                Phòng ban
                                             </label>
                                             <input
                                                 id="department"
@@ -3043,7 +3088,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                     <div className="candidate-modal-form-row">
                                         <div className="candidate-modal-form-group">
                                             <label htmlFor="modal-hoTen" className="candidate-modal-form-label">
-                                                Họ tên <span className="required">*</span>
+                                                Họ tên
                                             </label>
                                             <input
                                                 id="modal-hoTen"
@@ -3080,7 +3125,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
                                         <div className="candidate-modal-form-group">
                                             <label htmlFor="modal-ngaySinh" className="candidate-modal-form-label">
-                                                Ngày sinh <span className="required">*</span>
+                                                Ngày sinh
                                             </label>
                                             <DatePicker
                                                 id="modal-ngaySinh"
@@ -3215,7 +3260,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
                                         <div className="candidate-modal-form-group">
                                             <label id="modal-viTriUngTuyen-label" htmlFor="modal-viTriUngTuyen" className="candidate-modal-form-label">
-                                                Vị trí ứng tuyển <span className="required">*</span>
+                                                Vị trí ứng tuyển
                                             </label>
                                             <CustomDropdown
                                                 id="modal-viTriUngTuyen"
@@ -3236,7 +3281,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                     <div className="candidate-modal-form-row">
                                         <div className="candidate-modal-form-group">
                                             <label id="modal-phongBan-label" htmlFor="modal-phongBan" className="candidate-modal-form-label">
-                                                Phòng ban <span className="required">*</span>
+                                                Phòng ban
                                             </label>
                                             <CustomDropdown
                                                 id="modal-phongBan"
@@ -3254,7 +3299,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
                                         <div className="candidate-modal-form-group">
                                             <label htmlFor="modal-soDienThoai" className="candidate-modal-form-label">
-                                                Điện thoại di động <span className="required">*</span>
+                                                Điện thoại di động
                                             </label>
                                             <input
                                                 id="modal-soDienThoai"
@@ -3308,7 +3353,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
                                         <div className="candidate-modal-form-group">
                                             <label htmlFor="modal-cccd" className="candidate-modal-form-label">
-                                                Số CCCD <span className="required">*</span>
+                                                Số CCCD
                                             </label>
                                             <input
                                                 id="modal-cccd"
@@ -3327,7 +3372,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
                                         <div className="candidate-modal-form-group">
                                             <label htmlFor="modal-ngayCapCCCD" className="candidate-modal-form-label">
-                                                Ngày cấp <span className="required">*</span>
+                                                Ngày cấp
                                             </label>
                                             <DatePicker
                                                 id="modal-ngayCapCCCD"
@@ -3379,7 +3424,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
                                     <div className="candidate-modal-form-row">
                                         <div className="candidate-modal-form-group">
                                             <label htmlFor="modal-noiCapCCCD" className="candidate-modal-form-label">
-                                                Nơi cấp <span className="required">*</span>
+                                                Nơi cấp
                                             </label>
                                             <input
                                                 id="modal-noiCapCCCD"
@@ -3460,7 +3505,7 @@ const CandidateManagement = ({ currentUser, showToast, showConfirm, onNavigate }
 
                                         <div className="candidate-modal-form-group">
                                             <label htmlFor="modal-ngayGuiCV" className="candidate-modal-form-label">
-                                                Ngày gửi CV <span className="required">*</span>
+                                                Ngày gửi CV
                                             </label>
                                             <DatePicker
                                                 id="modal-ngayGuiCV"

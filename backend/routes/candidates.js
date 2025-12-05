@@ -838,11 +838,20 @@ router.post('/', upload.single('cvFile'), async (req, res) => {
             ngayGuiCV
         } = req.body;
 
-        // Validation
-        if (!hoTen || !ngaySinh || !viTriUngTuyen || !phongBan || !soDienThoai || !cccd || !ngayCapCCCD || !noiCapCCCD || !ngayGuiCV) {
+        // Validation - Chỉ validate format nếu có giá trị, không yêu cầu đầy đủ thông tin
+        // Validate phone format if provided
+        if (soDienThoai && soDienThoai.trim() && !/^[0-9]{10,11}$/.test(soDienThoai.replace(/\s/g, ''))) {
             return res.status(400).json({
                 success: false,
-                message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+                message: 'Số điện thoại không hợp lệ (phải có 10-11 chữ số)'
+            });
+        }
+
+        // Validate CCCD format if provided
+        if (cccd && cccd.trim() && !/^[0-9]{9,12}$/.test(cccd.replace(/\s/g, ''))) {
+            return res.status(400).json({
+                success: false,
+                message: 'Số CCCD không hợp lệ (phải có 9-12 chữ số)'
             });
         }
 
@@ -893,22 +902,22 @@ router.post('/', upload.single('cvFile'), async (req, res) => {
         }
 
         const result = await pool.query(insertQuery, [
-            hoTen,
+            hoTen || null,
             gioiTinh || null,
-            ngaySinh,
+            ngaySinh || null,
             noiSinh || null,
             tinhTrangHonNhan || null,
             danToc || null,
             quocTich || null,
             tonGiao || null,
-            viTriUngTuyen,
-            phongBan,
-            soDienThoai,
+            viTriUngTuyen || null,
+            phongBan || null,
+            soDienThoai || null,
             soDienThoaiKhac || null,
             email || null,
-            cccd,
-            ngayCapCCCD,
-            noiCapCCCD,
+            cccd || null,
+            ngayCapCCCD || null,
+            noiCapCCCD || null,
             nguyenQuan || null,
             diaChiTamTru || null,
             trinhDoVanHoa || null,
@@ -917,7 +926,7 @@ router.post('/', upload.single('cvFile'), async (req, res) => {
             kinhNghiemData ? JSON.stringify(kinhNghiemData) : null,
             quaTrinhData ? JSON.stringify(quaTrinhData) : null,
             ngoaiNguData ? JSON.stringify(ngoaiNguData) : null,
-            ngayGuiCV,
+            ngayGuiCV || null,
             cvFilePath,
             cvFileName,
             'PENDING_INTERVIEW'
@@ -1019,11 +1028,20 @@ router.put('/:id', upload.single('cvFile'), async (req, res) => {
             });
         }
 
-        // Validation
-        if (!hoTen || !ngaySinh || !viTriUngTuyen || !phongBan || !soDienThoai || !cccd || !ngayCapCCCD || !noiCapCCCD || !ngayGuiCV) {
+        // Validation - Chỉ validate format nếu có giá trị, không yêu cầu tất cả trường khi update
+        // Validate phone format if provided
+        if (soDienThoai && soDienThoai.trim() && !/^[0-9]{10,11}$/.test(soDienThoai.replace(/\s/g, ''))) {
             return res.status(400).json({
                 success: false,
-                message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+                message: 'Số điện thoại không hợp lệ (phải có 10-11 chữ số)'
+            });
+        }
+
+        // Validate CCCD format if provided
+        if (cccd && cccd.trim() && !/^[0-9]{9,12}$/.test(cccd.replace(/\s/g, ''))) {
+            return res.status(400).json({
+                success: false,
+                message: 'Số CCCD không hợp lệ (phải có 9-12 chữ số)'
             });
         }
 

@@ -230,6 +230,79 @@
     cursor: pointer;
 }
 
+/* DatePicker Month and Year Dropdowns */
+.react-datepicker__month-dropdown,
+.react-datepicker__year-dropdown {
+    border-radius: 0.75rem !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+    padding: 0.5rem !important;
+    margin-top: 0.5rem !important;
+    max-height: 260px !important;
+    overflow-y: auto !important;
+    z-index: 1000 !important;
+    min-width: 150px !important;
+}
+
+.react-datepicker__month-select,
+.react-datepicker__year-select {
+    border-radius: 0.5rem !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.875rem !important;
+    color: #1e293b !important;
+    cursor: pointer !important;
+    outline: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+}
+
+.react-datepicker__month-select:hover,
+.react-datepicker__year-select:hover {
+    border-color: #0096FF !important;
+    background-color: rgba(0, 150, 255, 0.05) !important;
+}
+
+.react-datepicker__month-select:focus,
+.react-datepicker__year-select:focus {
+    border-color: #0096FF !important;
+    background-color: rgba(0, 150, 255, 0.05) !important;
+    box-shadow: 0 0 0 3px rgba(0, 150, 255, 0.15) !important;
+}
+
+.react-datepicker__month-option,
+.react-datepicker__year-option {
+    padding: 0.75rem 1rem !important;
+    border-radius: 0.5rem !important;
+    margin: 0.125rem 0.25rem !important;
+    cursor: pointer !important;
+    color: #1e293b !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+}
+
+.react-datepicker__month-option:hover,
+.react-datepicker__year-option:hover {
+    background: rgba(59, 130, 246, 0.1) !important;
+    color: #1e293b !important;
+}
+
+.react-datepicker__month-option--selected,
+.react-datepicker__year-option--selected {
+    background: #3b82f6 !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
+.react-datepicker__month-option--selected:hover,
+.react-datepicker__year-option--selected:hover {
+    background: #2563eb !important;
+}
+
 .candidate-form-error {
     font-size: 0.875rem;
     color: #ef4444;

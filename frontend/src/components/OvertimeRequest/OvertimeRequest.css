@@ -179,51 +179,33 @@
     flex-shrink: 0;
 }
 
-/* Form Content - 2 Columns Layout */
+/* Form Content - Single Container Layout */
 .overtime-form-content {
-    display: flex;
-    gap: 1.5rem;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-}
-
-/* Left Column */
-.overtime-form-left-column {
-    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    padding-right: 1rem;
 }
 
-.overtime-form-left-column::-webkit-scrollbar {
+/* Custom Scrollbar cho form content */
+.overtime-form-content::-webkit-scrollbar {
     width: 6px;
 }
 
-.overtime-form-left-column::-webkit-scrollbar-track {
+.overtime-form-content::-webkit-scrollbar-track {
     background: transparent;
 }
 
-.overtime-form-left-column::-webkit-scrollbar-thumb {
+.overtime-form-content::-webkit-scrollbar-thumb {
     background: #d1d5db;
     border-radius: 3px;
 }
 
-.overtime-form-left-column::-webkit-scrollbar-thumb:hover {
+.overtime-form-content::-webkit-scrollbar-thumb:hover {
     background: #9ca3af;
-}
-
-/* Right Column */
-.overtime-form-right-column {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding-left: 1rem;
-    border-left: 1px solid #e5e7eb;
 }
 
 /* Form Section */
@@ -262,6 +244,19 @@
     grid-template-columns: 1fr 1fr;
     gap: 0.75rem; /* Reduced gap to save space */
     align-items: start;
+}
+
+/* Hours Row - Dynamic columns based on content */
+.overtime-hours-row.one-column {
+    grid-template-columns: 1fr;
+}
+
+.overtime-hours-row.two-columns {
+    grid-template-columns: 1fr 1fr;
+}
+
+.overtime-hours-row.three-columns {
+    grid-template-columns: 1fr 1fr 1fr;
 }
 
 /* Approver Box (II. Thông tin Duyệt): Light gray background to separate from input fields */
@@ -458,6 +453,37 @@
     font-weight: 600;
     border-radius: 0.375rem;
     pointer-events: none;
+}
+
+/* Day Hours - Blue theme */
+.overtime-day-hours .overtime-hours-input {
+    background: rgba(59, 130, 246, 0.05);
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.overtime-day-hours .overtime-hours-tag {
+    background: rgba(59, 130, 246, 0.15);
+    color: #2563eb;
+}
+
+/* Night Hours - Purple/Dark theme */
+.overtime-night-hours .overtime-hours-input {
+    background: rgba(139, 92, 246, 0.05);
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.overtime-night-hours .overtime-hours-tag {
+    background: rgba(139, 92, 246, 0.15);
+    color: #7c3aed;
+}
+
+/* Form Hint */
+.overtime-form-hint {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+    margin-bottom: 0;
+    font-style: italic;
 }
 
 /* Input/Textarea Nền - Trắng Tinh Khiết */

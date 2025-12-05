@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import { formatDateToISO, parseISODateString, today } from '../../utils/dateUtils';
 import { DATE_PICKER_LOCALE } from '../../utils/datepickerLocale';
-import { candidatesAPI } from '../../services/api';
+import { candidatesAPI, employeesAPI } from '../../services/api';
 import './CandidateForm.css';
 
 const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
@@ -40,18 +40,95 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
         { value: 'KETOAN_BANHANG', label: 'Kế toán bán hàng' }
     ];
 
-    const phongBanOptions = [
-        { value: '', label: 'Chọn phòng ban' },
-        { value: 'MUAHANG', label: 'Mua hàng' },
-        { value: 'HANHCHINH', label: 'Hành chính' },
-        { value: 'DVDT', label: 'DVĐT' },
-        { value: 'QA', label: 'QA' },
-        { value: 'KHAOSAT_THIETKE', label: 'Khảo sát thiết kế' },
-        { value: 'TUDONG', label: 'Tự động' },
-        { value: 'CNC', label: 'CNC' },
-        { value: 'DICHVU_KYTHUAT', label: 'Dịch vụ kỹ thuật' },
-        { value: 'KETOAN', label: 'Kế toán' }
-    ];
+    const [phongBanOptions, setPhongBanOptions] = useState([
+        { value: '', label: 'Chọn phòng ban' }
+    ]);
+
+    // Fetch departments from employees
+    useEffect(() => {
+        const fetchDepartments = async () => {
+            try {
+                const response = await employeesAPI.getAll();
+                if (response.data?.success) {
+                    const employees = response.data.data || [];
+
+                    // Mapping table for department normalization
+                    const departmentMapping = {
+                        'muahang': 'Mua hàng',
+                        'hanhchinh': 'Hành chính',
+                        'dvdt': 'DVĐT',
+                        'qa': 'QA',
+                        'khaosat_thietke': 'Khảo sát thiết kế',
+                        'khaosat thiết kế': 'Khảo sát thiết kế',
+                        'tudong': 'Tự động',
+                        'cnc': 'CNC',
+                        'dichvu_kythuat': 'Dịch vụ kỹ thuật',
+                        'dịch vụ kỹ thuật': 'Dịch vụ kỹ thuật',
+                        'ketoan': 'Kế toán',
+                        'ketoan_noibo': 'Kế toán nội bộ',
+                        'ketoan_banhang': 'Kế toán bán hàng'
+                    };
+
+                    // Normalize function: lowercase, trim, remove extra spaces
+                    const normalizeDepartment = (dept) => {
+                        if (!dept) return null;
+                        return dept.trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                    };
+
+                    // Map to store normalized -> original (best version)
+                    const departmentMap = new Map();
+
+                    employees.forEach(emp => {
+                        const dept = emp.phongBan || emp.phong_ban || emp.department;
+                        if (dept && dept.trim()) {
+                            const normalized = normalizeDepartment(dept);
+                            if (normalized) {
+                               // Check if we have a mapping for  this normalized name
+                                const mappedName = departmentMapping[normalized];
+                                const displayName = mappedName || dept.trim();
+
+                                // Use the longest/most complete version if multiple exist
+                                if (!departmentMap.has(normalized) ||
+                                    displayName.length > departmentMap.get(normalized).length) {
+                                    departmentMap.set(normalized, displayName);
+                                }
+                            }
+                        }
+                    });
+
+                    // Convert to options array, sorted alphabetically
+                    const departmentOptions = [
+                        { value: '', label: 'Chọn phòng ban' },
+                        ...Array.from(departmentMap.values())
+                            .sort((a, b) => a.localeCompare(b, 'vi'))
+                            .map(dept => ({
+                                value: dept,
+                                label: dept
+                            }))
+                    ];
+
+                    setPhongBanOptions(departmentOptions);
+                }
+            } catch (error) {
+                console.error('Error fetching departments from employees:', error);
+                // Fallback to default options if API fails
+                setPhongBanOptions([
+                    { value: '', label: 'Chọn phòng ban' },
+                    { value: 'MUAHANG', label: 'Mua hàng' },
+                    { value: 'HANHCHINH', label: 'Hành chính' },
+                    { value: 'DVDT', label: 'DVĐT' },
+                    { value: 'QA', label: 'QA' },
+                    { value: 'KHAOSAT_THIETKE', label: 'Khảo sát thiết kế' },
+                    { value: 'TUDONG', label: 'Tự động' },
+                    { value: 'CNC', label: 'CNC' },
+                    { value: 'DICHVU_KYTHUAT', label: 'Dịch vụ kỹ thuật' },
+                    { value: 'KETOAN', label: 'Kế toán' }
+                ]);
+            }
+        };
+
+        fetchDepartments();
+    }, []);
 
     const handleInputChange = (field, value) => {
         console.log('handleInputChange:', field, value); // Debug
@@ -162,44 +239,13 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
     const validateForm = () => {
         const newErrors = {};
 
-        if (!formData.hoTen.trim()) {
-            newErrors.hoTen = 'Vui lòng nhập họ tên';
-        }
-
-        if (!formData.ngaySinh) {
-            newErrors.ngaySinh = 'Vui lòng chọn ngày sinh';
-        }
-
-        if (!formData.viTriUngTuyen) {
-            newErrors.viTriUngTuyen = 'Vui lòng chọn vị trí ứng tuyển';
-        }
-
-        if (!formData.phongBan) {
-            newErrors.phongBan = 'Vui lòng chọn phòng ban';
-        }
-
-        if (!formData.soDienThoai.trim()) {
-            newErrors.soDienThoai = 'Vui lòng nhập số điện thoại';
-        } else if (!/^[0-9]{10,11}$/.test(formData.soDienThoai.replace(/\s/g, ''))) {
+        // Chỉ validate format nếu có giá trị, không yêu cầu đầy đủ thông tin
+        if (formData.soDienThoai && formData.soDienThoai.trim() && !/^[0-9]{10,11}$/.test(formData.soDienThoai.replace(/\s/g, ''))) {
             newErrors.soDienThoai = 'Số điện thoại không hợp lệ';
         }
 
-        if (!formData.cccd.trim()) {
-            newErrors.cccd = 'Vui lòng nhập số CCCD';
-        } else if (!/^[0-9]{9,12}$/.test(formData.cccd.replace(/\s/g, ''))) {
+        if (formData.cccd && formData.cccd.trim() && !/^[0-9]{9,12}$/.test(formData.cccd.replace(/\s/g, ''))) {
             newErrors.cccd = 'Số CCCD không hợp lệ';
-        }
-
-        if (!formData.ngayCapCCCD) {
-            newErrors.ngayCapCCCD = 'Vui lòng chọn ngày cấp CCCD';
-        }
-
-        if (!formData.noiCapCCCD.trim()) {
-            newErrors.noiCapCCCD = 'Vui lòng nhập nơi cấp CCCD';
-        }
-
-        if (!formData.ngayGuiCV) {
-            newErrors.ngayGuiCV = 'Vui lòng chọn ngày gửi CV';
         }
 
         setErrors(newErrors);
@@ -209,10 +255,8 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        // Chỉ validate format, không yêu cầu đầy đủ thông tin
         if (!validateForm()) {
-            if (showToast) {
-                showToast('Vui lòng điền đầy đủ thông tin bắt buộc', 'error');
-            }
             return;
         }
 
@@ -286,7 +330,7 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
                     <div className="candidate-form-row">
                         <div className="candidate-form-group">
                             <label htmlFor="hoTen" className="candidate-form-label">
-                                Họ tên <span className="required">*</span>
+                                Họ tên
                             </label>
                             <input
                                 id="hoTen"
@@ -303,7 +347,7 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
 
                         <div className="candidate-form-group">
                             <label htmlFor="ngaySinh" className="candidate-form-label">
-                                Ngày sinh <span className="required">*</span>
+                                Ngày sinh
                             </label>
                             <DatePicker
                                 id="ngaySinh"
@@ -319,6 +363,7 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
                                 dropdownMode="select"
                                 yearDropdownItemNumber={100}
                                 scrollableYearDropdown
+                                useShortMonthInDropdown={false}
                                 minDate={new Date(1900, 0, 1)}
                             />
                             {errors.ngaySinh && (
@@ -331,7 +376,7 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
                     <div className="candidate-form-row">
                         <div className="candidate-form-group">
                             <label htmlFor="viTriUngTuyen" className="candidate-form-label">
-                                Vị trí ứng tuyển <span className="required">*</span>
+                                Vị trí ứng tuyển
                             </label>
                             <select
                                 id="viTriUngTuyen"
@@ -355,7 +400,7 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
 
                         <div className="candidate-form-group">
                             <label htmlFor="phongBan" className="candidate-form-label">
-                                Phòng ban/Bộ phận <span className="required">*</span>
+                                Phòng ban/Bộ phận
                             </label>
                             <select
                                 id="phongBan"
@@ -382,7 +427,7 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
                     <div className="candidate-form-row">
                         <div className="candidate-form-group">
                             <label htmlFor="soDienThoai" className="candidate-form-label">
-                                Số điện thoại <span className="required">*</span>
+                                Số điện thoại
                             </label>
                             <input
                                 id="soDienThoai"
@@ -400,7 +445,7 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
 
                         <div className="candidate-form-group">
                             <label htmlFor="cccd" className="candidate-form-label">
-                                Số CCCD <span className="required">*</span>
+                                Số CCCD
                             </label>
                             <input
                                 id="cccd"
@@ -421,7 +466,7 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
                     <div className="candidate-form-row">
                         <div className="candidate-form-group">
                             <label htmlFor="ngayCapCCCD" className="candidate-form-label">
-                                Ngày cấp CCCD <span className="required">*</span>
+                                Ngày cấp CCCD
                             </label>
                             <DatePicker
                                 id="ngayCapCCCD"
@@ -437,6 +482,7 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
                                 dropdownMode="select"
                                 yearDropdownItemNumber={100}
                                 scrollableYearDropdown
+                                useShortMonthInDropdown={false}
                                 minDate={new Date(1900, 0, 1)}
                             />
                             {errors.ngayCapCCCD && (
@@ -446,7 +492,7 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
 
                         <div className="candidate-form-group">
                             <label htmlFor="noiCapCCCD" className="candidate-form-label">
-                                Nơi cấp CCCD <span className="required">*</span>
+                                Nơi cấp CCCD
                             </label>
                             <input
                                 id="noiCapCCCD"
@@ -466,7 +512,7 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
                     <div className="candidate-form-row">
                         <div className="candidate-form-group">
                             <label htmlFor="ngayGuiCV" className="candidate-form-label">
-                                Ngày gửi CV <span className="required">*</span>
+                                Ngày gửi CV
                             </label>
                             <DatePicker
                                 id="ngayGuiCV"
@@ -480,6 +526,9 @@ const CandidateForm = ({ currentUser, showToast, onNavigate }) => {
                                 showYearDropdown
                                 showMonthDropdown
                                 dropdownMode="select"
+                                yearDropdownItemNumber={100}
+                                scrollableYearDropdown
+                                useShortMonthInDropdown={false}
                             />
                             {errors.ngayGuiCV && (
                                 <span className="candidate-form-error">{errors.ngayGuiCV}</span>

@@ -240,14 +240,19 @@ router.post('/', async (req, res) => {
         const {
             employeeId,
             requestDate,
+            startDate,
             startTime,
+            endDate,
             endTime,
             duration,
             reason,
             notes
         } = req.body;
 
-        if (!employeeId || !requestDate || !startTime || !endTime || !reason) {
+        // Use startDate if provided, otherwise fallback to requestDate for backward compatibility
+        const primaryDate = startDate || requestDate;
+
+        if (!employeeId || !primaryDate || !startTime || !endDate || !endTime || !reason) {
             return res.status(400).json({
                 success: false,
                 message: 'Thiếu thông tin bắt buộc'
@@ -296,25 +301,41 @@ router.post('/', async (req, res) => {
 
         console.log(`[OvertimeRequest] Tạo đơn cho nhân viên "${employee.ho_ten}", quản lý trực tiếp: "${teamLead.ho_ten}"`);
 
+        // Kiểm tra và thêm cột start_date và end_date nếu chưa có
+        try {
+            await pool.query(`
+                ALTER TABLE overtime_requests 
+                ADD COLUMN IF NOT EXISTS start_date DATE,
+                ADD COLUMN IF NOT EXISTS end_date DATE
+            `);
+        } catch (alterError) {
+            // Column có thể đã tồn tại, bỏ qua lỗi
+            console.log('[OvertimeRequest] start_date/end_date columns check:', alterError.message);
+        }
+
         // Tạo đơn
         const insertResult = await pool.query(
             `INSERT INTO overtime_requests (
                 employee_id,
                 team_lead_id,
                 request_date,
+                start_date,
                 start_time,
+                end_date,
                 end_time,
                 duration,
                 reason,
                 notes,
                 status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *`,
             [
                 parseInt(employeeId, 10),
                 teamLead.id,
-                requestDate,
+                primaryDate, // request_date (backward compatibility)
+                startDate || primaryDate, // start_date
                 startTime,
+                endDate,
                 endTime,
                 duration || null,
                 reason,

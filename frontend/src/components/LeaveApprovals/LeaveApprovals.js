@@ -19,6 +19,13 @@ const REQUEST_TYPE_LABELS = {
     RESIGN: 'Xin nghỉ việc'
 };
 
+const LEAVE_TYPE_LABELS = {
+    annual: 'Phép năm',
+    unpaid: 'Không hưởng lương',
+    statutory: 'Nghỉ chế độ',
+    maternity: 'Nghỉ Thai Sản'
+};
+
 const MODULE_OPTIONS = [
     {
         key: 'leave',
@@ -445,6 +452,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
 
     const getStatusLabel = (status) => STATUS_LABELS[status] || status;
     const getRequestTypeLabel = (type) => REQUEST_TYPE_LABELS[type] || type;
+    const getLeaveTypeLabel = (leaveType) => LEAVE_TYPE_LABELS[leaveType] || leaveType;
 
     const renderModuleTabs = () => (
         <div className="leave-approvals-modules">
@@ -1072,6 +1080,22 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                 </div>
                             </div>
 
+                            {/* Violation Warning - Cảnh báo vi phạm nội quy */}
+                            {selectedRequest.has_violation && selectedRequest.violation_message && (
+                                <div className="leave-approvals-modal-section leave-approvals-violation-section">
+                                    <div className="leave-approvals-violation-warning">
+                                        <svg className="leave-violation-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                        </svg>
+                                        <div className="leave-violation-content">
+                                            <strong className="leave-violation-title">⚠️ Cảnh báo: Nhân viên đang vi phạm nội quy</strong>
+                                            <p className="leave-violation-text">{selectedRequest.violation_message}</p>
+                                            <p className="leave-violation-note">Đơn này vẫn có thể được xem xét và duyệt, nhưng nhân viên đang vi phạm quy định về thời gian báo trước khi xin nghỉ phép.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Module-specific details */}
                             {activeModule === 'leave' && (
                                 <div className="leave-approvals-modal-section">
@@ -1099,7 +1123,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                     </svg>
                                                     Loại phép
                                                 </span>
-                                                <span className="info-value">{selectedRequest.leave_type}</span>
+                                                <span className="info-value">{getLeaveTypeLabel(selectedRequest.leave_type)}</span>
                                             </div>
                                         )}
                                         <div className="leave-approvals-modal-info-item">

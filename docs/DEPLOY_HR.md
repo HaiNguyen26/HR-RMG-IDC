@@ -43,7 +43,7 @@ scripts\backup-hr-database.bat
 ```
 
 **Kết quả:**
-- File backup sẽ được lưu tại: `database\backup_HR_Management_System_122025_02200PM.sql`
+- File backup sẽ được lưu tại: `database\backup_HR_Management_System_122025_03020PM.sql`
 - Script sẽ yêu cầu nhập password PostgreSQL (password không hiển thị khi gõ)
 
 ### Linux/Mac
@@ -56,17 +56,17 @@ chmod +x scripts/backup-hr-database.sh
 ```
 
 **Kết quả:**
-- File backup sẽ được lưu tại: `database/backup_HR_Management_System_122025_02200PM.sql`
+- File backup sẽ được lưu tại: `database/backup_HR_Management_System_122025_03020PM.sql`
 
 ### Kiểm tra Backup thành công
 
 Sau khi backup, kiểm tra:
 ```bash
 # Windows
-dir database\backup_HR_Management_System_122025_02200PM.sql
+dir database\backup_HR_Management_System_122025_03020PM.sql
 
 # Linux/Mac
-ls -lh database/backup_HR_Management_System_122025_02200PM.sql
+ls -lh database/backup_HR_Management_System_122025_03020PM.sql
 ```
 
 File backup phải có kích thước > 0 KB. Nếu file = 0 KB hoặc không tồn tại, backup đã thất bại.
@@ -88,13 +88,13 @@ ssh root@27.71.16.15
 **Windows PowerShell:**
 ```powershell
 # Upload file backup lên server
-scp database\backup_HR_Management_System_122025_02200PM.sql root@27.71.16.15:/tmp/
+scp database\backup_HR_Management_System_122025_03020PM.sql root@27.71.16.15:/tmp/
 ```
 
 **Windows Git Bash hoặc Linux/Mac:**
 ```bash
 # Upload file backup lên server
-scp database/backup_HR_Management_System_122025_02200PM.sql root@27.71.16.15:/tmp/
+scp database/backup_HR_Management_System_122025_03020PM.sql root@27.71.16.15:/tmp/
 ```
 
 **Lưu ý:** 
@@ -112,7 +112,7 @@ scp database/backup_HR_Management_System_122025_02200PM.sql root@27.71.16.15:/tm
 - Upload trực tiếp qua SCP/SFTP an toàn và nhanh hơn
 
 **Nếu bắt buộc phải dùng (KHÔNG KHUYẾN NGHỊ):**
-1. Tạm thời force add: `git add -f database/backup_HR_Management_System_122025_02200PM.sql`
+1. Tạm thời force add: `git add -f database/backup_HR_Management_System_122025_03020PM.sql`
 2. Commit và push
 3. Pull trên server
 4. **Xóa file backup khỏi repo ngay sau khi deploy**
@@ -125,13 +125,13 @@ Dùng FileZilla, WinSCP hoặc SFTP client:
 - **User**: `root`
 - **Protocol**: SFTP
 - **Remote path**: `/tmp/`
-- **Local file**: `database/backup_HR_Management_System_122025_02200PM.sql`
+- **Local file**: `database/backup_HR_Management_System_122025_03020PM.sql`
 
 ### Kiểm tra file đã upload
 
 Trên server:
 ```bash
-ls -lh /tmp/backup_HR_Management_System_122025_02200PM.sql
+ls -lh /tmp/backup_HR_Management_System_122025_03020PM.sql
 ```
 
 File phải tồn tại và có kích thước > 0 KB.
@@ -205,7 +205,7 @@ sudo -u postgres psql -c "CREATE DATABASE HR_Management_System OWNER hr_user;" 2
 sudo -u postgres psql -c "ALTER DATABASE HR_Management_System OWNER TO hr_user;" 2>/dev/null || true
 
 # Restore từ backup - Làm TRƯỚC khi import schema
-BACKUP_FILE="/tmp/backup_HR_Management_System_122025_02200PM.sql"
+BACKUP_FILE="/tmp/backup_HR_Management_System_122025_03020PM.sql"
 
 if [ -f "$BACKUP_FILE" ]; then
     echo "Found backup: $BACKUP_FILE"
@@ -464,14 +464,14 @@ Nếu cần restore lại database sau khi đã deploy:
 ```bash
 # 1. Upload backup lên server từ local (nếu chưa có)
 # Từ máy local:
-scp database/backup_HR_Management_System_122025_02200PM.sql root@27.71.16.15:/tmp/
+scp database/backup_HR_Management_System_122025_03020PM.sql root@27.71.16.15:/tmp/
 
 # 2. Trên server - Dừng app tạm thời (optional)
 pm2 stop hr-management-api
 
 # 3. Restore database bằng postgres user
 cd /var/www/hr-management
-sudo -u postgres psql -d HR_Management_System < /tmp/backup_HR_Management_System_122025_02200PM.sql 2>&1 | grep -v "ERROR:" | grep -v "WARNING:" || true
+sudo -u postgres psql -d HR_Management_System < /tmp/backup_HR_Management_System_122025_03020PM.sql 2>&1 | grep -v "ERROR:" | grep -v "WARNING:" || true
 
 # 4. Chuyển ownership sang hr_user (QUAN TRỌNG!)
 # Option A: Dùng script tự động (khuyến nghị)
@@ -498,7 +498,7 @@ Nếu cần restore từ file backup khác:
 
 ```bash
 # Bước 1: Restore bằng postgres user (vì backup có owner là postgres)
-sudo -u postgres psql -d HR_Management_System < /tmp/backup_HR_Management_System_122025_02200PM.sql 2>&1 | grep -v "ERROR:" | grep -v "WARNING:" || true
+sudo -u postgres psql -d HR_Management_System < /tmp/backup_HR_Management_System_122025_03020PM.sql 2>&1 | grep -v "ERROR:" | grep -v "WARNING:" || true
 
 # Bước 2: Chuyển ownership sang hr_user
 if [ -f "database/transfer_ownership_to_hr_user.sql" ]; then

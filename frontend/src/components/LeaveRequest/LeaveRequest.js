@@ -6,7 +6,6 @@ import { DATE_PICKER_LOCALE } from '../../utils/datepickerLocale';
 import './LeaveRequest.css';
 
 const LeaveRequest = ({ currentUser, showToast }) => {
-  const [requestType, setRequestType] = useState('leave'); // 'leave' or 'resign'
   const [formData, setFormData] = useState({
     startDate: '',
     endDate: '',
@@ -116,13 +115,13 @@ const LeaveRequest = ({ currentUser, showToast }) => {
   const handleDateChange = (field) => (date) => {
     if (!date) {
       handleInputChange(field, '');
-      if (field === 'startDate' && requestType === 'leave') {
+      if (field === 'startDate') {
         handleInputChange('endDate', '');
       }
     } else {
       handleInputChange(field, formatDateToISO(date));
       // If start date changes and is after end date, clear end date
-      if (field === 'startDate' && requestType === 'leave' && formData.endDate) {
+      if (field === 'startDate' && formData.endDate) {
         const endDate = parseISODateString(formData.endDate);
         if (endDate && endDate < date) {
           handleInputChange('endDate', '');
@@ -146,33 +145,32 @@ const LeaveRequest = ({ currentUser, showToast }) => {
       return;
     }
 
-    if (requestType === 'leave') {
-      if (!formData.endDate) {
-        setError('Vui lòng chọn ngày kết thúc nghỉ phép.');
-        return;
-      }
-      if (!formData.leaveType) {
-        setError('Vui lòng chọn loại phép.');
-        return;
-      }
+    if (!formData.endDate) {
+      setError('Vui lòng chọn ngày kết thúc nghỉ phép.');
+      return;
+    }
+    if (!formData.leaveType) {
+      setError('Vui lòng chọn loại phép.');
+      return;
     }
 
-    if (requestType === 'leave' && new Date(formData.startDate) > new Date(formData.endDate)) {
+    if (new Date(formData.startDate) > new Date(formData.endDate)) {
       setError('Ngày kết thúc phải sau ngày bắt đầu.');
       return;
     }
 
-    // Kiểm tra vi phạm quy định thời gian báo trước
-    if (requestType === 'leave') {
-      const leaveDaysCalc = calculateLeaveDays();
-      const advanceNoticeDaysCalc = calculateAdvanceNoticeDays();
-      
-      if (leaveDaysCalc && advanceNoticeDaysCalc !== null) {
-        const requiredNoticeDays = leaveDaysCalc <= 3 ? 2 : 15;
-        if (advanceNoticeDaysCalc < requiredNoticeDays) {
-          setError(`Thời gian bạn xin nghỉ phép đang vi phạm về thời gian báo trước. Bạn cần báo trước ${requiredNoticeDays} ngày nhưng chỉ còn ${advanceNoticeDaysCalc} ngày.`);
-          return;
-        }
+    // Kiểm tra vi phạm quy định thời gian báo trước (không chặn submit, chỉ cảnh báo)
+    let violationInfo = null;
+    const leaveDaysCalc = calculateLeaveDays();
+    const advanceNoticeDaysCalc = calculateAdvanceNoticeDays();
+
+    if (leaveDaysCalc && advanceNoticeDaysCalc !== null) {
+      const requiredNoticeDays = leaveDaysCalc <= 3 ? 2 : 15;
+      if (advanceNoticeDaysCalc < requiredNoticeDays) {
+        violationInfo = {
+          hasViolation: true,
+          violationMessage: `Thời gian bạn xin nghỉ phép đang vi phạm về thời gian báo trước. Bạn cần báo trước ${requiredNoticeDays} ngày nhưng chỉ còn ${advanceNoticeDaysCalc} ngày. Nhân viên đang vi phạm nội quy.`
+        };
       }
     }
 
@@ -188,24 +186,21 @@ const LeaveRequest = ({ currentUser, showToast }) => {
     try {
       const payload = {
         employeeId: currentUser.id,
-        requestType: requestType === 'leave' ? 'LEAVE' : 'RESIGN',
+        requestType: 'LEAVE',
         startDate: formData.startDate,
-        endDate: requestType === 'leave' ? formData.endDate : null,
-        leaveType: requestType === 'leave' ? formData.leaveType : null,
+        endDate: formData.endDate,
+        leaveType: formData.leaveType,
         reason: formData.reason,
-        notes: formData.notes || ''
+        notes: formData.notes || '',
+        hasViolation: violationInfo?.hasViolation || false,
+        violationMessage: violationInfo?.violationMessage || null
       };
 
       const response = await leaveRequestsAPI.create(payload);
 
       if (response.data.success) {
         if (showToast) {
-          showToast(
-            requestType === 'leave'
-              ? 'Đơn xin nghỉ phép đã được gửi thành công!'
-              : 'Đơn xin nghỉ việc đã được gửi thành công!',
-            'success'
-          );
+          showToast('Đơn xin nghỉ phép đã được gửi thành công!', 'success');
         }
         // Reset form
         setFormData({
@@ -234,7 +229,7 @@ const LeaveRequest = ({ currentUser, showToast }) => {
 
   // Tính toán số ngày nghỉ: (Đến ngày - Từ ngày + 1)
   const calculateLeaveDays = () => {
-    if (!startDateValue || !endDateValue || requestType !== 'leave') {
+    if (!startDateValue || !endDateValue) {
       return null;
     }
     const start = new Date(startDateValue);
@@ -265,14 +260,14 @@ const LeaveRequest = ({ currentUser, showToast }) => {
 
   // Kiểm tra vi phạm quy định thời gian báo trước
   const checkViolation = () => {
-    if (requestType !== 'leave' || !leaveDays || advanceNoticeDays === null) {
+    if (!leaveDays || advanceNoticeDays === null) {
       return null;
     }
 
     // Nếu nghỉ từ 3 ngày trở xuống: phải báo trước 2 ngày
     // Nếu nghỉ trên 3 ngày: phải báo trước 15 ngày
     const requiredNoticeDays = leaveDays <= 3 ? 2 : 15;
-    
+
     if (advanceNoticeDays < requiredNoticeDays) {
       return {
         violated: true,
@@ -280,7 +275,7 @@ const LeaveRequest = ({ currentUser, showToast }) => {
         actualDays: advanceNoticeDays
       };
     }
-    
+
     return { violated: false };
   };
 
@@ -308,9 +303,7 @@ const LeaveRequest = ({ currentUser, showToast }) => {
             </svg>
           </div>
           <div>
-            <h1 className="leave-request-title">
-              {requestType === 'leave' ? 'Đơn xin nghỉ phép' : 'Đơn xin nghỉ việc'}
-            </h1>
+            <h1 className="leave-request-title">Đơn xin nghỉ phép</h1>
             <p className="leave-request-subtitle">
               Điền đầy đủ thông tin để gửi đơn đến quản lý duyệt.
             </p>
@@ -333,47 +326,13 @@ const LeaveRequest = ({ currentUser, showToast }) => {
               </div>
             )}
 
-            {/* Request Type Tabs */}
-            <div className="leave-request-type-tabs">
-              <button
-                type="button"
-                className={`leave-type-tab ${requestType === 'leave' ? 'active' : ''}`}
-                onClick={() => {
-                  setRequestType('leave');
-                  setError('');
-                }}
-              >
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                </svg>
-                <span>Xin nghỉ phép</span>
-              </button>
-              <button
-                type="button"
-                className={`leave-type-tab ${requestType === 'resign' ? 'active' : ''}`}
-                onClick={() => {
-                  setRequestType('resign');
-                  setError('');
-                  // Clear end date and leave type for resign
-                  handleInputChange('endDate', '');
-                  handleInputChange('leaveType', '');
-                }}
-              >
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                </svg>
-                <span>Xin nghỉ việc</span>
-              </button>
-            </div>
 
             {/* Form Fields */}
             <div className="leave-form-fields">
               {/* Date Fields */}
               <div className="leave-form-row">
                 <div className="leave-form-group">
-                  <label className="leave-form-label">
-                    {requestType === 'leave' ? 'Ngày bắt đầu nghỉ *' : 'Ngày nghỉ việc *'}
-                  </label>
+                  <label className="leave-form-label">Ngày bắt đầu nghỉ *</label>
                   <div className="leave-date-picker-wrapper">
                     <DatePicker
                       selected={startDateValue}
@@ -392,9 +351,8 @@ const LeaveRequest = ({ currentUser, showToast }) => {
                   </div>
                 </div>
 
-                {requestType === 'leave' && (
-                  <div className="leave-form-group">
-                    <label className="leave-form-label">Ngày kết thúc nghỉ *</label>
+                <div className="leave-form-group">
+                  <label className="leave-form-label">Ngày kết thúc nghỉ *</label>
                     <div className="leave-date-picker-wrapper">
                       <DatePicker
                         selected={endDateValue}
@@ -413,14 +371,12 @@ const LeaveRequest = ({ currentUser, showToast }) => {
                       </svg>
                     </div>
                   </div>
-                )}
               </div>
 
               {/* Calculated Fields - Chỉ hiển thị khi có đủ thông tin */}
-              {(requestType === 'leave' && (leaveDays !== null || advanceNoticeDays !== null)) || 
-               (requestType === 'resign' && advanceNoticeDays !== null) ? (
+              {(leaveDays !== null || advanceNoticeDays !== null) && (
                 <div className="leave-form-row">
-                  {requestType === 'leave' && leaveDays !== null && (
+                  {leaveDays !== null && (
                     <div className="leave-form-group">
                       <label className="leave-form-label">Số ngày nghỉ</label>
                       <div className="leave-calculated-field">
@@ -445,7 +401,7 @@ const LeaveRequest = ({ currentUser, showToast }) => {
                     </div>
                   )}
                 </div>
-              ) : null}
+              )}
 
               {/* Cảnh báo vi phạm quy định thời gian báo trước */}
               {violation && violation.violated && (
@@ -461,29 +417,27 @@ const LeaveRequest = ({ currentUser, showToast }) => {
                 </div>
               )}
 
-              {/* Leave Type Dropdown - Chỉ hiển thị khi chọn nghỉ phép */}
-              {requestType === 'leave' && (
-                <div className="leave-form-group">
-                  <label className="leave-form-label">Loại phép *</label>
-                  <div className="leave-select-wrapper">
-                    <select
-                      className="leave-form-select"
-                      value={formData.leaveType}
-                      onChange={(e) => handleInputChange('leaveType', e.target.value)}
-                      required
-                    >
-                      <option value="">-- Chọn loại phép --</option>
-                      <option value="annual">Phép năm</option>
-                      <option value="unpaid">Không hưởng lương</option>
-                      <option value="statutory">Nghỉ chế độ</option>
-                      <option value="maternity">Nghỉ Thai Sản</option>
-                    </select>
-                    <svg className="leave-select-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                  </div>
+              {/* Leave Type Dropdown */}
+              <div className="leave-form-group">
+                <label className="leave-form-label">Loại phép *</label>
+                <div className="leave-select-wrapper">
+                  <select
+                    className="leave-form-select"
+                    value={formData.leaveType}
+                    onChange={(e) => handleInputChange('leaveType', e.target.value)}
+                    required
+                  >
+                    <option value="">-- Chọn loại phép --</option>
+                    <option value="annual">Phép năm</option>
+                    <option value="unpaid">Không hưởng lương</option>
+                    <option value="statutory">Nghỉ chế độ</option>
+                    <option value="maternity">Nghỉ Thai Sản</option>
+                  </select>
+                  <svg className="leave-select-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
                 </div>
-              )}
+              </div>
 
               {/* Manager Field */}
               <div className="leave-form-group">
@@ -502,19 +456,13 @@ const LeaveRequest = ({ currentUser, showToast }) => {
 
               {/* Reason Field */}
               <div className="leave-form-group">
-                <label className="leave-form-label">
-                  Lý do {requestType === 'leave' ? 'xin nghỉ phép' : 'xin nghỉ việc'} *
-                </label>
+                <label className="leave-form-label">Lý do xin nghỉ phép *</label>
                 <textarea
                   className="leave-form-textarea"
                   rows="3"
                   value={formData.reason}
                   onChange={(e) => handleInputChange('reason', e.target.value)}
-                  placeholder={
-                    requestType === 'leave'
-                      ? 'Vui lòng nhập lý do xin nghỉ phép...'
-                      : 'Vui lòng nhập lý do xin nghỉ việc...'
-                  }
+                  placeholder="Vui lòng nhập lý do xin nghỉ phép..."
                   required
                 />
               </div>

@@ -6,6 +6,7 @@ import EmployeeForm from './components/EmployeeForm/EmployeeForm';
 import EquipmentAssignmentModal from './components/EquipmentAssignment/EquipmentAssignmentModal';
 import RequestsManagementModal from './components/RequestsManagement/RequestsManagementModal';
 import LeaveRequest from './components/LeaveRequest/LeaveRequest';
+import ResignRequest from './components/ResignRequest/ResignRequest';
 import LeaveApprovals from './components/LeaveApprovals/LeaveApprovals';
 import InterviewApprovals from './components/InterviewApprovals/InterviewApprovals';
 import ProbationList from './components/ProbationList/ProbationList';
@@ -213,6 +214,13 @@ function App() {
         case 'leave-request':
           return (
             <LeaveRequest
+              currentUser={currentUser}
+              showToast={showToast}
+            />
+          );
+        case 'resign-request':
+          return (
+            <ResignRequest
               currentUser={currentUser}
               showToast={showToast}
             />

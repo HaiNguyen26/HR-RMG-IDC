@@ -244,7 +244,9 @@ router.post('/', async (req, res) => {
             endDate,
             leaveType,
             reason,
-            notes
+            notes,
+            hasViolation,
+            violationMessage
         } = req.body;
 
         if (!employeeId || !requestType || !startDate || !reason) {
@@ -300,6 +302,18 @@ router.post('/', async (req, res) => {
             console.log('[LeaveRequest] leave_type column check:', alterError.message);
         }
 
+        // Kiểm tra và thêm cột has_violation và violation_message nếu chưa có
+        try {
+            await pool.query(`
+                ALTER TABLE leave_requests 
+                ADD COLUMN IF NOT EXISTS has_violation BOOLEAN DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS violation_message TEXT
+            `);
+        } catch (alterError) {
+            // Column có thể đã tồn tại, bỏ qua lỗi
+            console.log('[LeaveRequest] violation columns check:', alterError.message);
+        }
+
         // Tạo đơn
         const insertResult = await pool.query(
             `INSERT INTO leave_requests (
@@ -311,8 +325,10 @@ router.post('/', async (req, res) => {
                 leave_type,
                 reason,
                 notes,
-                status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                status,
+                has_violation,
+                violation_message
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *`,
             [
                 parseInt(employeeId, 10),
@@ -323,7 +339,9 @@ router.post('/', async (req, res) => {
                 leaveType || null,
                 reason,
                 notes || null,
-                STATUSES.PENDING
+                STATUSES.PENDING,
+                hasViolation || false,
+                violationMessage || null
             ]
         );
 
