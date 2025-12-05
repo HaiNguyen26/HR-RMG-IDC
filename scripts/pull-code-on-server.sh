@@ -38,7 +38,9 @@ echo ""
 echo "=========================================="
 echo "Dừng ứng dụng HR..."
 echo "=========================================="
-if pm2 list | grep -q "hr-backend\|hr-frontend"; then
+# Kiểm tra và dừng các process có thể có
+if pm2 list | grep -q "hr-management-api\|hr-backend\|hr-frontend"; then
+    pm2 stop hr-management-api 2>/dev/null || true
     pm2 stop hr-backend 2>/dev/null || true
     pm2 stop hr-frontend 2>/dev/null || true
     echo "✓ Đã dừng ứng dụng HR"
@@ -105,13 +107,24 @@ echo "=========================================="
 echo "Khởi động lại ứng dụng HR..."
 echo "=========================================="
 cd "$PROJECT_DIR"
-if [ -f "ecosystem.config.js" ]; then
-    pm2 restart hr-backend
-    pm2 restart hr-frontend
+
+# Kiểm tra PM2 process nào đang chạy
+PM2_PROCESS=$(pm2 list | grep -E "hr-management-api|hr-backend|hr-frontend" | awk '{print $2}' | head -1)
+
+if [ -n "$PM2_PROCESS" ]; then
+    echo "Tìm thấy PM2 process: $PM2_PROCESS"
+    pm2 restart "$PM2_PROCESS"
+    pm2 save
+    echo "✓ Đã khởi động lại ứng dụng HR"
+elif [ -f "ecosystem.config.js" ]; then
+    echo "Không tìm thấy process, thử khởi động từ ecosystem.config.js..."
+    pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
     pm2 save
     echo "✓ Đã khởi động lại ứng dụng HR"
 else
-    echo "⚠ Không tìm thấy ecosystem.config.js, vui lòng khởi động thủ công"
+    echo "⚠ Không tìm thấy PM2 process hoặc ecosystem.config.js"
+    echo "Vui lòng khởi động thủ công:"
+    echo "  cd backend && pm2 start npm --name hr-management-api -- run start"
 fi
 
 echo ""
@@ -119,6 +132,7 @@ echo "=========================================="
 echo "HOÀN TẤT!"
 echo "=========================================="
 echo "Code đã được cập nhật thành công."
-echo "Kiểm tra logs: pm2 logs hr-backend"
+echo "Kiểm tra logs: pm2 logs hr-management-api"
+echo "Hoặc: pm2 list (để xem tất cả processes)"
 echo "=========================================="
 
