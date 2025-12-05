@@ -406,17 +406,16 @@ scp database/backup_HR_Management_System_122025_02200PM.sql root@27.71.16.15:/tm
 # 2. Trên server - Dừng app tạm thời (optional)
 pm2 stop hr-management-api
 
-# 3. Restore database (dùng postgres để restore, sau đó chuyển ownership)
-# Bước 3a: Restore bằng postgres user
+# 3. Restore database bằng postgres user
+cd /var/www/hr-management
 sudo -u postgres psql -d HR_Management_System < /tmp/backup_HR_Management_System_122025_02200PM.sql 2>&1 | grep -v "ERROR:" | grep -v "WARNING:" || true
 
-# Bước 3b: Chuyển ownership sang hr_user
-if [ -f "database/transfer_ownership_to_hr_user.sql" ]; then
-    sudo -u postgres psql -d HR_Management_System -f database/transfer_ownership_to_hr_user.sql
-else
-    sudo -u postgres psql -d HR_Management_System -c "ALTER DATABASE HR_Management_System OWNER TO hr_user;"
-    sudo -u postgres psql -d HR_Management_System -c "ALTER SCHEMA public OWNER TO hr_user;"
-fi
+# 4. Chuyển ownership sang hr_user (QUAN TRỌNG!)
+# Option A: Dùng script tự động (khuyến nghị)
+./scripts/fix-ownership-on-server.sh
+
+# Option B: Chạy script SQL trực tiếp
+sudo -u postgres psql -d HR_Management_System -f database/transfer_ownership_to_hr_user.sql 2>&1 | grep -v "NOTICE:" || true
 
 # 5. Kiểm tra restore thành công
 PGPASSWORD=Hainguyen261097 psql -h localhost -U hr_user -d HR_Management_System -c "SELECT COUNT(*) FROM employees;"
@@ -459,6 +458,49 @@ fi
 - Backup database hiện tại trước khi restore (nếu cần)
 - Đảm bảo app đã được dừng hoặc người dùng đã được thông báo
 - Kiểm tra file backup có đầy đủ dữ liệu trước khi restore
+
+---
+
+## 🔧 Troubleshooting
+
+### Lỗi "must be owner of" sau khi restore backup
+
+Nếu gặp lỗi "must be owner of" sau khi restore backup, chạy script fix ownership:
+
+```bash
+cd /var/www/hr-management
+./scripts/fix-ownership-on-server.sh
+```
+
+Hoặc chạy trực tiếp:
+
+```bash
+cd /var/www/hr-management
+sudo -u postgres psql -d HR_Management_System -f database/transfer_ownership_to_hr_user.sql
+```
+
+Script này sẽ chuyển ownership của tất cả tables, sequences, views, indexes, và functions sang `hr_user`.
+
+### Lỗi "permission denied" khi app chạy
+
+Nếu app gặp lỗi "permission denied" khi truy cập database:
+
+1. Kiểm tra ownership đã được chuyển chưa:
+```bash
+sudo -u postgres psql -d HR_Management_System -c "SELECT tablename, tableowner FROM pg_tables WHERE schemaname = 'public' LIMIT 10;"
+```
+
+2. Nếu chưa, chạy script fix ownership:
+```bash
+cd /var/www/hr-management
+./scripts/fix-ownership-on-server.sh
+```
+
+3. Kiểm tra `.env` file có đúng user không:
+```bash
+cat /var/www/hr-management/backend/.env | grep DB_USER
+```
+Phải là `DB_USER=hr_user`
 
 ---
 
