@@ -5,7 +5,7 @@
 -- ============================================================
 
 -- Chuyển ownership của database
-ALTER DATABASE HR_Management_System OWNER TO hr_user;
+ALTER DATABASE "HR_Management_System" OWNER TO hr_user;
 
 -- Chuyển ownership của schema public
 ALTER SCHEMA public OWNER TO hr_user;
