@@ -1,0 +1,108 @@
+#!/bin/bash
+
+# Script: Pull code mới và chạy migration database trên server
+# Mô tả: Pull code từ git, chạy migration SQL scripts, restart PM2
+# Ngày tạo: 2025-01-XX
+
+set -e  # Exit on error
+
+# Màu sắc cho output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Thông tin database
+DB_NAME="HR_Management_System"
+DB_USER="hr_user"
+
+# Đường dẫn
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE}PULL CODE VÀ CHẠY MIGRATION DATABASE${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""
+
+# 1. Dừng PM2 process
+echo -e "${YELLOW}[1/4] Dừng PM2 process...${NC}"
+pm2 stop hr-management-api || echo "PM2 process không chạy hoặc không tìm thấy"
+echo -e "${GREEN}✓ Đã dừng PM2${NC}"
+echo ""
+
+# 2. Pull code mới từ git
+echo -e "${YELLOW}[2/4] Pull code mới từ git...${NC}"
+cd "$PROJECT_DIR"
+git pull origin main
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✓ Đã pull code thành công${NC}"
+else
+    echo -e "${RED}❌ Lỗi khi pull code${NC}"
+    echo -e "${YELLOW}Khởi động lại PM2...${NC}"
+    pm2 start hr-management-api
+    exit 1
+fi
+echo ""
+
+# 3. Chạy migration SQL scripts
+echo -e "${YELLOW}[3/4] Chạy migration SQL scripts...${NC}"
+echo "Database: $DB_NAME"
+echo "User: $DB_USER"
+echo ""
+
+# Migration 1: migrate_attendance_adjustments_allow_null_reason.sql
+MIGRATION1="$PROJECT_DIR/database/migrate_attendance_adjustments_allow_null_reason.sql"
+if [ -f "$MIGRATION1" ]; then
+    echo -e "${BLUE}→ Chạy migration: migrate_attendance_adjustments_allow_null_reason.sql${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION1"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 1 thành công${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 1${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 1: $MIGRATION1${NC}"
+fi
+
+# Migration 2: migrate_travel_expense_step1_fields.sql
+MIGRATION2="$PROJECT_DIR/database/migrate_travel_expense_step1_fields.sql"
+if [ -f "$MIGRATION2" ]; then
+    echo -e "${BLUE}→ Chạy migration: migrate_travel_expense_step1_fields.sql${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION2"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 2 thành công${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 2${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 2: $MIGRATION2${NC}"
+fi
+
+# 4. Khởi động lại PM2
+echo -e "${YELLOW}[4/4] Khởi động lại PM2...${NC}"
+pm2 start hr-management-api
+pm2 save
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✓ Đã khởi động lại PM2${NC}"
+else
+    echo -e "${RED}❌ Lỗi khi khởi động PM2${NC}"
+    exit 1
+fi
+
+echo ""
+echo -e "${GREEN}========================================${NC}"
+echo -e "${GREEN}✅ HOÀN THÀNH PULL VÀ MIGRATION${NC}"
+echo -e "${GREEN}========================================${NC}"
+echo ""
+echo "Đã thực hiện:"
+echo "  ✓ Pull code mới từ git"
+echo "  ✓ Chạy migration database"
+echo "  ✓ Khởi động lại PM2"
+echo ""
+
