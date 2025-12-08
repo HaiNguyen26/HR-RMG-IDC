@@ -6,6 +6,88 @@ Hệ thống hiện tại đã hoàn thành **khoảng 30-40%** của quy trình
 
 ---
 
+## 📋 QUY TRÌNH MỚI - GIAI ĐOẠN 1: KHỞI TẠO VÀ PHÊ DUYỆT NGÂN SÁCH
+
+### **BƯỚC 1: KHỞI TẠO YÊU CẦU CÔNG TÁC (Nhân viên)**
+
+#### Hoạt động:
+- **Tạo Yêu cầu Công tác Mới**: Nhập các thông tin:
+  - Mục đích (`purpose`)
+  - Tên công ty (`company_name`)
+  - Địa chỉ công ty (`company_address`)
+  - Địa điểm (Trong nước/Nước ngoài) (`location`, `location_type`)
+  - Ngày/Giờ Bắt đầu và Kết thúc (`start_date`, `start_time`, `end_date`, `end_time`)
+  - **Người tạo yêu cầu tự điền số tiền cần tạm ứng** (`requested_advance_amount`)
+  - **Không nhập kinh phí** khi tạo yêu cầu
+
+#### Logic Xử lý tự động:
+- ✅ Hệ thống tự động kiểm tra: **Có qua đêm không** (qua 24h)? → `is_overnight`
+- ✅ Hệ thống tự động kiểm tra: **Địa điểm có phải nước ngoài không**? → `location_type`, `requires_ceo`
+- ✅ **Tự động cấp phí sinh hoạt dựa trên châu lục**:
+  - Nếu là **Châu Âu – EU**: Tự động cấp **60 USD** phí sinh hoạt (`living_allowance_amount = 60`, `living_allowance_currency = 'USD'`)
+  - Nếu là **Châu Á – Asian**: Tự động cấp **40 USD** phí sinh hoạt (`living_allowance_amount = 40`, `living_allowance_currency = 'USD'`)
+  - Các châu lục khác: Cần xác định logic hoặc để trống
+
+---
+
+### **BƯỚC 2 & 2.1: PHÊ DUYỆT CẤP 1 & 2 (Quản lý Trực tiếp / Giám đốc Chi nhánh)**
+
+#### Hoạt động:
+- **Duyệt/Từ chối Yêu cầu**: 
+  - Kiểm tra tính cần thiết và phù hợp của công việc
+  - Có thể thêm ghi chú khi duyệt/từ chối
+
+#### Logic Xử lý:
+- Nếu **Duyệt** → Chuyển đến cấp phê duyệt tiếp theo dựa trên logic:
+  - Nếu công tác **nước ngoài** → chuyển đến Tổng Giám đốc (Bước 3)
+  - Nếu công tác **trong nước** → chuyển đến HR (Bước 4)
+- Nếu **Từ chối** → Yêu cầu bị từ chối, không chuyển tiếp
+
+#### Phân biệt Cấp 1 và Cấp 2:
+- **Cấp 1**: Quản lý Trực tiếp (`PENDING_LEVEL_1`)
+- **Cấp 2**: Giám đốc Chi nhánh (`PENDING_LEVEL_2`)
+- Workflow: Cấp 1 duyệt → Chuyển đến Cấp 2 (nếu cần) → Sau đó mới chuyển đến CEO hoặc HR
+
+---
+
+### **BƯỚC 3: PHÊ DUYỆT CẤP ĐẶC BIỆT (Tổng Giám đốc)**
+
+#### Hoạt động:
+- **Duyệt/Từ chối Yêu cầu**: 
+  - Chỉ xử lý nếu địa điểm là **Nước ngoài** và đã được **Cấp 1 duyệt**
+  - Xem xét tính cần thiết của công tác nước ngoài
+
+#### Logic Xử lý:
+- **Điều kiện**: Chỉ hiển thị và xử lý yêu cầu có:
+  - `location_type = 'INTERNATIONAL'` hoặc `requires_ceo = true`
+  - `status = 'PENDING_CEO'` (đã được Cấp 1 duyệt)
+- Nếu **Duyệt** → Chuyển đến cấp ngân sách (Bước 4)
+- Nếu **Từ chối** → Yêu cầu bị từ chối, không chuyển tiếp
+
+---
+
+### **BƯỚC 4: CẤP NGÂN SÁCH & TẠM ỨNG (HR & Kế toán)**
+
+#### Hoạt động - Xử lý Tạm ứng:
+
+**Trường hợp 1: HR đặt dịch vụ**
+- HR đặt dịch vụ (vé máy bay, khách sạn, ...) và làm yêu cầu thanh toán
+- HR nhập số tiền cần tạm ứng cho nhân viên
+- Hệ thống gửi thông báo cho Kế toán để xử lý thanh toán
+
+**Trường hợp 2: Nhân viên tự đặt**
+- Nhân viên tự đặt dịch vụ và báo số tiền tạm ứng cho HR
+- HR xác nhận và nhập số tiền tạm ứng vào hệ thống
+- Hệ thống gửi thông báo cho Kế toán để chuyển khoản cho nhân viên
+
+**Hành động Kế toán:**
+- Nhận thông báo yêu cầu tạm ứng
+- Thực hiện chuyển khoản cho nhân viên
+- Xác nhận đã chuyển khoản trên hệ thống
+- Cập nhật trạng thái: `advance_transferred_at`, `advance_confirmed_at`
+
+---
+
 ## ✅ ĐÃ HOÀN THÀNH
 
 ### **BƯỚC 1: KHỞI TẠO YÊU CẦU CÔNG TÁC (Nhân viên)**
@@ -19,10 +101,15 @@ Hệ thống hiện tại đã hoàn thành **khoảng 30-40%** của quy trình
 #### ❌ Thiếu:
 - ❌ **Tên công ty** (`company_name`) - chưa có field trong database
 - ❌ **Địa chỉ công ty** (`company_address`) - chưa có field trong database
+- ❌ **Số tiền cần tạm ứng** (`requested_advance_amount`) - người tạo tự điền
+- ❌ **Tự động cấp phí sinh hoạt dựa trên châu lục**:
+  - ❌ Xác định châu lục từ địa điểm (EU, Asian, ...)
+  - ❌ Tự động cấp 60 USD cho Châu Âu – EU (`living_allowance_amount`, `living_allowance_currency`)
+  - ❌ Tự động cấp 40 USD cho Châu Á – Asian (`living_allowance_amount`, `living_allowance_currency`)
 
 ---
 
-### **BƯỚC 2: PHÊ DUYỆT CẤP 1 (Quản lý Trực tiếp)**
+### **BƯỚC 2 & 2.1: PHÊ DUYỆT CẤP 1 & 2 (Quản lý Trực tiếp / Giám đốc Chi nhánh)**
 
 #### ✅ Đã có:
 - ✅ Module "Phê duyệt công tác" (`TravelExpenseApproval`)
@@ -35,6 +122,7 @@ Hệ thống hiện tại đã hoàn thành **khoảng 30-40%** của quy trình
 - ❌ **Phân biệt Cấp 1 và Cấp 2** - hiện tại chỉ có `PENDING_LEVEL_1`, không có `PENDING_LEVEL_2`
 - ❌ **Giám đốc Chi nhánh** - chưa có logic xử lý riêng cho cấp này
 - ❌ **Xác định vai trò người dùng** - frontend chưa truyền `actorRole` và `actorId` khi gọi API
+- ❌ **Workflow Cấp 1 → Cấp 2** - chưa có logic chuyển từ Cấp 1 sang Cấp 2 (Giám đốc Chi nhánh)
 
 ---
 
@@ -48,6 +136,7 @@ Hệ thống hiện tại đã hoàn thành **khoảng 30-40%** của quy trình
 #### ❌ Thiếu:
 - ❌ **Module riêng cho CEO** - hiện tại dùng chung module với quản lý
 - ❌ **Filter theo vai trò** - CEO chỉ thấy yêu cầu `PENDING_CEO`
+- ❌ **Điều kiện**: Chỉ xử lý nếu địa điểm là Nước ngoài và đã được Cấp 1 duyệt
 
 ---
 
@@ -64,14 +153,17 @@ Hệ thống hiện tại đã hoàn thành **khoảng 30-40%** của quy trình
 #### ❌ Thiếu (nhiều):
 - ❌ **Lưu ngân sách vào database** - hiện tại chỉ có form, chưa có API để lưu
 - ❌ **Trạng thái "Đã Duyệt Ngân sách"** - chưa có status này
-- ❌ **Tab B: Xử Lý Tạm ứng** - đã có form nhưng chưa hoàn chỉnh:
+- ❌ **Xử lý Tạm ứng - Trường hợp 1**: HR đặt dịch vụ và làm yêu cầu thanh toán
+- ❌ **Xử lý Tạm ứng - Trường hợp 2**: Nhân viên tự đặt và báo số tiền tạm ứng cho HR
+- ❌ **Hành động Kế toán**: 
+  - ❌ Nhận thông báo yêu cầu tạm ứng
+  - ❌ Thực hiện chuyển khoản cho nhân viên
+  - ❌ Xác nhận đã chuyển khoản trên hệ thống
+- ❌ **Form Tạm ứng** - chưa hoàn chỉnh:
   - ❌ Số tiền Thực Tạm ứng (`actualAmount`)
   - ❌ Hình thức Tạm ứng (`advanceMethod`)
   - ❌ Tài khoản Ngân hàng nhận (từ hồ sơ nhân viên)
   - ❌ Ghi chú (Nội dung Chuyển khoản)
-- ❌ **Trường hợp 1**: HR đặt dịch vụ và làm yêu cầu thanh toán
-- ❌ **Trường hợp 2**: Nhân viên tự đặt và báo số tiền tạm ứng cho HR
-- ❌ **Hành động Kế toán**: Nhận thông báo, chuyển khoản, xác nhận đã chuyển khoản
 
 ---
 
@@ -151,9 +243,13 @@ Hệ thống hiện tại đã hoàn thành **khoảng 30-40%** của quy trình
 ### **Bảng `travel_expense_requests` - Cần thêm:**
 
 ```sql
--- Bước 1: Thông tin công ty
+-- Bước 1: Thông tin công ty và tạm ứng
 company_name TEXT,
 company_address TEXT,
+requested_advance_amount NUMERIC(12, 2),        -- Số tiền cần tạm ứng (người tạo tự điền)
+living_allowance_amount NUMERIC(12, 2),         -- Phí sinh hoạt tự động cấp (40 USD cho EU, 60 USD cho Asian)
+living_allowance_currency VARCHAR(10),          -- Loại tiền phí sinh hoạt (USD)
+continent VARCHAR(50),                           -- Châu lục (EU, ASIAN, ...) - để xác định phí sinh hoạt
 
 -- Bước 4: Ngân sách và Tạm ứng
 approved_budget_amount NUMERIC(12, 2),        -- Ngân sách đã duyệt
@@ -203,7 +299,12 @@ payment_reference VARCHAR(100)                 -- Số tham chiếu giao dịch
 ## 🎯 CÁC MODULE CẦN PHÁT TRIỂN
 
 ### **1. Module Tạo Yêu Cầu Công Tác (Nhân viên) - Cần bổ sung:**
-- Thêm field: Tên công ty, Địa chỉ công ty
+- Thêm field: Tên công ty (`company_name`), Địa chỉ công ty (`company_address`)
+- Thêm field: Số tiền cần tạm ứng (`requested_advance_amount`) - người tạo tự điền
+- Thêm logic: Tự động xác định châu lục từ địa điểm và cấp phí sinh hoạt:
+  - Châu Âu – EU: 60 USD (`living_allowance_amount = 60`, `living_allowance_currency = 'USD'`)
+  - Châu Á – Asian: 40 USD (`living_allowance_amount = 40`, `living_allowance_currency = 'USD'`)
+- Thêm fields: `living_allowance_amount`, `living_allowance_currency`, `continent`
 
 ### **2. Module Phê Duyệt Công Tác (Quản lý/CEO) - Cần hoàn thiện:**
 - Sửa lỗi: Truyền `actorRole` và `actorId` khi gọi API
@@ -245,7 +346,7 @@ payment_reference VARCHAR(100)                 -- Số tham chiếu giao dịch
 
 | Giai Đoạn | Tỷ Lệ | Ghi Chú |
 |-----------|-------|---------|
-| **Bước 1: Khởi tạo** | 80% | Thiếu: Tên công ty, Địa chỉ công ty |
+| **Bước 1: Khởi tạo** | 70% | Thiếu: Tên công ty, Địa chỉ công ty, Số tiền tạm ứng, Logic tự động cấp phí sinh hoạt |
 | **Bước 2: Phê duyệt Cấp 1** | 70% | Thiếu: actorRole, Cấp 2, Giám đốc Chi nhánh |
 | **Bước 3: Phê duyệt CEO** | 60% | Thiếu: Module riêng, Filter theo vai trò |
 | **Bước 4: Cấp ngân sách** | 50% | Có form nhưng chưa lưu DB, thiếu tạm ứng |
@@ -261,9 +362,11 @@ payment_reference VARCHAR(100)                 -- Số tham chiếu giao dịch
 
 ### **Phase 1: Hoàn thiện Giai đoạn 1 (Ưu tiên cao)**
 1. ✅ Sửa lỗi `actorRole` trong module phê duyệt
-2. ✅ Thêm fields: Tên công ty, Địa chỉ công ty
-3. ✅ Lưu ngân sách vào database (Tab A)
-4. ✅ Hoàn thiện Tab B: Tạm ứng
+2. ✅ Thêm fields: Tên công ty (`company_name`), Địa chỉ công ty (`company_address`)
+3. ✅ Thêm field: Số tiền cần tạm ứng (`requested_advance_amount`) - người tạo tự điền
+4. ✅ Thêm logic: Tự động xác định châu lục và cấp phí sinh hoạt (EU: 60 USD, Asian: 40 USD)
+5. ✅ Lưu ngân sách vào database (Tab A)
+6. ✅ Hoàn thiện Tab B: Tạm ứng
 
 ### **Phase 2: Phát triển Giai đoạn 2 (Ưu tiên trung bình)**
 1. ✅ Module Báo cáo Hoàn ứng

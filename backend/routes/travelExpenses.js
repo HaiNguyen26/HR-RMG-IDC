@@ -77,6 +77,32 @@ const ensureTable = async () => {
         END $$;
     `;
     await pool.query(addBudgetFields);
+
+    // Add Step 1 fields (company_name, company_address, requested_advance_amount, living_allowance_amount, living_allowance_currency, continent)
+    const addStep1Fields = `
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='company_name') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN company_name TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='company_address') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN company_address TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='requested_advance_amount') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN requested_advance_amount NUMERIC(12, 2);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='living_allowance_amount') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN living_allowance_amount NUMERIC(12, 2);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='living_allowance_currency') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN living_allowance_currency VARCHAR(10);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='continent') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN continent VARCHAR(50);
+            END IF;
+        END $$;
+    `;
+    await pool.query(addStep1Fields);
 };
 
 ensureTable().catch((error) => {
@@ -116,6 +142,66 @@ const detectLocationTypeFromText = (location) => {
         }
     }
     return 'INTERNATIONAL';
+};
+
+// Xác định châu lục từ địa điểm
+const detectContinentFromLocation = (location) => {
+    if (!location) return null;
+    const normalizedLocation = normalizeText(location);
+    
+    // Danh sách các quốc gia Châu Âu (EU)
+    const europeanCountries = [
+        'austria', 'belgium', 'bulgaria', 'croatia', 'cyprus', 'czech', 'denmark',
+        'estonia', 'finland', 'france', 'germany', 'greece', 'hungary', 'ireland',
+        'italy', 'latvia', 'lithuania', 'luxembourg', 'malta', 'netherlands', 'poland',
+        'portugal', 'romania', 'slovakia', 'slovenia', 'spain', 'sweden', 'united kingdom',
+        'uk', 'england', 'scotland', 'wales', 'norway', 'switzerland', 'iceland',
+        'paris', 'london', 'berlin', 'madrid', 'rome', 'amsterdam', 'vienna', 'brussels',
+        'stockholm', 'copenhagen', 'dublin', 'lisbon', 'warsaw', 'prague', 'budapest',
+        'athens', 'helsinki', 'oslo', 'reykjavik', 'zurich', 'geneva'
+    ];
+    
+    // Danh sách các quốc gia Châu Á
+    const asianCountries = [
+        'china', 'japan', 'south korea', 'north korea', 'india', 'indonesia', 'thailand',
+        'vietnam', 'philippines', 'malaysia', 'singapore', 'myanmar', 'cambodia', 'laos',
+        'bangladesh', 'sri lanka', 'nepal', 'bhutan', 'maldives', 'pakistan', 'afghanistan',
+        'iran', 'iraq', 'saudi arabia', 'uae', 'united arab emirates', 'qatar', 'kuwait',
+        'bahrain', 'oman', 'yemen', 'jordan', 'lebanon', 'syria', 'israel', 'palestine',
+        'turkey', 'mongolia', 'kazakhstan', 'uzbekistan', 'tajikistan', 'kyrgyzstan',
+        'turkmenistan', 'taiwan', 'hong kong', 'macau', 'tokyo', 'seoul', 'beijing',
+        'shanghai', 'hongkong', 'bangkok', 'jakarta', 'manila', 'kuala lumpur', 'hanoi',
+        'ho chi minh', 'sai gon', 'dhaka', 'colombo', 'kathmandu', 'thimphu', 'male',
+        'islamabad', 'kabul', 'tehran', 'baghdad', 'riyadh', 'dubai', 'abu dhabi', 'doha',
+        'kuwait city', 'manama', 'muscat', 'sanaa', 'amman', 'beirut', 'damascus',
+        'jerusalem', 'tel aviv', 'ankara', 'istanbul', 'ulaanbaatar', 'astana', 'tashkent'
+    ];
+    
+    // Kiểm tra Châu Âu
+    for (const country of europeanCountries) {
+        if (normalizedLocation.includes(country)) {
+            return 'EU';
+        }
+    }
+    
+    // Kiểm tra Châu Á
+    for (const country of asianCountries) {
+        if (normalizedLocation.includes(country)) {
+            return 'ASIAN';
+        }
+    }
+    
+    return null;
+};
+
+// Tính toán phí sinh hoạt tự động dựa trên châu lục
+const calculateLivingAllowance = (continent) => {
+    if (continent === 'EU') {
+        return { amount: 60, currency: 'USD' };
+    } else if (continent === 'ASIAN') {
+        return { amount: 40, currency: 'USD' };
+    }
+    return { amount: null, currency: null };
 };
 
 const normalizeLocationType = (value, location) => {
@@ -209,6 +295,8 @@ const mapRowToResponse = (row) => {
         employee_branch: row.employee_branch || null,
         title: row.title,
         purpose: row.purpose,
+        companyName: row.company_name || null,
+        companyAddress: row.company_address || null,
         location: row.location,
         locationType: row.location_type,
         startTime: row.start_time,
@@ -217,6 +305,12 @@ const mapRowToResponse = (row) => {
         requiresCEO: row.requires_ceo,
         status: row.status,
         currentStep: row.current_step,
+        requestedAdvanceAmount: row.requested_advance_amount ? Number(row.requested_advance_amount) : null,
+        livingAllowance: row.living_allowance_amount ? {
+            amount: Number(row.living_allowance_amount),
+            currency: row.living_allowance_currency || 'USD',
+        } : null,
+        continent: row.continent || null,
         estimatedCost: row.estimated_cost ? Number(row.estimated_cost) : null,
         requestedBy: row.requested_by,
         approvedBudget: row.approved_budget_amount ? {
@@ -359,10 +453,13 @@ router.post('/', async (req, res) => {
             employeeId,
             title,
             purpose,
+            companyName,
+            companyAddress,
             location,
             locationType,
             startTime,
             endTime,
+            requestedAdvanceAmount,
             estimatedCost,
             requestedBy,
         } = req.body;
@@ -406,11 +503,27 @@ router.post('/', async (req, res) => {
         const initialStatus = 'PENDING_LEVEL_1';
         const initialStep = 'LEVEL_1';
 
+        // Xác định châu lục và tính phí sinh hoạt tự động (chỉ cho công tác nước ngoài)
+        let continent = null;
+        let livingAllowanceAmount = null;
+        let livingAllowanceCurrency = null;
+        
+        if (normalizedLocationType === 'INTERNATIONAL') {
+            continent = detectContinentFromLocation(location);
+            if (continent) {
+                const allowance = calculateLivingAllowance(continent);
+                livingAllowanceAmount = allowance.amount;
+                livingAllowanceCurrency = allowance.currency;
+            }
+        }
+
         const insertQuery = `
             INSERT INTO travel_expense_requests (
                 employee_id,
                 title,
                 purpose,
+                company_name,
+                company_address,
                 location,
                 location_type,
                 start_time,
@@ -419,10 +532,14 @@ router.post('/', async (req, res) => {
                 requires_ceo,
                 status,
                 current_step,
+                requested_advance_amount,
+                living_allowance_amount,
+                living_allowance_currency,
+                continent,
                 estimated_cost,
                 requested_by
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
             RETURNING *
         `;
 
@@ -430,6 +547,8 @@ router.post('/', async (req, res) => {
             employeeId,
             title || null,
             purpose || null,
+            companyName || null,
+            companyAddress || null,
             location,
             normalizedLocationType,
             start.toISOString(),
@@ -438,6 +557,10 @@ router.post('/', async (req, res) => {
             requiresCEO,
             initialStatus,
             initialStep,
+            requestedAdvanceAmount !== undefined && requestedAdvanceAmount !== null && requestedAdvanceAmount !== '' ? parseFloat(requestedAdvanceAmount) : null,
+            livingAllowanceAmount,
+            livingAllowanceCurrency,
+            continent,
             estimatedCost !== undefined && estimatedCost !== null ? estimatedCost : null,
             requestedBy || null,
         ];
