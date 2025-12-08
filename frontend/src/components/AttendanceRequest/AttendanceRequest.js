@@ -3,6 +3,7 @@ import DatePicker from 'react-datepicker';
 import { employeesAPI, attendanceAdjustmentsAPI } from '../../services/api';
 import { formatDateToISO, parseISODateString, today } from '../../utils/dateUtils';
 import { DATE_PICKER_LOCALE } from '../../utils/datepickerLocale';
+import TimePicker24h from '../TimePicker24h/TimePicker24h';
 import './AttendanceRequest.css';
 
 const ATTENDANCE_ITEMS = [
@@ -26,6 +27,7 @@ const ATTENDANCE_ITEMS = [
 const AttendanceRequest = ({ currentUser, showToast }) => {
   const [formData, setFormData] = useState({
     date: '',
+    reason: '', // Lý do bổ sung chấm công
     attendanceItems: [] // Danh sách mục cần bổ sung
   });
   const [loading, setLoading] = useState(false);
@@ -161,6 +163,10 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
       return;
     }
 
+    if (!formData.reason || formData.reason.trim() === '') {
+      setError('Vui lòng nhập lý do bổ sung chấm công.');
+      return;
+    }
 
     if (!selectedAttendanceItem) {
       setError('Vui lòng chọn loại bổ sung chấm công.');
@@ -181,11 +187,35 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
 
     // Validate chi tiết của item được chọn
     if (selectedItem.id === 1) {
-      // Quên Chấm Công: cần checkInTime và checkOutTime
-      if (!selectedItem.details?.checkInTime || !selectedItem.details?.checkOutTime) {
-        setError('Vui lòng nhập đầy đủ giờ vào và giờ ra cho mục "Quên Chấm Công".');
+      // Quên Chấm Công: cần ít nhất một trong hai (giờ vào hoặc giờ ra)
+      const hasCheckIn = selectedItem.details?.checkInTime && selectedItem.details.checkInTime.trim() !== '';
+      const hasCheckOut = selectedItem.details?.checkOutTime && selectedItem.details.checkOutTime.trim() !== '';
+      
+      if (!hasCheckIn && !hasCheckOut) {
+        setError('Vui lòng nhập ít nhất giờ vào hoặc giờ ra cho mục "Quên Chấm Công".');
         return;
       }
+      
+      // Tự động xác định label dựa trên dữ liệu nhập vào
+      let label = 'Quên Chấm Công';
+      if (hasCheckIn && !hasCheckOut) {
+        label = 'Quên giờ vào';
+      } else if (!hasCheckIn && hasCheckOut) {
+        label = 'Quên giờ ra';
+      } else if (hasCheckIn && hasCheckOut) {
+        label = 'Quên chấm công vào và ra';
+      }
+      
+      // Cập nhật label trong attendanceItems
+      selectedItem.label = label;
+      
+      // Cập nhật lại formData với label mới
+      setFormData(prev => ({
+        ...prev,
+        attendanceItems: prev.attendanceItems.map(item => 
+          item.id === selectedItem.id ? { ...item, label } : item
+        )
+      }));
     } else if (selectedItem.id === 2) {
       // Đi Công Trình: cần location, startTime, endTime
       if (!selectedItem.details?.location || !selectedItem.details?.startTime || !selectedItem.details?.endTime) {
@@ -210,7 +240,7 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
       const payload = {
         employeeId: currentUser.id,
         adjustmentDate: formData.date,
-        reason: '', // Không cần lý do cho các loại bổ sung công
+        reason: formData.reason.trim(), // Lý do bổ sung chấm công
         attendanceItems: formData.attendanceItems.map(item => ({
           id: item.id,
           type: item.type,
@@ -452,24 +482,56 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                 const displayDetails = savedItem?.details || currentDetails;
 
                 const handleItemDetailChange = (field, value) => {
+                  // Format time fields to 24-hour format
+                  let formattedValue = value;
+                  if ((field === 'checkInTime' || field === 'checkOutTime' || field === 'startTime' || field === 'endTime') && value) {
+                    if (value.includes(':')) {
+                      const [hours, minutes] = value.split(':');
+                      const hours24 = parseInt(hours, 10);
+                      
+                      // Ensure hours are in 24h format (0-23)
+                      if (hours24 >= 0 && hours24 <= 23) {
+                        // Format as HH:mm (2 digits for hours and minutes)
+                        formattedValue = `${hours24.toString().padStart(2, '0')}:${minutes || '00'}`;
+                      }
+                    }
+                  }
+
                   setItemDetails(prev => ({
                     ...prev,
                     [itemKey]: {
                       ...prev[itemKey],
-                      [field]: value
+                      [field]: formattedValue
                     }
                   }));
 
                   // Auto-save vào attendanceItems
                   const updatedDetails = {
                     ...displayDetails,
-                    [field]: value
+                    [field]: formattedValue
                   };
+
+                  // Tự động xác định label cho "Quên Chấm Công"
+                  let label = currentItem.label;
+                  if (selectedAttendanceItem === 1) {
+                    const hasCheckIn = updatedDetails.checkInTime && updatedDetails.checkInTime.trim() !== '';
+                    const hasCheckOut = updatedDetails.checkOutTime && updatedDetails.checkOutTime.trim() !== '';
+                    
+                    if (hasCheckIn && !hasCheckOut) {
+                      label = 'Quên giờ vào';
+                    } else if (!hasCheckIn && hasCheckOut) {
+                      label = 'Quên giờ ra';
+                    } else if (hasCheckIn && hasCheckOut) {
+                      label = 'Quên chấm công vào và ra';
+                    } else {
+                      label = 'Quên Chấm Công';
+                    }
+                  }
 
                   const newItem = {
                     id: currentItem.id,
                     type: currentItem.type,
-                    label: currentItem.label,
+                    label: label,
                     details: updatedDetails
                   };
 
@@ -482,10 +544,25 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                   });
                 };
 
+                // Xác định label hiển thị cho "Quên Chấm Công"
+                let displayTitle = currentItem.label;
+                if (selectedAttendanceItem === 1) {
+                  const hasCheckIn = displayDetails.checkInTime && displayDetails.checkInTime.trim() !== '';
+                  const hasCheckOut = displayDetails.checkOutTime && displayDetails.checkOutTime.trim() !== '';
+                  
+                  if (hasCheckIn && !hasCheckOut) {
+                    displayTitle = 'Quên giờ vào';
+                  } else if (!hasCheckIn && hasCheckOut) {
+                    displayTitle = 'Quên giờ ra';
+                  } else if (hasCheckIn && hasCheckOut) {
+                    displayTitle = 'Quên chấm công vào và ra';
+                  }
+                }
+
                 return (
                   <div className="attendance-item-detail-form">
                     <div className="attendance-item-detail-header">
-                      <h3 className="attendance-item-detail-title">{currentItem.label}</h3>
+                      <h3 className="attendance-item-detail-title">{displayTitle}</h3>
                       <button
                         type="button"
                         className="attendance-item-detail-close"
@@ -501,35 +578,44 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                         /* Mục 1: Quên Chấm Công */
                         <div className="attendance-item-form">
                           <div className="attendance-item-form-group">
-                            <label className="attendance-item-form-label">Giờ vào *</label>
+                            <label className="attendance-item-form-label">Giờ vào</label>
                             <div className="attendance-time-picker-wrapper">
-                              <input
-                                type="time"
-                                className="attendance-form-timepicker"
+                              <TimePicker24h
                                 value={displayDetails.checkInTime || ''}
                                 onChange={(e) => handleItemDetailChange('checkInTime', e.target.value)}
-                                onClick={(e) => e.target.showPicker?.()}
+                                className="attendance-form-timepicker"
                               />
-                              <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                              </svg>
                             </div>
                           </div>
                           <div className="attendance-item-form-group">
-                            <label className="attendance-item-form-label">Giờ ra *</label>
+                            <label className="attendance-item-form-label">Giờ ra</label>
                             <div className="attendance-time-picker-wrapper">
-                              <input
-                                type="time"
-                                className="attendance-form-timepicker"
+                              <TimePicker24h
                                 value={displayDetails.checkOutTime || ''}
                                 onChange={(e) => handleItemDetailChange('checkOutTime', e.target.value)}
-                                onClick={(e) => e.target.showPicker?.()}
+                                className="attendance-form-timepicker"
                               />
-                              <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                              </svg>
                             </div>
                           </div>
+                          {/* Hiển thị loại quên chấm công dựa trên dữ liệu nhập */}
+                          {(() => {
+                            const hasCheckIn = displayDetails.checkInTime && displayDetails.checkInTime.trim() !== '';
+                            const hasCheckOut = displayDetails.checkOutTime && displayDetails.checkOutTime.trim() !== '';
+                            let displayLabel = '';
+                            if (hasCheckIn && !hasCheckOut) {
+                              displayLabel = 'Quên giờ vào';
+                            } else if (!hasCheckIn && hasCheckOut) {
+                              displayLabel = 'Quên giờ ra';
+                            } else if (hasCheckIn && hasCheckOut) {
+                              displayLabel = 'Quên chấm công vào và ra';
+                            }
+                            return displayLabel ? (
+                              <div className="attendance-forgot-check-type-display">
+                                <span className="attendance-forgot-check-type-label">Loại:</span>
+                                <span className="attendance-forgot-check-type-value">{displayLabel}</span>
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                       ) : selectedAttendanceItem === 2 ? (
                         /* Mục 2: Đi Công Trình */
@@ -548,31 +634,21 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                             <div className="attendance-item-form-group">
                               <label className="attendance-item-form-label">Giờ bắt đầu *</label>
                               <div className="attendance-time-picker-wrapper">
-                                <input
-                                  type="time"
-                                  className="attendance-form-timepicker"
+                                <TimePicker24h
                                   value={displayDetails.startTime || ''}
                                   onChange={(e) => handleItemDetailChange('startTime', e.target.value)}
-                                  onClick={(e) => e.target.showPicker?.()}
+                                  className="attendance-form-timepicker"
                                 />
-                                <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
                               </div>
                             </div>
                             <div className="attendance-item-form-group">
                               <label className="attendance-item-form-label">Giờ kết thúc *</label>
                               <div className="attendance-time-picker-wrapper">
-                                <input
-                                  type="time"
-                                  className="attendance-form-timepicker"
+                                <TimePicker24h
                                   value={displayDetails.endTime || ''}
                                   onChange={(e) => handleItemDetailChange('endTime', e.target.value)}
-                                  onClick={(e) => e.target.showPicker?.()}
+                                  className="attendance-form-timepicker"
                                 />
-                                <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
                               </div>
                             </div>
                           </div>
@@ -594,36 +670,44 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                             <div className="attendance-item-form-group">
                               <label className="attendance-item-form-label">Giờ bắt đầu *</label>
                               <div className="attendance-time-picker-wrapper">
-                                <input
-                                  type="time"
-                                  className="attendance-form-timepicker"
+                                <TimePicker24h
                                   value={displayDetails.startTime || ''}
                                   onChange={(e) => handleItemDetailChange('startTime', e.target.value)}
-                                  onClick={(e) => e.target.showPicker?.()}
+                                  className="attendance-form-timepicker"
                                 />
-                                <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
                               </div>
                             </div>
                             <div className="attendance-item-form-group">
                               <label className="attendance-item-form-label">Giờ kết thúc *</label>
                               <div className="attendance-time-picker-wrapper">
-                                <input
-                                  type="time"
-                                  className="attendance-form-timepicker"
+                                <TimePicker24h
                                   value={displayDetails.endTime || ''}
                                   onChange={(e) => handleItemDetailChange('endTime', e.target.value)}
-                                  onClick={(e) => e.target.showPicker?.()}
+                                  className="attendance-form-timepicker"
                                 />
-                                <svg className="attendance-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
                               </div>
                             </div>
                           </div>
                         </div>
                       )}
+                      
+                      {/* Lý do bổ sung - Hiển thị cho tất cả các loại */}
+                      <div className="attendance-item-form-group" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                        <label className="attendance-item-form-label">
+                          <svg className="attendance-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '1rem', height: '1rem', marginRight: '0.5rem' }}>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                          </svg>
+                          Lý do bổ sung *
+                        </label>
+                        <textarea
+                          className="attendance-form-textarea"
+                          value={formData.reason}
+                          onChange={(e) => handleInputChange('reason', e.target.value)}
+                          placeholder="Nhập lý do bổ sung chấm công..."
+                          rows={4}
+                          required
+                        />
+                      </div>
                     </div>
                   </div>
                 );

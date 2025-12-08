@@ -3,6 +3,7 @@ import DatePicker from 'react-datepicker';
 import { employeesAPI, overtimeRequestsAPI } from '../../services/api';
 import { formatDateToISO, parseISODateString, today } from '../../utils/dateUtils';
 import { DATE_PICKER_LOCALE } from '../../utils/datepickerLocale';
+import TimePicker24h from '../TimePicker24h/TimePicker24h';
 import './OvertimeRequest.css';
 
 const OvertimeRequest = ({ currentUser, showToast }) => {
@@ -221,8 +222,27 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
   };
 
   const handleTimeChange = (field) => (e) => {
-    const value = e.target.value;
-    // Validate time format hh:mm
+    let value = e.target.value;
+    
+    // Convert to 24-hour format if needed
+    // HTML5 time input should already be in 24h format, but ensure it's correct
+    if (value && value.includes(':')) {
+      const [hours, minutes] = value.split(':');
+      const hours24 = parseInt(hours, 10);
+      const minutesInt = parseInt(minutes, 10);
+      
+      // Ensure hours are in 24h format (0-23)
+      if (hours24 >= 0 && hours24 <= 23) {
+        // Làm tròn phút về bước 15 phút gần nhất (00, 15, 30, 45)
+        const roundedMinutes = Math.round(minutesInt / 15) * 15;
+        const finalMinutes = Math.min(roundedMinutes, 45); // Tối đa 45
+        
+        // Format as HH:mm (2 digits for hours and minutes)
+        value = `${hours24.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}`;
+      }
+    }
+    
+    // Validate time format hh:mm (24-hour)
     if (value === '' || /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(value)) {
       handleInputChange(field, value);
     }
@@ -427,17 +447,12 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
                       <span>Giờ bắt đầu *</span>
                     </label>
                     <div className="overtime-time-picker-wrapper">
-                      <input
-                        type="time"
-                        className="overtime-form-timepicker"
+                      <TimePicker24h
                         value={formData.startTime}
                         onChange={handleTimeChange('startTime')}
-                        onClick={(e) => e.target.showPicker?.()}
-                        required
+                        className="overtime-form-timepicker"
+                        minuteStep={15}
                       />
-                      <svg className="overtime-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                      </svg>
                     </div>
                   </div>
                 </div>
@@ -477,17 +492,12 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
                       <span>Giờ kết thúc *</span>
                     </label>
                     <div className="overtime-time-picker-wrapper">
-                      <input
-                        type="time"
-                        className="overtime-form-timepicker"
+                      <TimePicker24h
                         value={formData.endTime}
                         onChange={handleTimeChange('endTime')}
-                        onClick={(e) => e.target.showPicker?.()}
-                        required
+                        className="overtime-form-timepicker"
+                        minuteStep={15}
                       />
-                      <svg className="overtime-time-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                      </svg>
                     </div>
                   </div>
                 </div>

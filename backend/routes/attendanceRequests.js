@@ -181,10 +181,8 @@ router.get('/', async (req, res) => {
 
         if (teamLeadId) {
             conditions.push(`adj.team_lead_id = $${paramIndex}`);
-            conditions.push(`adj.status = $${paramIndex + 1}`);
             params.push(parseInt(teamLeadId, 10));
-            params.push(STATUSES.PENDING);
-            paramIndex += 2;
+            paramIndex += 1;
         }
 
         if (status) {
@@ -199,6 +197,11 @@ router.get('/', async (req, res) => {
                 params.push(...statuses);
                 paramIndex += statuses.length;
             }
+        } else if (teamLeadId) {
+            // Nếu không có status filter nhưng có teamLeadId, mặc định chỉ hiển thị PENDING
+            conditions.push(`adj.status = $${paramIndex}`);
+            params.push(STATUSES.PENDING);
+            paramIndex += 1;
         }
 
         const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '1=1';
@@ -245,10 +248,18 @@ router.post('/', async (req, res) => {
         } = req.body;
 
         // Validation cơ bản
-        if (!employeeId || !adjustmentDate || !reason) {
+        if (!employeeId || !adjustmentDate) {
             return res.status(400).json({
                 success: false,
-                message: 'Thiếu thông tin bắt buộc: employeeId, adjustmentDate, reason'
+                message: 'Thiếu thông tin bắt buộc: employeeId, adjustmentDate'
+            });
+        }
+
+        // Validation reason: yêu cầu phải có lý do
+        if (!reason || typeof reason !== 'string' || reason.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                message: 'Vui lòng nhập lý do bổ sung chấm công'
             });
         }
 
@@ -275,16 +286,25 @@ router.post('/', async (req, res) => {
         let checkOutTime = null;
 
         if (item.id === 1) {
-            // Quên Chấm Công: cần checkInTime và checkOutTime
-            checkType = 'BOTH';
-            checkInTime = item.details.checkInTime || null;
-            checkOutTime = item.details.checkOutTime || null;
+            // Quên Chấm Công: có thể chỉ có giờ vào, chỉ có giờ ra, hoặc cả hai
+            checkInTime = item.details.checkInTime && item.details.checkInTime.trim() !== '' ? item.details.checkInTime.trim() : null;
+            checkOutTime = item.details.checkOutTime && item.details.checkOutTime.trim() !== '' ? item.details.checkOutTime.trim() : null;
             
-            if (!checkInTime || !checkOutTime) {
+            // Phải có ít nhất một trong hai
+            if (!checkInTime && !checkOutTime) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Thiếu thông tin bắt buộc: checkInTime và checkOutTime cho "Quên Chấm Công"'
+                    message: 'Vui lòng nhập ít nhất giờ vào hoặc giờ ra cho "Quên Chấm Công"'
                 });
+            }
+            
+            // Xác định checkType dựa trên dữ liệu nhập vào
+            if (checkInTime && !checkOutTime) {
+                checkType = 'CHECK_IN'; // Chỉ quên giờ vào
+            } else if (!checkInTime && checkOutTime) {
+                checkType = 'CHECK_OUT'; // Chỉ quên giờ ra
+            } else {
+                checkType = 'BOTH'; // Quên cả hai
             }
         } else if (item.id === 2 || item.id === 3) {
             // Đi Công Trình hoặc Làm việc bên ngoài: dùng startTime và endTime
@@ -335,25 +355,25 @@ router.post('/', async (req, res) => {
 
         const employee = employeeResult.rows[0];
 
-        if (!employee.quan_ly_truc_tiep || employee.quan_ly_truc_tiep.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: `Nhân viên chưa có thông tin quản lý trực tiếp. Vui lòng cập nhật thông tin quản lý trực tiếp cho nhân viên "${employee.ho_ten || 'N/A'}" trong module Quản lý nhân viên.`
-            });
+        // Cho phép tạo đơn mà không cần quản lý trực tiếp
+        // Nếu không có quản lý trực tiếp, team_lead_id sẽ là NULL và đơn sẽ được gửi trực tiếp cho HR
+        let teamLead = null;
+        let teamLeadId = null;
+
+        if (employee.quan_ly_truc_tiep && employee.quan_ly_truc_tiep.trim() !== '') {
+            // Tìm quản lý trực tiếp nếu có
+            teamLead = await findManagerFromCache(employee.quan_ly_truc_tiep);
+
+            if (!teamLead) {
+                console.warn(`[AttendanceRequest] Không tìm thấy quản lý trực tiếp. Nhân viên: ${employee.ho_ten}, quan_ly_truc_tiep: "${employee.quan_ly_truc_tiep}". Đơn sẽ được gửi trực tiếp cho HR.`);
+                // Không trả về lỗi, tiếp tục với teamLeadId = null
+            } else {
+                teamLeadId = teamLead.id;
+                console.log(`[AttendanceRequest] Tạo đơn cho nhân viên "${employee.ho_ten}", quản lý trực tiếp: "${teamLead.ho_ten}"`);
+            }
+        } else {
+            console.log(`[AttendanceRequest] Nhân viên "${employee.ho_ten}" không có quản lý trực tiếp. Đơn sẽ được gửi trực tiếp cho HR.`);
         }
-
-        // Tìm quản lý trực tiếp
-        const teamLead = await findManagerFromCache(employee.quan_ly_truc_tiep);
-
-        if (!teamLead) {
-            console.error(`[AttendanceRequest] Không tìm thấy quản lý trực tiếp. Nhân viên: ${employee.ho_ten}, quan_ly_truc_tiep: "${employee.quan_ly_truc_tiep}"`);
-            return res.status(404).json({
-                success: false,
-                message: `Không tìm thấy quản lý trực tiếp "${employee.quan_ly_truc_tiep}" trong hệ thống. Vui lòng kiểm tra lại tên quản lý trực tiếp của nhân viên "${employee.ho_ten || 'N/A'}" trong module Quản lý nhân viên.`
-            });
-        }
-
-        console.log(`[AttendanceRequest] Tạo đơn cho nhân viên "${employee.ho_ten}", quản lý trực tiếp: "${teamLead.ho_ten}"`);
 
         // Lưu notes từ item details nếu có (cho item 2 và 3)
         const notes = (item.id === 2 || item.id === 3) ? (item.details.reason || null) : null;
@@ -373,6 +393,9 @@ router.post('/', async (req, res) => {
         }
 
         // Tạo đơn
+        // Xử lý reason: đã validate ở trên, nên chắc chắn có giá trị
+        const reasonValue = reason.trim();
+        
         const insertResult = await pool.query(
             `INSERT INTO attendance_adjustments (
                 employee_id,
@@ -388,12 +411,12 @@ router.post('/', async (req, res) => {
             RETURNING *`,
             [
                 parseInt(employeeId, 10),
-                teamLead.id,
+                teamLeadId, // Có thể là NULL nếu không có quản lý trực tiếp
                 adjustmentDate,
                 checkType,
                 checkInTime,
                 checkOutTime,
-                reason,
+                reasonValue,
                 notesWithType,
                 STATUSES.PENDING
             ]

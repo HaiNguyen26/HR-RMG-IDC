@@ -102,6 +102,30 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [managerResolved, setManagerResolved] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
+    
+    // Statistics for badge counts - overall (tính từ requests hiện tại)
+    const statistics = useMemo(() => {
+        const pending = requests.filter(r => r.status === 'PENDING').length;
+        const approved = requests.filter(r => r.status === 'APPROVED').length;
+        const rejected = requests.filter(r => r.status === 'REJECTED').length;
+        const cancelled = requests.filter(r => r.status === 'CANCELLED').length;
+        return { pending, approved, rejected, cancelled };
+    }, [requests]);
+
+    // Statistics cho tất cả các status của module hiện tại (để hiển thị badge)
+    const [moduleStatusStatistics, setModuleStatusStatistics] = useState({
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        cancelled: 0
+    });
+
+    // Statistics per module - fetch all modules to show badges
+    const [moduleStatistics, setModuleStatistics] = useState({
+        leave: { pending: 0, total: 0 },
+        overtime: { pending: 0, total: 0 },
+        attendance: { pending: 0, total: 0 }
+    });
 
     useEffect(() => {
         let isMounted = true;
@@ -233,6 +257,75 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const isTeamLead = viewerMode === 'teamLead';
     const isHr = viewerMode === 'hr';
 
+    // Fetch statistics for all modules (after viewerMode is defined)
+    useEffect(() => {
+        const fetchModuleStatistics = async () => {
+            if (!viewerMode || !currentUser?.id) return;
+
+            try {
+                const params = {};
+                if (isTeamLead) {
+                    params.teamLeadId = currentUser.id;
+                }
+
+                // Fetch tất cả các status cho mỗi module để tính tổng
+                const statuses = isTeamLead 
+                    ? ['PENDING', 'APPROVED', 'REJECTED'] 
+                    : ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'];
+
+                // Fetch cho từng module với tất cả các status
+                const leavePromises = statuses.map(status => 
+                    leaveRequestsAPI.getAll({ ...params, status })
+                );
+                const overtimePromises = statuses.map(status => 
+                    overtimeRequestsAPI.getAll({ ...params, status })
+                );
+                const attendancePromises = statuses.map(status => 
+                    attendanceAdjustmentsAPI.getAll({ ...params, status })
+                );
+
+                const [leaveResults, overtimeResults, attendanceResults] = await Promise.all([
+                    Promise.all(leavePromises),
+                    Promise.all(overtimePromises),
+                    Promise.all(attendancePromises)
+                ]);
+
+                // Tính tổng và pending cho từng module
+                const calculateStats = (results) => {
+                    let pending = 0;
+                    let total = 0;
+                    results.forEach((result, index) => {
+                        const count = result.data?.success && Array.isArray(result.data.data) 
+                            ? result.data.data.length : 0;
+                        total += count;
+                        // Kết quả đầu tiên là PENDING (index 0)
+                        if (index === 0) {
+                            pending = count;
+                        }
+                    });
+                    return { pending, total };
+                };
+
+                const leaveStats = calculateStats(leaveResults);
+                const overtimeStats = calculateStats(overtimeResults);
+                const attendanceStats = calculateStats(attendanceResults);
+
+                setModuleStatistics({
+                    leave: leaveStats,
+                    overtime: overtimeStats,
+                    attendance: attendanceStats
+                });
+            } catch (error) {
+                console.error('[LeaveApprovals] Error fetching module statistics:', error);
+            }
+        };
+
+        fetchModuleStatistics();
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchModuleStatistics, 30000);
+        return () => clearInterval(interval);
+    }, [viewerMode, currentUser?.id, isTeamLead]);
+
     const statusFilters = useMemo(() => {
         if (isTeamLead) {
             return [
@@ -253,7 +346,10 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     }, [isTeamLead]);
 
     const buildStatusQuery = (filterKey) => {
-        if (filterKey === 'ALL') return null;
+        if (filterKey === 'ALL') {
+            // Khi chọn "Tất cả", gửi tất cả các status có thể để backend không tự động filter PENDING
+            return 'PENDING,APPROVED,REJECTED,CANCELLED';
+        }
         // Status mới: PENDING, APPROVED, REJECTED, CANCELLED
         return filterKey;
     };
@@ -267,12 +363,67 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
         []
     );
 
+    // Fetch statistics cho tất cả các status của module hiện tại (để hiển thị badge)
+    useEffect(() => {
+        const fetchModuleStatusStatistics = async () => {
+            if (!viewerMode || !currentUser?.id || !activeModule) return;
+
+            try {
+                const params = {};
+                if (isTeamLead) {
+                    params.teamLeadId = currentUser.id;
+                }
+
+                const api = moduleApiMap[activeModule];
+                if (!api) return;
+
+                // Fetch tất cả các status
+                const statuses = isTeamLead 
+                    ? ['PENDING', 'APPROVED', 'REJECTED'] 
+                    : ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'];
+                
+                const promises = statuses.map(status => 
+                    api.getAll({ ...params, status })
+                );
+
+                const results = await Promise.all(promises);
+                
+                const stats = {
+                    pending: 0,
+                    approved: 0,
+                    rejected: 0,
+                    cancelled: 0
+                };
+
+                results.forEach((result, index) => {
+                    const status = statuses[index];
+                    const count = result.data?.success && Array.isArray(result.data.data) 
+                        ? result.data.data.length : 0;
+                    
+                    if (status === 'PENDING') stats.pending = count;
+                    else if (status === 'APPROVED') stats.approved = count;
+                    else if (status === 'REJECTED') stats.rejected = count;
+                    else if (status === 'CANCELLED') stats.cancelled = count;
+                });
+
+                setModuleStatusStatistics(stats);
+            } catch (error) {
+                console.error('[LeaveApprovals] Error fetching module status statistics:', error);
+            }
+        };
+
+        fetchModuleStatusStatistics();
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchModuleStatusStatistics, 30000);
+        return () => clearInterval(interval);
+    }, [viewerMode, currentUser?.id, isTeamLead, activeModule, moduleApiMap]);
+
     const currentModuleConfig = useMemo(
         () => MODULE_OPTIONS.find((module) => module.key === activeModule) || MODULE_OPTIONS[0],
         [activeModule]
     );
 
-    const fetchRequests = async () => {
+    const fetchRequests = async (statusOverride = null) => {
         if (!viewerMode || !currentUser?.id) {
             console.log('[LeaveApprovals] Cannot fetch - viewerMode:', viewerMode, 'currentUser.id:', currentUser?.id);
             return;
@@ -290,9 +441,22 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 console.log('[LeaveApprovals] Fetching as HR with ID:', currentUser.id);
             }
 
-            const statusQuery = buildStatusQuery(selectedStatus);
-            if (statusQuery) {
-                params.status = statusQuery;
+            const statusToUse = statusOverride !== null ? statusOverride : selectedStatus;
+            
+            // Xử lý trường hợp "Tất cả" - gửi tất cả các status có thể
+            if (statusToUse === 'ALL') {
+                // TeamLead chỉ xem PENDING, APPROVED, REJECTED (không có CANCELLED)
+                // HR xem tất cả bao gồm CANCELLED
+                if (isTeamLead) {
+                    params.status = 'PENDING,APPROVED,REJECTED';
+                } else {
+                    params.status = 'PENDING,APPROVED,REJECTED,CANCELLED';
+                }
+            } else {
+                const statusQuery = buildStatusQuery(statusToUse);
+                if (statusQuery) {
+                    params.status = statusQuery;
+                }
             }
 
             console.log('[LeaveApprovals] Fetching with params:', params);
@@ -392,7 +556,25 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 );
             }
 
-            setRefreshToken((prev) => prev + 1);
+            // Đóng modal nếu đang mở
+            if (showDetailModal && selectedRequest && selectedRequest.id === request.id) {
+                setShowDetailModal(false);
+                setSelectedRequest(null);
+            }
+
+            // Nếu từ chối và đang ở tab PENDING, chuyển sang tab REJECTED để xem đơn vừa từ chối
+            if (decision === 'REJECT' && selectedStatus === 'PENDING') {
+                // Chuyển tab sang REJECTED
+                setSelectedStatus('REJECTED');
+                // Đợi một chút để đảm bảo database đã cập nhật và state đã thay đổi, sau đó fetch lại
+                // Gọi fetchRequests với status mới để đảm bảo fetch đúng dữ liệu
+                setTimeout(() => {
+                    fetchRequests('REJECTED');
+                }, 300);
+            } else {
+                // Nếu không từ chối hoặc không ở tab PENDING, refresh như bình thường
+                setRefreshToken((prev) => prev + 1);
+            }
         } catch (error) {
             console.error('Error updating decision:', error);
             if (showToast) {
@@ -689,32 +871,64 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 {/* Main Filter Bar - Lọc theo Loại Yêu cầu */}
                 <div className="leave-approvals-main-filter-bar">
                     <div className="request-type-filter-group">
-                        {MODULE_OPTIONS.map((module) => (
-                            <button
-                                key={module.key}
-                                type="button"
-                                className={`request-type-filter-chip ${module.key} ${activeModule === module.key ? 'active' : ''}`}
-                                onClick={() => setActiveModule(module.key)}
-                            >
-                                <span className="request-type-filter-label">{module.label}</span>
-                            </button>
-                        ))}
+                        {MODULE_OPTIONS.map((module) => {
+                            const totalCount = moduleStatistics[module.key]?.total || 0;
+                            const pendingCount = moduleStatistics[module.key]?.pending || 0;
+                            const hasPending = pendingCount > 0;
+                            
+                            return (
+                                <button
+                                    key={module.key}
+                                    type="button"
+                                    className={`request-type-filter-chip ${module.key} ${activeModule === module.key ? 'active' : ''} ${hasPending ? 'has-pending' : ''}`}
+                                    onClick={() => setActiveModule(module.key)}
+                                >
+                                    <span className="request-type-filter-label">{module.label}</span>
+                                    <span className={`leave-module-badge ${hasPending ? 'pulsing' : ''}`}>
+                                        {totalCount}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
                 {/* Status Filter Bar - Lọc theo Trạng thái Xử lý */}
                 <div className="leave-approvals-status-filter-bar">
                     <div className="status-filter-group">
-                        {statusFilters.map((filter) => (
-                            <button
-                                key={filter.key}
-                                type="button"
-                                className={`status-filter-chip ${filter.key.toLowerCase()} ${selectedStatus === filter.key ? 'active' : ''}`}
-                                onClick={() => setSelectedStatus(filter.key)}
-                            >
-                                <span className="status-filter-label">{filter.label}</span>
-                            </button>
-                        ))}
+                        {statusFilters.map((filter) => {
+                            let count = 0;
+                            if (filter.key === 'PENDING') {
+                                count = moduleStatusStatistics.pending;
+                            } else if (filter.key === 'APPROVED') {
+                                count = moduleStatusStatistics.approved;
+                            } else if (filter.key === 'REJECTED') {
+                                count = moduleStatusStatistics.rejected;
+                            } else if (filter.key === 'CANCELLED') {
+                                count = moduleStatusStatistics.cancelled;
+                            } else if (filter.key === 'ALL') {
+                                // Tính tổng tất cả các status
+                                count = moduleStatusStatistics.pending + 
+                                        moduleStatusStatistics.approved + 
+                                        moduleStatusStatistics.rejected + 
+                                        moduleStatusStatistics.cancelled;
+                            }
+                            const hasPending = filter.key === 'PENDING' && moduleStatusStatistics.pending > 0;
+                            
+                            return (
+                                <button
+                                    key={filter.key}
+                                    type="button"
+                                    className={`status-filter-chip ${filter.key.toLowerCase()} ${selectedStatus === filter.key ? 'active' : ''} ${hasPending ? 'has-pending' : ''}`}
+                                    onClick={() => setSelectedStatus(filter.key)}
+                                >
+                                    <span className="status-filter-label">{filter.label}</span>
+                                    <span className={`leave-filter-tab-badge ${hasPending ? 'pulsing' : ''}`}>
+                                        {count}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {/* Xóa nút Gửi cảnh báo đơn quá hạn vì không còn trong quy trình mới */}

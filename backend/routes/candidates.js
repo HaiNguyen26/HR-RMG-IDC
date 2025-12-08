@@ -1801,6 +1801,7 @@ router.put('/interview-requests/:id/status', async (req, res) => {
         }
 
         // Allow status change from PENDING to PENDING_EVALUATION, or from PENDING_EVALUATION to APPROVED/REJECTED
+        // Also allow REJECTED from PENDING (manager can reject before interview)
         if (status === 'PENDING_EVALUATION' && currentRequest.rows[0].status !== 'PENDING') {
             return res.status(400).json({
                 success: false,
@@ -1808,10 +1809,19 @@ router.put('/interview-requests/:id/status', async (req, res) => {
             });
         }
 
-        if (['APPROVED', 'REJECTED'].includes(status) && currentRequest.rows[0].status !== 'PENDING_EVALUATION') {
+        // Allow REJECTED from PENDING (manager can reject before interview)
+        // Allow APPROVED/REJECTED from PENDING_EVALUATION (after evaluation)
+        if (status === 'APPROVED' && currentRequest.rows[0].status !== 'PENDING_EVALUATION') {
             return res.status(400).json({
                 success: false,
-                message: 'Yêu cầu phỏng vấn phải ở trạng thái chờ đánh giá để duyệt/từ chối'
+                message: 'Yêu cầu phỏng vấn phải ở trạng thái chờ đánh giá để duyệt'
+            });
+        }
+
+        if (status === 'REJECTED' && !['PENDING', 'PENDING_EVALUATION'].includes(currentRequest.rows[0].status)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Chỉ có thể từ chối yêu cầu phỏng vấn khi đang chờ duyệt hoặc chờ đánh giá'
             });
         }
 

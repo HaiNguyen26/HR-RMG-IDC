@@ -420,6 +420,26 @@
     z-index: 2;
 }
 
+/* Force 24-hour format for time input */
+.overtime-form-timepicker {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Hide AM/PM selector if browser shows it */
+.overtime-form-timepicker::-webkit-datetime-edit-ampm-field {
+    display: none;
+}
+
+/* Ensure 24-hour format display */
+.overtime-form-timepicker[type="time"] {
+    text-align: left;
+}
+
+/* For Firefox */
+.overtime-form-timepicker::-moz-datetime-edit-ampm-field {
+    display: none;
+}
+
 /* Estimated Hours Input with Tag */
 .overtime-hours-input-wrapper {
     position: relative;

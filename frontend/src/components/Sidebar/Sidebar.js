@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { employeesAPI, candidatesAPI } from '../../services/api';
+import { employeesAPI, candidatesAPI, leaveRequestsAPI, overtimeRequestsAPI, attendanceAdjustmentsAPI } from '../../services/api';
 import './Sidebar.css';
 
 const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout }) => {
     const [managerAccessResolved, setManagerAccessResolved] = useState(false);
     const [canApproveFromManagerLookup, setCanApproveFromManagerLookup] = useState(false);
     const [pendingInterviewCount, setPendingInterviewCount] = useState(0);
+    const [pendingLeaveApprovalsCount, setPendingLeaveApprovalsCount] = useState(0);
 
     useEffect(() => {
         let isMounted = true;
@@ -141,6 +142,54 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
         return () => clearInterval(interval);
     }, [currentUser]);
 
+    // Fetch pending leave approvals count (for team leads and HR)
+    useEffect(() => {
+        if (!currentUser?.id) {
+            setPendingLeaveApprovalsCount(0);
+            return;
+        }
+
+        const fetchPendingLeaveApprovalsCount = async () => {
+            try {
+                // Check if user is team lead or HR
+                const isTeamLead = canApproveFromManagerLookup || currentUser?.role === 'HR' || currentUser?.role === 'ADMIN';
+
+                if (!isTeamLead) {
+                    setPendingLeaveApprovalsCount(0);
+                    return;
+                }
+
+                const params = {};
+                if (currentUser?.role !== 'HR' && currentUser?.role !== 'ADMIN') {
+                    params.teamLeadId = currentUser.id;
+                }
+
+                // Fetch pending counts for all modules
+                const [leaveRes, overtimeRes, attendanceRes] = await Promise.all([
+                    leaveRequestsAPI.getAll({ ...params, status: 'PENDING' }).catch(() => ({ data: { success: false, data: [] } })),
+                    overtimeRequestsAPI.getAll({ ...params, status: 'PENDING' }).catch(() => ({ data: { success: false, data: [] } })),
+                    attendanceAdjustmentsAPI.getAll({ ...params, status: 'PENDING' }).catch(() => ({ data: { success: false, data: [] } }))
+                ]);
+
+                const leavePending = leaveRes.data?.success && Array.isArray(leaveRes.data.data) ? leaveRes.data.data.length : 0;
+                const overtimePending = overtimeRes.data?.success && Array.isArray(overtimeRes.data.data) ? overtimeRes.data.data.length : 0;
+                const attendancePending = attendanceRes.data?.success && Array.isArray(attendanceRes.data.data) ? attendanceRes.data.data.length : 0;
+
+                setPendingLeaveApprovalsCount(leavePending + overtimePending + attendancePending);
+            } catch (error) {
+                console.error('Error fetching pending leave approvals count:', error);
+                setPendingLeaveApprovalsCount(0);
+            }
+        };
+
+        // Wait for manager access to be resolved
+        if (managerAccessResolved) {
+            fetchPendingLeaveApprovalsCount();
+            const interval = setInterval(fetchPendingLeaveApprovalsCount, 30000);
+            return () => clearInterval(interval);
+        }
+    }, [currentUser, canApproveFromManagerLookup, managerAccessResolved]);
+
     const isEmployee = currentUser?.role === 'EMPLOYEE';
     const normalizedTitle = (currentUser?.chucDanh || '').toLowerCase();
     const canApproveAsEmployee = isEmployee && (
@@ -204,6 +253,9 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                     </svg>
                                 </span>
                                 <span className="nav-label">Quản lý đơn nghỉ</span>
+                                {pendingLeaveApprovalsCount > 0 && (
+                                    <span className="nav-badge nav-badge-pending">{pendingLeaveApprovalsCount > 99 ? '99+' : pendingLeaveApprovalsCount}</span>
+                                )}
                             </button>
                         </li>
                     )}
@@ -349,6 +401,9 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                                 </svg>
                                             </span>
                                             <span className="nav-label">Duyệt đơn nghỉ</span>
+                                            {pendingLeaveApprovalsCount > 0 && (
+                                                <span className="nav-badge nav-badge-pending">{pendingLeaveApprovalsCount > 99 ? '99+' : pendingLeaveApprovalsCount}</span>
+                                            )}
                                         </button>
                                     </li>
                                     <li>

@@ -253,24 +253,24 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 if (response.data?.success && Array.isArray(response.data.data)) {
                     const allRequests = response.data.data;
                     const currentUserId = currentUser?.id;
-                    
+
                     // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
                     const pendingEvaluationCount = allRequests.filter(r => {
                         if (r.status !== 'PENDING_EVALUATION') return false;
-                        
+
                         // Nếu là quản lý trực tiếp
                         if (r.manager_id === currentUserId) {
                             return !r.direct_manager_evaluated;
                         }
-                        
+
                         // Nếu là quản lý gián tiếp
                         if (r.indirect_manager_id === currentUserId) {
                             return !r.indirect_manager_evaluated;
                         }
-                        
+
                         return false;
                     }).length;
-                    
+
                     const stats = {
                         pending: allRequests.filter(r => r.status === 'PENDING').length,
                         pendingEvaluation: pendingEvaluationCount,
@@ -618,24 +618,24 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 if (statsResponse.data?.success && Array.isArray(statsResponse.data.data)) {
                     const allRequests = statsResponse.data.data;
                     const currentUserId = currentUser.id;
-                    
+
                     // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
                     const pendingEvaluationCount = allRequests.filter(r => {
                         if (r.status !== 'PENDING_EVALUATION') return false;
-                        
+
                         // Nếu là quản lý trực tiếp
                         if (r.manager_id === currentUserId) {
                             return !r.direct_manager_evaluated;
                         }
-                        
+
                         // Nếu là quản lý gián tiếp
                         if (r.indirect_manager_id === currentUserId) {
                             return !r.indirect_manager_evaluated;
                         }
-                        
+
                         return false;
                     }).length;
-                    
+
                     setStatistics({
                         pending: allRequests.filter(r => r.status === 'PENDING').length,
                         pendingEvaluation: pendingEvaluationCount,
@@ -686,24 +686,24 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 if (statsResponse.data?.success && Array.isArray(statsResponse.data.data)) {
                     const allRequests = statsResponse.data.data;
                     const currentUserId = currentUser.id;
-                    
+
                     // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
                     const pendingEvaluationCount = allRequests.filter(r => {
                         if (r.status !== 'PENDING_EVALUATION') return false;
-                        
+
                         // Nếu là quản lý trực tiếp
                         if (r.manager_id === currentUserId) {
                             return !r.direct_manager_evaluated;
                         }
-                        
+
                         // Nếu là quản lý gián tiếp
                         if (r.indirect_manager_id === currentUserId) {
                             return !r.indirect_manager_evaluated;
                         }
-                        
+
                         return false;
                     }).length;
-                    
+
                     setStatistics({
                         pending: allRequests.filter(r => r.status === 'PENDING').length,
                         pendingEvaluation: pendingEvaluationCount,
@@ -749,24 +749,24 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 if (statsResponse.data?.success && Array.isArray(statsResponse.data.data)) {
                     const allRequests = statsResponse.data.data;
                     const currentUserId = currentUser.id;
-                    
+
                     // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
                     const pendingEvaluationCount = allRequests.filter(r => {
                         if (r.status !== 'PENDING_EVALUATION') return false;
-                        
+
                         // Nếu là quản lý trực tiếp
                         if (r.manager_id === currentUserId) {
                             return !r.direct_manager_evaluated;
                         }
-                        
+
                         // Nếu là quản lý gián tiếp
                         if (r.indirect_manager_id === currentUserId) {
                             return !r.indirect_manager_evaluated;
                         }
-                        
+
                         return false;
                     }).length;
-                    
+
                     setStatistics({
                         pending: allRequests.filter(r => r.status === 'PENDING').length,
                         pendingEvaluation: pendingEvaluationCount,
@@ -825,24 +825,24 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 if (statsResponse.data?.success && Array.isArray(statsResponse.data.data)) {
                     const allRequests = statsResponse.data.data;
                     const currentUserId = currentUser.id;
-                    
+
                     // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
                     const pendingEvaluationCount = allRequests.filter(r => {
                         if (r.status !== 'PENDING_EVALUATION') return false;
-                        
+
                         // Nếu là quản lý trực tiếp
                         if (r.manager_id === currentUserId) {
                             return !r.direct_manager_evaluated;
                         }
-                        
+
                         // Nếu là quản lý gián tiếp
                         if (r.indirect_manager_id === currentUserId) {
                             return !r.indirect_manager_evaluated;
                         }
-                        
+
                         return false;
                     }).length;
-                    
+
                     setStatistics({
                         pending: allRequests.filter(r => r.status === 'PENDING').length,
                         pendingEvaluation: pendingEvaluationCount,

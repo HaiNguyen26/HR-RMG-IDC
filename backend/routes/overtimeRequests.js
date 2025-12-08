@@ -181,10 +181,8 @@ router.get('/', async (req, res) => {
 
         if (teamLeadId) {
             conditions.push(`orq.team_lead_id = $${paramIndex}`);
-            conditions.push(`orq.status = $${paramIndex + 1}`);
             params.push(parseInt(teamLeadId, 10));
-            params.push(STATUSES.PENDING);
-            paramIndex += 2;
+            paramIndex += 1;
         }
 
         if (status) {
@@ -199,6 +197,11 @@ router.get('/', async (req, res) => {
                 params.push(...statuses);
                 paramIndex += statuses.length;
             }
+        } else if (teamLeadId) {
+            // Nếu không có status filter nhưng có teamLeadId, mặc định chỉ hiển thị PENDING
+            conditions.push(`orq.status = $${paramIndex}`);
+            params.push(STATUSES.PENDING);
+            paramIndex += 1;
         }
 
         const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '1=1';

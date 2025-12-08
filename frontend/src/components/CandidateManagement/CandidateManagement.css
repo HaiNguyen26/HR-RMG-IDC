@@ -3554,6 +3554,26 @@ select {
     color: #ef4444;
 }
 
+/* Force 24-hour format for time input */
+.custom-time-input {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Hide AM/PM selector if browser shows it */
+.custom-time-input::-webkit-datetime-edit-ampm-field {
+    display: none;
+}
+
+/* Ensure 24-hour format display */
+.custom-time-input[type="time"] {
+    text-align: left;
+}
+
+/* For Firefox */
+.custom-time-input::-moz-datetime-edit-ampm-field {
+    display: none;
+}
+
 
 .candidate-manager-select-label {
     display: block;

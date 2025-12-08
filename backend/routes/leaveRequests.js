@@ -176,13 +176,11 @@ router.get('/', async (req, res) => {
             paramIndex += 1;
         }
 
-        // Quản lý xem đơn cần duyệt
+        // Quản lý xem đơn của nhóm mình phụ trách
         if (teamLeadId) {
             conditions.push(`lr.team_lead_id = $${paramIndex}`);
-            conditions.push(`lr.status = $${paramIndex + 1}`);
             params.push(parseInt(teamLeadId, 10));
-            params.push(STATUSES.PENDING);
-            paramIndex += 2;
+            paramIndex += 1;
         }
 
         // Filter theo status
@@ -198,6 +196,11 @@ router.get('/', async (req, res) => {
                 params.push(...statuses);
                 paramIndex += statuses.length;
             }
+        } else if (teamLeadId) {
+            // Nếu không có status filter nhưng có teamLeadId, mặc định chỉ hiển thị PENDING
+            conditions.push(`lr.status = $${paramIndex}`);
+            params.push(STATUSES.PENDING);
+            paramIndex += 1;
         }
 
         const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '1=1';
