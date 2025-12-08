@@ -33,7 +33,7 @@ echo -e "${GREEN}✓ Đã dừng PM2${NC}"
 echo ""
 
 # 2. Pull code mới từ git
-echo -e "${YELLOW}[2/4] Pull code mới từ git...${NC}"
+echo -e "${YELLOW}[2/5] Pull code mới từ git...${NC}"
 cd "$PROJECT_DIR"
 git pull origin main
 
@@ -47,8 +47,30 @@ else
 fi
 echo ""
 
-# 3. Chạy migration SQL scripts
-echo -e "${YELLOW}[3/4] Chạy migration SQL scripts...${NC}"
+# 2.5. Build lại frontend
+echo -e "${YELLOW}[3/5] Build lại frontend...${NC}"
+cd "$PROJECT_DIR/frontend"
+
+# Kiểm tra xem có file .env không, nếu không thì tạo
+if [ ! -f .env ]; then
+    echo "REACT_APP_API_URL=/hr/api" > .env
+    echo -e "${BLUE}→ Đã tạo file .env cho frontend${NC}"
+fi
+
+# Build frontend
+echo "Đang build frontend (có thể mất vài phút)..."
+REACT_APP_API_URL="/hr/api" npm run build
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✓ Đã build frontend thành công${NC}"
+else
+    echo -e "${RED}❌ Lỗi khi build frontend${NC}"
+    echo -e "${YELLOW}Tiếp tục với các bước khác...${NC}"
+fi
+echo ""
+
+# 4. Chạy migration SQL scripts
+echo -e "${YELLOW}[4/5] Chạy migration SQL scripts...${NC}"
 echo "Database: $DB_NAME"
 echo "User: $DB_USER"
 echo ""
@@ -83,8 +105,8 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 2: $MIGRATION2${NC}"
 fi
 
-# 4. Khởi động lại PM2
-echo -e "${YELLOW}[4/4] Khởi động lại PM2...${NC}"
+# 5. Khởi động lại PM2
+echo -e "${YELLOW}[5/5] Khởi động lại PM2...${NC}"
 pm2 start hr-management-api
 pm2 save
 
@@ -102,6 +124,7 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "Đã thực hiện:"
 echo "  ✓ Pull code mới từ git"
+echo "  ✓ Build lại frontend"
 echo "  ✓ Chạy migration database"
 echo "  ✓ Khởi động lại PM2"
 echo ""
