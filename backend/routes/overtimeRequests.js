@@ -249,7 +249,8 @@ router.post('/', async (req, res) => {
             endTime,
             duration,
             reason,
-            notes
+            notes,
+            isLateRequest
         } = req.body;
 
         // Use startDate if provided, otherwise fallback to requestDate for backward compatibility
@@ -316,6 +317,28 @@ router.post('/', async (req, res) => {
             console.log('[OvertimeRequest] start_date/end_date columns check:', alterError.message);
         }
 
+        // Kiểm tra và thêm cột is_late_request nếu chưa có
+        try {
+            await pool.query(`
+                ALTER TABLE overtime_requests 
+                ADD COLUMN IF NOT EXISTS is_late_request BOOLEAN DEFAULT FALSE
+            `);
+            // Nếu cột cũ is_future_request tồn tại, migrate dữ liệu
+            try {
+                await pool.query(`
+                    UPDATE overtime_requests 
+                    SET is_late_request = NOT is_future_request 
+                    WHERE is_future_request IS NOT NULL AND is_late_request = FALSE
+                `);
+            } catch (migrateError) {
+                // Cột cũ có thể không tồn tại, bỏ qua
+                console.log('[OvertimeRequest] Migration check:', migrateError.message);
+            }
+        } catch (alterError) {
+            // Column có thể đã tồn tại, bỏ qua lỗi
+            console.log('[OvertimeRequest] is_late_request column check:', alterError.message);
+        }
+
         // Tạo đơn
         const insertResult = await pool.query(
             `INSERT INTO overtime_requests (
@@ -329,8 +352,9 @@ router.post('/', async (req, res) => {
                 duration,
                 reason,
                 notes,
-                status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                status,
+                is_late_request
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING *`,
             [
                 parseInt(employeeId, 10),
@@ -343,7 +367,8 @@ router.post('/', async (req, res) => {
                 duration || null,
                 reason,
                 notes || null,
-                STATUSES.PENDING
+                STATUSES.PENDING,
+                isLateRequest === true || isLateRequest === 'true' || isLateRequest === 1
             ]
         );
 

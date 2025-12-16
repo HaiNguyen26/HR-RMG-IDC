@@ -1,0 +1,1049 @@
+/* Travel Expense Settlement Module */
+
+/* I. MÀU NỀN CHỦ ĐẠO: Xám nhạt - #f7f9fc */
+.travel-expense-settlement {
+    width: 100%;
+    height: 100vh;
+    padding: 1.25rem;
+    box-sizing: border-box;
+    /* Nền chung: Xám nhạt - tạo cảm giác sạch sẽ và chuyên nghiệp */
+    background: #f7f9fc;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    /* Giảm gap để container gần header hơn */
+    position: relative;
+}
+
+/* Custom Scrollbar cho module */
+.travel-expense-settlement::-webkit-scrollbar {
+    width: 10px;
+}
+
+.travel-expense-settlement::-webkit-scrollbar-track {
+    background: rgba(240, 249, 255, 0.3);
+    backdrop-filter: blur(5px);
+    border-radius: 10px;
+}
+
+.travel-expense-settlement::-webkit-scrollbar-thumb {
+    background: rgba(14, 165, 233, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    transition: background 0.2s ease;
+}
+
+.travel-expense-settlement::-webkit-scrollbar-thumb:hover {
+    background: rgba(14, 165, 233, 0.6);
+}
+
+/* II. HEADER FORM (Phần Đầu Form) */
+.travel-expense-settlement-header {
+    margin-bottom: 0.5rem;
+    /* Giảm margin-bottom để container gần header hơn */
+    flex-shrink: 0;
+}
+
+/* Khối bao quanh Header - Calm Integrity Gradient đậm hơn Nền Ngoại vi */
+.travel-expense-settlement-header-content {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    /* Calm Integrity Gradient đậm hơn: Sky Blue 200 → Emerald 100 → Indigo 200 */
+    background: linear-gradient(135deg, #bfdbfe 0%, #d1fae5 50%, #c7d2fe 100%);
+    padding: 1.25rem 1.75rem;
+    border-radius: 1rem;
+    /* Bo tròn 4 góc */
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex: 1;
+}
+
+.travel-expense-settlement-header-content:hover {
+    box-shadow: 0 6px 16px rgba(14, 165, 233, 0.2);
+}
+
+/* Icon Banner Block - Light Glass Block */
+.travel-expense-settlement-icon-wrapper {
+    width: 4rem;
+    height: 4rem;
+    background: rgba(255, 255, 255, 0.9);
+    /* bg-white/90 */
+    padding: 1rem;
+    /* p-4 */
+    border-radius: 0.75rem;
+    /* rounded-xl */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    /* shadow-md */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.travel-expense-settlement-icon-wrapper:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.12), 0 3px 5px -1px rgba(0, 0, 0, 0.08);
+}
+
+/* Icon - Xanh Dương Đậm */
+.travel-expense-settlement-icon {
+    width: 2rem;
+    height: 2rem;
+    color: #2563eb;
+    /* Blue 600 - Đậm hơn */
+    stroke-width: 2;
+}
+
+/* Tiêu đề - Xám Đậm */
+.travel-expense-settlement-title {
+    font-size: 1.5rem;
+    /* text-2xl */
+    font-weight: 700;
+    /* font-bold */
+    color: #000000;
+    /* Màu đen */
+    margin: 0 0 0.375rem 0;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+/* Mô tả - Màu đen */
+.travel-expense-settlement-subtitle {
+    font-size: 0.875rem;
+    /* text-sm */
+    color: #000000;
+    /* Màu đen */
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* III. MAIN CONTAINER - Master-Detail View */
+/* Container Chính: dài ra toàn bộ width như header */
+.travel-expense-settlement-main-container {
+    width: 100%;
+    height: calc(90vh - 6rem);
+    /* Tăng chiều cao lên một chút (từ 8rem xuống 6rem) */
+    min-height: 700px;
+    /* Tăng min-height từ 600px lên 700px */
+    padding: 0;
+    /* Glass Card */
+    background: rgba(255, 255, 255, 0.85);
+    /* bg-white/85 */
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 1.5rem;
+    /* rounded-3xl */
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    /* shadow-2xl */
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+/* Bố cục chính: Grid 2 cột - 33% và 66% */
+.travel-expense-settlement-main-layout {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: 33% 67%;
+    /* 1/3 và 2/3 */
+    gap: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    flex: 1;
+    min-height: 0;
+}
+
+/* IV. CỘT 1: MASTER - DANH SÁCH YÊU CẦU (33%) */
+.travel-expense-settlement-list-column {
+    height: 100%;
+    overflow: hidden;
+    border-right: 1px solid rgba(226, 232, 240, 0.6);
+    box-sizing: border-box;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Nền Cột: Trắng tinh - #ffffff - tạo độ nổi bật so với nền */
+.travel-expense-settlement-list-container {
+    width: 100%;
+    height: 100%;
+    background: #ffffff;
+    /* Trắng tinh - Card/Panel Background */
+    border-radius: 0.75rem;
+    /* rounded-xl */
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    /* shadow-lg */
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    box-sizing: border-box;
+    overflow: hidden;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Tiêu đề danh sách - Màu Chính: Xanh Dương Đậm #2563eb */
+.travel-expense-settlement-list-title {
+    font-size: 1.25rem;
+    /* text-xl */
+    font-weight: 700;
+    /* font-bold */
+    color: #2563eb;
+    /* Blue 600 - Đậm hơn */
+    margin: 0 0 0.5rem 0;
+    /* Giảm margin-bottom để dịch lên */
+    padding-bottom: 0.5rem;
+    /* Giảm padding-bottom */
+    border-bottom: 2px solid #e2e8f0;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+
+/* Thanh Công Cụ: Filter + Search */
+.travel-expense-settlement-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    /* Giảm gap */
+    margin-bottom: 1rem;
+    margin-top: 0;
+    /* Đảm bảo không có margin-top */
+    flex-shrink: 0;
+}
+
+.travel-expense-settlement-status-filter {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    /* Giảm padding dọc */
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    /* Nhỏ lại từ 0.875rem */
+    background: #ffffff;
+    color: #2d3748;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-sizing: border-box;
+}
+
+.travel-expense-settlement-status-filter:focus {
+    outline: none;
+    border-color: #2563eb;
+    /* Blue 600 - Đậm hơn */
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.travel-expense-settlement-search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.travel-expense-settlement-search-icon {
+    position: absolute;
+    left: 0.75rem;
+    width: 1rem;
+    /* Nhỏ lại */
+    height: 1rem;
+    /* Nhỏ lại */
+    color: #718096;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.travel-expense-settlement-search-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    /* Giảm padding dọc */
+    padding-left: 2.5rem;
+    /* Giảm padding-left để phù hợp với icon nhỏ hơn */
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    /* Nhỏ lại từ 0.875rem */
+    transition: all 0.2s;
+    box-sizing: border-box;
+}
+
+.travel-expense-settlement-search-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    /* Blue 600 - Đậm hơn */
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* Danh sách items - có thể cuộn */
+.travel-expense-settlement-list-items {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+    padding-top: 0.5rem;
+    /* Thêm padding-top để item đầu tiên không bị che khi hover */
+}
+
+/* Custom Scrollbar cho danh sách */
+.travel-expense-settlement-list-items::-webkit-scrollbar {
+    width: 8px;
+}
+
+.travel-expense-settlement-list-items::-webkit-scrollbar-track {
+    background: rgba(240, 249, 255, 0.3);
+    border-radius: 4px;
+}
+
+.travel-expense-settlement-list-items::-webkit-scrollbar-thumb {
+    background: rgba(14, 165, 233, 0.4);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.travel-expense-settlement-list-items::-webkit-scrollbar-thumb:hover {
+    background: rgba(14, 165, 233, 0.6);
+}
+
+/* Item trong danh sách */
+.travel-expense-settlement-list-item {
+    padding: 1rem;
+    border: 1px solid #e2e8f0;
+    border-left: 3px solid transparent;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    background: #ffffff;
+    position: relative;
+}
+
+.travel-expense-settlement-list-item:hover {
+    border-color: #2563eb;
+    /* Blue 600 - Đậm hơn */
+    background: #f7fafc;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.travel-expense-settlement-list-item.active {
+    border-left-color: #2563eb;
+    /* Viền trái xanh dương đậm - Blue 600 */
+    border-color: #2563eb;
+    background: #edf2f7;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.travel-expense-settlement-item-left {
+    flex: 1;
+}
+
+.travel-expense-settlement-request-code {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #2563eb;
+    /* Blue 600 - Đậm hơn cho chữ Mã Yêu Cầu */
+    margin-bottom: 0.25rem;
+}
+
+.travel-expense-settlement-employee-name {
+    font-size: 0.875rem;
+    color: #1a202c;
+    /* Màu đen đậm hơn */
+    font-weight: 700;
+    /* Đậm hơn */
+    margin-bottom: 0.25rem;
+}
+
+.travel-expense-settlement-purpose {
+    font-size: 0.875rem;
+    color: #718096;
+    /* Màu xám nhạt */
+    font-weight: 400;
+    /* Mỏng hơn */
+    margin-bottom: 0.25rem;
+}
+
+.travel-expense-settlement-actual-expense {
+    font-size: 0.875rem;
+    color: #dc2626;
+    /* Red 600 - Màu Nhấn cho Chi phí Thực Tế */
+    font-weight: 700;
+    margin-top: 0.25rem;
+}
+
+.travel-expense-settlement-item-right {
+    text-align: right;
+    display: flex;
+    align-items: flex-start;
+}
+
+/* Tag Trạng Thái - Theo Color Scheme */
+.travel-expense-settlement-status-tag {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+/* Chờ HR (SUBMITTED) */
+.travel-expense-settlement-status-tag.status-submitted {
+    background: #fef3c7;
+    /* Vàng Nhạt */
+    color: #d97706;
+    /* Vàng Cam Đậm */
+}
+
+/* Chờ Kế Toán (HR_CONFIRMED) */
+.travel-expense-settlement-status-tag.status-hr-confirmed {
+    background: #dbeafe;
+    /* Xanh Dương Nhạt */
+    color: #2563eb;
+    /* Xanh Dương Đậm */
+}
+
+/* Đã Hoàn Tất (ACCOUNTANT_DONE) */
+.travel-expense-settlement-status-tag.status-accountant-done {
+    background: #d1fae5;
+    /* Xanh Lá Nhạt */
+    color: #059669;
+    /* Xanh Lá Đậm */
+}
+
+/* Từ Chối (REJECTED) */
+.travel-expense-settlement-status-tag.status-rejected {
+    background: #fee2e2;
+    /* Đỏ Nhạt */
+    color: #dc2626;
+    /* Đỏ Đậm */
+}
+
+/* Chờ gửi (PENDING) - fallback */
+.travel-expense-settlement-status-tag.status-pending {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.travel-expense-settlement-loading,
+.travel-expense-settlement-empty {
+    text-align: center;
+    padding: 2rem;
+    color: #718096;
+    font-size: 0.875rem;
+}
+
+/* V. CỘT 2: DETAIL - FORM BÁO CÁO QUYẾT TOÁN (66%) */
+.travel-expense-settlement-detail-column {
+    height: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Nền Cột: Trắng tinh - #ffffff - tạo độ nổi bật so với nền */
+.travel-expense-settlement-detail-container {
+    width: 100%;
+    height: 100%;
+    background: #ffffff;
+    /* Trắng tinh - Card/Panel Background */
+    border-radius: 0.75rem;
+    /* rounded-xl */
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    /* shadow-lg */
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+}
+
+/* Custom Scrollbar cho detail container */
+.travel-expense-settlement-detail-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.travel-expense-settlement-detail-container::-webkit-scrollbar-track {
+    background: rgba(240, 249, 255, 0.3);
+    border-radius: 4px;
+}
+
+.travel-expense-settlement-detail-container::-webkit-scrollbar-thumb {
+    background: rgba(14, 165, 233, 0.4);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.travel-expense-settlement-detail-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(14, 165, 233, 0.6);
+}
+
+/* Form */
+.travel-expense-settlement-form {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+/* Report Header */
+.travel-expense-settlement-report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.travel-expense-settlement-report-header-left {
+    flex: 1;
+}
+
+.travel-expense-settlement-report-title {
+    font-size: 1.5rem;
+    /* Nhỏ lại từ 1.75rem */
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    text-transform: uppercase;
+}
+
+.travel-expense-settlement-report-title-text {
+    color: #1a202c;
+    /* Màu đen */
+}
+
+.travel-expense-settlement-report-title-code {
+    color: #2563eb;
+    /* Royal Blue - Màu xanh dương đậm */
+}
+
+.travel-expense-settlement-report-date {
+    font-size: 0.875rem;
+    color: #718096;
+}
+
+.travel-expense-settlement-report-header-right {
+    display: flex;
+    align-items: flex-start;
+}
+
+.travel-expense-settlement-status-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.travel-expense-settlement-status-badge.status-submitted {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.travel-expense-settlement-status-badge.status-hr-confirmed {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.travel-expense-settlement-status-badge.status-accountant-done {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.travel-expense-settlement-status-badge.status-rejected {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.travel-expense-settlement-status-badge.status-pending {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.travel-expense-settlement-empty-detail {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #718096;
+    font-size: 1rem;
+    text-align: center;
+}
+
+/* Section */
+.travel-expense-settlement-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.travel-expense-settlement-section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1d4ed8;
+    /* Blue 700 - Đậm hơn cho tiêu đề */
+    margin: -1.5rem 0 0 0;
+    /* Dịch lên thêm 1 chút nữa */
+    padding-bottom: 0.25rem;
+    /* Giảm padding để gần border hơn */
+    border-bottom: 1px solid #1d4ed8;
+    /* Mỏng hơn từ 2px xuống 1px */
+    text-transform: uppercase;
+}
+
+.travel-expense-settlement-section-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Chỉ Section I có khung và màu xanh nhạt */
+.travel-expense-settlement-section-summary-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: #eff6ff;
+    /* Light blue background - Blue 50 (nhạt hơn) */
+    border: 1px solid #2563eb;
+    /* Viền xanh đậm mỏng hơn (1px) */
+    border-radius: 0.75rem;
+    /* Rounded corners */
+    padding: 1.5rem;
+    /* Padding cho card */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Info Item Full Width - Layout 3 cột */
+.travel-expense-settlement-info-item-full {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    /* Mục đích (rộng hơn), Từ Ngày, Đến Ngày */
+    gap: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(37, 99, 235, 0.2);
+    /* Đường kẻ ngang mỏng */
+    margin-bottom: 1rem;
+}
+
+.travel-expense-settlement-info-item-full>div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.travel-expense-settlement-info-value {
+    font-size: 0.875rem;
+    color: #718096;
+    /* Màu xám nhạt */
+    font-weight: 400;
+    /* Mỏng hơn */
+}
+
+.travel-expense-settlement-dates-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.travel-expense-settlement-date-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Advance Amount Large - Font lớn màu xanh */
+.travel-expense-settlement-advance-amount-large {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0;
+    /* Không cần margin-top vì đã có border-bottom ở trên */
+}
+
+.travel-expense-settlement-advance-label {
+    font-size: 0.875rem;
+    color: #718096;
+    font-weight: 600;
+}
+
+.travel-expense-settlement-advance-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #2563eb;
+    /* Blue 600 - Đậm hơn */
+}
+
+/* Actual Expense Display - Font lớn màu đỏ */
+.travel-expense-settlement-actual-expense-display {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #dc2626;
+    /* Red 600 - Màu Nhấn */
+    padding: 0.75rem 1rem;
+    /* Thêm padding ngang */
+    border: 2px solid #cbd5e0;
+    /* Border rõ ràng */
+    border-radius: 0.5rem;
+    background: #ffffff;
+}
+
+/* Notes Display */
+.travel-expense-settlement-notes-display {
+    padding: 0.75rem;
+    background: #ffffff;
+    border: 2px solid #cbd5e0;
+    /* Border rõ ràng */
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    color: #2d3748;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+/* Attachments */
+.travel-expense-settlement-attachments {
+    margin-top: 1rem;
+}
+
+.travel-expense-settlement-attachments-box {
+    border: 2px dashed #cbd5e0;
+    /* Dashed border màu xám */
+    border-radius: 0.5rem;
+    padding: 1rem;
+    background: #f7fafc;
+    /* Light grey background */
+}
+
+.travel-expense-settlement-attachments-info {
+    font-size: 0.875rem;
+    color: #2d3748;
+    margin-bottom: 0.5rem;
+}
+
+.travel-expense-settlement-attachments-link {
+    font-size: 0.875rem;
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.travel-expense-settlement-attachments-link:hover {
+    text-decoration: underline;
+    color: #1d4ed8;
+    /* Blue 700 - Đậm hơn khi hover */
+}
+
+/* Info Grid (Mục I) */
+.travel-expense-settlement-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.travel-expense-settlement-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.travel-expense-settlement-info-label {
+    font-size: 0.75rem;
+    color: #718096;
+    font-weight: 600;
+}
+
+.travel-expense-settlement-info-value {
+    font-size: 0.875rem;
+    color: #2d3748;
+}
+
+.travel-expense-settlement-info-value.amount {
+    color: #48bb78;
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+/* Form Group (Mục II) */
+.travel-expense-settlement-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.travel-expense-settlement-form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.travel-expense-settlement-form-label .required {
+    color: #e53e3e;
+}
+
+.travel-expense-settlement-currency-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.travel-expense-settlement-currency-input {
+    flex: 1;
+    padding: 0.75rem;
+    padding-right: 4rem;
+    border: 2px solid #cbd5e0;
+    /* Border rõ ràng hơn */
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    transition: all 0.2s;
+    background: #ffffff;
+}
+
+.travel-expense-settlement-currency-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    /* Blue 600 - Đậm hơn */
+    border-width: 2px;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.travel-expense-settlement-currency-unit {
+    position: absolute;
+    right: 0.75rem;
+    font-size: 0.875rem;
+    color: #718096;
+    pointer-events: none;
+}
+
+.travel-expense-settlement-form-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #cbd5e0;
+    /* Border rõ ràng hơn */
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    resize: vertical;
+    transition: all 0.2s;
+    box-sizing: border-box;
+    background: #ffffff;
+}
+
+.travel-expense-settlement-form-textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    /* Blue 600 - Đậm hơn */
+    border-width: 2px;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.travel-expense-settlement-form-help {
+    font-size: 0.75rem;
+    color: #718096;
+    margin: 0;
+}
+
+/* Summary (Mục III) - Màu Thông Tin: Xanh Dương Nhạt #eff6ff */
+.travel-expense-settlement-summary {
+    background: #dbeafe;
+    /* Blue 100 - Đậm hơn */
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    border-left: 4px solid #2563eb;
+    /* Blue 600 - Đậm hơn */
+}
+
+.travel-expense-settlement-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+}
+
+.travel-expense-settlement-summary-label {
+    font-size: 0.875rem;
+    color: #718096;
+    font-weight: 600;
+}
+
+.travel-expense-settlement-summary-value {
+    font-size: 0.875rem;
+    color: #2d3748;
+    font-weight: 600;
+}
+
+.travel-expense-settlement-summary-value.actual {
+    color: #dc2626;
+    /* Red 600 - Màu Nhấn cho Chi phí Thực Tế */
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.travel-expense-settlement-summary-value.excess {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+.travel-expense-settlement-summary-value.refund {
+    color: #d97706;
+    font-weight: 700;
+}
+
+.travel-expense-settlement-summary-value.balanced {
+    color: #16a34a;
+    font-weight: 700;
+}
+
+.travel-expense-settlement-summary-divider {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 0.5rem 0;
+}
+
+/* Actions (Mục IV) */
+.travel-expense-settlement-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.travel-expense-settlement-submit-btn {
+    padding: 0.75rem 2rem;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    /* Blue 600 → Blue 700 - Đậm hơn cho nút DUYỆT (Gradient) */
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.travel-expense-settlement-submit-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.5);
+}
+
+.travel-expense-settlement-submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Calculation Section */
+.travel-expense-settlement-calculation {
+    background: transparent;
+    /* Không có background riêng vì đã có ở section-content */
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: 1rem;
+}
+
+.travel-expense-settlement-calculation-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #2563eb;
+    /* Màu xanh đậm */
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+}
+
+.travel-expense-settlement-calculation-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+}
+
+.travel-expense-settlement-calculation-label {
+    font-size: 0.875rem;
+    color: #718096;
+    font-weight: 600;
+}
+
+.travel-expense-settlement-calculation-value {
+    font-size: 0.875rem;
+    color: #2d3748;
+    font-weight: 600;
+}
+
+.travel-expense-settlement-calculation-value.advance {
+    color: #2563eb;
+    /* Blue 600 - Đậm hơn */
+    font-weight: 700;
+}
+
+.travel-expense-settlement-calculation-value.actual {
+    color: #dc2626;
+    /* Red 600 */
+    font-weight: 700;
+}
+
+/* Result Section */
+.travel-expense-settlement-result {
+    background: transparent;
+    /* Không có background riêng vì đã có ở section-content */
+    border-radius: 0;
+    padding: 0;
+    border-top: 1px solid rgba(37, 99, 235, 0.2);
+    /* Đường kẻ ngang phân cách */
+    padding-top: 1rem;
+    margin-top: 1rem;
+}
+
+.travel-expense-settlement-result-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a202c;
+    /* Màu đen */
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+.travel-expense-settlement-result-amount {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.travel-expense-settlement-result-amount.refund {
+    color: #059669;
+    /* Green 600 - Số tiền cần hoàn trả */
+}
+
+.travel-expense-settlement-result-amount.supplement {
+    color: #dc2626;
+    /* Red 600 - Số tiền cần bổ sung */
+}
+
+.travel-expense-settlement-result-amount.balanced {
+    color: #059669;
+    /* Green 600 - Khớp */
+}
+
+.travel-expense-settlement-result-description {
+    font-size: 0.875rem;
+    color: #059669;
+    /* Green 600 - Màu xanh lá như trong hình */
+    font-weight: 600;
+}

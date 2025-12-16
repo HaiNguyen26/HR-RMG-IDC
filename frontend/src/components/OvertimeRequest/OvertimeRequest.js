@@ -20,6 +20,7 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [employeeProfile, setEmployeeProfile] = useState(null);
+  const [isLateRequest, setIsLateRequest] = useState(false);
 
   // Fetch employee profile to get manager info
   useEffect(() => {
@@ -107,6 +108,21 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
   const employeeName = getValue('hoTen', 'ho_ten', 'fullName', 'name') || '';
   const employeeBranch = getValue('chiNhanh', 'chi_nhanh', 'branch') || '';
   const employeeDepartment = getValue('phongBan', 'phong_ban', 'department') || '';
+
+  // Check if request time is in the past (late submission)
+  useEffect(() => {
+    if (formData.startDate && formData.startTime) {
+      const startDateTime = new Date(formData.startDate);
+      const [startHour, startMin] = formData.startTime.split(':').map(Number);
+      startDateTime.setHours(startHour, startMin || 0, 0, 0);
+
+      const now = new Date();
+      // Cảnh báo khi thời gian bắt đầu đã qua (nộp đơn muộn)
+      setIsLateRequest(startDateTime < now);
+    } else {
+      setIsLateRequest(false);
+    }
+  }, [formData.startDate, formData.startTime]);
 
   // Calculate estimated hours and overtime type (day/night)
   useEffect(() => {
@@ -223,25 +239,25 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
 
   const handleTimeChange = (field) => (e) => {
     let value = e.target.value;
-    
+
     // Convert to 24-hour format if needed
     // HTML5 time input should already be in 24h format, but ensure it's correct
     if (value && value.includes(':')) {
       const [hours, minutes] = value.split(':');
       const hours24 = parseInt(hours, 10);
       const minutesInt = parseInt(minutes, 10);
-      
+
       // Ensure hours are in 24h format (0-23)
       if (hours24 >= 0 && hours24 <= 23) {
         // Làm tròn phút về bước 15 phút gần nhất (00, 15, 30, 45)
         const roundedMinutes = Math.round(minutesInt / 15) * 15;
         const finalMinutes = Math.min(roundedMinutes, 45); // Tối đa 45
-        
+
         // Format as HH:mm (2 digits for hours and minutes)
         value = `${hours24.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}`;
       }
     }
-    
+
     // Validate time format hh:mm (24-hour)
     if (value === '' || /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(value)) {
       handleInputChange(field, value);
@@ -281,6 +297,13 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
         return;
       }
 
+      // Check if request time is in the past (late submission)
+      const startDateTime = new Date(formData.startDate);
+      const [startHour, startMin] = formData.startTime.split(':').map(Number);
+      startDateTime.setHours(startHour, startMin || 0, 0, 0);
+      const now = new Date();
+      const isLate = startDateTime < now;
+
       const payload = {
         employeeId: currentUser.id,
         requestDate: formData.startDate, // Use start date as primary date
@@ -289,7 +312,8 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
         endDate: formData.endDate,
         endTime: formData.endTime,
         duration: formData.estimatedHours || null,
-        reason: formData.reason
+        reason: formData.reason,
+        isLateRequest: isLate
       };
 
       const response = await overtimeRequestsAPI.create(payload);
@@ -555,6 +579,16 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
                     </div>
                   )}
                 </div>
+
+                {/* Warning Message for Late Request */}
+                {isLateRequest && (
+                  <div className="overtime-request-warning">
+                    <svg className="warning-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <span><strong>Cảnh báo vi phạm:</strong> Bạn đang nộp đơn tăng ca sau thời gian thực tế. Đơn tăng ca phải được nộp trước khi bắt đầu làm việc.</span>
+                  </div>
+                )}
 
                 {/* Reason Field */}
                 <div className="overtime-form-group">

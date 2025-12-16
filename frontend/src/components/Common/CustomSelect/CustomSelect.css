@@ -106,19 +106,19 @@
 /* Dropdown Menu - Optimized for Performance */
 .custom-select-menu {
     position: absolute;
-    bottom: calc(100% + 8px);
+    top: calc(100% + 8px);
     left: 0;
     right: 0;
     background: #ffffff;
     border: 1.5px solid #e0e0e0;
     border-radius: 12px;
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.12), 0 -2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
     z-index: 10000;
     /* Very high z-index to ensure it's on top */
     max-height: 200px;
     overflow-y: auto;
     overflow-x: hidden;
-    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overscroll-behavior: contain;
     /* Performance optimizations */
     transform: translateZ(0);
@@ -153,11 +153,11 @@
     background: #a0a0a0;
 }
 
-/* Dropdown Animation - Slide Up */
-@keyframes slideUp {
+/* Dropdown Animation - Slide Down */
+@keyframes slideDown {
     from {
         opacity: 0;
-        transform: translateY(8px) scale(0.98);
+        transform: translateY(-8px) scale(0.98);
     }
 
     to {

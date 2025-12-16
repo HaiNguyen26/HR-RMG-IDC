@@ -607,41 +607,26 @@ router.get('/', async (req, res) => {
 router.get('/departments', async (req, res) => {
     try {
         const query = `
-            SELECT DISTINCT phong_ban as department
+            SELECT DISTINCT TRIM(phong_ban) as department
             FROM employees
-            WHERE phong_ban IS NOT NULL AND phong_ban != ''
-            ORDER BY phong_ban ASC
+            WHERE phong_ban IS NOT NULL AND TRIM(phong_ban) != ''
+            ORDER BY TRIM(phong_ban) ASC
         `;
         const result = await pool.query(query);
-        res.json({
-            success: true,
-            data: result.rows.map(row => row.department)
-        });
-    } catch (error) {
-        console.error('Error fetching departments:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi lấy danh sách phòng ban: ' + error.message
-        });
-    }
-});
 
-/**
- * GET /api/employees/departments - Lấy danh sách phòng ban (DISTINCT)
- * Phải đặt trước route /:id để tránh conflict
- */
-router.get('/departments', async (req, res) => {
-    try {
-        const query = `
-            SELECT DISTINCT phong_ban as department
-            FROM employees
-            WHERE phong_ban IS NOT NULL AND phong_ban != ''
-            ORDER BY phong_ban ASC
-        `;
-        const result = await pool.query(query);
+        // Loại bỏ duplicate và normalize dữ liệu
+        const departments = result.rows
+            .map(row => row.department ? String(row.department).trim() : '')
+            .filter(dept => dept !== '')
+            .filter((dept, index, self) => {
+                // Loại bỏ duplicate (case-insensitive)
+                return self.findIndex(d => d.toLowerCase() === dept.toLowerCase()) === index;
+            })
+            .sort();
+
         res.json({
             success: true,
-            data: result.rows.map(row => row.department)
+            data: departments
         });
     } catch (error) {
         console.error('Error fetching departments:', error);
@@ -805,17 +790,76 @@ router.get('/bo-phan', async (req, res) => {
  */
 router.get('/job-titles', async (req, res) => {
     try {
+        // Lấy tất cả chức danh từ database và normalize ngay trong SQL
         const query = `
-            SELECT DISTINCT chuc_danh as job_title
+            SELECT 
+                REGEXP_REPLACE(
+                    REGEXP_REPLACE(
+                        TRIM(chuc_danh),
+                        '\\s+', ' ', 'g'
+                    ),
+                    '[\\u00A0\\u2000-\\u200B\\u202F\\u205F\\u3000\\uFEFF]', ' ', 'g'
+                ) as job_title
             FROM employees
-            WHERE chuc_danh IS NOT NULL AND chuc_danh != ''
-            ORDER BY chuc_danh ASC
+            WHERE chuc_danh IS NOT NULL AND TRIM(chuc_danh) != ''
         `;
         console.log('[GET /api/employees/job-titles] Executing query...');
         const result = await pool.query(query);
-        console.log(`[GET /api/employees/job-titles] Found ${result.rows.length} job titles`);
-        const jobTitles = result.rows.map(row => row.job_title).filter(Boolean);
-        console.log(`[GET /api/employees/job-titles] Returning ${jobTitles.length} job titles:`, jobTitles.slice(0, 5));
+        console.log(`[GET /api/employees/job-titles] Found ${result.rows.length} raw job titles`);
+
+        // Loại bỏ duplicate và normalize dữ liệu
+        const seen = new Set();
+        const jobTitlesMap = new Map(); // Map để lưu giá trị đã normalize
+
+        for (const row of result.rows) {
+            if (!row.job_title) continue;
+
+            // Normalize: chuẩn hóa về NFC trước, sau đó loại bỏ khoảng trắng thừa
+            let normalized = String(row.job_title)
+                .normalize('NFC') // Chuẩn hóa về NFC (composed form) - dấu tích hợp vào ký tự
+                .trim()
+                .replace(/[\u00A0\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g, ' ') // Loại bỏ các loại khoảng trắng đặc biệt
+                .replace(/\s+/g, ' ') // Thay nhiều khoảng trắng thành 1 khoảng
+                .trim();
+
+            if (!normalized) continue;
+
+            // Tạo key để so sánh (lowercase, normalize về NFC, loại bỏ dấu)
+            const key = normalized
+                .toLowerCase()
+                .normalize('NFC') // Đảm bảo cùng form
+                .normalize('NFD') // Decompose để loại bỏ dấu
+                .replace(/[\u0300-\u036f]/g, '') // Loại bỏ dấu
+                .replace(/[^a-z0-9]/g, '') // Chỉ giữ chữ và số
+                .trim();
+
+            // Chỉ thêm nếu chưa thấy (so sánh bằng key)
+            if (!seen.has(key)) {
+                seen.add(key);
+                jobTitlesMap.set(key, normalized); // Lưu giá trị đã normalize
+            }
+        }
+
+        // Chuyển Map thành mảng và sắp xếp
+        const jobTitles = Array.from(jobTitlesMap.values());
+        jobTitles.sort((a, b) => a.localeCompare(b, 'vi'));
+
+        // Debug: Kiểm tra các giá trị có thể bị duplicate
+        const debugDuplicates = [];
+        const checkSeen = new Set();
+        jobTitles.forEach(title => {
+            const checkKey = title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+            if (checkSeen.has(checkKey)) {
+                debugDuplicates.push(title);
+            }
+            checkSeen.add(checkKey);
+        });
+
+        if (debugDuplicates.length > 0) {
+            console.warn('[GET /api/employees/job-titles] Found potential duplicates after processing:', debugDuplicates);
+        }
+
+        console.log(`[GET /api/employees/job-titles] Returning ${jobTitles.length} unique job titles:`, jobTitles.slice(0, 10));
         res.json({
             success: true,
             data: jobTitles

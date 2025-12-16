@@ -4,61 +4,8 @@ const pool = require('../config/database');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const PDFDocument = require('pdfkit');
-const XLSX = require('xlsx');
 
-// Vietnamese fonts configuration - PDFKit uses font file paths directly
-const fontsPath = path.join(__dirname, '../fonts');
-const notoSansRegular = path.join(fontsPath, 'NotoSans-Regular.ttf');
-const notoSansBold = path.join(fontsPath, 'NotoSans-Bold.ttf');
-
-// Get Vietnamese fonts - return file path if exists, otherwise use default font name
-const getVietnameseFonts = () => {
-    let fonts = {
-        regular: 'Times-Roman',
-        bold: 'Times-Bold'
-    };
-
-    if (fs.existsSync(notoSansRegular)) {
-        fonts.regular = notoSansRegular;
-        console.log('✓ Using NotoSans-Regular for Vietnamese text');
-    } else {
-        console.warn('✗ NotoSans-Regular font file not found, using Times-Roman');
-    }
-
-    if (fs.existsSync(notoSansBold)) {
-        fonts.bold = notoSansBold;
-        console.log('✓ Using NotoSans-Bold for Vietnamese text');
-    } else {
-        console.warn('✗ NotoSans-Bold font file not found, using Times-Bold');
-    }
-
-    return fonts;
-};
-
-// Initialize fonts once at module load
-const vietnameseFonts = getVietnameseFonts();
-
-// Prepare logs directory for PDF generation errors
-const logsDir = path.join(__dirname, '../logs');
-if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
-}
-const pdfErrorLogPath = path.join(logsDir, 'pdf-errors.log');
-const logPdfError = (message, metadata = {}) => {
-    try {
-        const logEntry = {
-            timestamp: new Date().toISOString(),
-            message,
-            ...metadata
-        };
-        fs.appendFileSync(pdfErrorLogPath, JSON.stringify(logEntry) + '\n');
-    } catch (err) {
-        console.error('Failed to write PDF error log:', err.message);
-    }
-};
-
-// Configure multer for file uploads
+// Cấu hình multer để lưu file
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = path.join(__dirname, '../uploads/candidates');
@@ -69,732 +16,89 @@ const storage = multer.diskStorage({
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'cv-' + uniqueSuffix + path.extname(file.originalname));
+        const ext = path.extname(file.originalname);
+        cb(null, file.fieldname + '-' + uniqueSuffix + ext);
     }
 });
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB
+    },
     fileFilter: (req, file, cb) => {
-        const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-        if (allowedTypes.includes(file.mimetype)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Chỉ chấp nhận file PDF, DOC hoặc DOCX'));
-        }
-    }
-});
-
-// Multer instance for Excel file uploads (bulk import)
-const uploadExcel = multer({
-    storage: multer.memoryStorage(), // Use memory storage for Excel files
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB for Excel files
-    fileFilter: (req, file, cb) => {
-        const allowedTypes = [
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-            'application/vnd.ms-excel', // .xls
-            'application/excel', // .xls (alternative)
-            'application/x-excel', // .xls (alternative)
-            'application/x-msexcel' // .xls (alternative)
-        ];
-        if (allowedTypes.includes(file.mimetype)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Chỉ chấp nhận file Excel (.xlsx, .xls)'));
-        }
-    }
-});
-
-// Notification system removed
-
-// Ensure candidates table exists
-const ensureCandidatesTable = async () => {
-    const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS candidates (
-            id SERIAL PRIMARY KEY,
-            ho_ten VARCHAR(255) NOT NULL,
-            ngay_sinh DATE,
-            vi_tri_ung_tuyen VARCHAR(100),
-            phong_ban VARCHAR(50),
-            so_dien_thoai VARCHAR(20),
-            cccd VARCHAR(20),
-            ngay_cap_cccd DATE,
-            noi_cap_cccd VARCHAR(255),
-            ngay_gui_cv DATE,
-            cv_file_path VARCHAR(500),
-            cv_file_name VARCHAR(255),
-            status VARCHAR(50) DEFAULT 'PENDING_INTERVIEW' CHECK (status IN ('PENDING_INTERVIEW', 'PENDING_MANAGER', 'PASSED', 'FAILED', 'PROBATION')),
-            notes TEXT,
-            job_offer_sent_date TIMESTAMP,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        -- Add new columns if they don't exist (for existing databases)
-        DO $$ 
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='ngay_cap_cccd') THEN
-                ALTER TABLE candidates ADD COLUMN ngay_cap_cccd DATE;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='noi_cap_cccd') THEN
-                ALTER TABLE candidates ADD COLUMN noi_cap_cccd VARCHAR(255);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='dia_chi_tam_tru') THEN
-                ALTER TABLE candidates ADD COLUMN dia_chi_tam_tru TEXT;
-            END IF;
-            -- Add personal information columns
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='gioi_tinh') THEN
-                ALTER TABLE candidates ADD COLUMN gioi_tinh VARCHAR(20);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='noi_sinh') THEN
-                ALTER TABLE candidates ADD COLUMN noi_sinh VARCHAR(255);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='tinh_trang_hon_nhan') THEN
-                ALTER TABLE candidates ADD COLUMN tinh_trang_hon_nhan VARCHAR(50);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='dan_toc') THEN
-                ALTER TABLE candidates ADD COLUMN dan_toc VARCHAR(50);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='quoc_tich') THEN
-                ALTER TABLE candidates ADD COLUMN quoc_tich VARCHAR(100);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='ton_giao') THEN
-                ALTER TABLE candidates ADD COLUMN ton_giao VARCHAR(100);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='so_dien_thoai_khac') THEN
-                ALTER TABLE candidates ADD COLUMN so_dien_thoai_khac VARCHAR(20);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='email') THEN
-                ALTER TABLE candidates ADD COLUMN email VARCHAR(255);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='nguyen_quan') THEN
-                ALTER TABLE candidates ADD COLUMN nguyen_quan VARCHAR(255);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='trinh_do_van_hoa') THEN
-                ALTER TABLE candidates ADD COLUMN trinh_do_van_hoa VARCHAR(100);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='trinh_do_chuyen_mon') THEN
-                ALTER TABLE candidates ADD COLUMN trinh_do_chuyen_mon VARCHAR(255);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='chuyen_nganh') THEN
-                ALTER TABLE candidates ADD COLUMN chuyen_nganh VARCHAR(255);
-            END IF;
-            -- Add JSONB columns for arrays
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='kinh_nghiem_lam_viec') THEN
-                ALTER TABLE candidates ADD COLUMN kinh_nghiem_lam_viec JSONB;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='qua_trinh_dao_tao') THEN
-                ALTER TABLE candidates ADD COLUMN qua_trinh_dao_tao JSONB;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='trinh_do_ngoai_ngu') THEN
-                ALTER TABLE candidates ADD COLUMN trinh_do_ngoai_ngu JSONB;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='candidates' AND column_name='job_offer_sent_date') THEN
-                ALTER TABLE candidates ADD COLUMN job_offer_sent_date TIMESTAMP;
-            END IF;
-        END $$;
-
-        -- Allow ho_ten to be NULL for bulk import
-        DO $$
-        BEGIN
-            IF EXISTS (
-                SELECT 1 
-                FROM information_schema.columns 
-                WHERE table_name = 'candidates' 
-                AND column_name = 'ho_ten'
-                AND is_nullable = 'NO'
-            ) THEN
-                ALTER TABLE candidates 
-                ALTER COLUMN ho_ten DROP NOT NULL;
-            END IF;
-        EXCEPTION
-            WHEN OTHERS THEN
-                NULL;
-        END $$;
-
-        CREATE INDEX IF NOT EXISTS idx_candidates_status ON candidates(status);
-        CREATE INDEX IF NOT EXISTS idx_candidates_created_at ON candidates(created_at);
-    `;
-
-    try {
-        await pool.query(createTableQuery);
-        // Update existing table constraint if needed
-        await pool.query(`
-            DO $$ 
-            BEGIN
-                -- Drop old constraint if exists
-                ALTER TABLE candidates DROP CONSTRAINT IF EXISTS candidates_status_check;
-                -- Add new constraint with PENDING_MANAGER and PROBATION
-                ALTER TABLE candidates ADD CONSTRAINT candidates_status_check 
-                    CHECK (status IN ('PENDING_INTERVIEW', 'PENDING_MANAGER', 'PASSED', 'FAILED', 'PROBATION'));
-            EXCEPTION
-                WHEN OTHERS THEN
-                    -- If constraint doesn't exist, ignore
-                    NULL;
-            END $$;
-        `);
-    } catch (error) {
-        console.error('Error ensuring candidates table:', error);
-        throw error;
-    }
-};
-
-// Ensure interview_requests table exists
-const ensureInterviewRequestsTable = async () => {
-    const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS interview_requests (
-            id SERIAL PRIMARY KEY,
-            candidate_id INTEGER NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
-            manager_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            manager_name VARCHAR(255) NOT NULL,
-            indirect_manager_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
-            indirect_manager_name VARCHAR(255),
-            interview_date DATE,
-            interview_time TIME,
-            status VARCHAR(50) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'PENDING_EVALUATION')),
-            notes TEXT,
-            created_by INTEGER REFERENCES employees(id),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_interview_requests_candidate_id ON interview_requests(candidate_id);
-        CREATE INDEX IF NOT EXISTS idx_interview_requests_manager_id ON interview_requests(manager_id);
-        CREATE INDEX IF NOT EXISTS idx_interview_requests_status ON interview_requests(status);
-    `;
-
-    try {
-        await pool.query(createTableQuery);
-
-        // Add new columns if they don't exist (for existing databases)
-        await pool.query(`
-            DO $$ 
-            BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='indirect_manager_id') THEN
-                    ALTER TABLE interview_requests ADD COLUMN indirect_manager_id INTEGER REFERENCES employees(id) ON DELETE SET NULL;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='indirect_manager_name') THEN
-                    ALTER TABLE interview_requests ADD COLUMN indirect_manager_name VARCHAR(255);
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='interview_date') THEN
-                    ALTER TABLE interview_requests ADD COLUMN interview_date DATE;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='interview_time') THEN
-                    ALTER TABLE interview_requests ADD COLUMN interview_time TIME;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='evaluation_criteria_1') THEN
-                    ALTER TABLE interview_requests ADD COLUMN evaluation_criteria_1 BOOLEAN DEFAULT FALSE;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='evaluation_criteria_2') THEN
-                    ALTER TABLE interview_requests ADD COLUMN evaluation_criteria_2 BOOLEAN DEFAULT FALSE;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='evaluation_criteria_3') THEN
-                    ALTER TABLE interview_requests ADD COLUMN evaluation_criteria_3 BOOLEAN DEFAULT FALSE;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='evaluation_criteria_4') THEN
-                    ALTER TABLE interview_requests ADD COLUMN evaluation_criteria_4 BOOLEAN DEFAULT FALSE;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='evaluation_criteria_5') THEN
-                    ALTER TABLE interview_requests ADD COLUMN evaluation_criteria_5 BOOLEAN DEFAULT FALSE;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='evaluation_notes') THEN
-                    ALTER TABLE interview_requests ADD COLUMN evaluation_notes TEXT;
-                END IF;
-                -- Direct manager evaluation status
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='direct_manager_evaluated') THEN
-                    ALTER TABLE interview_requests ADD COLUMN direct_manager_evaluated BOOLEAN DEFAULT FALSE;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='direct_manager_evaluation_data') THEN
-                    ALTER TABLE interview_requests ADD COLUMN direct_manager_evaluation_data JSONB;
-                END IF;
-                -- Indirect manager evaluation status
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='indirect_manager_evaluated') THEN
-                    ALTER TABLE interview_requests ADD COLUMN indirect_manager_evaluated BOOLEAN DEFAULT FALSE;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_requests' AND column_name='indirect_manager_evaluation_data') THEN
-                    ALTER TABLE interview_requests ADD COLUMN indirect_manager_evaluation_data JSONB;
-                END IF;
-            END $$;
-        `);
-
-        // Update CHECK constraint to include PENDING_EVALUATION
-        await pool.query(`
-            DO $$ 
-            BEGIN
-                -- Drop existing constraint if it exists
-                IF EXISTS (
-                    SELECT 1 FROM pg_constraint 
-                    WHERE conname = 'interview_requests_status_check'
-                    AND conrelid = 'interview_requests'::regclass
-                ) THEN
-                    ALTER TABLE interview_requests DROP CONSTRAINT interview_requests_status_check;
-                END IF;
-                
-                -- Add new constraint with PENDING_EVALUATION
-                ALTER TABLE interview_requests 
-                ADD CONSTRAINT interview_requests_status_check 
-                CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'PENDING_EVALUATION'));
-            END $$;
-        `);
-    } catch (error) {
-        console.error('Error ensuring interview_requests table:', error);
-        throw error;
-    }
-};
-
-// Seed demo data - DISABLED
-const seedDemoCandidates = async () => {
-    // Demo data seeding has been disabled
-    return;
-
-    /* DISABLED - Demo data no longer seeded automatically
-    try {
-        // Check if candidates already exist
-        const checkResult = await pool.query('SELECT COUNT(*) as count FROM candidates');
-        if (parseInt(checkResult.rows[0].count) > 0) {
-            return; // Already has data, skip seeding
-        }
-
-        const demoCandidates = [
-            {
-                ho_ten: 'Nguyễn Văn An',
-                ngay_sinh: '1995-03-15',
-                vi_tri_ung_tuyen: 'Lập trình viên',
-                phong_ban: 'IT',
-                so_dien_thoai: '0912345678',
-                cccd: '001234567890',
-                ngay_gui_cv: '2024-01-10',
-                status: 'PENDING_INTERVIEW'
-            },
-            {
-                ho_ten: 'Trần Thị Bình',
-                ngay_sinh: '1998-07-22',
-                vi_tri_ung_tuyen: 'Thiết kế',
-                phong_ban: 'IT',
-                so_dien_thoai: '0923456789',
-                cccd: '001234567891',
-                ngay_gui_cv: '2024-01-12',
-                status: 'PASSED'
-            },
-            {
-                ho_ten: 'Lê Minh Cường',
-                ngay_sinh: '1996-11-05',
-                vi_tri_ung_tuyen: 'Marketing',
-                phong_ban: 'MARKETING',
-                so_dien_thoai: '0934567890',
-                cccd: '001234567892',
-                ngay_gui_cv: '2024-01-08',
-                status: 'FAILED'
-            },
-            {
-                ho_ten: 'Phạm Thị Dung',
-                ngay_sinh: '1997-05-18',
-                vi_tri_ung_tuyen: 'Lập trình viên',
-                phong_ban: 'IT',
-                so_dien_thoai: '0945678901',
-                cccd: '001234567893',
-                ngay_gui_cv: '2024-01-15',
-                status: 'PENDING_INTERVIEW'
-            },
-            {
-                ho_ten: 'Hoàng Văn Đức',
-                ngay_sinh: '1994-09-25',
-                vi_tri_ung_tuyen: 'Quản lý dự án',
-                phong_ban: 'IT',
-                so_dien_thoai: '0956789012',
-                cccd: '001234567894',
-                ngay_gui_cv: '2024-01-18',
-                status: 'PASSED'
-            },
-            {
-                ho_ten: 'Vũ Thị Hương',
-                ngay_sinh: '1999-02-14',
-                vi_tri_ung_tuyen: 'Thiết kế',
-                phong_ban: 'IT',
-                so_dien_thoai: '0967890123',
-                cccd: '001234567895',
-                ngay_gui_cv: '2024-01-20',
-                status: 'PENDING_INTERVIEW'
-            },
-            {
-                ho_ten: 'Đỗ Văn Hùng',
-                ngay_sinh: '1993-08-30',
-                vi_tri_ung_tuyen: 'Phân tích nghiệp vụ',
-                phong_ban: 'IT',
-                so_dien_thoai: '0978901234',
-                cccd: '001234567896',
-                ngay_gui_cv: '2024-01-22',
-                status: 'FAILED'
-            },
-            {
-                ho_ten: 'Bùi Thị Lan',
-                ngay_sinh: '1996-12-08',
-                vi_tri_ung_tuyen: 'Nhân sự',
-                phong_ban: 'HR',
-                so_dien_thoai: '0989012345',
-                cccd: '001234567897',
-                ngay_gui_cv: '2024-01-25',
-                status: 'PASSED'
-            },
-            {
-                ho_ten: 'Ngô Văn Minh',
-                ngay_sinh: '1995-06-20',
-                vi_tri_ung_tuyen: 'Kế toán',
-                phong_ban: 'ACCOUNTING',
-                so_dien_thoai: '0990123456',
-                cccd: '001234567898',
-                ngay_gui_cv: '2024-01-28',
-                status: 'PENDING_INTERVIEW'
-            },
-            {
-                ho_ten: 'Lý Thị Nga',
-                ngay_sinh: '1998-04-12',
-                vi_tri_ung_tuyen: 'Marketing',
-                phong_ban: 'MARKETING',
-                so_dien_thoai: '0901234567',
-                cccd: '001234567899',
-                ngay_gui_cv: '2024-02-01',
-                status: 'PASSED'
-            },
-            {
-                ho_ten: 'Trương Văn Phong',
-                ngay_sinh: '1994-10-05',
-                vi_tri_ung_tuyen: 'Kinh doanh',
-                phong_ban: 'SALES',
-                so_dien_thoai: '0912345679',
-                cccd: '001234567900',
-                ngay_gui_cv: '2024-02-05',
-                status: 'PENDING_INTERVIEW'
-            },
-            {
-                ho_ten: 'Đinh Thị Quỳnh',
-                ngay_sinh: '1997-01-28',
-                vi_tri_ung_tuyen: 'Lập trình viên',
-                phong_ban: 'IT',
-                so_dien_thoai: '0923456780',
-                cccd: '001234567901',
-                ngay_gui_cv: '2024-02-08',
-                status: 'FAILED'
-            },
-            {
-                ho_ten: 'Phan Văn Sơn',
-                ngay_sinh: '1996-07-15',
-                vi_tri_ung_tuyen: 'Kiểm thử',
-                phong_ban: 'IT',
-                so_dien_thoai: '0934567891',
-                cccd: '001234567902',
-                ngay_gui_cv: '2024-02-10',
-                status: 'PASSED'
-            },
-            {
-                ho_ten: 'Võ Thị Tuyết',
-                ngay_sinh: '1999-03-22',
-                vi_tri_ung_tuyen: 'Thiết kế',
-                phong_ban: 'IT',
-                so_dien_thoai: '0945678902',
-                cccd: '001234567903',
-                ngay_gui_cv: '2024-02-12',
-                status: 'PENDING_INTERVIEW'
-            },
-            {
-                ho_ten: 'Dương Văn Tuấn',
-                ngay_sinh: '1995-11-10',
-                vi_tri_ung_tuyen: 'Marketing',
-                phong_ban: 'MARKETING',
-                so_dien_thoai: '0956789013',
-                cccd: '001234567904',
-                ngay_gui_cv: '2024-02-15',
-                status: 'PASSED'
-            },
-            {
-                ho_ten: 'Lưu Thị Uyên',
-                ngay_sinh: '1998-08-03',
-                vi_tri_ung_tuyen: 'Nhân sự',
-                phong_ban: 'HR',
-                so_dien_thoai: '0967890124',
-                cccd: '001234567905',
-                ngay_gui_cv: '2024-02-18',
-                status: 'PENDING_INTERVIEW'
-            },
-            {
-                ho_ten: 'Cao Văn Việt',
-                ngay_sinh: '1994-12-19',
-                vi_tri_ung_tuyen: 'Quản lý dự án',
-                phong_ban: 'IT',
-                so_dien_thoai: '0978901235',
-                cccd: '001234567906',
-                ngay_gui_cv: '2024-02-20',
-                status: 'FAILED'
-            },
-            {
-                ho_ten: 'Tôn Thị Xuân',
-                ngay_sinh: '1997-06-07',
-                vi_tri_ung_tuyen: 'Kế toán',
-                phong_ban: 'ACCOUNTING',
-                so_dien_thoai: '0989012346',
-                cccd: '001234567907',
-                ngay_gui_cv: '2024-02-22',
-                status: 'PASSED'
-            },
-            {
-                ho_ten: 'Hồ Văn Yên',
-                ngay_sinh: '1996-02-25',
-                vi_tri_ung_tuyen: 'Kinh doanh',
-                phong_ban: 'SALES',
-                so_dien_thoai: '0990123457',
-                cccd: '001234567908',
-                ngay_gui_cv: '2024-02-25',
-                status: 'PENDING_INTERVIEW'
-            },
-            {
-                ho_ten: 'Mai Thị Zara',
-                ngay_sinh: '1999-09-14',
-                vi_tri_ung_tuyen: 'Lập trình viên',
-                phong_ban: 'IT',
-                so_dien_thoai: '0901234568',
-                cccd: '001234567909',
-                ngay_gui_cv: '2024-02-28',
-                status: 'PASSED'
-            },
-            {
-                ho_ten: 'Lâm Văn Anh',
-                ngay_sinh: '1995-04-30',
-                vi_tri_ung_tuyen: 'Vận hành',
-                phong_ban: 'OPERATIONS',
-                so_dien_thoai: '0912345680',
-                cccd: '001234567910',
-                ngay_gui_cv: '2024-03-01',
-                status: 'PENDING_INTERVIEW'
-            },
-            {
-                ho_ten: 'Chu Thị Bảo',
-                ngay_sinh: '1998-10-17',
-                vi_tri_ung_tuyen: 'Thiết kế',
-                phong_ban: 'IT',
-                so_dien_thoai: '0923456781',
-                cccd: '001234567911',
-                ngay_gui_cv: '2024-03-05',
-                status: 'FAILED'
-            },
-            {
-                ho_ten: 'Tạ Văn Cường',
-                ngay_sinh: '1994-05-23',
-                vi_tri_ung_tuyen: 'Marketing',
-                phong_ban: 'MARKETING',
-                so_dien_thoai: '0934567892',
-                cccd: '001234567912',
-                ngay_gui_cv: '2024-03-08',
-                status: 'PASSED'
+        // Cho phép ảnh và PDF/Excel cho CV
+        if (file.fieldname === 'anhDaiDien') {
+            if (file.mimetype.startsWith('image/')) {
+                cb(null, true);
+            } else {
+                cb(new Error('Ảnh đại diện phải là file ảnh'));
             }
-        ];
-
-        for (const candidate of demoCandidates) {
-            await pool.query(
-                `INSERT INTO candidates (
-                    ho_ten, ngay_sinh, vi_tri_ung_tuyen, phong_ban, 
-                    so_dien_thoai, cccd, ngay_gui_cv, status
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                [
-                    candidate.ho_ten,
-                    candidate.ngay_sinh,
-                    candidate.vi_tri_ung_tuyen,
-                    candidate.phong_ban,
-                    candidate.so_dien_thoai,
-                    candidate.cccd,
-                    candidate.ngay_gui_cv,
-                    candidate.status
-                ]
-            );
+        } else if (file.fieldname === 'cvDinhKem') {
+            const allowedTypes = ['application/pdf', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+            if (allowedTypes.includes(file.mimetype)) {
+                cb(null, true);
+            } else {
+                cb(new Error('CV đính kèm phải là file PDF hoặc Excel'));
+            }
+        } else {
+            cb(null, true);
         }
-
-        console.log('Demo candidates seeded successfully');
-    } catch (error) {
-        console.error('Error seeding demo candidates:', error);
-        // Don't throw error, just log it
     }
-    */
+});
+
+// Đảm bảo các bảng tồn tại
+const ensureTables = async () => {
+    // Tables đã được tạo bằng script SQL, không cần tạo lại ở đây
+    // Nhưng có thể thêm logic kiểm tra nếu cần
 };
 
 // GET /api/candidates - Lấy danh sách ứng viên
-// GET /api/candidates/managers - Get list of direct managers
-router.get('/managers', async (req, res) => {
-    try {
-        const query = `
-            SELECT DISTINCT e.id, e.ho_ten, e.email, e.chuc_danh, e.phong_ban
-            FROM employees e
-            INNER JOIN employees staff ON LOWER(TRIM(staff.quan_ly_truc_tiep)) = LOWER(TRIM(e.ho_ten))
-            WHERE (e.trang_thai = 'ACTIVE' OR e.trang_thai = 'PENDING' OR e.trang_thai IS NULL)
-            ORDER BY e.ho_ten
-        `;
-
-        const result = await pool.query(query);
-
-        res.json({
-            success: true,
-            message: 'Danh sách quản lý trực tiếp',
-            data: result.rows
-        });
-    } catch (error) {
-        console.error('Error fetching managers:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Không thể lấy danh sách quản lý: ' + error.message
-        });
-    }
-});
-
 router.get('/', async (req, res) => {
     try {
-        await ensureCandidatesTable();
-
-        // Seed demo data if table is empty
-        await seedDemoCandidates();
-
-        const { status, search } = req.query;
-
-        // Ensure interview_requests table exists
-        await ensureInterviewRequestsTable();
+        const { search, status, page = 1, limit = 50 } = req.query;
+        const offset = (page - 1) * limit;
 
         let query = `
             SELECT 
-                c.id,
-                c.ho_ten,
-                c.gioi_tinh,
-                c.ngay_sinh,
-                c.noi_sinh,
-                c.tinh_trang_hon_nhan,
-                c.dan_toc,
-                c.quoc_tich,
-                c.ton_giao,
-                c.vi_tri_ung_tuyen,
-                c.phong_ban,
-                c.so_dien_thoai,
-                c.so_dien_thoai_khac,
-                c.email,
-                c.cccd,
-                c.ngay_cap_cccd,
-                c.noi_cap_cccd,
-                c.nguyen_quan,
-                c.dia_chi_tam_tru,
-                c.trinh_do_van_hoa,
-                c.trinh_do_chuyen_mon,
-                c.chuyen_nganh,
-                c.kinh_nghiem_lam_viec,
-                c.qua_trinh_dao_tao,
-                c.trinh_do_ngoai_ngu,
-                c.ngay_gui_cv,
-                c.cv_file_path,
-                c.cv_file_name,
-                c.status,
-                c.notes,
-                c.job_offer_sent_date,
-                c.created_at,
-                c.updated_at,
-                ir.manager_name,
-                ir.manager_id
+                c.*,
+                COUNT(*) OVER() as total_count
             FROM candidates c
-            LEFT JOIN (
-                SELECT DISTINCT ON (candidate_id) 
-                    candidate_id, 
-                    manager_name, 
-                    manager_id
-                FROM interview_requests
-                WHERE status IN ('APPROVED', 'REJECTED')
-                ORDER BY candidate_id, updated_at DESC
-            ) ir ON c.id = ir.candidate_id
             WHERE 1=1
-            -- Loại bỏ các placeholder records (dữ liệu mẫu cho dropdown)
-            AND (c.ho_ten NOT LIKE '[Placeholder%' OR c.ho_ten IS NULL)
-            AND (c.notes NOT LIKE '%Dữ liệu mẫu cho dropdown%' OR c.notes IS NULL)
-            AND (c.notes NOT LIKE '%Được tạo tự động từ yêu cầu tuyển dụng%' OR c.notes IS NULL)
         `;
         const params = [];
         let paramIndex = 1;
 
+        if (search) {
+            query += ` AND (
+                c.ho_ten ILIKE $${paramIndex} OR 
+                c.email ILIKE $${paramIndex} OR 
+                c.so_dien_thoai ILIKE $${paramIndex} OR
+                c.vi_tri_ung_tuyen ILIKE $${paramIndex}
+            )`;
+            params.push(`%${search}%`);
+            paramIndex++;
+        }
+
         if (status && status !== 'all') {
-            query += ` AND c.status = $${paramIndex}`;
+            query += ` AND c.trang_thai = $${paramIndex}`;
             params.push(status);
             paramIndex++;
         }
 
-        if (search && search.trim()) {
-            query += ` AND (
-                LOWER(c.ho_ten) LIKE $${paramIndex} OR
-                c.so_dien_thoai LIKE $${paramIndex} OR
-                c.cccd LIKE $${paramIndex} OR
-                LOWER(c.vi_tri_ung_tuyen) LIKE $${paramIndex}
-            )`;
-            params.push(`%${search.toLowerCase()}%`);
-            paramIndex++;
-        }
-
-        query += ` ORDER BY c.created_at DESC`;
+        query += ` ORDER BY c.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+        params.push(limit, offset);
 
         const result = await pool.query(query, params);
 
         res.json({
             success: true,
-            message: 'Danh sách ứng viên',
-            data: result.rows.map(row => ({
-                id: row.id,
-                hoTen: row.ho_ten,
-                ho_ten: row.ho_ten, // Keep snake_case for backward compatibility
-                gioiTinh: row.gioi_tinh,
-                gioi_tinh: row.gioi_tinh,
-                ngaySinh: row.ngay_sinh,
-                noiSinh: row.noi_sinh,
-                noi_sinh: row.noi_sinh,
-                tinhTrangHonNhan: row.tinh_trang_hon_nhan,
-                tinh_trang_hon_nhan: row.tinh_trang_hon_nhan,
-                danToc: row.dan_toc,
-                dan_toc: row.dan_toc,
-                quocTich: row.quoc_tich,
-                quoc_tich: row.quoc_tich,
-                tonGiao: row.ton_giao,
-                ton_giao: row.ton_giao,
-                viTriUngTuyen: row.vi_tri_ung_tuyen,
-                vi_tri_ung_tuyen: row.vi_tri_ung_tuyen,
-                phongBan: row.phong_ban,
-                phong_ban: row.phong_ban,
-                soDienThoai: row.so_dien_thoai,
-                so_dien_thoai: row.so_dien_thoai,
-                soDienThoaiKhac: row.so_dien_thoai_khac,
-                so_dien_thoai_khac: row.so_dien_thoai_khac,
-                email: row.email,
-                cccd: row.cccd,
-                ngayCapCCCD: row.ngay_cap_cccd,
-                ngay_cap_cccd: row.ngay_cap_cccd,
-                noiCapCCCD: row.noi_cap_cccd,
-                noi_cap_cccd: row.noi_cap_cccd,
-                nguyenQuan: row.nguyen_quan,
-                nguyen_quan: row.nguyen_quan,
-                diaChiTamTru: row.dia_chi_tam_tru,
-                dia_chi_tam_tru: row.dia_chi_tam_tru,
-                trinhDoVanHoa: row.trinh_do_van_hoa,
-                trinh_do_van_hoa: row.trinh_do_van_hoa,
-                trinhDoChuyenMon: row.trinh_do_chuyen_mon,
-                trinh_do_chuyen_mon: row.trinh_do_chuyen_mon,
-                chuyenNganh: row.chuyen_nganh,
-                chuyen_nganh: row.chuyen_nganh,
-                kinhNghiemLamViec: row.kinh_nghiem_lam_viec,
-                kinh_nghiem_lam_viec: row.kinh_nghiem_lam_viec,
-                quaTrinhDaoTao: row.qua_trinh_dao_tao,
-                qua_trinh_dao_tao: row.qua_trinh_dao_tao,
-                trinhDoNgoaiNgu: row.trinh_do_ngoai_ngu,
-                trinh_do_ngoai_ngu: row.trinh_do_ngoai_ngu,
-                ngayGuiCV: row.ngay_gui_cv,
-                cvFilePath: row.cv_file_path,
-                cvFileName: row.cv_file_name,
-                status: row.status,
-                notes: row.notes,
-                jobOfferSentDate: row.job_offer_sent_date,
-                job_offer_sent_date: row.job_offer_sent_date,
-                createdAt: row.created_at,
-                managerName: row.manager_name,
-                manager_name: row.manager_name, // Keep snake_case for backward compatibility
-                managerId: row.manager_id
-            }))
+            data: result.rows,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0
+            }
         });
     } catch (error) {
         console.error('Error fetching candidates:', error);
@@ -805,711 +109,16 @@ router.get('/', async (req, res) => {
     }
 });
 
-// POST /api/candidates - Tạo ứng viên mới
-router.post('/', upload.single('cvFile'), async (req, res) => {
+// GET /api/candidates/:id - Lấy thông tin chi tiết ứng viên
+router.get('/:id', async (req, res) => {
     try {
-        await ensureCandidatesTable();
-
-        const {
-            hoTen,
-            gioiTinh,
-            ngaySinh,
-            noiSinh,
-            tinhTrangHonNhan,
-            danToc,
-            quocTich,
-            tonGiao,
-            viTriUngTuyen,
-            phongBan,
-            soDienThoai,
-            soDienThoaiKhac,
-            email,
-            cccd,
-            ngayCapCCCD,
-            noiCapCCCD,
-            nguyenQuan,
-            diaChiTamTru,
-            trinhDoVanHoa,
-            trinhDoChuyenMon,
-            chuyenNganh,
-            kinhNghiemLamViec,
-            quaTrinhDaoTao,
-            trinhDoNgoaiNgu,
-            ngayGuiCV
-        } = req.body;
-
-        // Validation - Chỉ validate format nếu có giá trị, không yêu cầu đầy đủ thông tin
-        // Validate phone format if provided
-        if (soDienThoai && soDienThoai.trim() && !/^[0-9]{10,11}$/.test(soDienThoai.replace(/\s/g, ''))) {
-            return res.status(400).json({
-                success: false,
-                message: 'Số điện thoại không hợp lệ (phải có 10-11 chữ số)'
-            });
-        }
-
-        // Validate CCCD format if provided
-        if (cccd && cccd.trim() && !/^[0-9]{9,12}$/.test(cccd.replace(/\s/g, ''))) {
-            return res.status(400).json({
-                success: false,
-                message: 'Số CCCD không hợp lệ (phải có 9-12 chữ số)'
-            });
-        }
-
-        const insertQuery = `
-            INSERT INTO candidates (
-                ho_ten, gioi_tinh, ngay_sinh, noi_sinh, tinh_trang_hon_nhan, dan_toc, quoc_tich, ton_giao,
-                vi_tri_ung_tuyen, phong_ban,
-                so_dien_thoai, so_dien_thoai_khac, email,
-                cccd, ngay_cap_cccd, noi_cap_cccd, nguyen_quan,
-                dia_chi_tam_tru,
-                trinh_do_van_hoa, trinh_do_chuyen_mon, chuyen_nganh,
-                kinh_nghiem_lam_viec, qua_trinh_dao_tao, trinh_do_ngoai_ngu,
-                ngay_gui_cv,
-                cv_file_path, cv_file_name, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
-            RETURNING *
-        `;
-
-        const cvFilePath = req.file ? req.file.path : null;
-        const cvFileName = req.file ? req.file.originalname : null;
-
-        // Parse JSON arrays if they are strings
-        let kinhNghiemData = null;
-        if (kinhNghiemLamViec) {
-            try {
-                kinhNghiemData = typeof kinhNghiemLamViec === 'string' ? JSON.parse(kinhNghiemLamViec) : kinhNghiemLamViec;
-            } catch (e) {
-                console.error('Error parsing kinhNghiemLamViec:', e);
-            }
-        }
-
-        let quaTrinhData = null;
-        if (quaTrinhDaoTao) {
-            try {
-                quaTrinhData = typeof quaTrinhDaoTao === 'string' ? JSON.parse(quaTrinhDaoTao) : quaTrinhDaoTao;
-            } catch (e) {
-                console.error('Error parsing quaTrinhDaoTao:', e);
-            }
-        }
-
-        let ngoaiNguData = null;
-        if (trinhDoNgoaiNgu) {
-            try {
-                ngoaiNguData = typeof trinhDoNgoaiNgu === 'string' ? JSON.parse(trinhDoNgoaiNgu) : trinhDoNgoaiNgu;
-            } catch (e) {
-                console.error('Error parsing trinhDoNgoaiNgu:', e);
-            }
-        }
-
-        // Convert empty strings to null for date fields
-        const normalizeDate = (dateValue) => {
-            if (!dateValue || dateValue === '' || (typeof dateValue === 'string' && dateValue.trim() === '')) {
-                return null;
-            }
-            return dateValue;
-        };
-
-        const result = await pool.query(insertQuery, [
-            hoTen || null,
-            gioiTinh || null,
-            normalizeDate(ngaySinh),
-            noiSinh || null,
-            tinhTrangHonNhan || null,
-            danToc || null,
-            quocTich || null,
-            tonGiao || null,
-            viTriUngTuyen || null,
-            phongBan || null,
-            soDienThoai || null,
-            soDienThoaiKhac || null,
-            email || null,
-            cccd || null,
-            normalizeDate(ngayCapCCCD),
-            noiCapCCCD || null,
-            nguyenQuan || null,
-            diaChiTamTru || null,
-            trinhDoVanHoa || null,
-            trinhDoChuyenMon || null,
-            chuyenNganh || null,
-            kinhNghiemData ? JSON.stringify(kinhNghiemData) : null,
-            quaTrinhData ? JSON.stringify(quaTrinhData) : null,
-            ngoaiNguData ? JSON.stringify(ngoaiNguData) : null,
-            normalizeDate(ngayGuiCV),
-            cvFilePath,
-            cvFileName,
-            'PENDING_INTERVIEW'
-        ]);
-
-        res.json({
-            success: true,
-            message: 'Đã lưu thông tin ứng viên thành công',
-            data: {
-                id: result.rows[0].id,
-                hoTen: result.rows[0].ho_ten,
-                gioiTinh: result.rows[0].gioi_tinh,
-                ngaySinh: result.rows[0].ngay_sinh,
-                noiSinh: result.rows[0].noi_sinh,
-                tinhTrangHonNhan: result.rows[0].tinh_trang_hon_nhan,
-                danToc: result.rows[0].dan_toc,
-                quocTich: result.rows[0].quoc_tich,
-                tonGiao: result.rows[0].ton_giao,
-                viTriUngTuyen: result.rows[0].vi_tri_ung_tuyen,
-                phongBan: result.rows[0].phong_ban,
-                soDienThoai: result.rows[0].so_dien_thoai,
-                soDienThoaiKhac: result.rows[0].so_dien_thoai_khac,
-                email: result.rows[0].email,
-                cccd: result.rows[0].cccd,
-                ngayCapCCCD: result.rows[0].ngay_cap_cccd,
-                noiCapCCCD: result.rows[0].noi_cap_cccd,
-                nguyenQuan: result.rows[0].nguyen_quan,
-                diaChiTamTru: result.rows[0].dia_chi_tam_tru,
-                trinhDoVanHoa: result.rows[0].trinh_do_van_hoa,
-                trinhDoChuyenMon: result.rows[0].trinh_do_chuyen_mon,
-                chuyenNganh: result.rows[0].chuyen_nganh,
-                kinhNghiemLamViec: result.rows[0].kinh_nghiem_lam_viec,
-                quaTrinhDaoTao: result.rows[0].qua_trinh_dao_tao,
-                trinhDoNgoaiNgu: result.rows[0].trinh_do_ngoai_ngu,
-                ngayGuiCV: result.rows[0].ngay_gui_cv,
-                cvFilePath: result.rows[0].cv_file_path,
-                cvFileName: result.rows[0].cv_file_name,
-                status: result.rows[0].status,
-                createdAt: result.rows[0].created_at
-            }
-        });
-    } catch (error) {
-        console.error('Error creating candidate:', error);
-        // Delete uploaded file if exists
-        if (req.file && req.file.path) {
-            try {
-                fs.unlinkSync(req.file.path);
-            } catch (unlinkError) {
-                console.error('Error deleting uploaded file:', unlinkError);
-            }
-        }
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi lưu thông tin ứng viên: ' + error.message
-        });
-    }
-});
-
-// PUT /api/candidates/:id - Cập nhật thông tin ứng viên
-router.put('/:id', upload.single('cvFile'), async (req, res) => {
-    try {
-        await ensureCandidatesTable();
-
         const { id } = req.params;
-        const {
-            hoTen,
-            gioiTinh,
-            ngaySinh,
-            noiSinh,
-            tinhTrangHonNhan,
-            danToc,
-            quocTich,
-            tonGiao,
-            viTriUngTuyen,
-            phongBan,
-            soDienThoai,
-            soDienThoaiKhac,
-            email,
-            cccd,
-            ngayCapCCCD,
-            noiCapCCCD,
-            nguyenQuan,
-            diaChiTamTru,
-            trinhDoVanHoa,
-            trinhDoChuyenMon,
-            chuyenNganh,
-            kinhNghiemLamViec,
-            quaTrinhDaoTao,
-            trinhDoNgoaiNgu,
-            ngayGuiCV
-        } = req.body;
 
-        // Check if candidate exists
-        const checkResult = await pool.query('SELECT id, cv_file_path FROM candidates WHERE id = $1', [id]);
-        if (checkResult.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy ứng viên'
-            });
-        }
-
-        // Validation - Chỉ validate format nếu có giá trị, không yêu cầu tất cả trường khi update
-        // Validate phone format if provided
-        if (soDienThoai && soDienThoai.trim() && !/^[0-9]{10,11}$/.test(soDienThoai.replace(/\s/g, ''))) {
-            return res.status(400).json({
-                success: false,
-                message: 'Số điện thoại không hợp lệ (phải có 10-11 chữ số)'
-            });
-        }
-
-        // Validate CCCD format if provided
-        if (cccd && cccd.trim() && !/^[0-9]{9,12}$/.test(cccd.replace(/\s/g, ''))) {
-            return res.status(400).json({
-                success: false,
-                message: 'Số CCCD không hợp lệ (phải có 9-12 chữ số)'
-            });
-        }
-
-        // Parse JSON arrays if they are strings
-        let kinhNghiemData = null;
-        if (kinhNghiemLamViec) {
-            try {
-                kinhNghiemData = typeof kinhNghiemLamViec === 'string' ? JSON.parse(kinhNghiemLamViec) : kinhNghiemLamViec;
-            } catch (e) {
-                console.error('Error parsing kinhNghiemLamViec:', e);
-            }
-        }
-
-        let quaTrinhData = null;
-        if (quaTrinhDaoTao) {
-            try {
-                quaTrinhData = typeof quaTrinhDaoTao === 'string' ? JSON.parse(quaTrinhDaoTao) : quaTrinhDaoTao;
-            } catch (e) {
-                console.error('Error parsing quaTrinhDaoTao:', e);
-            }
-        }
-
-        let ngoaiNguData = null;
-        if (trinhDoNgoaiNgu) {
-            try {
-                ngoaiNguData = typeof trinhDoNgoaiNgu === 'string' ? JSON.parse(trinhDoNgoaiNgu) : trinhDoNgoaiNgu;
-            } catch (e) {
-                console.error('Error parsing trinhDoNgoaiNgu:', e);
-            }
-        }
-
-        // Handle CV file update
-        let cvFilePath = checkResult.rows[0].cv_file_path;
-        let cvFileName = null;
-
-        if (req.file) {
-            // Delete old CV file if exists
-            if (cvFilePath && fs.existsSync(cvFilePath)) {
-                try {
-                    fs.unlinkSync(cvFilePath);
-                } catch (unlinkError) {
-                    console.error('Error deleting old CV file:', unlinkError);
-                }
-            }
-            cvFilePath = req.file.path;
-            cvFileName = req.file.originalname;
-        }
-
-        const updateQuery = `
-            UPDATE candidates SET
-                ho_ten = $1,
-                gioi_tinh = $2,
-                ngay_sinh = $3,
-                noi_sinh = $4,
-                tinh_trang_hon_nhan = $5,
-                dan_toc = $6,
-                quoc_tich = $7,
-                ton_giao = $8,
-                vi_tri_ung_tuyen = $9,
-                phong_ban = $10,
-                so_dien_thoai = $11,
-                so_dien_thoai_khac = $12,
-                email = $13,
-                cccd = $14,
-                ngay_cap_cccd = $15,
-                noi_cap_cccd = $16,
-                nguyen_quan = $17,
-                dia_chi_tam_tru = $18,
-                trinh_do_van_hoa = $19,
-                trinh_do_chuyen_mon = $20,
-                chuyen_nganh = $21,
-                kinh_nghiem_lam_viec = $22,
-                qua_trinh_dao_tao = $23,
-                trinh_do_ngoai_ngu = $24,
-                ngay_gui_cv = $25,
-                cv_file_path = $26,
-                cv_file_name = $27,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = $28
-            RETURNING *
-        `;
-
-        // Convert empty strings to null for date fields
-        const normalizeDate = (dateValue) => {
-            if (!dateValue || dateValue === '' || dateValue.trim() === '') {
-                return null;
-            }
-            return dateValue;
-        };
-
-        const result = await pool.query(updateQuery, [
-            hoTen,
-            gioiTinh || null,
-            normalizeDate(ngaySinh),
-            noiSinh || null,
-            tinhTrangHonNhan || null,
-            danToc || null,
-            quocTich || null,
-            tonGiao || null,
-            viTriUngTuyen,
-            phongBan,
-            soDienThoai,
-            soDienThoaiKhac || null,
-            email || null,
-            cccd,
-            normalizeDate(ngayCapCCCD),
-            noiCapCCCD,
-            nguyenQuan || null,
-            diaChiTamTru || null,
-            trinhDoVanHoa || null,
-            trinhDoChuyenMon || null,
-            chuyenNganh || null,
-            kinhNghiemData ? JSON.stringify(kinhNghiemData) : null,
-            quaTrinhData ? JSON.stringify(quaTrinhData) : null,
-            ngoaiNguData ? JSON.stringify(ngoaiNguData) : null,
-            normalizeDate(ngayGuiCV),
-            cvFilePath,
-            cvFileName,
-            id
-        ]);
-
-        res.json({
-            success: true,
-            message: 'Đã cập nhật thông tin ứng viên thành công',
-            data: {
-                id: result.rows[0].id,
-                hoTen: result.rows[0].ho_ten,
-                gioiTinh: result.rows[0].gioi_tinh,
-                ngaySinh: result.rows[0].ngay_sinh,
-                noiSinh: result.rows[0].noi_sinh,
-                tinhTrangHonNhan: result.rows[0].tinh_trang_hon_nhan,
-                danToc: result.rows[0].dan_toc,
-                quocTich: result.rows[0].quoc_tich,
-                tonGiao: result.rows[0].ton_giao,
-                viTriUngTuyen: result.rows[0].vi_tri_ung_tuyen,
-                phongBan: result.rows[0].phong_ban,
-                soDienThoai: result.rows[0].so_dien_thoai,
-                soDienThoaiKhac: result.rows[0].so_dien_thoai_khac,
-                email: result.rows[0].email,
-                cccd: result.rows[0].cccd,
-                ngayCapCCCD: result.rows[0].ngay_cap_cccd,
-                noiCapCCCD: result.rows[0].noi_cap_cccd,
-                nguyenQuan: result.rows[0].nguyen_quan,
-                diaChiTamTru: result.rows[0].dia_chi_tam_tru,
-                trinhDoVanHoa: result.rows[0].trinh_do_van_hoa,
-                trinhDoChuyenMon: result.rows[0].trinh_do_chuyen_mon,
-                chuyenNganh: result.rows[0].chuyen_nganh,
-                kinhNghiemLamViec: result.rows[0].kinh_nghiem_lam_viec,
-                quaTrinhDaoTao: result.rows[0].qua_trinh_dao_tao,
-                trinhDoNgoaiNgu: result.rows[0].trinh_do_ngoai_ngu,
-                ngayGuiCV: result.rows[0].ngay_gui_cv,
-                cvFilePath: result.rows[0].cv_file_path,
-                cvFileName: result.rows[0].cv_file_name,
-                status: result.rows[0].status,
-                updatedAt: result.rows[0].updated_at
-            }
-        });
-    } catch (error) {
-        console.error('Error updating candidate:', error);
-        // Delete uploaded file if exists
-        if (req.file && req.file.path) {
-            try {
-                fs.unlinkSync(req.file.path);
-            } catch (unlinkError) {
-                console.error('Error deleting uploaded file:', unlinkError);
-            }
-        }
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi cập nhật thông tin ứng viên: ' + error.message
-        });
-    }
-});
-
-// PUT /api/candidates/:id/status - Cập nhật trạng thái ứng viên
-router.put('/:id/status', async (req, res) => {
-    try {
-        await ensureCandidatesTable();
-
-        const { id } = req.params;
-        const { status, notes } = req.body;
-
-        if (!status || !['PENDING_INTERVIEW', 'PENDING_MANAGER', 'PASSED', 'FAILED', 'PROBATION'].includes(status)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Trạng thái không hợp lệ'
-            });
-        }
-
-        // If updating to PROBATION, also set job_offer_sent_date
-        let updateQuery;
-        let updateParams;
-
-        if (status === 'PROBATION') {
-            updateQuery = `
-                UPDATE candidates
-                SET status = $1,
-                    notes = $2,
-                    job_offer_sent_date = CURRENT_TIMESTAMP,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = $3
-                RETURNING *
-            `;
-            updateParams = [status, notes || null, id];
-        } else {
-            updateQuery = `
-                UPDATE candidates
-                SET status = $1,
-                    notes = $2,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = $3
-                RETURNING *
-            `;
-            updateParams = [status, notes || null, id];
-        }
-
-        const result = await pool.query(updateQuery, updateParams);
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy ứng viên'
-            });
-        }
-
-        res.json({
-            success: true,
-            message: 'Đã cập nhật trạng thái ứng viên',
-            data: {
-                id: result.rows[0].id,
-                status: result.rows[0].status,
-                notes: result.rows[0].notes
-            }
-        });
-    } catch (error) {
-        console.error('Error updating candidate status:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi cập nhật trạng thái: ' + error.message
-        });
-    }
-});
-
-// PUT /api/candidates/:id/notes - Cập nhật ghi chú cho ứng viên
-router.put('/:id/notes', async (req, res) => {
-    try {
-        await ensureCandidatesTable();
-
-        const { id } = req.params;
-        const { notes } = req.body;
-
-        const updateQuery = `
-            UPDATE candidates
-            SET notes = $1,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = $2
-            RETURNING *
-        `;
-
-        const result = await pool.query(updateQuery, [notes || null, id]);
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy ứng viên'
-            });
-        }
-
-        res.json({
-            success: true,
-            message: 'Đã cập nhật ghi chú',
-            data: {
-                id: result.rows[0].id,
-                notes: result.rows[0].notes
-            }
-        });
-    } catch (error) {
-        console.error('Error updating candidate notes:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi cập nhật ghi chú: ' + error.message
-        });
-    }
-});
-
-// GET /api/candidates/probation - Lấy danh sách ứng viên đang thử việc
-router.get('/probation', async (req, res) => {
-    try {
-        await ensureCandidatesTable();
-
-        const query = `
-            SELECT 
-                id,
-                ho_ten,
-                vi_tri_ung_tuyen,
-                phong_ban,
-                so_dien_thoai,
-                email,
-                status,
-                job_offer_sent_date,
-                updated_at,
-                created_at
-            FROM candidates
-            WHERE status = 'PROBATION'
-            ORDER BY job_offer_sent_date DESC, created_at DESC
-        `;
-
-        const result = await pool.query(query);
-
-        res.json({
-            success: true,
-            message: 'Danh sách ứng viên đang thử việc',
-            data: result.rows
-        });
-    } catch (error) {
-        console.error('Error fetching probation candidates:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi lấy danh sách ứng viên đang thử việc: ' + error.message
-        });
-    }
-});
-
-// PUT /api/candidates/:id/probation-evaluation - Đánh giá quá trình thử việc
-router.put('/:id/probation-evaluation', async (req, res) => {
-    try {
-        await ensureCandidatesTable();
-
-        const { id } = req.params;
-        const { result: evaluationResult, notes } = req.body; // 'PASSED' or 'FAILED'
-        const currentUserId = req.user?.id;
-
-        if (!evaluationResult || !['PASSED', 'FAILED'].includes(evaluationResult)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Kết quả đánh giá không hợp lệ. Phải là PASSED hoặc FAILED'
-            });
-        }
-
-        // Get candidate info
-        const candidateResult = await pool.query(
+        // Lấy thông tin ứng viên
+        const candidateQuery = await pool.query(
             'SELECT * FROM candidates WHERE id = $1',
             [id]
         );
-
-        if (candidateResult.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy ứng viên'
-            });
-        }
-
-        const candidate = candidateResult.rows[0];
-
-        if (candidate.status !== 'PROBATION') {
-            return res.status(400).json({
-                success: false,
-                message: 'Ứng viên không ở trạng thái đang thử việc'
-            });
-        }
-
-        // Check if 45 days have passed since job offer sent
-        if (!candidate.job_offer_sent_date) {
-            return res.status(400).json({
-                success: false,
-                message: 'Không tìm thấy ngày xuất thư tuyển dụng'
-            });
-        }
-
-        const jobOfferDate = new Date(candidate.job_offer_sent_date);
-        const today = new Date();
-        const daysDiff = Math.floor((today - jobOfferDate) / (1000 * 60 * 60 * 24));
-
-        if (daysDiff < 45) {
-            return res.status(400).json({
-                success: false,
-                message: `Chưa đủ 45 ngày kể từ ngày xuất thư tuyển dụng. Còn ${45 - daysDiff} ngày nữa.`
-            });
-        }
-
-        // Update candidate status based on evaluation result
-        const newStatus = evaluationResult === 'PASSED' ? 'PASSED' : 'FAILED';
-
-        const updateQuery = `
-            UPDATE candidates
-            SET status = $1,
-                notes = $2,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = $3
-            RETURNING *
-        `;
-
-        const result = await pool.query(updateQuery, [newStatus, notes || null, id]);
-
-        res.json({
-            success: true,
-            message: `Đã đánh giá quá trình thử việc: ${evaluationResult === 'PASSED' ? 'Đạt' : 'Không đạt'}`,
-            data: {
-                id: result.rows[0].id,
-                status: result.rows[0].status,
-                notes: result.rows[0].notes
-            }
-        });
-    } catch (error) {
-        console.error('Error evaluating probation:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi đánh giá quá trình thử việc: ' + error.message
-        });
-    }
-});
-
-// DELETE /api/candidates/all - Xóa tất cả ứng viên (để xóa dữ liệu demo)
-router.delete('/all', async (req, res) => {
-    try {
-        await ensureCandidatesTable();
-
-        // Get all candidates to delete CV files
-        const candidatesQuery = await pool.query('SELECT cv_file_path FROM candidates');
-
-        // Delete CV files
-        for (const candidate of candidatesQuery.rows) {
-            if (candidate.cv_file_path) {
-                try {
-                    if (fs.existsSync(candidate.cv_file_path)) {
-                        fs.unlinkSync(candidate.cv_file_path);
-                    }
-                } catch (unlinkError) {
-                    console.error('Error deleting CV file:', unlinkError);
-                }
-            }
-        }
-
-        // Delete all candidates
-        const deleteQuery = `DELETE FROM candidates RETURNING id`;
-        const result = await pool.query(deleteQuery);
-
-        res.json({
-            success: true,
-            message: `Đã xóa ${result.rowCount} ứng viên`,
-            count: result.rowCount
-        });
-    } catch (error) {
-        console.error('Error deleting all candidates:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi xóa ứng viên: ' + error.message
-        });
-    }
-});
-
-// DELETE /api/candidates/:id - Xóa ứng viên
-router.delete('/:id', async (req, res) => {
-    try {
-        await ensureCandidatesTable();
-
-        const { id } = req.params;
-
-        // Get candidate info to delete CV file
-        const candidateQuery = await pool.query('SELECT cv_file_path FROM candidates WHERE id = $1', [id]);
 
         if (candidateQuery.rows.length === 0) {
             return res.status(404).json({
@@ -1518,25 +127,618 @@ router.delete('/:id', async (req, res) => {
             });
         }
 
-        // Delete CV file if exists
-        if (candidateQuery.rows[0].cv_file_path) {
-            try {
-                if (fs.existsSync(candidateQuery.rows[0].cv_file_path)) {
-                    fs.unlinkSync(candidateQuery.rows[0].cv_file_path);
-                }
-            } catch (unlinkError) {
-                console.error('Error deleting CV file:', unlinkError);
-            }
-        }
+        const candidate = candidateQuery.rows[0];
 
-        // Delete candidate record
-        const deleteQuery = `DELETE FROM candidates WHERE id = $1 RETURNING *`;
-        const result = await pool.query(deleteQuery, [id]);
+        // Lấy kinh nghiệm làm việc
+        const workExperiences = await pool.query(
+            'SELECT * FROM candidate_work_experiences WHERE candidate_id = $1 ORDER BY ngay_bat_dau DESC',
+            [id]
+        );
+
+        // Lấy quá trình đào tạo
+        const trainingProcesses = await pool.query(
+            'SELECT * FROM candidate_training_processes WHERE candidate_id = $1 ORDER BY ngay_bat_dau DESC',
+            [id]
+        );
+
+        // Lấy trình độ ngoại ngữ
+        const foreignLanguages = await pool.query(
+            'SELECT * FROM candidate_foreign_languages WHERE candidate_id = $1',
+            [id]
+        );
 
         res.json({
             success: true,
-            message: 'Đã xóa ứng viên',
-            data: result.rows[0]
+            data: {
+                ...candidate,
+                workExperiences: workExperiences.rows,
+                trainingProcesses: trainingProcesses.rows,
+                foreignLanguages: foreignLanguages.rows
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching candidate:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy thông tin ứng viên: ' + error.message
+        });
+    }
+});
+
+// POST /api/candidates - Tạo ứng viên mới
+router.post('/', upload.fields([
+    { name: 'anhDaiDien', maxCount: 1 },
+    { name: 'cvDinhKem', maxCount: 1 }
+]), async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        const {
+            hoTen, gioiTinh, ngaySinh, noiSinh, tinhTrangHonNhan,
+            danToc, quocTich, tonGiao, soCCCD, ngayCapCCCD, noiCapCCCD,
+            soDienThoai, soDienThoaiKhac, email,
+            diaChiTamTru, diaChiLienLac,
+            trinhDoVanHoa, trinhDoChuyenMon, chuyenNganh,
+            chiNhanh, viTriUngTuyen, phongBan,
+            ngayGuiCV, nguonCV,
+            workExperiences, trainingProcesses, foreignLanguages
+        } = req.body;
+
+        // Parse JSON strings nếu có
+        let diaChiTamTruObj = null;
+        let diaChiLienLacObj = null;
+        let workExp = [];
+        let trainingProc = [];
+        let foreignLang = [];
+
+        try {
+            if (diaChiTamTru) {
+                diaChiTamTruObj = typeof diaChiTamTru === 'string' ? JSON.parse(diaChiTamTru) : diaChiTamTru;
+            }
+        } catch (e) {
+            console.error('Error parsing diaChiTamTru:', e);
+            diaChiTamTruObj = {};
+        }
+
+        try {
+            if (diaChiLienLac) {
+                diaChiLienLacObj = typeof diaChiLienLac === 'string' ? JSON.parse(diaChiLienLac) : diaChiLienLac;
+            }
+        } catch (e) {
+            console.error('Error parsing diaChiLienLac:', e);
+            diaChiLienLacObj = {};
+        }
+
+        try {
+            if (workExperiences) {
+                workExp = typeof workExperiences === 'string' ? JSON.parse(workExperiences) : (Array.isArray(workExperiences) ? workExperiences : []);
+            }
+        } catch (e) {
+            console.error('Error parsing workExperiences:', e);
+            workExp = [];
+        }
+
+        try {
+            if (trainingProcesses) {
+                trainingProc = typeof trainingProcesses === 'string' ? JSON.parse(trainingProcesses) : (Array.isArray(trainingProcesses) ? trainingProcesses : []);
+            }
+        } catch (e) {
+            console.error('Error parsing trainingProcesses:', e);
+            trainingProc = [];
+        }
+
+        try {
+            if (foreignLanguages) {
+                foreignLang = typeof foreignLanguages === 'string' ? JSON.parse(foreignLanguages) : (Array.isArray(foreignLanguages) ? foreignLanguages : []);
+            }
+        } catch (e) {
+            console.error('Error parsing foreignLanguages:', e);
+            foreignLang = [];
+        }
+
+        // Lấy đường dẫn file nếu có
+        const anhDaiDienPath = req.files?.anhDaiDien?.[0]?.filename
+            ? `/uploads/candidates/${req.files.anhDaiDien[0].filename}`
+            : null;
+        const cvDinhKemPath = req.files?.cvDinhKem?.[0]?.filename
+            ? `/uploads/candidates/${req.files.cvDinhKem[0].filename}`
+            : null;
+
+        // Lấy user ID từ header hoặc body
+        const userId = req.headers['user-id'] || req.body.userId || null;
+
+        // Tạo ứng viên
+        const insertCandidate = await client.query(`
+            INSERT INTO candidates (
+                ho_ten, gioi_tinh, ngay_sinh, noi_sinh, tinh_trang_hon_nhan,
+                dan_toc, quoc_tich, ton_giao, so_cccd, ngay_cap_cccd, noi_cap_cccd,
+                so_dien_thoai, so_dien_thoai_khac, email,
+                dia_chi_tam_tru_so_nha, dia_chi_tam_tru_phuong_xa, dia_chi_tam_tru_quan_huyen, dia_chi_tam_tru_thanh_pho_tinh,
+                nguyen_quan_so_nha, nguyen_quan_phuong_xa, nguyen_quan_quan_huyen, nguyen_quan_thanh_pho_tinh,
+                trinh_do_van_hoa, trinh_do_chuyen_mon, chuyen_nganh,
+                chi_nhanh, vi_tri_ung_tuyen, phong_ban,
+                anh_dai_dien_path, cv_dinh_kem_path, ngay_gui_cv, nguon_cv,
+                trang_thai, created_by
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+                $15, $16, $17, $18, $19, $20, $21, $22,
+                $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34
+            ) RETURNING *
+        `, [
+            (hoTen && typeof hoTen === 'string' ? hoTen.trim() : hoTen) || null,
+            (gioiTinh && typeof gioiTinh === 'string' ? gioiTinh.trim() : gioiTinh) || 'Nam',
+            ngaySinh || null,
+            (noiSinh && typeof noiSinh === 'string' ? noiSinh.trim() : noiSinh) || null,
+            (tinhTrangHonNhan && typeof tinhTrangHonNhan === 'string' ? tinhTrangHonNhan.trim() : tinhTrangHonNhan) || 'Độc thân',
+            (danToc && typeof danToc === 'string' ? danToc.trim() : danToc) || null,
+            (quocTich && typeof quocTich === 'string' ? quocTich.trim() : quocTich) || 'Việt Nam',
+            (tonGiao && typeof tonGiao === 'string' ? tonGiao.trim() : tonGiao) || null,
+            (soCCCD && typeof soCCCD === 'string' ? soCCCD.trim() : soCCCD) || null,
+            ngayCapCCCD || null,
+            (noiCapCCCD && typeof noiCapCCCD === 'string' ? noiCapCCCD.trim() : noiCapCCCD) || null,
+            (soDienThoai && typeof soDienThoai === 'string' ? soDienThoai.trim() : soDienThoai) || null,
+            (soDienThoaiKhac && typeof soDienThoaiKhac === 'string' ? soDienThoaiKhac.trim() : soDienThoaiKhac) || null,
+            (email && typeof email === 'string' ? email.trim() : email) || null,
+            (diaChiTamTruObj?.soNha && typeof diaChiTamTruObj.soNha === 'string' ? diaChiTamTruObj.soNha.trim() : diaChiTamTruObj.soNha) || null,
+            (diaChiTamTruObj?.phuongXa && typeof diaChiTamTruObj.phuongXa === 'string' ? diaChiTamTruObj.phuongXa.trim() : diaChiTamTruObj.phuongXa) || null,
+            (diaChiTamTruObj?.quanHuyen && typeof diaChiTamTruObj.quanHuyen === 'string' ? diaChiTamTruObj.quanHuyen.trim() : diaChiTamTruObj.quanHuyen) || null,
+            (diaChiTamTruObj?.thanhPhoTinh && typeof diaChiTamTruObj.thanhPhoTinh === 'string' ? diaChiTamTruObj.thanhPhoTinh.trim() : diaChiTamTruObj.thanhPhoTinh) || null,
+            (diaChiLienLacObj?.soNha && typeof diaChiLienLacObj.soNha === 'string' ? diaChiLienLacObj.soNha.trim() : diaChiLienLacObj.soNha) || null,
+            (diaChiLienLacObj?.phuongXa && typeof diaChiLienLacObj.phuongXa === 'string' ? diaChiLienLacObj.phuongXa.trim() : diaChiLienLacObj.phuongXa) || null,
+            (diaChiLienLacObj?.quanHuyen && typeof diaChiLienLacObj.quanHuyen === 'string' ? diaChiLienLacObj.quanHuyen.trim() : diaChiLienLacObj.quanHuyen) || null,
+            (diaChiLienLacObj?.thanhPhoTinh && typeof diaChiLienLacObj.thanhPhoTinh === 'string' ? diaChiLienLacObj.thanhPhoTinh.trim() : diaChiLienLacObj.thanhPhoTinh) || null,
+            (trinhDoVanHoa && typeof trinhDoVanHoa === 'string' ? trinhDoVanHoa.trim() : trinhDoVanHoa) || null,
+            (trinhDoChuyenMon && typeof trinhDoChuyenMon === 'string' ? trinhDoChuyenMon.trim() : trinhDoChuyenMon) || null,
+            (chuyenNganh && typeof chuyenNganh === 'string' ? chuyenNganh.trim() : chuyenNganh) || null,
+            (chiNhanh && typeof chiNhanh === 'string' ? chiNhanh.trim() : chiNhanh) || null,
+            (viTriUngTuyen && typeof viTriUngTuyen === 'string' ? viTriUngTuyen.trim() : viTriUngTuyen) || null,
+            (phongBan && typeof phongBan === 'string' ? phongBan.trim() : phongBan) || null,
+            anhDaiDienPath,
+            cvDinhKemPath,
+            ngayGuiCV || null,
+            (nguonCV && typeof nguonCV === 'string' ? nguonCV.trim() : nguonCV) || null,
+            'NEW',
+            userId
+        ]);
+
+        const candidateId = insertCandidate.rows[0].id;
+
+        // Thêm kinh nghiệm làm việc
+        if (workExp && Array.isArray(workExp)) {
+            for (const exp of workExp) {
+                if (exp.ngayBatDau || exp.ngayKetThuc || exp.congTy || exp.chucDanh) {
+                    await client.query(`
+                        INSERT INTO candidate_work_experiences (candidate_id, ngay_bat_dau, ngay_ket_thuc, cong_ty, chuc_danh)
+                        VALUES ($1, $2, $3, $4, $5)
+                    `, [
+                        candidateId,
+                        exp.ngayBatDau || null,
+                        exp.ngayKetThuc || null,
+                        exp.congTy || null,
+                        exp.chucDanh || null
+                    ]);
+                }
+            }
+        }
+
+        // Thêm quá trình đào tạo
+        if (trainingProc && Array.isArray(trainingProc)) {
+            for (const tp of trainingProc) {
+                if (tp.ngayBatDau || tp.ngayKetThuc || tp.truongDaoTao || tp.chuyenNganh || tp.vanBang) {
+                    await client.query(`
+                        INSERT INTO candidate_training_processes (candidate_id, ngay_bat_dau, ngay_ket_thuc, truong_dao_tao, chuyen_nganh, van_bang)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                    `, [
+                        candidateId,
+                        tp.ngayBatDau || null,
+                        tp.ngayKetThuc || null,
+                        tp.truongDaoTao || null,
+                        tp.chuyenNganh || null,
+                        tp.vanBang || null
+                    ]);
+                }
+            }
+        }
+
+        // Thêm trình độ ngoại ngữ
+        if (foreignLang && Array.isArray(foreignLang)) {
+            for (const fl of foreignLang) {
+                if (fl.ngoaiNgu || fl.chungChi || fl.diem || fl.khaNangSuDung) {
+                    await client.query(`
+                        INSERT INTO candidate_foreign_languages (candidate_id, ngoai_ngu, chung_chi, diem, kha_nang_su_dung)
+                        VALUES ($1, $2, $3, $4, $5)
+                    `, [
+                        candidateId,
+                        fl.ngoaiNgu || null,
+                        fl.chungChi || null,
+                        fl.diem || null,
+                        fl.khaNangSuDung || 'A: Giỏi'
+                    ]);
+                }
+            }
+        }
+
+        await client.query('COMMIT');
+
+        // Lấy lại thông tin đầy đủ
+        const fullCandidate = await pool.query(`
+            SELECT * FROM candidates WHERE id = $1
+        `, [candidateId]);
+
+        res.status(201).json({
+            success: true,
+            message: 'Đã tạo ứng viên thành công',
+            data: fullCandidate.rows[0]
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error creating candidate:', error);
+        console.error('Error stack:', error.stack);
+        console.error('Request body:', JSON.stringify(req.body, null, 2));
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi tạo ứng viên: ' + error.message,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    } finally {
+        client.release();
+    }
+});
+
+// PUT /api/candidates/:id - Cập nhật ứng viên
+router.put('/:id', upload.fields([
+    { name: 'anhDaiDien', maxCount: 1 },
+    { name: 'cvDinhKem', maxCount: 1 }
+]), async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        const { id } = req.params;
+        const updateData = req.body;
+
+        // Kiểm tra ứng viên có tồn tại không
+        const checkCandidate = await client.query('SELECT id FROM candidates WHERE id = $1', [id]);
+        if (checkCandidate.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy ứng viên'
+            });
+        }
+
+        const {
+            hoTen, gioiTinh, ngaySinh, noiSinh, tinhTrangHonNhan,
+            danToc, quocTich, tonGiao, soCCCD, ngayCapCCCD, noiCapCCCD,
+            soDienThoai, soDienThoaiKhac, email,
+            diaChiTamTru, diaChiLienLac,
+            trinhDoVanHoa, trinhDoChuyenMon, chuyenNganh,
+            chiNhanh, viTriUngTuyen, phongBan,
+            ngayGuiCV, nguonCV,
+            workExperiences, trainingProcesses, foreignLanguages
+        } = req.body;
+
+        // Parse JSON strings nếu có
+        let diaChiTamTruObj = null;
+        let diaChiLienLacObj = null;
+        let workExp = [];
+        let trainingProc = [];
+        let foreignLang = [];
+
+        try {
+            if (diaChiTamTru) {
+                diaChiTamTruObj = typeof diaChiTamTru === 'string' ? JSON.parse(diaChiTamTru) : diaChiTamTru;
+            }
+        } catch (e) {
+            console.error('Error parsing diaChiTamTru:', e);
+            diaChiTamTruObj = {};
+        }
+
+        try {
+            if (diaChiLienLac) {
+                diaChiLienLacObj = typeof diaChiLienLac === 'string' ? JSON.parse(diaChiLienLac) : diaChiLienLac;
+            }
+        } catch (e) {
+            console.error('Error parsing diaChiLienLac:', e);
+            diaChiLienLacObj = {};
+        }
+
+        try {
+            if (workExperiences) {
+                workExp = typeof workExperiences === 'string' ? JSON.parse(workExperiences) : (Array.isArray(workExperiences) ? workExperiences : []);
+            }
+        } catch (e) {
+            console.error('Error parsing workExperiences:', e);
+            workExp = [];
+        }
+
+        try {
+            if (trainingProcesses) {
+                trainingProc = typeof trainingProcesses === 'string' ? JSON.parse(trainingProcesses) : (Array.isArray(trainingProcesses) ? trainingProcesses : []);
+            }
+        } catch (e) {
+            console.error('Error parsing trainingProcesses:', e);
+            trainingProc = [];
+        }
+
+        try {
+            if (foreignLanguages) {
+                foreignLang = typeof foreignLanguages === 'string' ? JSON.parse(foreignLanguages) : (Array.isArray(foreignLanguages) ? foreignLanguages : []);
+            }
+        } catch (e) {
+            console.error('Error parsing foreignLanguages:', e);
+            foreignLang = [];
+        }
+
+        // Lấy đường dẫn file nếu có (chỉ cập nhật nếu có file mới)
+        let anhDaiDienPath = null;
+        let cvDinhKemPath = null;
+
+        console.log('[PUT /api/candidates/:id] Files received:', {
+            hasAnhDaiDien: !!req.files?.anhDaiDien?.[0],
+            hasCvDinhKem: !!req.files?.cvDinhKem?.[0],
+            anhDaiDienFilename: req.files?.anhDaiDien?.[0]?.filename,
+            cvDinhKemFilename: req.files?.cvDinhKem?.[0]?.filename,
+            filesKeys: req.files ? Object.keys(req.files) : [],
+            allFiles: req.files ? Object.keys(req.files).map(k => ({ key: k, count: req.files[k]?.length || 0 })) : []
+        });
+
+        if (req.files?.anhDaiDien?.[0]?.filename) {
+            anhDaiDienPath = `/uploads/candidates/${req.files.anhDaiDien[0].filename}`;
+            console.log('[PUT /api/candidates/:id] Setting anhDaiDienPath:', anhDaiDienPath);
+        }
+
+        if (req.files?.cvDinhKem?.[0]?.filename) {
+            cvDinhKemPath = `/uploads/candidates/${req.files.cvDinhKem[0].filename}`;
+            console.log('[PUT /api/candidates/:id] Setting cvDinhKemPath:', cvDinhKemPath);
+        } else {
+            console.log('[PUT /api/candidates/:id] No CV file received in req.files');
+            console.log('[PUT /api/candidates/:id] req.files structure:', JSON.stringify(req.files, null, 2));
+        }
+
+        // Build update query
+        const updateFields = [];
+        const updateValues = [];
+        let paramIndex = 1;
+
+        if (hoTen !== undefined) {
+            updateFields.push(`ho_ten = $${paramIndex++}`);
+            updateValues.push((hoTen && typeof hoTen === 'string' ? hoTen.trim() : hoTen) || null);
+        }
+        if (gioiTinh !== undefined) {
+            updateFields.push(`gioi_tinh = $${paramIndex++}`);
+            updateValues.push((gioiTinh && typeof gioiTinh === 'string' ? gioiTinh.trim() : gioiTinh) || 'Nam');
+        }
+        if (ngaySinh !== undefined) {
+            updateFields.push(`ngay_sinh = $${paramIndex++}`);
+            updateValues.push(ngaySinh || null);
+        }
+        if (noiSinh !== undefined) {
+            updateFields.push(`noi_sinh = $${paramIndex++}`);
+            updateValues.push((noiSinh && typeof noiSinh === 'string' ? noiSinh.trim() : noiSinh) || null);
+        }
+        if (tinhTrangHonNhan !== undefined) {
+            updateFields.push(`tinh_trang_hon_nhan = $${paramIndex++}`);
+            updateValues.push((tinhTrangHonNhan && typeof tinhTrangHonNhan === 'string' ? tinhTrangHonNhan.trim() : tinhTrangHonNhan) || 'Độc thân');
+        }
+        if (danToc !== undefined) {
+            updateFields.push(`dan_toc = $${paramIndex++}`);
+            updateValues.push((danToc && typeof danToc === 'string' ? danToc.trim() : danToc) || null);
+        }
+        if (quocTich !== undefined) {
+            updateFields.push(`quoc_tich = $${paramIndex++}`);
+            updateValues.push((quocTich && typeof quocTich === 'string' ? quocTich.trim() : quocTich) || 'Việt Nam');
+        }
+        if (tonGiao !== undefined) {
+            updateFields.push(`ton_giao = $${paramIndex++}`);
+            updateValues.push((tonGiao && typeof tonGiao === 'string' ? tonGiao.trim() : tonGiao) || null);
+        }
+        if (soCCCD !== undefined) {
+            updateFields.push(`so_cccd = $${paramIndex++}`);
+            updateValues.push((soCCCD && typeof soCCCD === 'string' ? soCCCD.trim() : soCCCD) || null);
+        }
+        if (ngayCapCCCD !== undefined) {
+            updateFields.push(`ngay_cap_cccd = $${paramIndex++}`);
+            updateValues.push(ngayCapCCCD || null);
+        }
+        if (noiCapCCCD !== undefined) {
+            updateFields.push(`noi_cap_cccd = $${paramIndex++}`);
+            updateValues.push((noiCapCCCD && typeof noiCapCCCD === 'string' ? noiCapCCCD.trim() : noiCapCCCD) || null);
+        }
+        if (soDienThoai !== undefined) {
+            updateFields.push(`so_dien_thoai = $${paramIndex++}`);
+            updateValues.push((soDienThoai && typeof soDienThoai === 'string' ? soDienThoai.trim() : soDienThoai) || null);
+        }
+        if (soDienThoaiKhac !== undefined) {
+            updateFields.push(`so_dien_thoai_khac = $${paramIndex++}`);
+            updateValues.push((soDienThoaiKhac && typeof soDienThoaiKhac === 'string' ? soDienThoaiKhac.trim() : soDienThoaiKhac) || null);
+        }
+        if (email !== undefined) {
+            updateFields.push(`email = $${paramIndex++}`);
+            updateValues.push((email && typeof email === 'string' ? email.trim() : email) || null);
+        }
+        if (diaChiTamTruObj !== null) {
+            if (diaChiTamTruObj.soNha !== undefined) {
+                updateFields.push(`dia_chi_tam_tru_so_nha = $${paramIndex++}`);
+                updateValues.push((diaChiTamTruObj.soNha && typeof diaChiTamTruObj.soNha === 'string' ? diaChiTamTruObj.soNha.trim() : diaChiTamTruObj.soNha) || null);
+            }
+            if (diaChiTamTruObj.phuongXa !== undefined) {
+                updateFields.push(`dia_chi_tam_tru_phuong_xa = $${paramIndex++}`);
+                updateValues.push((diaChiTamTruObj.phuongXa && typeof diaChiTamTruObj.phuongXa === 'string' ? diaChiTamTruObj.phuongXa.trim() : diaChiTamTruObj.phuongXa) || null);
+            }
+            if (diaChiTamTruObj.quanHuyen !== undefined) {
+                updateFields.push(`dia_chi_tam_tru_quan_huyen = $${paramIndex++}`);
+                updateValues.push((diaChiTamTruObj.quanHuyen && typeof diaChiTamTruObj.quanHuyen === 'string' ? diaChiTamTruObj.quanHuyen.trim() : diaChiTamTruObj.quanHuyen) || null);
+            }
+            if (diaChiTamTruObj.thanhPhoTinh !== undefined) {
+                updateFields.push(`dia_chi_tam_tru_thanh_pho_tinh = $${paramIndex++}`);
+                updateValues.push((diaChiTamTruObj.thanhPhoTinh && typeof diaChiTamTruObj.thanhPhoTinh === 'string' ? diaChiTamTruObj.thanhPhoTinh.trim() : diaChiTamTruObj.thanhPhoTinh) || null);
+            }
+        }
+        if (diaChiLienLacObj !== null) {
+            if (diaChiLienLacObj.soNha !== undefined) {
+                updateFields.push(`nguyen_quan_so_nha = $${paramIndex++}`);
+                updateValues.push((diaChiLienLacObj.soNha && typeof diaChiLienLacObj.soNha === 'string' ? diaChiLienLacObj.soNha.trim() : diaChiLienLacObj.soNha) || null);
+            }
+            if (diaChiLienLacObj.phuongXa !== undefined) {
+                updateFields.push(`nguyen_quan_phuong_xa = $${paramIndex++}`);
+                updateValues.push((diaChiLienLacObj.phuongXa && typeof diaChiLienLacObj.phuongXa === 'string' ? diaChiLienLacObj.phuongXa.trim() : diaChiLienLacObj.phuongXa) || null);
+            }
+            if (diaChiLienLacObj.quanHuyen !== undefined) {
+                updateFields.push(`nguyen_quan_quan_huyen = $${paramIndex++}`);
+                updateValues.push((diaChiLienLacObj.quanHuyen && typeof diaChiLienLacObj.quanHuyen === 'string' ? diaChiLienLacObj.quanHuyen.trim() : diaChiLienLacObj.quanHuyen) || null);
+            }
+            if (diaChiLienLacObj.thanhPhoTinh !== undefined) {
+                updateFields.push(`nguyen_quan_thanh_pho_tinh = $${paramIndex++}`);
+                updateValues.push((diaChiLienLacObj.thanhPhoTinh && typeof diaChiLienLacObj.thanhPhoTinh === 'string' ? diaChiLienLacObj.thanhPhoTinh.trim() : diaChiLienLacObj.thanhPhoTinh) || null);
+            }
+        }
+        if (trinhDoVanHoa !== undefined) {
+            updateFields.push(`trinh_do_van_hoa = $${paramIndex++}`);
+            updateValues.push((trinhDoVanHoa && typeof trinhDoVanHoa === 'string' ? trinhDoVanHoa.trim() : trinhDoVanHoa) || null);
+        }
+        if (trinhDoChuyenMon !== undefined) {
+            updateFields.push(`trinh_do_chuyen_mon = $${paramIndex++}`);
+            updateValues.push((trinhDoChuyenMon && typeof trinhDoChuyenMon === 'string' ? trinhDoChuyenMon.trim() : trinhDoChuyenMon) || null);
+        }
+        if (chuyenNganh !== undefined) {
+            updateFields.push(`chuyen_nganh = $${paramIndex++}`);
+            updateValues.push((chuyenNganh && typeof chuyenNganh === 'string' ? chuyenNganh.trim() : chuyenNganh) || null);
+        }
+        if (chiNhanh !== undefined) {
+            updateFields.push(`chi_nhanh = $${paramIndex++}`);
+            updateValues.push((chiNhanh && typeof chiNhanh === 'string' ? chiNhanh.trim() : chiNhanh) || null);
+        }
+        if (viTriUngTuyen !== undefined) {
+            updateFields.push(`vi_tri_ung_tuyen = $${paramIndex++}`);
+            updateValues.push((viTriUngTuyen && typeof viTriUngTuyen === 'string' ? viTriUngTuyen.trim() : viTriUngTuyen) || null);
+        }
+        if (phongBan !== undefined) {
+            updateFields.push(`phong_ban = $${paramIndex++}`);
+            updateValues.push((phongBan && typeof phongBan === 'string' ? phongBan.trim() : phongBan) || null);
+        }
+        if (ngayGuiCV !== undefined) {
+            updateFields.push(`ngay_gui_cv = $${paramIndex++}`);
+            updateValues.push(ngayGuiCV || null);
+        }
+        if (nguonCV !== undefined) {
+            updateFields.push(`nguon_cv = $${paramIndex++}`);
+            updateValues.push((nguonCV && typeof nguonCV === 'string' ? nguonCV.trim() : nguonCV) || null);
+        }
+        if (anhDaiDienPath !== null) {
+            updateFields.push(`anh_dai_dien_path = $${paramIndex++}`);
+            updateValues.push(anhDaiDienPath);
+        }
+        if (cvDinhKemPath !== null) {
+            updateFields.push(`cv_dinh_kem_path = $${paramIndex++}`);
+            updateValues.push(cvDinhKemPath);
+        }
+
+        // Cập nhật bảng candidates
+        if (updateFields.length > 0) {
+            updateFields.push(`updated_at = NOW()`);
+            updateValues.push(id);
+            const updateQuery = `UPDATE candidates SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`;
+            await client.query(updateQuery, updateValues);
+        }
+
+        // Xóa các bản ghi cũ trong các bảng con
+        await client.query('DELETE FROM candidate_work_experiences WHERE candidate_id = $1', [id]);
+        await client.query('DELETE FROM candidate_training_processes WHERE candidate_id = $1', [id]);
+        await client.query('DELETE FROM candidate_foreign_languages WHERE candidate_id = $1', [id]);
+
+        // Thêm lại kinh nghiệm làm việc
+        if (workExp && Array.isArray(workExp)) {
+            for (const exp of workExp) {
+                if (exp.ngayBatDau || exp.ngayKetThuc || exp.congTy || exp.chucDanh) {
+                    await client.query(`
+                        INSERT INTO candidate_work_experiences (candidate_id, ngay_bat_dau, ngay_ket_thuc, cong_ty, chuc_danh)
+                        VALUES ($1, $2, $3, $4, $5)
+                    `, [
+                        id,
+                        exp.ngayBatDau || null,
+                        exp.ngayKetThuc || null,
+                        exp.congTy || null,
+                        exp.chucDanh || null
+                    ]);
+                }
+            }
+        }
+
+        // Thêm lại quá trình đào tạo
+        if (trainingProc && Array.isArray(trainingProc)) {
+            for (const tp of trainingProc) {
+                if (tp.ngayBatDau || tp.ngayKetThuc || tp.truongDaoTao || tp.chuyenNganh || tp.vanBang) {
+                    await client.query(`
+                        INSERT INTO candidate_training_processes (candidate_id, ngay_bat_dau, ngay_ket_thuc, truong_dao_tao, chuyen_nganh, van_bang)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                    `, [
+                        id,
+                        tp.ngayBatDau || null,
+                        tp.ngayKetThuc || null,
+                        tp.truongDaoTao || null,
+                        tp.chuyenNganh || null,
+                        tp.vanBang || null
+                    ]);
+                }
+            }
+        }
+
+        // Thêm lại trình độ ngoại ngữ
+        if (foreignLang && Array.isArray(foreignLang)) {
+            for (const fl of foreignLang) {
+                if (fl.ngoaiNgu || fl.chungChi || fl.diem || fl.khaNangSuDung) {
+                    await client.query(`
+                        INSERT INTO candidate_foreign_languages (candidate_id, ngoai_ngu, chung_chi, diem, kha_nang_su_dung)
+                        VALUES ($1, $2, $3, $4, $5)
+                    `, [
+                        id,
+                        fl.ngoaiNgu || null,
+                        fl.chungChi || null,
+                        fl.diem || null,
+                        fl.khaNangSuDung || 'A: Giỏi'
+                    ]);
+                }
+            }
+        }
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Đã cập nhật ứng viên thành công'
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error updating candidate:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi cập nhật ứng viên: ' + error.message
+        });
+    } finally {
+        client.release();
+    }
+});
+
+// DELETE /api/candidates/:id - Xóa ứng viên
+router.delete('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query('DELETE FROM candidates WHERE id = $1 RETURNING *', [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy ứng viên'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Đã xóa ứng viên thành công'
         });
     } catch (error) {
         console.error('Error deleting candidate:', error);
@@ -1547,2847 +749,5 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
-// POST /api/candidates/:id/interview-request - Create interview request
-router.post('/:id/interview-request', async (req, res) => {
-    try {
-        await ensureInterviewRequestsTable();
-        await ensureCandidatesTable();
-
-        const { id } = req.params;
-        const {
-            managerName,
-            indirectManagerName,
-            interviewDate,
-            interviewTime,
-            notes
-        } = req.body;
-        const createdBy = req.user?.id || null;
-
-        if (!managerName) {
-            return res.status(400).json({
-                success: false,
-                message: 'Vui lòng chọn quản lý trực tiếp'
-            });
-        }
-
-        if (!interviewDate) {
-            return res.status(400).json({
-                success: false,
-                message: 'Vui lòng chọn ngày phỏng vấn'
-            });
-        }
-
-        if (!interviewTime) {
-            return res.status(400).json({
-                success: false,
-                message: 'Vui lòng chọn giờ phỏng vấn'
-            });
-        }
-
-        // Check if candidate exists
-        const candidateCheck = await pool.query('SELECT id, ho_ten FROM candidates WHERE id = $1', [id]);
-        if (candidateCheck.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy ứng viên'
-            });
-        }
-
-        // Find manager by name (optional - for manager_id if exists)
-        let managerId = null;
-        const managerCheck = await pool.query(
-            'SELECT id, ho_ten FROM employees WHERE LOWER(TRIM(ho_ten)) = LOWER(TRIM($1))',
-            [managerName]
-        );
-        if (managerCheck.rows.length > 0) {
-            managerId = managerCheck.rows[0].id;
-        }
-
-        // Find indirect manager by name (optional)
-        let indirectManagerId = null;
-        if (indirectManagerName) {
-            const indirectManagerCheck = await pool.query(
-                'SELECT id, ho_ten FROM employees WHERE LOWER(TRIM(ho_ten)) = LOWER(TRIM($1))',
-                [indirectManagerName]
-            );
-            if (indirectManagerCheck.rows.length > 0) {
-                indirectManagerId = indirectManagerCheck.rows[0].id;
-            }
-        }
-
-        // Check if there's already a pending request for this candidate
-        const existingRequest = await pool.query(
-            'SELECT id FROM interview_requests WHERE candidate_id = $1 AND status = $2',
-            [id, 'PENDING']
-        );
-
-        if (existingRequest.rows.length > 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Đã có yêu cầu phỏng vấn đang chờ xét duyệt cho ứng viên này'
-            });
-        }
-
-        // Ensure notifications table is ready
-        // Notification system removed
-
-        // Create interview request and update candidate status to PENDING_MANAGER
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
-
-            const insertQuery = `
-                INSERT INTO interview_requests (
-                    candidate_id, 
-                    manager_id, 
-                    manager_name, 
-                    indirect_manager_id,
-                    indirect_manager_name,
-                    interview_date,
-                    interview_time,
-                    notes, 
-                    created_by
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                RETURNING *
-            `;
-
-            const result = await client.query(insertQuery, [
-                id,
-                managerId,
-                managerName,
-                indirectManagerId || null,
-                indirectManagerName || null,
-                interviewDate || null,
-                interviewTime || null,
-                notes || null,
-                createdBy
-            ]);
-
-            // Update candidate status to PENDING_MANAGER
-            await client.query(
-                'UPDATE candidates SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-                ['PENDING_MANAGER', id]
-            );
-
-            await client.query('COMMIT');
-
-            // Notification system removed
-
-            res.json({
-                success: true,
-                message: 'Đã gửi yêu cầu phỏng vấn đến quản lý trực tiếp',
-                data: result.rows[0]
-            });
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
-        }
-    } catch (error) {
-        console.error('Error creating interview request:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi tạo yêu cầu phỏng vấn: ' + error.message
-        });
-    }
-});
-
-// GET /api/candidates/interview-requests - Get interview requests (for managers)
-router.get('/interview-requests', async (req, res) => {
-    try {
-        await ensureInterviewRequestsTable();
-
-        const { managerId, status } = req.query;
-        const currentUserId = req.user?.id;
-
-        let query = `
-            SELECT 
-                ir.id,
-                ir.candidate_id,
-                ir.manager_id,
-                ir.manager_name,
-                ir.indirect_manager_id,
-                ir.indirect_manager_name,
-                ir.interview_date,
-                ir.interview_time,
-                ir.status,
-                ir.notes,
-                ir.direct_manager_evaluated,
-                ir.direct_manager_evaluation_data,
-                ir.indirect_manager_evaluated,
-                ir.indirect_manager_evaluation_data,
-                ir.created_at,
-                ir.updated_at,
-                c.ho_ten as candidate_name,
-                c.vi_tri_ung_tuyen,
-                c.phong_ban,
-                c.so_dien_thoai,
-                c.cv_file_path,
-                c.cv_file_name
-            FROM interview_requests ir
-            INNER JOIN candidates c ON ir.candidate_id = c.id
-            WHERE 1=1
-        `;
-
-        const params = [];
-        let paramIndex = 1;
-
-        // If managerId is provided, filter by direct manager
-        // Otherwise, show requests for current user (either as direct or indirect manager)
-        if (managerId) {
-            query += ` AND ir.manager_id = $${paramIndex}`;
-            params.push(managerId);
-            paramIndex++;
-        } else if (currentUserId) {
-            // Show requests where user is either direct or indirect manager
-            query += ` AND (ir.manager_id = $${paramIndex} OR ir.indirect_manager_id = $${paramIndex})`;
-            params.push(currentUserId);
-            paramIndex++;
-        }
-
-        if (status) {
-            query += ` AND ir.status = $${paramIndex}`;
-            params.push(status);
-            paramIndex++;
-        }
-
-        query += ` ORDER BY ir.created_at DESC`;
-
-        const result = await pool.query(query, params);
-
-        res.json({
-            success: true,
-            message: 'Danh sách yêu cầu phỏng vấn',
-            data: result.rows
-        });
-    } catch (error) {
-        console.error('Error fetching interview requests:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi lấy danh sách yêu cầu phỏng vấn: ' + error.message
-        });
-    }
-});
-
-// PUT /api/candidates/interview-requests/:id/status - Update interview request status
-router.put('/interview-requests/:id/status', async (req, res) => {
-    try {
-        await ensureInterviewRequestsTable();
-        // Notification system removed
-
-        const { id } = req.params;
-        const { status, notes } = req.body;
-
-        if (!status || !['APPROVED', 'REJECTED', 'PENDING_EVALUATION'].includes(status)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Trạng thái không hợp lệ'
-            });
-        }
-
-        // Get current request
-        const currentRequest = await pool.query(
-            'SELECT * FROM interview_requests WHERE id = $1',
-            [id]
-        );
-
-        if (currentRequest.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy yêu cầu phỏng vấn'
-            });
-        }
-
-        // Allow status change from PENDING to PENDING_EVALUATION, or from PENDING_EVALUATION to APPROVED/REJECTED
-        // Also allow REJECTED from PENDING (manager can reject before interview)
-        if (status === 'PENDING_EVALUATION' && currentRequest.rows[0].status !== 'PENDING') {
-            return res.status(400).json({
-                success: false,
-                message: 'Chỉ có thể chuyển sang chờ đánh giá từ trạng thái chờ duyệt'
-            });
-        }
-
-        // Allow REJECTED from PENDING (manager can reject before interview)
-        // Allow APPROVED/REJECTED from PENDING_EVALUATION (after evaluation)
-        if (status === 'APPROVED' && currentRequest.rows[0].status !== 'PENDING_EVALUATION') {
-            return res.status(400).json({
-                success: false,
-                message: 'Yêu cầu phỏng vấn phải ở trạng thái chờ đánh giá để duyệt'
-            });
-        }
-
-        if (status === 'REJECTED' && !['PENDING', 'PENDING_EVALUATION'].includes(currentRequest.rows[0].status)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Chỉ có thể từ chối yêu cầu phỏng vấn khi đang chờ duyệt hoặc chờ đánh giá'
-            });
-        }
-
-        // Update request status and candidate status
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
-
-            const updateQuery = `
-                UPDATE interview_requests
-                SET status = $1, notes = $2, updated_at = CURRENT_TIMESTAMP
-                WHERE id = $3
-                RETURNING *
-            `;
-
-            console.log('Updating interview request:', { id, status, notes });
-            const result = await client.query(updateQuery, [status, notes || null, id]);
-            console.log('Update result:', result.rows);
-
-            // Get candidate info for notification
-            const candidateInfo = await client.query(
-                'SELECT ho_ten, vi_tri_ung_tuyen FROM candidates WHERE id = $1',
-                [currentRequest.rows[0].candidate_id]
-            );
-
-            // Update candidate status based on manager decision
-            if (status === 'APPROVED') {
-                await client.query(
-                    'UPDATE candidates SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-                    ['PASSED', currentRequest.rows[0].candidate_id]
-                );
-            } else if (status === 'REJECTED') {
-                await client.query(
-                    'UPDATE candidates SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-                    ['FAILED', currentRequest.rows[0].candidate_id]
-                );
-            }
-
-            await client.query('COMMIT');
-
-            // Notification system removed
-
-            // Always return success response even if notification fails
-            let message = 'Đã cập nhật trạng thái';
-            if (status === 'APPROVED') {
-                message = 'Đã duyệt yêu cầu phỏng vấn';
-            } else if (status === 'REJECTED') {
-                message = 'Đã từ chối yêu cầu phỏng vấn';
-            } else if (status === 'PENDING_EVALUATION') {
-                message = 'Đã chuyển sang chờ đánh giá tiêu chí';
-            }
-
-            res.json({
-                success: true,
-                message: message,
-                data: result.rows[0]
-            });
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
-        }
-    } catch (error) {
-        console.error('Error updating interview request status:', error);
-        console.error('Error stack:', error.stack);
-        console.error('Error details:', {
-            message: error.message,
-            code: error.code,
-            constraint: error.constraint,
-            detail: error.detail
-        });
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi cập nhật trạng thái yêu cầu phỏng vấn: ' + error.message,
-            error: process.env.NODE_ENV === 'development' ? {
-                message: error.message,
-                code: error.code,
-                constraint: error.constraint,
-                detail: error.detail
-            } : undefined
-        });
-    }
-});
-
-// PUT /api/candidates/interview-requests/:id/evaluation - Submit interview evaluation
-router.put('/interview-requests/:id/evaluation', async (req, res) => {
-    try {
-        await ensureInterviewRequestsTable();
-
-        const { id } = req.params;
-        const {
-            criteria1,
-            criteria2,
-            criteria3,
-            criteria4,
-            criteria5,
-            strengths,
-            improvements,
-            generalComments,
-            finalConclusion
-        } = req.body;
-
-        // Get evaluator ID from request body, headers, or req.user
-        const evaluatorId = req.body.userId || req.headers['user-id'] || req.user?.id;
-        if (!evaluatorId) {
-            return res.status(401).json({
-                success: false,
-                message: 'Không xác định được người đánh giá. Vui lòng đăng nhập lại.'
-            });
-        }
-
-        // Get current request
-        const currentRequest = await pool.query(
-            'SELECT * FROM interview_requests WHERE id = $1',
-            [id]
-        );
-
-        if (currentRequest.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy yêu cầu phỏng vấn'
-            });
-        }
-
-        const request = currentRequest.rows[0];
-
-        // Check if request is in evaluation state
-        if (request.status !== 'PENDING_EVALUATION') {
-            return res.status(400).json({
-                success: false,
-                message: 'Yêu cầu phỏng vấn phải ở trạng thái chờ đánh giá tiêu chí'
-            });
-        }
-
-        // Determine if evaluator is direct or indirect manager
-        const isDirectManager = request.manager_id === evaluatorId;
-        const isIndirectManager = request.indirect_manager_id === evaluatorId;
-
-        if (!isDirectManager && !isIndirectManager) {
-            return res.status(403).json({
-                success: false,
-                message: 'Bạn không có quyền đánh giá yêu cầu phỏng vấn này'
-            });
-        }
-
-        // Prepare evaluation data
-        const evaluationData = {
-            criteria: [
-                { score: criteria1?.score || null, comment: criteria1?.comment || '' },
-                { score: criteria2?.score || null, comment: criteria2?.comment || '' },
-                { score: criteria3?.score || null, comment: criteria3?.comment || '' },
-                { score: criteria4?.score || null, comment: criteria4?.comment || '' },
-                { score: criteria5?.score || null, comment: criteria5?.comment || '' }
-            ],
-            strengths: strengths || '',
-            improvements: improvements || '',
-            generalComments: generalComments || '',
-            finalConclusion: finalConclusion || null,
-            evaluatedAt: new Date().toISOString()
-        };
-
-        // Update evaluation based on manager type
-        let updateQuery;
-        let updateParams;
-
-        if (isDirectManager) {
-            updateQuery = `
-                UPDATE interview_requests
-                SET 
-                    direct_manager_evaluated = TRUE,
-                    direct_manager_evaluation_data = $1,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = $2
-                RETURNING *
-            `;
-            updateParams = [JSON.stringify(evaluationData), id];
-        } else {
-            updateQuery = `
-                UPDATE interview_requests
-                SET 
-                    indirect_manager_evaluated = TRUE,
-                    indirect_manager_evaluation_data = $1,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = $2
-                RETURNING *
-            `;
-            updateParams = [JSON.stringify(evaluationData), id];
-        }
-
-        const result = await pool.query(updateQuery, updateParams);
-        const updatedRequest = result.rows[0];
-
-        // Check if both managers have evaluated
-        const bothEvaluated = updatedRequest.direct_manager_evaluated &&
-            (updatedRequest.indirect_manager_id ? updatedRequest.indirect_manager_evaluated : true);
-
-        // If both evaluated, change status to APPROVED
-        if (bothEvaluated) {
-            await pool.query(
-                `UPDATE interview_requests 
-                 SET status = 'APPROVED', updated_at = CURRENT_TIMESTAMP 
-                 WHERE id = $1`,
-                [id]
-            );
-
-            // Update candidate status based on final conclusions
-            // For now, we'll set it to PASSED if at least one manager passed
-            // This logic can be refined later
-            await pool.query(
-                'UPDATE candidates SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-                ['PASSED', request.candidate_id]
-            );
-        }
-
-        // Get updated request
-        const finalRequest = await pool.query(
-            'SELECT * FROM interview_requests WHERE id = $1',
-            [id]
-        );
-
-        res.json({
-            success: true,
-            message: bothEvaluated
-                ? 'Cả hai quản lý đã đánh giá. Đánh giá đã được gửi về HR.'
-                : 'Đã gửi đánh giá. Đang chờ quản lý còn lại đánh giá.',
-            data: finalRequest.rows[0]
-        });
-    } catch (error) {
-        console.error('Error submitting interview evaluation:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi gửi đánh giá phỏng vấn: ' + error.message
-        });
-    }
-});
-
-// Helper function to format date to DD/MM/YYYY
-const formatDate = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-};
-
-// Helper function to calculate probation end date
-const calculateProbationEndDate = (startDateString, probationDays = 60) => {
-    if (!startDateString) return '';
-    const startDate = new Date(startDateString);
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + parseInt(probationDays));
-    return formatDate(endDate.toISOString().split('T')[0]);
-};
-
-// Helper function to format currency
-const formatCurrency = (amount) => {
-    if (!amount) return '';
-    const num = amount.toString().replace(/\D/g, '');
-    if (!num) return '';
-    return num.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-};
-
-// Helper function to convert position code to Vietnamese label
-const getViTriLabel = (value) => {
-    if (!value) return '';
-    const positionMap = {
-        'MUAHANG': 'Mua hàng',
-        'TAPVU_NAUAN': 'Tạp vụ & nấu ăn',
-        'HAN_BOMACH': 'Hàn bo mạch',
-        'CHATLUONG': 'Chất lượng',
-        'KHAOSAT_THIETKE': 'Khảo sát thiết kế',
-        'ADMIN_DUAN': 'Admin dự án',
-        'LAPRAP': 'Lắp ráp',
-        'LAPRAP_JIG_PALLET': 'Lắp ráp JIG, Pallet',
-        'DIEN_LAPTRINH_PLC': 'Điện lập trình PLC',
-        'THIETKE_MAY_TUDONG': 'Thiết kế máy tự động',
-        'VANHANH_MAY_CNC': 'Vận hành máy CNC',
-        'DICHVU_KYTHUAT': 'Dịch vụ Kỹ thuật',
-        'KETOAN_NOIBO': 'Kế toán nội bộ',
-        'KETOAN_BANHANG': 'Kế toán bán hàng'
-    };
-    return positionMap[value] || value;
-};
-
-// Helper function to convert department code to Vietnamese label
-const getPhongBanLabel = (value) => {
-    if (!value) return '';
-    const departmentMap = {
-        'MUAHANG': 'Mua hàng',
-        'HANHCHINH': 'Hành chính',
-        'HAN_BOMACH': 'Hàn bo mạch',
-        'CHATLUONG': 'Chất lượng',
-        'KHAOSAT_THIETKE': 'Khảo sát thiết kế',
-        'ADMIN_DUAN': 'Admin dự án',
-        'LAPRAP': 'Lắp ráp',
-        'LAPRAP_JIG_PALLET': 'Lắp ráp JIG, Pallet',
-        'DIEN_LAPTRINH_PLC': 'Điện lập trình PLC',
-        'THIETKE_MAY_TUDONG': 'Thiết kế máy tự động',
-        'VANHANH_MAY_CNC': 'Vận hành máy CNC',
-        'DICHVU_KYTHUAT': 'Dịch vụ Kỹ thuật',
-        'KETOAN_NOIBO': 'Kế toán nội bộ',
-        'KETOAN_BANHANG': 'Kế toán bán hàng'
-    };
-    return departmentMap[value] || value;
-};
-
-// POST /api/candidates/generate-job-offer-pdf - Generate job offer letter PDF from form data
-router.post('/generate-job-offer-pdf', async (req, res) => {
-    try {
-        const {
-            applicantName,
-            dateOfBirth,
-            cccd,
-            placeOfIssue,
-            ngayCapCCCD,
-            noiCapCCCD,
-            gender,
-            position,
-            department,
-            directReportTo,
-            indirectReportTo,
-            workLocation,
-            diaChiTamTru,
-            startDate,
-            probationDays,
-            workingHours,
-            probationGrossSalary,
-            officialGrossSalary,
-            lunchSupport,
-            travelAllowance,
-            phoneAllowance,
-            annualLeaveDays,
-            jobDuties
-        } = req.body;
-
-        if (!applicantName || !position || !workLocation || !startDate || !probationDays || !probationGrossSalary || !officialGrossSalary) {
-            return res.status(400).json({
-                success: false,
-                message: 'Vui lòng điền đầy đủ các trường bắt buộc'
-            });
-        }
-
-        // Debug: Log received data for CCCD fields
-        console.log('CCCD Fields received:', {
-            ngayCapCCCD: ngayCapCCCD,
-            noiCapCCCD: noiCapCCCD,
-            placeOfIssue: placeOfIssue,
-            cccd: cccd
-        });
-
-        // Get Vietnamese fonts first to check if they exist
-        const vietnameseFonts = getVietnameseFonts();
-
-        // Validate font files exist if using file paths
-        if (fs.existsSync(notoSansRegular) && typeof vietnameseFonts.regular === 'string' && !vietnameseFonts.regular.match(/^Times-/)) {
-            if (!fs.existsSync(vietnameseFonts.regular)) {
-                console.warn('Font file not found, falling back to Times-Roman');
-                vietnameseFonts.regular = 'Times-Roman';
-            }
-        }
-        if (fs.existsSync(notoSansBold) && typeof vietnameseFonts.bold === 'string' && !vietnameseFonts.bold.match(/^Times-/)) {
-            if (!fs.existsSync(vietnameseFonts.bold)) {
-                console.warn('Font file not found, falling back to Times-Bold');
-                vietnameseFonts.bold = 'Times-Bold';
-            }
-        }
-
-        // Create PDF document
-        let doc;
-        try {
-            doc = new PDFDocument({
-                size: 'A4',
-                margins: { top: 50, bottom: 50, left: 50, right: 50 }
-            });
-
-            // Set filename and headers BEFORE piping
-            const filename = `Thu-Tuyen-Dung-${applicantName.replace(/\s+/g, '-')}-${Date.now()}.pdf`;
-            res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-            res.setHeader('Content-Type', 'application/pdf');
-
-            // Pipe document to response
-            doc.pipe(res);
-
-            // Handle stream errors
-            doc.on('error', (err) => {
-                console.error('PDF Document stream error:', err);
-                if (!res.headersSent) {
-                    res.status(500).json({
-                        success: false,
-                        message: 'Lỗi khi tạo PDF: ' + err.message
-                    });
-                }
-            });
-
-            res.on('error', (err) => {
-                console.error('Response stream error:', err);
-                doc.destroy();
-            });
-
-            res.on('close', () => {
-                if (doc && !doc.destroyed) {
-                    doc.destroy();
-                }
-            });
-        } catch (error) {
-            console.error('Error creating PDF document:', error);
-            return res.status(500).json({
-                success: false,
-                message: 'Lỗi khi khởi tạo PDF: ' + error.message
-            });
-        }
-
-        // Helper function to ensure Vietnamese font is used - MUST be defined before use
-        const setVietnameseFont = (isBold = false) => {
-            try {
-                const fontPath = isBold ? vietnameseFonts.bold : vietnameseFonts.regular;
-                // Check if font path is a file path or font name
-                if (typeof fontPath === 'string') {
-                    // If it's a file path (contains path separators), check if file exists
-                    if (fontPath.includes('/') || fontPath.includes('\\')) {
-                        if (fs.existsSync(fontPath)) {
-                            doc.font(fontPath);
-                        } else {
-                            console.warn(`Font file not found: ${fontPath}, using default`);
-                            doc.font(isBold ? 'Times-Bold' : 'Times-Roman');
-                        }
-                    } else {
-                        // It's a font name, use directly
-                        doc.font(fontPath);
-                    }
-                } else {
-                    // Fallback to default
-                    doc.font(isBold ? 'Times-Bold' : 'Times-Roman');
-                }
-            } catch (error) {
-                console.warn('Error setting font, using default:', error.message);
-                // Fallback to default fonts
-                doc.font(isBold ? 'Times-Bold' : 'Times-Roman');
-            }
-        };
-
-        // Helper function to safely set font when using .font() directly
-        const safeFont = (fontPath) => {
-            try {
-                if (typeof fontPath === 'string') {
-                    if (fontPath.includes('/') || fontPath.includes('\\')) {
-                        if (fs.existsSync(fontPath)) {
-                            return fontPath;
-                        } else {
-                            console.warn(`Font file not found: ${fontPath}, using default`);
-                            return fontPath.includes('bold') || fontPath.includes('Bold') ? 'Times-Bold' : 'Times-Roman';
-                        }
-                    }
-                    return fontPath;
-                }
-                return 'Times-Roman';
-            } catch (error) {
-                console.warn('Error checking font, using default:', error.message);
-                return 'Times-Roman';
-            }
-        };
-
-        // Wrap all PDF generation in try-catch to handle errors properly
-        try {
-            console.log('Starting PDF generation for:', applicantName);
-            console.log('Using fonts:', {
-                regular: vietnameseFonts.regular,
-                bold: vietnameseFonts.bold
-            });
-
-            // Header without border, logo on left, text on right (black text on white background)
-            const tableLeft = 50;
-            const headerX = tableLeft;
-            const headerY = 50;
-            const headerPadding = 15;
-
-            // Add logo if available (on white background, on the left)
-            const logoPath = path.join(__dirname, '../../LogoRMG.png');
-            const logoSize = 70;
-            const logoX = headerX;
-            const logoY = headerY;
-
-            if (fs.existsSync(logoPath)) {
-                try {
-                    doc.image(logoPath, logoX, logoY, { width: logoSize, height: logoSize });
-                } catch (error) {
-                    console.warn('Could not add logo:', error.message);
-                }
-            }
-
-            // Company name and title on the right side (black text on white background)
-            const textX = logoX + logoSize + headerPadding;
-            const textY = headerY;
-            const textWidth = 450;
-
-            doc.fillColor('black'); // Black text on white background
-            doc.fontSize(12);
-            setVietnameseFont(true);
-            doc.text('CÔNG TY TNHH RMG VIỆT NAM', textX, textY, { width: textWidth, align: 'left' });
-
-            // Title "THƯ TUYỂN DỤNG" below company name, larger and bold
-            const titleY = textY + 20;
-            doc.fontSize(16);
-            setVietnameseFont(true);
-            doc.text('THƯ TUYỂN DỤNG', textX, titleY, { width: textWidth, align: 'left' });
-
-            // Set starting position for greeting and content sections
-            let currentY = headerY + logoSize + 25; // Start after header with spacing
-
-            // Greeting - aligned with section labels, with red name and additional info
-            doc.fontSize(11);
-            setVietnameseFont(false);
-            doc.fillColor('black');
-            doc.text('Kính gửi anh ', tableLeft, currentY, { continued: true });
-            setVietnameseFont(false);
-            doc.fillColor('red');
-            doc.text(applicantName, { continued: true });
-            doc.fillColor('black');
-            setVietnameseFont(false);
-
-            // Add additional info after name
-            let additionalInfo = [];
-            if (dateOfBirth) {
-                additionalInfo.push(`Ngày sinh: ${formatDate(dateOfBirth)}`);
-            }
-            if (cccd) {
-                additionalInfo.push(`Số CCCD: ${cccd}`);
-            }
-            // Use ngayCapCCCD and noiCapCCCD from form
-            // Check and add Ngày cấp CCCD - format as date (dd/mm/yyyy)
-            if (ngayCapCCCD) {
-                try {
-                    // Try to format as date if it's a valid date string
-                    const dateStr = typeof ngayCapCCCD === 'string' ? ngayCapCCCD.trim() : String(ngayCapCCCD).trim();
-                    if (dateStr) {
-                        // Try parsing as date and format it
-                        const date = new Date(dateStr);
-                        if (!isNaN(date.getTime())) {
-                            // Valid date, format it
-                            const formattedDate = formatDate(dateStr);
-                            additionalInfo.push(`Ngày cấp CCCD: ${formattedDate}`);
-                        } else {
-                            // Not a valid date string, use as is
-                            additionalInfo.push(`Ngày cấp CCCD: ${dateStr}`);
-                        }
-                    }
-                } catch (error) {
-                    // If parsing fails, use original value
-                    const dateStr = typeof ngayCapCCCD === 'string' ? ngayCapCCCD.trim() : String(ngayCapCCCD).trim();
-                    if (dateStr) {
-                        additionalInfo.push(`Ngày cấp CCCD: ${dateStr}`);
-                    }
-                }
-            }
-
-            // Check and add Nơi cấp CCCD
-            if (noiCapCCCD) {
-                const noiCap = typeof noiCapCCCD === 'string' ? noiCapCCCD.trim() : String(noiCapCCCD).trim();
-                if (noiCap) {
-                    additionalInfo.push(`Nơi cấp CCCD: ${noiCap}`);
-                }
-            } else if (placeOfIssue) {
-                // Fallback to placeOfIssue if noiCapCCCD is not available
-                const noiCap = typeof placeOfIssue === 'string' ? placeOfIssue.trim() : String(placeOfIssue).trim();
-                if (noiCap) {
-                    additionalInfo.push(`Nơi cấp CCCD: ${noiCap}`);
-                }
-            }
-
-            // Debug: Log additional info
-            console.log('Additional info to display:', additionalInfo);
-            if (gender) {
-                const genderText = gender === 'male' || gender === 'Nam' ? 'Nam' : (gender === 'female' || gender === 'Nữ' ? 'Nữ' : gender);
-                additionalInfo.push(`Phái: ${genderText}`);
-            }
-
-            if (additionalInfo.length > 0) {
-                doc.text(',', { continued: false });
-                currentY += 15;
-                // Display additional info in red, aligned
-                doc.fillColor('red');
-                doc.fontSize(10);
-                additionalInfo.forEach((info, index) => {
-                    doc.text(info, tableLeft, currentY);
-                    currentY += 12;
-                });
-                doc.fillColor('black');
-                doc.fontSize(11);
-            } else {
-                doc.text(',');
-            }
-            currentY += 12;
-
-            // Introduction line - also aligned
-            doc.fontSize(11);
-            setVietnameseFont(false);
-            doc.text('Công ty TNHH RMG Việt Nam trân trọng gửi đến Anh/ Chị thư mời làm việc cho vị trí công việc như sau:', tableLeft, currentY, { width: 500, align: 'justify' });
-            // Update currentY from actual text height and add more spacing
-            currentY = doc.y + 15; // More spacing before section 1
-
-            // Helper function to add text with red color for monetary values
-            // Now includes /tháng in the pattern to keep it on the same line
-            const addTextWithRed = (text, x, y, options = {}) => {
-                const fontSize = options.fontSize || 10;
-                doc.fontSize(fontSize);
-                // Updated regex to include /tháng after VNĐ
-                const regex = /(\d[\d,.\s]*\s*VNĐ\/tháng)/g;
-                let lastIndex = 0;
-                let match;
-                let currentX = x;
-
-                while ((match = regex.exec(text)) !== null) {
-                    // Add text before monetary value
-                    if (match.index > lastIndex) {
-                        const beforeText = text.substring(lastIndex, match.index);
-                        doc.fillColor('black');
-                        setVietnameseFont(false);
-                        doc.text(beforeText, currentX, y, { width: options.width || 460, continued: true });
-                        currentX += doc.widthOfString(beforeText, { fontSize });
-                    }
-
-                    // Add monetary value in red (including /tháng)
-                    doc.fillColor('red');
-                    setVietnameseFont(false);
-                    doc.text(match[0], currentX, y, { width: options.width || 460, continued: true });
-                    currentX += doc.widthOfString(match[0], { fontSize });
-                    lastIndex = regex.lastIndex;
-                }
-
-                // Add remaining text (if no match found, try old pattern without /tháng)
-                if (lastIndex === 0) {
-                    const regexOld = /(\d[\d,.\s]*\s*VNĐ)/g;
-                    let matchOld;
-                    let lastIndexOld = 0;
-                    let currentXOld = x;
-
-                    while ((matchOld = regexOld.exec(text)) !== null) {
-                        if (matchOld.index > lastIndexOld) {
-                            const beforeText = text.substring(lastIndexOld, matchOld.index);
-                            doc.fillColor('black');
-                            setVietnameseFont(false);
-                            doc.text(beforeText, currentXOld, y, { width: options.width || 460, continued: true });
-                            currentXOld += doc.widthOfString(beforeText, { fontSize });
-                        }
-
-                        doc.fillColor('red');
-                        setVietnameseFont(false);
-                        doc.text(matchOld[0], currentXOld, y, { width: options.width || 460, continued: true });
-                        currentXOld += doc.widthOfString(matchOld[0], { fontSize });
-                        lastIndexOld = regexOld.lastIndex;
-                    }
-
-                    if (lastIndexOld < text.length) {
-                        const afterText = text.substring(lastIndexOld);
-                        doc.fillColor('black');
-                        setVietnameseFont(false);
-                        doc.text(afterText, currentXOld, y, { width: options.width || 460 });
-                    }
-                } else if (lastIndex < text.length) {
-                    const afterText = text.substring(lastIndex);
-                    doc.fillColor('black');
-                    setVietnameseFont(false);
-                    doc.text(afterText, currentX, y, { width: options.width || 460 });
-                }
-                doc.fillColor('black'); // Reset to black
-            };
-
-            // Helper function to add monetary value aligned at fixed X position
-            const addAlignedRedValue = (label, value, labelX, valueX, y, options = {}) => {
-                const fontSize = options.fontSize || 10;
-                doc.fontSize(fontSize);
-                setVietnameseFont(false);
-
-                // Write label in black
-                doc.fillColor('black');
-                doc.text(label, labelX, y);
-
-                // Write value in red at fixed X position
-                doc.fillColor('red');
-                const formattedValue = value ? formatCurrency(value) : '';
-                doc.text(`${formattedValue} VNĐ/tháng`, valueX, y);
-                doc.fillColor('black');
-            };
-
-            // tableLeft and currentY are already set from header section above
-
-            const writeLine = ({
-                text,
-                indent = 0,
-                align = 'left',
-                isBold = false,
-                spacing = 6,
-                fontSize = 10,
-                width,
-            }) => {
-                doc.fontSize(fontSize);
-                setVietnameseFont(isBold);
-                doc.text(text, tableLeft + indent, currentY, {
-                    width: width !== undefined ? width : 460 - indent,
-                    align,
-                });
-                currentY = doc.y + spacing;
-            };
-
-            // Helper to add system value with red color and alignment
-            const addSystemValue = (value, x, y) => {
-                const displayValue = value || 'Hệ thống';
-                doc.fillColor('red');
-                doc.text(displayValue, x, y);
-                doc.fillColor('black'); // Reset to black
-            };
-
-            // Fixed X position for all system values (right-aligned after labels)
-            const systemValueX = tableLeft + 180;
-
-            // Section 1: Chức danh
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('1. Chức danh :', tableLeft, currentY);
-            addSystemValue(getViTriLabel(position), systemValueX, currentY);
-            currentY += 15;
-            doc.moveDown(0.5);
-
-            // Section 2: Báo cáo trực tiếp
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('2. Báo cáo trực tiếp cho :', tableLeft, currentY);
-            addSystemValue(directReportTo, systemValueX, currentY);
-            currentY += 15;
-            doc.moveDown(0.5);
-
-            // Section 3: Báo cáo gián tiếp
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('3. Báo cáo gián tiếp cho :', tableLeft, currentY);
-            addSystemValue(indirectReportTo, systemValueX, currentY);
-            currentY += 15;
-            doc.moveDown(0.5);
-
-            // Section 4: Địa điểm làm việc
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('4. Địa điểm làm việc :', tableLeft, currentY);
-            addSystemValue(workLocation, systemValueX, currentY);
-            currentY += 15;
-            doc.y = currentY; // Sync doc.y with currentY
-
-            // Section 4.1: Địa chỉ tạm trú (if provided)
-            if (diaChiTamTru && diaChiTamTru.trim()) {
-                doc.fontSize(10);
-                setVietnameseFont(true);
-                doc.text('4.1. Địa chỉ tạm trú :', tableLeft, currentY);
-                addSystemValue(diaChiTamTru.trim(), systemValueX, currentY);
-                currentY += 15;
-                doc.y = currentY; // Sync doc.y with currentY
-            }
-            doc.moveDown(0.5);
-
-            // Section 5: Ngày bắt đầu làm việc
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('5. Ngày bắt đầu làm việc :', tableLeft, currentY);
-            addSystemValue(startDate ? formatDate(startDate) : null, systemValueX, currentY);
-            currentY += 15;
-            doc.moveDown(0.5);
-
-            // Section 6: Thời gian thử việc
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('6. Thời gian thử việc :', tableLeft, currentY);
-            setVietnameseFont(false);
-            doc.text(`${probationDays || 60} ngày (kể từ ngày bắt đầu làm việc)`, tableLeft + 180, currentY);
-            currentY += 15;
-            doc.moveDown(0.5);
-
-            // Section 7: Thời gian làm việc
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('7. Thời gian làm việc :', tableLeft, currentY);
-            const workingHoursStr = workingHours || '08:30 - 17:30';
-            // Parse working hours to get the time range
-            let workingTimeLine = '08:30 – 17:30';
-            if (workingHoursStr.match(/\d{2}:\d{2}/)) {
-                const matches = workingHoursStr.match(/(\d{2}:\d{2})\s*[-–]\s*(\d{2}:\d{2})/);
-                if (matches) {
-                    workingTimeLine = `${matches[1]} – ${matches[2]}`;
-                }
-            }
-            currentY += 15;
-            doc.fontSize(10);
-            setVietnameseFont(false);
-            doc.text(`${workingTimeLine} (Từ Thứ Hai đến Thứ Sáu)`, tableLeft, currentY);
-            currentY += 15;
-            doc.text('08:00 – 12:00 (Thứ Bảy- Nếu cần)', tableLeft, currentY);
-            currentY += 15;
-            doc.moveDown(0.5);
-
-            // Section 8: Công việc chính
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('8. Công việc chính:', tableLeft, currentY);
-            currentY += 15;
-            doc.fontSize(10);
-            setVietnameseFont(false);
-            let dutyCount = 0;
-            if (jobDuties && Array.isArray(jobDuties) && jobDuties.length > 0) {
-                jobDuties.forEach((duty, index) => {
-                    if (duty && duty.trim()) {
-                        const labelLetter = String.fromCharCode(97 + dutyCount); // a, b, c, ...
-                        doc.text(`${labelLetter}. ${duty.trim()}`, tableLeft + 20, currentY, { width: 460, align: 'left' });
-                        currentY += 15;
-                        dutyCount++;
-                    }
-                });
-            }
-            // Add last item
-            const lastLabelLetter = String.fromCharCode(97 + dutyCount);
-            doc.text(`${lastLabelLetter}. Những công việc khác theo sự phân công của cấp quản lý trực tiếp.`, tableLeft + 20, currentY, { width: 460, align: 'left' });
-            currentY += 15;
-            doc.moveDown(0.5);
-
-            // Section 9: Mức lương gộp hàng tháng (gross)
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('9. Mức lương gộp hàng tháng (gross)', tableLeft, currentY);
-            currentY += 15;
-            doc.fontSize(10);
-            setVietnameseFont(false);
-            // Fixed X position for all red monetary values to align them
-            const salaryValueX = tableLeft + 200; // Fixed position for all salary values
-            // a. Trong thời gian thử việc
-            doc.text('a. Trong thời gian thử việc : ', tableLeft + 20, currentY);
-            doc.fillColor('red');
-            doc.text(`${formatCurrency(probationGrossSalary)} VNĐ/tháng.`, salaryValueX, currentY);
-            doc.fillColor('black');
-            currentY += 15;
-            // b. Sau thời gian thử việc
-            doc.text('b. Sau thời gian thử việc : ', tableLeft + 20, currentY);
-            doc.fillColor('red');
-            doc.text(`${formatCurrency(officialGrossSalary)} VNĐ/tháng.`, salaryValueX, currentY);
-            doc.fillColor('black');
-            currentY += 15;
-            setVietnameseFont(false);
-            doc.text('Trong đó 80% là mức lương cơ bản và 20% là phụ cấp lương.', tableLeft + 20, currentY, { width: 460, align: 'justify' });
-            currentY += 20;
-            doc.moveDown(0.5);
-
-            // Section 10: Thuế thu nhập cá nhân và bảo hiểm bắt buộc
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('10. Thuế thu nhập cá nhân và bảo hiểm bắt buộc:', tableLeft, currentY);
-            currentY += 15;
-            doc.y = currentY; // Sync doc.y with currentY
-            doc.fontSize(10);
-            setVietnameseFont(false);
-            doc.text('Hàng tháng nhân viên có nghĩa vụ nộp thuế thu nhập cá nhân theo Luật định. Nếu đạt yêu cầu qua thử việc và được ký Hợp đồng lao động, Anh/Chị có nghĩa vụ tham gia BHXH, BHYT, BH thất nghiệp được trích từ tiền lương theo Luật định.', tableLeft + 20, currentY, { width: 460, align: 'justify' });
-            // Update currentY from doc.y (actual text height) + spacing
-            currentY = doc.y + 10;
-            doc.y = currentY;
-
-            // Section 11: Chính sách phụ cấp
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('11. Chính sách phụ cấp', tableLeft, currentY);
-            currentY += 15;
-            doc.fontSize(10);
-            setVietnameseFont(false);
-            // Fixed X position for all allowance values to align them
-            const allowanceValueX = tableLeft + 165; // Fixed position for alignment
-            // a. Hỗ trợ cơm trưa - always "Theo chính sách công ty" in red
-            doc.text('a. Hỗ trợ cơm trưa : ', tableLeft + 20, currentY);
-            doc.fillColor('red');
-            doc.text('Theo chính sách công ty', allowanceValueX, currentY);
-            doc.fillColor('black');
-            currentY += 15;
-            // b. Phụ cấp điện thoại - Use same fixed X position for alignment
-            doc.text('b. Phụ cấp điện thoại : ', tableLeft + 20, currentY);
-            doc.fillColor('red');
-            if (phoneAllowance) {
-                doc.text(`${formatCurrency(phoneAllowance)} VNĐ/tháng`, allowanceValueX, currentY);
-            } else {
-                doc.text('200.000 VNĐ/tháng', allowanceValueX, currentY);
-            }
-            doc.fillColor('black');
-            currentY += 15;
-            doc.moveDown(0.5);
-
-            // Section 12: Bảo hiểm Tai nạn
-            doc.fontSize(10).font(vietnameseFonts.bold).text('12. Bảo hiểm Tai nạn :', tableLeft, currentY);
-            doc.fontSize(10).font(vietnameseFonts.regular).text('Theo chính sách công ty', tableLeft + 180, currentY);
-            currentY += 15;
-            doc.moveDown(0.5);
-
-            // Section 13: Chính sách tiền thưởng
-            doc.fontSize(10).font(vietnameseFonts.bold).text('13. Chính sách tiền thưởng', tableLeft, currentY);
-            currentY += 15;
-            doc.y = currentY; // Sync doc.y with currentY
-            doc.fontSize(10).font(vietnameseFonts.regular).text('a. Thưởng tháng lương thứ 13: Theo chính sách công ty hiện hành.', tableLeft + 20, currentY, { width: 460 });
-            currentY = doc.y + 10; // Update from actual text position
-            doc.y = currentY;
-            doc.text('b. Thưởng theo đánh giá hoàn thành mục tiêu cuối năm và các khoản thưởng khác: Theo chính sách công ty hiện hành.', tableLeft + 20, currentY, { width: 460, align: 'justify' });
-            // Update currentY from doc.y (actual text height) + spacing
-            currentY = doc.y + 10;
-            doc.y = currentY;
-
-            // Section 14: Phương tiện
-            doc.fontSize(10).font(vietnameseFonts.bold).text('14. Phương tiện', tableLeft, currentY);
-            currentY += 15;
-            doc.fontSize(10).font(vietnameseFonts.regular).text('a. Phương tiện đi làm: tự túc', tableLeft + 20, currentY, { width: 460 });
-            currentY += 15;
-            doc.text('b. Phương tiện đi công tác trong thời gian làm việc: Theo chính sách công ty.', tableLeft + 20, currentY, { width: 460, align: 'justify' });
-            currentY = doc.y + 10; // Use doc.y instead of fixed increment
-            doc.y = currentY;
-
-            // Check if we need to move Section 15 to next page
-            // A4 page height is approximately 842 points, with margins we have about 742 points usable
-            // If currentY is close to bottom (within 150 points), add page break
-            const pageHeight = doc.page.height;
-            const bottomMargin = 50;
-            const section15Height = 80; // Estimated height for section 15 content
-
-            if (currentY + section15Height > pageHeight - bottomMargin) {
-                doc.addPage();
-                currentY = 50; // Top margin
-                doc.y = currentY;
-            } else {
-                // Add some spacing to push section 15 down a bit
-                currentY += 20;
-                doc.y = currentY;
-            }
-
-            // Section 15: Số ngày nghỉ trong năm
-            doc.fontSize(10).font(vietnameseFonts.bold).text('15. Số ngày nghỉ trong năm:', tableLeft, currentY);
-            currentY += 15; // Increased spacing to avoid sticking to title
-            doc.y = currentY; // Sync doc.y with currentY
-            doc.fontSize(10).font(vietnameseFonts.regular).text(`a. Nghỉ phép năm: ${annualLeaveDays || 12} ngày trong một năm.`, tableLeft + 20, currentY, { width: 460 });
-            currentY = doc.y + 8; // Reduced from 10 to 8 for tighter spacing
-            doc.y = currentY;
-            doc.text('Phép năm được tính từ ngày Anh/Chị bắt đầu làm việc tại công ty và chỉ được sử dụng sau thời hạn thử việc.', tableLeft + 20, currentY, { width: 460, align: 'justify' });
-            currentY = doc.y + 8; // Reduced from 10 to 8 for tighter spacing
-            doc.y = currentY;
-            doc.text('b. Nghỉ lễ, nghỉ chế độ: áp dụng theo Luật lao động Việt Nam và Chính sách công ty.', tableLeft + 20, currentY, { width: 460, align: 'justify' });
-            currentY = doc.y + 10; // Keep normal spacing before next section
-            doc.y = currentY;
-
-            // Section 16: Hình thức trả lương
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('16. Hình thức trả lương:', tableLeft, currentY);
-            currentY += 15;
-            doc.y = currentY; // Sync doc.y with currentY
-            doc.fontSize(10);
-            setVietnameseFont(false);
-            doc.text('Lương và phụ cấp được trả bằng tiền đồng và được chuyển khoản vào tài khoản ngân hàng của Anh/Chị vào ngày 5 hàng tháng.', tableLeft, currentY, { width: 500, align: 'justify' });
-            // Update currentY from doc.y (actual text height) + small spacing
-            currentY = doc.y + 8;
-            doc.y = currentY;
-
-            // Section 17: Phúc lợi
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('17. Phúc lợi:', tableLeft, currentY);
-            currentY += 15;
-            doc.y = currentY; // Sync doc.y with currentY
-            doc.fontSize(10);
-            setVietnameseFont(false);
-            doc.text('Trong thời gian thử việc, Anh/Chị được hưởng các phúc lợi của công ty bao gồm trợ cấp ngày lễ (nếu có), sinh nhật, cưới hỏi, ốm đau, chia buồn; và các khoản phúc lợi khác áp dụng chung cho toàn thể nhân viên công ty tại thời điểm Anh/Chị đang làm việc (nếu có).', tableLeft, currentY, { width: 500, align: 'justify' });
-            // Update currentY from doc.y (actual text height) + small spacing
-            currentY = doc.y + 8;
-            doc.y = currentY;
-
-            // QUI ĐỊNH section
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('* QUI ĐỊNH:', tableLeft, currentY);
-            currentY += 15;
-            doc.y = currentY; // Sync doc.y with currentY
-            doc.fontSize(10);
-            setVietnameseFont(false);
-            doc.text('→ Cam kết tuân thủ Nội Quy làm việc của Công ty làm kim chỉ nam cho mọi hành động.', tableLeft, currentY, { width: 500, align: 'justify' });
-            currentY = doc.y + 5;
-            doc.y = currentY;
-            doc.text('→ Không làm bất cứ điều gì gây ảnh hưởng xấu đến vị thế, danh tiếng và hình ảnh của RMG Việt Nam dưới mọi hình thức.', tableLeft, currentY, { width: 500, align: 'justify' });
-            currentY = doc.y + 5;
-            doc.y = currentY;
-            doc.text('→ Không được tiết lộ các thông tin liên quan đến tiền lương và phúc lợi cá nhân cho người khác không có thẩm quyền.', tableLeft, currentY, { width: 500, align: 'justify' });
-            currentY = doc.y + 5;
-            doc.y = currentY;
-            doc.text('→ Đảm bảo giấy phép hành nghề phải được sử dụng phục vụ cho công việc tại công ty RMG Việt Nam', tableLeft, currentY, { width: 500, align: 'justify' });
-            currentY = doc.y + 10;
-            doc.y = currentY;
-
-            // Closing statements
-            doc.fontSize(10);
-            setVietnameseFont(false);
-            doc.text('Hết thời hạn thử việc, Công ty sẽ tiến hành đánh giá hiệu quả công việc của Anh/Chị và sẽ xem xét ký hợp đồng lao động.', tableLeft, currentY, { width: 500, align: 'justify' });
-            currentY = doc.y + 10;
-            doc.y = currentY;
-            doc.text('Chào mừng Anh/Chị đến với Công ty TNHH RMG Việt Nam, chúc Anh/Chị thành công trong thời gian làm việc với Công ty.', tableLeft, currentY, { width: 500, align: 'justify' });
-            currentY = doc.y + 10;
-            doc.y = currentY;
-            doc.text('Vui lòng ký xác nhận những điều kiện và điều khoản trong Thư Tuyển dụng và gởi lại phòng Hành chính Nhân sự một (01) bản.', tableLeft, currentY, { width: 500, align: 'justify' });
-            currentY = doc.y + 12;
-            doc.y = currentY;
-
-            // Signature section
-            const signatureY = currentY;
-            const signatureLeft = tableLeft;
-            const signatureRight = signatureLeft + 250;
-            doc.fontSize(10);
-            setVietnameseFont(true);
-            doc.text('NGƯỜI NHẬN VIỆC', signatureLeft, signatureY, { align: 'center', width: 200 });
-            doc.text('TỔNG GIÁM ĐỐC', signatureRight, signatureY, { align: 'center', width: 200 });
-            currentY += 30;
-
-            doc.fontSize(9);
-            setVietnameseFont(false);
-            doc.text('(Ký tên và ghi rõ họ tên)', signatureLeft, currentY, { align: 'center', width: 200 });
-            doc.text('(Ký tên và đóng dấu)', signatureRight, currentY, { align: 'center', width: 200 });
-            currentY += 20;
-
-            doc.fontSize(9);
-            setVietnameseFont(true);
-            doc.text('LÊ THANH TÙNG', signatureRight, currentY, { align: 'center', width: 200 });
-            currentY += 20;
-
-            // Contact information
-            doc.fontSize(9);
-            setVietnameseFont(false);
-            doc.text('Mọi chi tiết hoặc thắc mắc vui lòng liên hệ Ms. Bảo Hà, số điện thoại: 0973662771', tableLeft, currentY, { width: 500, align: 'left' });
-            currentY += 15;
-
-            // Document checklist - Page 2
-            doc.addPage();
-            doc.fontSize(14).font(vietnameseFonts.bold).text('DANH SÁCH HỒ SƠ CẦN NỘP', { align: 'center' });
-            doc.moveDown(1);
-
-            const checklistItems = [
-                { stt: '1', tenHoSo: 'CCCD', soLuong: '1' },
-                { stt: '2', tenHoSo: 'Bằng cấp liên quan khác (nếu có)', soLuong: '1' },
-                { stt: '3', tenHoSo: 'Giấy KSK theo Thông tư số 32 (bản gốc)', soLuong: '1' },
-                { stt: '4', tenHoSo: 'Ảnh 3x4 mới nhất (Scan/bản cứng)', soLuong: '1' },
-                { stt: '5', tenHoSo: 'Thông tin ngân hàng:', soLuong: '' }
-            ];
-
-            const checklistTableLeft = 50;
-            let checklistY = doc.y + 20;
-
-            doc.fontSize(10).font(vietnameseFonts.bold);
-            doc.text('STT', checklistTableLeft, checklistY);
-            doc.text('Loại hồ sơ', checklistTableLeft + 40, checklistY);
-            doc.text('Số lượng', checklistTableLeft + 350, checklistY);
-            checklistY += 20;
-
-            doc.fontSize(10).font(vietnameseFonts.regular);
-            checklistItems.forEach(item => {
-                doc.text(item.stt, checklistTableLeft, checklistY);
-                doc.text(item.tenHoSo, checklistTableLeft + 40, checklistY, { width: 300 });
-                doc.text(item.soLuong, checklistTableLeft + 350, checklistY);
-                checklistY += 20;
-            });
-
-            // Banking information sub-items
-            checklistY += 10;
-            doc.fontSize(9).font(vietnameseFonts.regular);
-            doc.text('• Số TK:', checklistTableLeft + 60, checklistY);
-            checklistY += 15;
-            doc.text('• Ngân hàng: VIB', checklistTableLeft + 60, checklistY);
-            checklistY += 15;
-            doc.text('• Chi nhánh:', checklistTableLeft + 60, checklistY);
-
-            // Note
-            doc.moveDown(2);
-            doc.fontSize(10).font(vietnameseFonts.bold).text('LƯU Ý:', checklistTableLeft);
-            doc.moveDown(0.5);
-            doc.fontSize(9).font(vietnameseFonts.regular).text(
-                '- Hồ sơ nộp đầy đủ vào ngày nhận việc',
-                checklistTableLeft + 20, doc.y, { width: 500, align: 'left' }
-            );
-
-            // Finalize PDF
-            doc.end();
-
-        } catch (pdfError) {
-            // Error occurred during PDF generation
-            console.error('Error during PDF generation:', pdfError);
-            console.error('Error name:', pdfError.name);
-            console.error('Error message:', pdfError.message);
-            console.error('Error stack:', pdfError.stack);
-            if (pdfError.code) {
-                console.error('Error code:', pdfError.code);
-            }
-
-            logPdfError('Error during PDF generation', {
-                applicantName,
-                errorName: pdfError.name,
-                errorMessage: pdfError.message,
-                errorCode: pdfError.code || null
-            });
-
-            // Destroy document if it exists
-            if (doc && !doc.destroyed) {
-                doc.destroy();
-            }
-
-            // If headers not sent yet, send error response
-            if (!res.headersSent) {
-                return res.status(500).json({
-                    success: false,
-                    message: 'Lỗi khi tạo PDF: ' + (pdfError.message || pdfError.toString())
-                });
-            } else {
-                // Response already started, just end it
-                if (!res.finished) {
-                    res.end();
-                }
-            }
-        }
-
-    } catch (error) {
-        console.error('Error generating job offer PDF:', error);
-        console.error('Error stack:', error.stack);
-
-        logPdfError('Error generating job offer PDF (outer catch)', {
-            applicantName: req.body?.applicantName,
-            errorName: error.name,
-            errorMessage: error.message
-        });
-
-        // If headers already sent, can't send JSON response
-        if (!res.headersSent) {
-            res.status(500).json({
-                success: false,
-                message: 'Lỗi khi tạo thư tuyển dụng: ' + error.message
-            });
-        } else {
-            // Response already started, destroy document and end response
-            if (typeof doc !== 'undefined' && doc && !doc.destroyed) {
-                doc.destroy();
-            }
-            if (!res.finished) {
-                res.end();
-            }
-        }
-    }
-});
-
-// GET /api/candidates/:id/job-offer-pdf - Generate job offer letter PDF (legacy endpoint)
-router.get('/:id/job-offer-pdf', async (req, res) => {
-    try {
-        await ensureCandidatesTable();
-
-        const { id } = req.params;
-
-        // Get candidate information
-        const candidateResult = await pool.query(
-            'SELECT * FROM candidates WHERE id = $1',
-            [id]
-        );
-
-        if (candidateResult.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy ứng viên'
-            });
-        }
-
-        const candidate = candidateResult.rows[0];
-
-        // Check if candidate has passed
-        if (candidate.status !== 'PASSED') {
-            return res.status(400).json({
-                success: false,
-                message: 'Chỉ có thể xuất thư mời nhận việc cho ứng viên đã đạt'
-            });
-        }
-
-        // Get job offer data from request query or use defaults
-        const {
-            viTriCongViec = candidate.vi_tri_ung_tuyen || 'Chuyên viên',
-            diaDiemLamViec = 'Trụ sở Công ty tại 159/59 Trần Văn Đang, P. Nhiêu Lộc, TP. HCM',
-            thoiGianLamViec = '8h30 – 17h30, Thứ 2 – Thứ 6',
-            ngayBatDau = new Date().toISOString().split('T')[0],
-            luongCoBanThiViec = '',
-            luongCoBanChinhThuc = '',
-            hoTroNhaOThiViec = '',
-            hoTroNhaOChinhThuc = '',
-            hoTroDiLai = '2,400,000',
-            troCapTienCom = '30,000',
-            troCapTienGuiXe = 'Theo chính sách công ty'
-        } = req.query;
-
-        const formattedStartDate = formatDate(ngayBatDau);
-        const probationEndDate = calculateProbationEndDate(ngayBatDau);
-        const today = new Date();
-        const formattedToday = formatDate(today.toISOString().split('T')[0]);
-
-        // Create PDF document
-        const doc = new PDFDocument({
-            size: 'A4',
-            margins: { top: 50, bottom: 50, left: 50, right: 50 }
-        });
-
-        // Set filename
-        const filename = `Thu-Moi-Nhan-Viec-${candidate.ho_ten.replace(/\s+/g, '-')}-${Date.now()}.pdf`;
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-        res.setHeader('Content-Type', 'application/pdf');
-
-        doc.pipe(res);
-
-        // Title
-        doc.fontSize(16).font(vietnameseFonts.bold).text('THƯ MỜI NHẬN VIỆC', { align: 'center' });
-        doc.moveDown(0.5);
-        doc.fontSize(12).font(vietnameseFonts.regular).text('(Thay thế cho Hợp đồng thử việc)', { align: 'center' });
-        doc.moveDown(1);
-
-        // Introduction
-        doc.fontSize(11).font(vietnameseFonts.regular).text(
-            `Chúng tôi hân hạnh mời Anh/Chị ${candidate.ho_ten} vào làm việc tại Công ty với các điều khoản sau đây:`,
-            { align: 'justify' }
-        );
-        doc.moveDown(1);
-
-        // Table structure for job offer details
-        const tableTop = doc.y;
-        const tableLeft = 50;
-        const col1Width = 150;
-        const col2Width = 350;
-        let currentY = tableTop;
-
-        // Helper function to add table row
-        const addTableRow = (label, value, isBold = false) => {
-            doc.fontSize(10).font(isBold ? 'Times-Bold' : 'Times-Roman');
-            doc.text(label, tableLeft, currentY, { width: col1Width, align: 'left' });
-            doc.font(isBold ? 'Times-Bold' : 'Times-Roman');
-            doc.text(value || '-', tableLeft + col1Width, currentY, { width: col2Width, align: 'left' });
-            currentY += 20;
-        };
-
-        // Job offer details
-        addTableRow('1. Vị trí công việc:', viTriCongViec);
-        addTableRow('2. Địa điểm làm việc:', diaDiemLamViec);
-        addTableRow('3. Thời gian làm việc:', thoiGianLamViec);
-        addTableRow('4. Ngày bắt đầu làm việc:', formattedStartDate);
-        addTableRow('5. Thời gian thử việc:', `Từ ${formattedStartDate} Đến ${probationEndDate}`);
-        doc.moveDown(0.5);
-
-        // Total income section
-        doc.fontSize(10).font(vietnameseFonts.bold).text('6. Tổng thu nhập:', tableLeft, currentY);
-        currentY += 20;
-        doc.fontSize(9).font(vietnameseFonts.regular).text(
-            'Tổng thu nhập (Gross) đã bao gồm các khoản đóng thuế TNCN, BHXH, BHYT & BHTN theo quy định của Nhà nước.',
-            tableLeft, currentY, { width: 500, align: 'justify' }
-        );
-        currentY += 30;
-
-        // Income table header
-        const incomeTableLeft = tableLeft + 20;
-        doc.fontSize(9).font(vietnameseFonts.bold);
-        doc.text('Khoản mục', incomeTableLeft, currentY);
-        doc.text('Thử việc/VNĐ Tháng', incomeTableLeft + 150, currentY);
-        doc.text('Chính thức/VNĐ Tháng (Đánh giá theo năng lực)', incomeTableLeft + 280, currentY);
-        currentY += 20;
-
-        // Income details
-        doc.fontSize(9).font(vietnameseFonts.regular);
-        addTableRow('6.1 Lương cơ bản', `${luongCoBanThiViec || '-'} / ${luongCoBanChinhThuc || '-'}`, false);
-        currentY -= 20;
-        addTableRow('6.2 Hỗ trợ nhà ở', `${hoTroNhaOThiViec || '-'} / ${hoTroNhaOChinhThuc || '-'}`, false);
-        currentY -= 20;
-        addTableRow('6.3 Hỗ trợ đi lại', `${hoTroDiLai} / ${hoTroDiLai}`, false);
-        currentY -= 20;
-        addTableRow('6.4 Trợ cấp tiền cơm', `${troCapTienCom} / ${troCapTienCom}`, false);
-        currentY -= 20;
-        addTableRow('6.5 Trợ cấp tiền gửi xe', `${troCapTienGuiXe} / ${troCapTienGuiXe}`, false);
-        currentY -= 20;
-        addTableRow('6.6 Tổng Lương + Phụ cấp', '- / -', false);
-        currentY -= 20;
-        addTableRow('6.7 Mức đóng BHXH', '- / -', false);
-        currentY += 20;
-
-        doc.moveDown(1);
-
-        // Other policies
-        addTableRow('7. Các chính sách, phúc lợi khác', '- Theo chính sách công ty');
-
-        // Additional sections
-        doc.moveDown(1);
-        doc.fontSize(10).font(vietnameseFonts.bold).text('8. Hợp đồng lao động', tableLeft);
-        doc.moveDown(0.5);
-        doc.fontSize(9).font(vietnameseFonts.regular).text(
-            'Khi kết thúc thử việc, nếu đạt yêu cầu tuyển dụng Công ty sẽ ký HĐLĐ thời hạn 01 năm (tái ký theo thỏa thuận) và NLĐ được hưởng mọi quyền lợi theo quy định và chính sách của Công ty RMG Vietnam',
-            tableLeft, doc.y, { width: 500, align: 'justify' }
-        );
-
-        doc.moveDown(1);
-        doc.fontSize(10).font(vietnameseFonts.bold).text('9. Trách nhiệm và nghĩa vụ của NLĐ', tableLeft);
-        doc.moveDown(0.5);
-        doc.fontSize(9).font(vietnameseFonts.regular).text(
-            '• Hoàn thành công việc theo mô tả công việc (Đính kèm)\n' +
-            '• Chấp hành pháp luật, nội quy, an toàn lao động, các quy định, quy trình, quy chế khác của Công ty.\n' +
-            '• Tuân thủ nguyên tắc và đạo đức nghề nghiệp theo quy định của Công ty RMG Vietnam.\n' +
-            '• Không tự tiến hành hoặc hợp tác với các cá nhân, tổ chức khác thực hiện các hoạt động có xung đột về lợi ích với hoạt động của Công ty RMG Vietnam và các Công ty liên kết.\n' +
-            '• Không làm việc cho bất kỳ bên thứ ba nào khác có cùng lĩnh vực hoạt động với các hoạt động đang đảm trách.',
-            tableLeft, doc.y, { width: 500, align: 'left' }
-        );
-
-        doc.moveDown(1);
-        doc.fontSize(10).font(vietnameseFonts.bold).text('10. Thời gian đào tạo và thử việc', tableLeft);
-        doc.moveDown(0.5);
-        doc.fontSize(9).font(vietnameseFonts.regular).text(
-            'Thời gian đào tạo, học việc: 60 ngày\n' +
-            'Sau thời gian đào tạo, học việc:\n' +
-            '• Nếu đạt: Hưởng lương đầy đủ kể từ ngày đầu tiên nhận việc theo mức trên.\n' +
-            '• Nếu không đạt: Công ty và Người lao động sẽ thỏa thuận theo Luật lao động.',
-            tableLeft, doc.y, { width: 500, align: 'left' }
-        );
-
-        // Signature section
-        doc.moveDown(2);
-        const signatureY = doc.y;
-        const signatureLeft = tableLeft;
-        const signatureRight = signatureLeft + 250;
-
-        doc.fontSize(10).font(vietnameseFonts.bold).text('NGƯỜI NHẬN VIỆC', signatureLeft, signatureY, { align: 'center' });
-        doc.fontSize(10).font(vietnameseFonts.bold).text('TỔNG GIÁM ĐỐC', signatureRight, signatureY, { align: 'center' });
-
-        doc.moveDown(2);
-        doc.fontSize(9).font(vietnameseFonts.regular).text('(Ký tên và ghi rõ họ tên)', signatureLeft, doc.y, { align: 'center' });
-        doc.fontSize(9).font(vietnameseFonts.regular).text('(Ký tên và đóng dấu)', signatureRight, doc.y, { align: 'center' });
-
-        doc.moveDown(1.5);
-        doc.fontSize(9).font(vietnameseFonts.regular).text('', signatureLeft, doc.y, { align: 'center' });
-        doc.fontSize(9).font(vietnameseFonts.bold).text('LÊ THANH TÙNG', signatureRight, doc.y, { align: 'center' });
-
-        // Contact information
-        doc.moveDown(1);
-        doc.fontSize(9).font(vietnameseFonts.regular).text(
-            'Mọi chi tiết hoặc thắc mắc vui lòng liên hệ Ms. Bảo Hà, số điện thoại: 0973662771',
-            tableLeft, doc.y, { width: 500, align: 'left' }
-        );
-
-        // Document checklist
-        doc.addPage();
-        doc.fontSize(14).font(vietnameseFonts.bold).text('DANH SÁCH HỒ SƠ CẦN NỘP', { align: 'center' });
-        doc.moveDown(1);
-
-        const checklistItems = [
-            { stt: '1', tenHoSo: 'CCCD', soLuong: '1' },
-            { stt: '2', tenHoSo: 'Bằng cấp liên quan khác (nếu có)', soLuong: '1' },
-            { stt: '3', tenHoSo: 'Giấy KSK theo Thông tư số 32 (bản gốc)', soLuong: '1' },
-            { stt: '4', tenHoSo: 'Ảnh 3x4 mới nhất (Scan/bản cứng)', soLuong: '1' },
-            { stt: '5', tenHoSo: 'Thông tin ngân hàng:', soLuong: '' }
-        ];
-
-        const checklistTableLeft = 50;
-        let checklistY = doc.y + 20;
-
-        doc.fontSize(10).font(vietnameseFonts.bold);
-        doc.text('STT', checklistTableLeft, checklistY);
-        doc.text('Loại hồ sơ', checklistTableLeft + 40, checklistY);
-        doc.text('Số lượng', checklistTableLeft + 350, checklistY);
-        checklistY += 20;
-
-        doc.fontSize(10).font(vietnameseFonts.regular);
-        checklistItems.forEach(item => {
-            doc.text(item.stt, checklistTableLeft, checklistY);
-            doc.text(item.tenHoSo, checklistTableLeft + 40, checklistY, { width: 300 });
-            doc.text(item.soLuong, checklistTableLeft + 350, checklistY);
-            checklistY += 20;
-        });
-
-        // Banking information sub-items
-        checklistY += 10;
-        doc.fontSize(9).font(vietnameseFonts.regular);
-        doc.text('• Số TK:', checklistTableLeft + 60, checklistY);
-        checklistY += 15;
-        doc.text('• Ngân hàng: VIB', checklistTableLeft + 60, checklistY);
-        checklistY += 15;
-        doc.text('• Chi nhánh:', checklistTableLeft + 60, checklistY);
-
-        // Note
-        doc.moveDown(2);
-        doc.fontSize(10).font(vietnameseFonts.bold).text('LƯU Ý:', checklistTableLeft);
-        doc.moveDown(0.5);
-        doc.fontSize(9).font(vietnameseFonts.regular).text(
-            '- Hồ sơ nộp đầy đủ vào ngày nhận việc',
-            checklistTableLeft + 20, doc.y, { width: 500, align: 'left' }
-        );
-
-        // Finalize PDF
-        doc.end();
-
-    } catch (error) {
-        console.error('Error generating job offer PDF:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi tạo thư mời nhận việc: ' + error.message
-        });
-    }
-});
-
-// ============================================
-// RECRUITMENT REQUESTS API
-// ============================================
-
-// Ensure recruitment_requests table exists
-const ensureRecruitmentRequestsTable = async () => {
-    const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS recruitment_requests (
-            id SERIAL PRIMARY KEY,
-            manager_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            manager_type VARCHAR(20) NOT NULL CHECK (manager_type IN ('DIRECT', 'INDIRECT')),
-            -- PHẦN I: VỊ TRÍ TUYỂN DỤNG
-            chuc_danh_can_tuyen VARCHAR(255) NOT NULL,
-            so_luong_yeu_cau INTEGER NOT NULL,
-            phong_ban VARCHAR(255) NOT NULL,
-            nguoi_quan_ly_truc_tiep VARCHAR(255),
-            mo_ta_cong_viec VARCHAR(20) CHECK (mo_ta_cong_viec IN ('co', 'chua_co')),
-            loai_lao_dong VARCHAR(20) CHECK (loai_lao_dong IN ('thoi_vu', 'toan_thoi_gian')),
-            ly_do_tuyen JSONB,
-            ly_do_khac_ghi_chu TEXT,
-            -- PHẦN II: TIÊU CHUẨN TUYỂN CHỌN
-            tieu_chuan_tuyen_chon JSONB,
-            -- Status
-            status VARCHAR(50) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'IN_PROGRESS', 'COMPLETED')),
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_recruitment_requests_manager_id ON recruitment_requests(manager_id);
-        CREATE INDEX IF NOT EXISTS idx_recruitment_requests_status ON recruitment_requests(status);
-        CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_at ON recruitment_requests(created_at DESC);
-    `;
-
-    try {
-        await pool.query(createTableQuery);
-
-        // Alter existing table to allow NULL for nguoi_quan_ly_truc_tiep if it exists
-        await pool.query(`
-            DO $$
-            BEGIN
-                -- Check if column exists and has NOT NULL constraint
-                IF EXISTS (
-                    SELECT 1 
-                    FROM information_schema.columns 
-                    WHERE table_name = 'recruitment_requests' 
-                    AND column_name = 'nguoi_quan_ly_truc_tiep'
-                    AND is_nullable = 'NO'
-                ) THEN
-                    ALTER TABLE recruitment_requests 
-                    ALTER COLUMN nguoi_quan_ly_truc_tiep DROP NOT NULL;
-                    RAISE NOTICE '✅ Đã cho phép nguoi_quan_ly_truc_tiep NULL';
-                END IF;
-            EXCEPTION
-                WHEN OTHERS THEN
-                    -- Ignore errors (column might not exist or constraint already dropped)
-                    NULL;
-            END $$;
-        `);
-
-        console.log('✓ Recruitment requests table ensured');
-    } catch (error) {
-        console.error('Error ensuring recruitment_requests table:', error);
-        throw error;
-    }
-};
-
-// Initialize table on module load
-ensureRecruitmentRequestsTable();
-
-// POST /api/candidates/recruitment-requests - Create recruitment request
-router.post('/recruitment-requests', async (req, res) => {
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        await ensureRecruitmentRequestsTable();
-        await ensureCandidatesTable();
-
-        const {
-            managerId,
-            managerType, // 'DIRECT' or 'INDIRECT'
-            chucDanhCanTuyen,
-            soLuongYeuCau,
-            phongBan,
-            nguoiQuanLyTrucTiep,
-            moTaCongViec,
-            loaiLaoDong,
-            lyDoTuyen,
-            lyDoKhacGhiChu,
-            tieuChuanTuyenChon
-        } = req.body;
-
-        if (!managerId || !managerType || !chucDanhCanTuyen || !soLuongYeuCau || !phongBan) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({
-                success: false,
-                message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
-            });
-        }
-
-        // Kiểm tra và thêm phòng ban/vị trí vào candidates nếu chưa có
-        // Tạo một placeholder candidate duy nhất nếu cần
-        let needPhongBan = false;
-        let needViTri = false;
-
-        if (phongBan) {
-            const checkPhongBanQuery = `
-                SELECT COUNT(*) as count
-                FROM candidates
-                WHERE phong_ban = $1
-                LIMIT 1
-            `;
-            const phongBanResult = await client.query(checkPhongBanQuery, [phongBan]);
-            needPhongBan = phongBanResult.rows[0].count === '0';
-        }
-
-        if (chucDanhCanTuyen) {
-            const checkViTriQuery = `
-                SELECT COUNT(*) as count
-                FROM candidates
-                WHERE vi_tri_ung_tuyen = $1
-                LIMIT 1
-            `;
-            const viTriResult = await client.query(checkViTriQuery, [chucDanhCanTuyen]);
-            needViTri = viTriResult.rows[0].count === '0';
-        }
-
-        // Tạo placeholder candidate nếu cần (chỉ tạo 1 record với cả phòng ban và vị trí)
-        if (needPhongBan || needViTri) {
-            // Kiểm tra xem đã có candidate nào với cả 2 thông tin chưa (tránh tạo duplicate)
-            const checkExistingQuery = `
-                SELECT COUNT(*) as count
-                FROM candidates
-                WHERE phong_ban = $1 AND vi_tri_ung_tuyen = $2
-                LIMIT 1
-            `;
-            const existingResult = await client.query(checkExistingQuery, [
-                phongBan || null,
-                chucDanhCanTuyen || null
-            ]);
-
-            if (existingResult.rows[0].count === '0') {
-                // Tạo placeholder candidate với cả phòng ban và vị trí
-                const placeholderCandidateQuery = `
-                    INSERT INTO candidates (ho_ten, phong_ban, vi_tri_ung_tuyen, status, notes)
-                    VALUES ($1, $2, $3, 'PENDING_INTERVIEW', $4)
-                    ON CONFLICT DO NOTHING
-                `;
-                const placeholderName = `[Placeholder${phongBan ? ` - ${phongBan}` : ''}${chucDanhCanTuyen ? ` - ${chucDanhCanTuyen}` : ''}]`;
-                await client.query(placeholderCandidateQuery, [
-                    placeholderName,
-                    phongBan || null,
-                    chucDanhCanTuyen || null,
-                    'Được tạo tự động từ yêu cầu tuyển dụng'
-                ]);
-            }
-        }
-
-        // Tạo recruitment request
-        const insertQuery = `
-            INSERT INTO recruitment_requests (
-                manager_id, manager_type,
-                chuc_danh_can_tuyen, so_luong_yeu_cau, phong_ban, nguoi_quan_ly_truc_tiep,
-                mo_ta_cong_viec, loai_lao_dong,
-                ly_do_tuyen, ly_do_khac_ghi_chu,
-                tieu_chuan_tuyen_chon,
-                status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'PENDING')
-            RETURNING *
-        `;
-
-        const result = await client.query(insertQuery, [
-            managerId,
-            managerType,
-            chucDanhCanTuyen,
-            parseInt(soLuongYeuCau, 10),
-            phongBan,
-            null, // nguoi_quan_ly_truc_tiep - đã xóa khỏi form
-            moTaCongViec || null,
-            loaiLaoDong || null,
-            lyDoTuyen ? JSON.stringify(lyDoTuyen) : null,
-            lyDoKhacGhiChu || null,
-            tieuChuanTuyenChon ? JSON.stringify(tieuChuanTuyenChon) : null
-        ]);
-
-        await client.query('COMMIT');
-
-        res.json({
-            success: true,
-            message: 'Yêu cầu tuyển dụng đã được gửi thành công!',
-            data: result.rows[0]
-        });
-    } catch (error) {
-        await client.query('ROLLBACK');
-        console.error('Error creating recruitment request:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi tạo yêu cầu tuyển dụng: ' + error.message
-        });
-    } finally {
-        client.release();
-    }
-});
-
-// GET /api/candidates/recruitment-requests - Get all recruitment requests (for HR)
-router.get('/recruitment-requests', async (req, res) => {
-    try {
-        await ensureRecruitmentRequestsTable();
-
-        const { status } = req.query;
-
-        let query = `
-            SELECT 
-                rr.*,
-                e.ho_ten as manager_name,
-                e.email as manager_email,
-                e.phong_ban as manager_department
-            FROM recruitment_requests rr
-            LEFT JOIN employees e ON rr.manager_id = e.id
-        `;
-
-        const params = [];
-        if (status && status !== 'all') {
-            query += ` WHERE rr.status = $1`;
-            params.push(status);
-        }
-
-        query += ` ORDER BY rr.created_at DESC`;
-
-        const result = await pool.query(query, params);
-
-        // Parse JSONB fields
-        const requests = result.rows.map(row => ({
-            ...row,
-            ly_do_tuyen: row.ly_do_tuyen ? (typeof row.ly_do_tuyen === 'string' ? JSON.parse(row.ly_do_tuyen) : row.ly_do_tuyen) : null,
-            tieu_chuan_tuyen_chon: row.tieu_chuan_tuyen_chon ? (typeof row.tieu_chuan_tuyen_chon === 'string' ? JSON.parse(row.tieu_chuan_tuyen_chon) : row.tieu_chuan_tuyen_chon) : null
-        }));
-
-        res.json({
-            success: true,
-            data: requests
-        });
-    } catch (error) {
-        console.error('Error fetching recruitment requests:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi lấy danh sách yêu cầu tuyển dụng: ' + error.message
-        });
-    }
-});
-
-// GET /api/candidates/recruitment-requests/my-requests - Get recruitment requests of current manager
-router.get('/recruitment-requests/my-requests', async (req, res) => {
-    try {
-        await ensureRecruitmentRequestsTable();
-
-        const currentUserId = req.user?.id;
-        if (!currentUserId) {
-            return res.status(401).json({
-                success: false,
-                message: 'Chưa đăng nhập'
-            });
-        }
-
-        const query = `
-            SELECT 
-                rr.*,
-                e.ho_ten as manager_name,
-                e.email as manager_email,
-                e.phong_ban as manager_department
-            FROM recruitment_requests rr
-            LEFT JOIN employees e ON rr.manager_id = e.id
-            WHERE rr.manager_id = $1
-            ORDER BY rr.created_at DESC
-        `;
-
-        const result = await pool.query(query, [currentUserId]);
-
-        // Parse JSONB fields
-        const requests = result.rows.map(row => ({
-            ...row,
-            ly_do_tuyen: row.ly_do_tuyen ? (typeof row.ly_do_tuyen === 'string' ? JSON.parse(row.ly_do_tuyen) : row.ly_do_tuyen) : null,
-            tieu_chuan_tuyen_chon: row.tieu_chuan_tuyen_chon ? (typeof row.tieu_chuan_tuyen_chon === 'string' ? JSON.parse(row.tieu_chuan_tuyen_chon) : row.tieu_chuan_tuyen_chon) : null
-        }));
-
-        res.json({
-            success: true,
-            data: requests
-        });
-    } catch (error) {
-        console.error('Error fetching my recruitment requests:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi lấy danh sách yêu cầu tuyển dụng: ' + error.message
-        });
-    }
-});
-
-// GET /api/candidates/recruitment-requests/:id - Get recruitment request details
-router.get('/recruitment-requests/:id', async (req, res) => {
-    try {
-        await ensureRecruitmentRequestsTable();
-
-        const { id } = req.params;
-
-        const query = `
-            SELECT 
-                rr.*,
-                e.ho_ten as manager_name,
-                e.email as manager_email,
-                e.phong_ban as manager_department
-            FROM recruitment_requests rr
-            LEFT JOIN employees e ON rr.manager_id = e.id
-            WHERE rr.id = $1
-        `;
-
-        const result = await pool.query(query, [id]);
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy yêu cầu tuyển dụng'
-            });
-        }
-
-        const request = result.rows[0];
-        // Parse JSONB fields
-        request.ly_do_tuyen = request.ly_do_tuyen ? (typeof request.ly_do_tuyen === 'string' ? JSON.parse(request.ly_do_tuyen) : request.ly_do_tuyen) : null;
-        request.tieu_chuan_tuyen_chon = request.tieu_chuan_tuyen_chon ? (typeof request.tieu_chuan_tuyen_chon === 'string' ? JSON.parse(request.tieu_chuan_tuyen_chon) : request.tieu_chuan_tuyen_chon) : null;
-
-        res.json({
-            success: true,
-            data: request
-        });
-    } catch (error) {
-        console.error('Error fetching recruitment request:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi lấy chi tiết yêu cầu tuyển dụng: ' + error.message
-        });
-    }
-});
-
-// PUT /api/candidates/recruitment-requests/:id/status - Update recruitment request status
-router.put('/recruitment-requests/:id/status', async (req, res) => {
-    try {
-        await ensureRecruitmentRequestsTable();
-
-        const { id } = req.params;
-        const { status, notes } = req.body;
-
-        if (!status || !['PENDING', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'].includes(status)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Trạng thái không hợp lệ'
-            });
-        }
-
-        const query = `
-            UPDATE recruitment_requests
-            SET status = $1, notes = $2, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $3
-            RETURNING *
-        `;
-
-        const result = await pool.query(query, [status, notes || null, id]);
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy yêu cầu tuyển dụng'
-            });
-        }
-
-        res.json({
-            success: true,
-            message: 'Cập nhật trạng thái thành công',
-            data: result.rows[0]
-        });
-    } catch (error) {
-        console.error('Error updating recruitment request status:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi cập nhật trạng thái: ' + error.message
-        });
-    }
-});
-
-// DELETE /api/candidates/recruitment-requests/:id - Delete recruitment request (when rejected)
-router.delete('/recruitment-requests/:id', async (req, res) => {
-    try {
-        await ensureRecruitmentRequestsTable();
-
-        const { id } = req.params;
-
-        // Check if request exists
-        const checkQuery = `
-            SELECT id FROM recruitment_requests WHERE id = $1
-        `;
-        const checkResult = await pool.query(checkQuery, [id]);
-
-        if (checkResult.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy yêu cầu tuyển dụng'
-            });
-        }
-
-        // Delete the request
-        const deleteQuery = `
-            DELETE FROM recruitment_requests
-            WHERE id = $1
-            RETURNING id
-        `;
-
-        const result = await pool.query(deleteQuery, [id]);
-
-        res.json({
-            success: true,
-            message: 'Đã xóa yêu cầu tuyển dụng',
-            data: { id: result.rows[0].id }
-        });
-    } catch (error) {
-        console.error('Error deleting recruitment request:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi xóa yêu cầu tuyển dụng: ' + error.message
-        });
-    }
-});
-
-/**
- * Seed departments and positions if not exists
- */
-const seedDepartmentsAndPositions = async () => {
-    try {
-        // Đảm bảo table tồn tại trước
-        await ensureCandidatesTable();
-
-        // Kiểm tra xem đã có dữ liệu chưa
-        const checkDept = await pool.query(`
-            SELECT COUNT(DISTINCT phong_ban) as count
-            FROM candidates
-            WHERE phong_ban IS NOT NULL AND phong_ban != ''
-        `);
-
-        const checkPos = await pool.query(`
-            SELECT COUNT(DISTINCT vi_tri_ung_tuyen) as count
-            FROM candidates
-            WHERE vi_tri_ung_tuyen IS NOT NULL AND vi_tri_ung_tuyen != ''
-        `);
-
-        const deptCount = parseInt(checkDept.rows[0].count) || 0;
-        const posCount = parseInt(checkPos.rows[0].count) || 0;
-
-        console.log(`📊 Current counts - Departments: ${deptCount}, Positions: ${posCount}`);
-
-        // Nếu chưa có dữ liệu, thêm vào
-        if (deptCount === 0 || posCount === 0) {
-            console.log('🌱 Seeding departments and positions...');
-
-            // Danh sách phòng ban
-            const departments = [
-                'Mua hàng', 'Hành chính', 'DVĐT', 'QA', 'Khảo sát thiết kế',
-                'Tự động', 'CNC', 'Dịch vụ kỹ thuật', 'Kế toán'
-            ];
-
-            // Danh sách vị trí ứng tuyển
-            const positions = [
-                'Mua hàng', 'Tạp vụ & nấu ăn', 'Hàn bo mạch', 'Chất lượng',
-                'Khảo sát thiết kế', 'Admin dự án', 'Lắp ráp', 'Lắp ráp JIG, Pallet',
-                'Điện lập trình PLC', 'Thiết kế máy tự động', 'Vận hành máy CNC',
-                'Dịch vụ Kỹ thuật', 'Kế toán nội bộ', 'Kế toán bán hàng'
-            ];
-
-            let deptInserted = 0;
-            let posInserted = 0;
-
-            // Thêm phòng ban (kiểm tra trước để tránh duplicate)
-            for (const dept of departments) {
-                const existing = await pool.query(`
-                    SELECT COUNT(*) as count
-                    FROM candidates
-                    WHERE phong_ban = $1 AND ho_ten = $2
-                `, [dept, `[Placeholder - ${dept}]`]);
-
-                const exists = parseInt(existing.rows[0].count) || 0;
-                if (exists === 0) {
-                    await pool.query(`
-                        INSERT INTO candidates (ho_ten, phong_ban, vi_tri_ung_tuyen, status, notes, created_at)
-                        VALUES ($1, $2, NULL, 'PENDING_INTERVIEW', 'Dữ liệu mẫu cho dropdown phòng ban', NOW())
-                    `, [`[Placeholder - ${dept}]`, dept]);
-                    deptInserted++;
-                    console.log(`  ✅ Inserted department: ${dept}`);
-                }
-            }
-
-            // Thêm vị trí ứng tuyển (kiểm tra trước để tránh duplicate)
-            for (const pos of positions) {
-                const existing = await pool.query(`
-                    SELECT COUNT(*) as count
-                    FROM candidates
-                    WHERE vi_tri_ung_tuyen = $1 AND ho_ten = $2
-                `, [pos, `[Placeholder - ${pos}]`]);
-
-                const exists = parseInt(existing.rows[0].count) || 0;
-                if (exists === 0) {
-                    await pool.query(`
-                        INSERT INTO candidates (ho_ten, phong_ban, vi_tri_ung_tuyen, status, notes, created_at)
-                        VALUES ($1, NULL, $2, 'PENDING_INTERVIEW', 'Dữ liệu mẫu cho dropdown vị trí ứng tuyển', NOW())
-                    `, [`[Placeholder - ${pos}]`, pos]);
-                    posInserted++;
-                    console.log(`  ✅ Inserted position: ${pos}`);
-                }
-            }
-
-            console.log(`✅ Seeding completed - Departments: ${deptInserted}, Positions: ${posInserted}`);
-        } else {
-            console.log('✅ Departments and positions already exist, skipping seed');
-        }
-    } catch (error) {
-        console.error('❌ Error seeding departments and positions:', error);
-        throw error; // Re-throw để caller biết có lỗi
-    }
-};
-
-/**
- * GET /api/candidates/departments - Lấy danh sách phòng ban từ candidates (DISTINCT)
- */
-router.get('/departments', async (req, res) => {
-    try {
-        // Tự động seed nếu chưa có dữ liệu
-        await seedDepartmentsAndPositions();
-
-        const query = `
-            SELECT DISTINCT phong_ban as department
-            FROM candidates
-            WHERE phong_ban IS NOT NULL 
-              AND phong_ban != ''
-              AND phong_ban NOT IN ('HANHCHINH', 'TAPVU_NAUAN')
-              AND NOT (phong_ban ~ '^[A-Z0-9_]+$' AND phong_ban LIKE '%_%')
-            ORDER BY phong_ban ASC
-        `;
-        const result = await pool.query(query);
-
-        // Lọc bỏ các giá trị code cũ (enum values - chứa dấu gạch dưới và chữ in hoa)
-        // Ví dụ: TAPVU_NAUAN, HANHCHINH
-        const departments = result.rows
-            .map(row => row.department)
-            .filter(dept => {
-                // Loại bỏ các giá trị code enum (chứa dấu gạch dưới và toàn chữ in hoa hoặc chữ in hoa + số)
-                if (!dept || dept.trim() === '') return false;
-
-                // Loại bỏ các giá trị code enum cụ thể đã biết
-                const excludedCodes = ['TAPVU_NAUAN', 'HANHCHINH', 'MUAHANG', 'HAN_BOMACH',
-                    'CHATLUONG', 'KHAOSAT_THIETKE', 'ADMIN_DUAN', 'LAPRAP',
-                    'LAPRAP_JIG_PALLET', 'DIEN_LAPTRINH_PLC', 'THIETKE_MAY_TUDONG',
-                    'VANHANH_MAY_CNC', 'DICHVU_KYTHUAT', 'KETOAN_NOIBO', 'KETOAN_BANHANG'];
-
-                if (excludedCodes.includes(dept.toUpperCase())) {
-                    return false;
-                }
-
-                // Nếu có dấu gạch dưới và toàn chữ in hoa/số, thì là code enum cũ
-                if (dept.includes('_') && /^[A-Z0-9_]+$/.test(dept)) {
-                    return false;
-                }
-
-                // Loại bỏ các giá trị chỉ có chữ in hoa không có khoảng trắng (có thể là code)
-                // Ví dụ: HANHCHINH, DVĐT (nhưng DVĐT có thể hợp lệ, nên kiểm tra kỹ hơn)
-                const deptUpper = dept.toUpperCase();
-                if (/^[A-Z0-9]+$/.test(deptUpper) && dept.length <= 20 && !dept.includes(' ') && !dept.includes('Đ')) {
-                    // Loại bỏ các giá trị toàn chữ in hoa và số, không có ký tự đặc biệt Việt Nam
-                    return false;
-                }
-
-                return true;
-            });
-
-        res.json({
-            success: true,
-            data: departments
-        });
-    } catch (error) {
-        console.error('Error fetching candidate departments:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi lấy danh sách phòng ban: ' + error.message
-        });
-    }
-});
-
-/**
- * GET /api/candidates/positions - Lấy danh sách vị trí ứng tuyển từ candidates (DISTINCT)
- */
-router.get('/positions', async (req, res) => {
-    try {
-        // Tự động seed nếu chưa có dữ liệu
-        await seedDepartmentsAndPositions();
-
-        const query = `
-            SELECT DISTINCT vi_tri_ung_tuyen as position
-            FROM candidates
-            WHERE vi_tri_ung_tuyen IS NOT NULL 
-              AND vi_tri_ung_tuyen != ''
-              AND vi_tri_ung_tuyen NOT IN ('TAPVU_NAUAN')
-              AND NOT (vi_tri_ung_tuyen ~ '^[A-Z0-9_]+$' AND vi_tri_ung_tuyen LIKE '%_%')
-            ORDER BY vi_tri_ung_tuyen ASC
-        `;
-        const result = await pool.query(query);
-
-        // Lọc bỏ các giá trị code cũ (enum values - chứa dấu gạch dưới và chữ in hoa)
-        // Ví dụ: TAPVU_NAUAN
-        const positions = result.rows
-            .map(row => row.position)
-            .filter(pos => {
-                // Loại bỏ các giá trị code enum (chứa dấu gạch dưới và toàn chữ in hoa hoặc chữ in hoa + số)
-                if (!pos || pos.trim() === '') return false;
-                // Nếu có dấu gạch dưới và toàn chữ in hoa/số, thì là code enum cũ
-                if (pos.includes('_') && /^[A-Z0-9_]+$/.test(pos)) {
-                    return false;
-                }
-                return true;
-            });
-
-        res.json({
-            success: true,
-            data: positions
-        });
-    } catch (error) {
-        console.error('Error fetching candidate positions:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi lấy danh sách vị trí ứng tuyển: ' + error.message
-        });
-    }
-});
-
-/**
- * GET /api/candidates/cv/:id - Tải/xem file CV đính kèm của ứng viên
- */
-router.get('/cv/:id', async (req, res) => {
-    try {
-        const candidateId = parseInt(req.params.id, 10);
-
-        if (isNaN(candidateId) || candidateId <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID ứng viên không hợp lệ'
-            });
-        }
-
-        // Lấy thông tin file CV từ database
-        const result = await pool.query(
-            'SELECT cv_file_path, cv_file_name FROM candidates WHERE id = $1',
-            [candidateId]
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy ứng viên'
-            });
-        }
-
-        const candidate = result.rows[0];
-        const cvFilePath = candidate.cv_file_path;
-        const cvFileName = candidate.cv_file_name;
-
-        if (!cvFilePath) {
-            return res.status(404).json({
-                success: false,
-                message: 'Ứng viên này chưa có file CV đính kèm'
-            });
-        }
-
-        // Kiểm tra file có tồn tại không
-        const fullPath = path.isAbsolute(cvFilePath)
-            ? cvFilePath
-            : path.join(__dirname, '..', cvFilePath);
-
-        if (!fs.existsSync(fullPath)) {
-            console.error(`CV file not found at path: ${fullPath}`);
-            return res.status(404).json({
-                success: false,
-                message: 'File CV không tồn tại trên server'
-            });
-        }
-
-        // Xác định MIME type dựa trên extension
-        const ext = path.extname(fullPath).toLowerCase();
-        let contentType = 'application/octet-stream';
-        if (ext === '.pdf') {
-            contentType = 'application/pdf';
-        } else if (ext === '.doc') {
-            contentType = 'application/msword';
-        } else if (ext === '.docx') {
-            contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-        }
-
-        // Đặt tên file cho download (sử dụng tên gốc hoặc tên từ database)
-        const downloadFileName = cvFileName || `CV-${candidateId}${ext}`;
-
-        // Trả về file
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(downloadFileName)}"`);
-
-        // Stream file về client
-        const fileStream = fs.createReadStream(fullPath);
-        fileStream.pipe(res);
-
-        fileStream.on('error', (error) => {
-            console.error('Error streaming CV file:', error);
-            if (!res.headersSent) {
-                res.status(500).json({
-                    success: false,
-                    message: 'Lỗi khi đọc file CV: ' + error.message
-                });
-            }
-        });
-
-    } catch (error) {
-        console.error('Error serving CV file:', error);
-        if (!res.headersSent) {
-            res.status(500).json({
-                success: false,
-                message: 'Lỗi khi tải file CV: ' + error.message
-            });
-        }
-    }
-});
-
-// GET /api/candidates/export-template - Xuất file mẫu Excel
-router.get('/export-template', async (req, res) => {
-    try {
-        // Tạo workbook mới
-        const workbook = XLSX.utils.book_new();
-
-        // Định nghĩa các cột với tên tiếng Việt
-        const headers = [
-            'Họ tên*',
-            'Giới tính',
-            'Ngày sinh* (YYYY-MM-DD)',
-            'Nơi sinh',
-            'Tình trạng hôn nhân',
-            'Dân tộc',
-            'Quốc tịch',
-            'Tôn giáo',
-            'Vị trí ứng tuyển*',
-            'Phòng ban*',
-            'Số điện thoại*',
-            'Số điện thoại khác',
-            'Email',
-            'CCCD*',
-            'Ngày cấp CCCD* (YYYY-MM-DD)',
-            'Nơi cấp CCCD*',
-            'Nguyên quán',
-            'Địa chỉ tạm trú',
-            'Trình độ văn hóa',
-            'Trình độ chuyên môn',
-            'Chuyên ngành',
-            'Kinh nghiệm làm việc (JSON)',
-            'Quá trình đào tạo (JSON)',
-            'Trình độ ngoại ngữ (JSON)',
-            'Ngày gửi CV* (YYYY-MM-DD)'
-        ];
-
-        // Tạo worksheet với headers
-        const worksheet = XLSX.utils.aoa_to_sheet([headers]);
-
-        // Đặt độ rộng cột
-        const colWidths = [
-            { wch: 25 }, // Họ tên
-            { wch: 12 }, // Giới tính
-            { wch: 18 }, // Ngày sinh
-            { wch: 20 }, // Nơi sinh
-            { wch: 18 }, // Tình trạng hôn nhân
-            { wch: 12 }, // Dân tộc
-            { wch: 15 }, // Quốc tịch
-            { wch: 15 }, // Tôn giáo
-            { wch: 25 }, // Vị trí ứng tuyển
-            { wch: 20 }, // Phòng ban
-            { wch: 18 }, // Số điện thoại
-            { wch: 18 }, // Số điện thoại khác
-            { wch: 25 }, // Email
-            { wch: 15 }, // CCCD
-            { wch: 20 }, // Ngày cấp CCCD
-            { wch: 20 }, // Nơi cấp CCCD
-            { wch: 20 }, // Nguyên quán
-            { wch: 30 }, // Địa chỉ tạm trú
-            { wch: 20 }, // Trình độ văn hóa
-            { wch: 25 }, // Trình độ chuyên môn
-            { wch: 20 }, // Chuyên ngành
-            { wch: 40 }, // Kinh nghiệm làm việc
-            { wch: 40 }, // Quá trình đào tạo
-            { wch: 30 }, // Trình độ ngoại ngữ
-            { wch: 18 }  // Ngày gửi CV
-        ];
-        worksheet['!cols'] = colWidths;
-
-        // Thêm một dòng mẫu với hướng dẫn
-        const sampleRow = [
-            'Nguyễn Văn A',
-            'Nam',
-            '1990-01-15',
-            'Hà Nội',
-            'Độc thân',
-            'Kinh',
-            'Việt Nam',
-            'Không',
-            'Lập trình viên',
-            'IT',
-            '0912345678',
-            '',
-            'nguyenvana@email.com',
-            '001234567890',
-            '2010-01-15',
-            'Công an quận 1, TP.HCM',
-            'Hà Nội',
-            '123 Đường ABC, Quận 1, TP.HCM',
-            'Đại học',
-            'Kỹ sư',
-            'Công nghệ thông tin',
-            '[]',
-            '[]',
-            '[]',
-            '2024-01-20'
-        ];
-        XLSX.utils.sheet_add_aoa(worksheet, [sampleRow], { origin: -1 });
-
-        // Thêm worksheet vào workbook
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Mẫu ứng viên');
-
-        // Tạo file Excel
-        const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-        // Gửi file về client
-        const fileName = `Mau_Thong_Tin_Ung_Vien_${new Date().toISOString().split('T')[0]}.xlsx`;
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-        res.send(excelBuffer);
-
-    } catch (error) {
-        console.error('Error exporting template:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi xuất file mẫu: ' + error.message
-        });
-    }
-});
-
-// POST /api/candidates/bulk-import - Import hàng loạt từ Excel
-router.post('/bulk-import', uploadExcel.single('file'), async (req, res) => {
-    try {
-        await ensureCandidatesTable();
-
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: 'Vui lòng chọn file Excel để import'
-            });
-        }
-
-        // Hàm helper để chuyển đổi Excel serial date hoặc string date sang YYYY-MM-DD
-        const parseDateValue = (value) => {
-            if (!value || value === '') return null;
-
-            // Nếu là số (Excel serial date)
-            if (typeof value === 'number') {
-                // Excel epoch: 1899-12-30 (Excel tính từ 1900-01-01 nhưng có bug với năm 1900)
-                const excelEpoch = new Date(1899, 11, 30);
-                const date = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000);
-
-                if (!isNaN(date.getTime())) {
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    return `${year}-${month}-${day}`;
-                }
-                return null;
-            }
-
-            // Nếu là string, thử parse
-            if (typeof value === 'string') {
-                const trimmed = value.trim();
-                if (!trimmed) return null;
-
-                // Thử parse nếu là số dạng string (Excel serial date dạng text)
-                const numValue = parseFloat(trimmed);
-                if (!isNaN(numValue) && numValue > 0 && numValue < 100000) {
-                    const excelEpoch = new Date(1899, 11, 30);
-                    const date = new Date(excelEpoch.getTime() + numValue * 24 * 60 * 60 * 1000);
-
-                    if (!isNaN(date.getTime())) {
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                        const day = String(date.getDate()).padStart(2, '0');
-                        return `${year}-${month}-${day}`;
-                    }
-                }
-
-                // Thử parse định dạng dd/mm/yyyy hoặc dd-mm-yyyy
-                const parts = trimmed.split(/[/-]/);
-                if (parts.length === 3) {
-                    const day = parseInt(parts[0], 10);
-                    const month = parseInt(parts[1], 10);
-                    const year = parseInt(parts[2], 10);
-
-                    if (!isNaN(day) && !isNaN(month) && !isNaN(year) &&
-                        day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
-                        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    }
-                }
-
-                // Thử parse định dạng YYYY-MM-DD
-                const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
-                if (isoMatch) {
-                    return trimmed.substring(0, 10);
-                }
-
-                // Thử parse với Date object
-                const date = new Date(trimmed);
-                if (!isNaN(date.getTime())) {
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    return `${year}-${month}-${day}`;
-                }
-            }
-
-            // Nếu là Date object
-            if (value instanceof Date) {
-                if (!isNaN(value.getTime())) {
-                    const year = value.getFullYear();
-                    const month = String(value.getMonth() + 1).padStart(2, '0');
-                    const day = String(value.getDate()).padStart(2, '0');
-                    return `${year}-${month}-${day}`;
-                }
-            }
-
-            return null;
-        };
-
-        // Đọc file Excel với raw: false để lấy formatted values
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', raw: false, dateNF: 'yyyy-mm-dd' });
-
-        if (data.length < 2) {
-            return res.status(400).json({
-                success: false,
-                message: 'File Excel không có dữ liệu hoặc chỉ có header'
-            });
-        }
-
-        // Lấy header (dòng đầu tiên)
-        const headers = data[0].map(h => String(h).trim());
-
-        // Map header tiếng Việt sang tên field
-        const headerMap = {
-            'Họ tên*': 'hoTen',
-            'Giới tính': 'gioiTinh',
-            'Ngày sinh* (YYYY-MM-DD)': 'ngaySinh',
-            'Nơi sinh': 'noiSinh',
-            'Tình trạng hôn nhân': 'tinhTrangHonNhan',
-            'Dân tộc': 'danToc',
-            'Quốc tịch': 'quocTich',
-            'Tôn giáo': 'tonGiao',
-            'Vị trí ứng tuyển*': 'viTriUngTuyen',
-            'Phòng ban*': 'phongBan',
-            'Số điện thoại*': 'soDienThoai',
-            'Số điện thoại khác': 'soDienThoaiKhac',
-            'Email': 'email',
-            'CCCD*': 'cccd',
-            'Ngày cấp CCCD* (YYYY-MM-DD)': 'ngayCapCCCD',
-            'Nơi cấp CCCD*': 'noiCapCCCD',
-            'Nguyên quán': 'nguyenQuan',
-            'Địa chỉ tạm trú': 'diaChiTamTru',
-            'Trình độ văn hóa': 'trinhDoVanHoa',
-            'Trình độ chuyên môn': 'trinhDoChuyenMon',
-            'Chuyên ngành': 'chuyenNganh',
-            'Kinh nghiệm làm việc (JSON)': 'kinhNghiemLamViec',
-            'Quá trình đào tạo (JSON)': 'quaTrinhDaoTao',
-            'Trình độ ngoại ngữ (JSON)': 'trinhDoNgoaiNgu',
-            'Ngày gửi CV* (YYYY-MM-DD)': 'ngayGuiCV'
-        };
-
-        // Tạo mapping từ index cột sang field name
-        const columnMap = {};
-        headers.forEach((header, index) => {
-            const fieldName = headerMap[header];
-            if (fieldName) {
-                columnMap[index] = fieldName;
-            }
-        });
-
-        const results = {
-            success: 0,
-            failed: 0,
-            errors: []
-        };
-
-        // Xử lý từng dòng (bỏ qua dòng đầu tiên - header)
-        for (let i = 1; i < data.length; i++) {
-            const row = data[i];
-
-            // Bỏ qua dòng trống
-            if (!row || row.every(cell => !cell || String(cell).trim() === '')) {
-                continue;
-            }
-
-            try {
-                // Map dữ liệu từ row sang object
-                const candidateData = {};
-                // Danh sách các trường ngày tháng
-                const dateFields = ['ngaySinh', 'ngayCapCCCD', 'ngayGuiCV'];
-
-                Object.keys(columnMap).forEach(colIndex => {
-                    const fieldName = columnMap[colIndex];
-                    const value = row[parseInt(colIndex)];
-
-                    if (value !== undefined && value !== null && String(value).trim() !== '') {
-                        // Xử lý đặc biệt cho các trường ngày tháng
-                        if (dateFields.includes(fieldName)) {
-                            const parsedDate = parseDateValue(value);
-                            if (parsedDate) {
-                                candidateData[fieldName] = parsedDate;
-                            }
-                        } else {
-                            candidateData[fieldName] = String(value).trim();
-                        }
-                    }
-                });
-
-                // Bỏ qua dòng nếu hoàn toàn trống (không có dữ liệu nào)
-                if (Object.keys(candidateData).length === 0) {
-                    continue;
-                }
-
-                // Parse JSON fields nếu có
-                if (candidateData.kinhNghiemLamViec) {
-                    try {
-                        candidateData.kinhNghiemLamViec = JSON.parse(candidateData.kinhNghiemLamViec);
-                    } catch (e) {
-                        candidateData.kinhNghiemLamViec = null;
-                    }
-                }
-
-                if (candidateData.quaTrinhDaoTao) {
-                    try {
-                        candidateData.quaTrinhDaoTao = JSON.parse(candidateData.quaTrinhDaoTao);
-                    } catch (e) {
-                        candidateData.quaTrinhDaoTao = null;
-                    }
-                }
-
-                if (candidateData.trinhDoNgoaiNgu) {
-                    try {
-                        candidateData.trinhDoNgoaiNgu = JSON.parse(candidateData.trinhDoNgoaiNgu);
-                    } catch (e) {
-                        candidateData.trinhDoNgoaiNgu = null;
-                    }
-                }
-
-                // Kiểm tra trùng số điện thoại (chỉ kiểm tra nếu có số điện thoại)
-                if (candidateData.soDienThoai) {
-                    const checkDuplicate = await pool.query(
-                        'SELECT id FROM candidates WHERE so_dien_thoai = $1',
-                        [candidateData.soDienThoai]
-                    );
-
-                    if (checkDuplicate.rows.length > 0) {
-                        results.failed++;
-                        results.errors.push({
-                            row: i + 1,
-                            candidate: candidateData.hoTen || 'N/A',
-                            error: 'Số điện thoại đã tồn tại'
-                        });
-                        continue;
-                    }
-                }
-
-                // Insert vào database
-                const insertQuery = `
-                    INSERT INTO candidates (
-                        ho_ten, gioi_tinh, ngay_sinh, noi_sinh, tinh_trang_hon_nhan, dan_toc, quoc_tich, ton_giao,
-                        vi_tri_ung_tuyen, phong_ban,
-                        so_dien_thoai, so_dien_thoai_khac, email,
-                        cccd, ngay_cap_cccd, noi_cap_cccd, nguyen_quan,
-                        dia_chi_tam_tru,
-                        trinh_do_van_hoa, trinh_do_chuyen_mon, chuyen_nganh,
-                        kinh_nghiem_lam_viec, qua_trinh_dao_tao, trinh_do_ngoai_ngu,
-                        ngay_gui_cv,
-                        status
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
-                    RETURNING id
-                `;
-
-                // Convert empty strings to null for date fields
-                const normalizeDate = (dateValue) => {
-                    if (!dateValue || dateValue === '' || (typeof dateValue === 'string' && dateValue.trim() === '')) {
-                        return null;
-                    }
-                    return dateValue;
-                };
-
-                await pool.query(insertQuery, [
-                    candidateData.hoTen || null,
-                    candidateData.gioiTinh || null,
-                    normalizeDate(candidateData.ngaySinh),
-                    candidateData.noiSinh || null,
-                    candidateData.tinhTrangHonNhan || null,
-                    candidateData.danToc || null,
-                    candidateData.quocTich || null,
-                    candidateData.tonGiao || null,
-                    candidateData.viTriUngTuyen || null,
-                    candidateData.phongBan || null,
-                    candidateData.soDienThoai || null,
-                    candidateData.soDienThoaiKhac || null,
-                    candidateData.email || null,
-                    candidateData.cccd || null,
-                    normalizeDate(candidateData.ngayCapCCCD),
-                    candidateData.noiCapCCCD || null,
-                    candidateData.nguyenQuan || null,
-                    candidateData.diaChiTamTru || null,
-                    candidateData.trinhDoVanHoa || null,
-                    candidateData.trinhDoChuyenMon || null,
-                    candidateData.chuyenNganh || null,
-                    candidateData.kinhNghiemLamViec ? JSON.stringify(candidateData.kinhNghiemLamViec) : null,
-                    candidateData.quaTrinhDaoTao ? JSON.stringify(candidateData.quaTrinhDaoTao) : null,
-                    candidateData.trinhDoNgoaiNgu ? JSON.stringify(candidateData.trinhDoNgoaiNgu) : null,
-                    normalizeDate(candidateData.ngayGuiCV),
-                    'PENDING_INTERVIEW'
-                ]);
-
-                results.success++;
-
-            } catch (error) {
-                results.failed++;
-                results.errors.push({
-                    row: i + 1,
-                    error: error.message
-                });
-            }
-        }
-
-        res.json({
-            success: true,
-            message: `Import hoàn tất: ${results.success} thành công, ${results.failed} thất bại`,
-            results: results
-        });
-
-    } catch (error) {
-        console.error('Error importing candidates:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi import file: ' + error.message
-        });
-    }
-});
-
 module.exports = router;
-
 

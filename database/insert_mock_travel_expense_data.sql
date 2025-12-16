@@ -1,0 +1,698 @@
+-- ============================================
+-- SCRIPT TỰ ĐỘNG CHÈN MOCK DATA CHO TRAVEL EXPENSE
+-- Script này sẽ tự động lấy employee IDs từ database
+-- ============================================
+
+DO $$
+DECLARE
+    emp1_id INTEGER;
+    emp2_id INTEGER;
+    manager1_id INTEGER;
+    manager2_id INTEGER;
+    branch_dir_id INTEGER;
+    ceo_id INTEGER;
+    hr_id INTEGER;
+    req_id INTEGER;
+BEGIN
+    -- Lấy employee IDs (lấy 2 employees đầu tiên)
+    SELECT id INTO emp1_id FROM employees ORDER BY id LIMIT 1;
+    SELECT id INTO emp2_id FROM employees ORDER BY id OFFSET 1 LIMIT 1;
+    
+    -- Lấy manager IDs (giả sử có quan_ly_truc_tiep)
+    SELECT id INTO manager1_id FROM employees WHERE id != emp1_id ORDER BY id LIMIT 1;
+    SELECT id INTO manager2_id FROM employees WHERE id != emp2_id AND id != manager1_id ORDER BY id LIMIT 1;
+    
+    -- Lấy branch director và CEO (giả sử có role hoặc tìm theo tên)
+    SELECT id INTO branch_dir_id FROM employees WHERE id NOT IN (emp1_id, emp2_id, manager1_id, manager2_id) ORDER BY id LIMIT 1;
+    SELECT id INTO ceo_id FROM employees WHERE id NOT IN (emp1_id, emp2_id, manager1_id, manager2_id, branch_dir_id) ORDER BY id LIMIT 1;
+    SELECT id INTO hr_id FROM employees WHERE id NOT IN (emp1_id, emp2_id, manager1_id, manager2_id, branch_dir_id, ceo_id) ORDER BY id LIMIT 1;
+    
+    -- Nếu không đủ employees, sử dụng các ID mặc định
+    IF emp1_id IS NULL THEN emp1_id := 1; END IF;
+    IF emp2_id IS NULL THEN emp2_id := 2; END IF;
+    IF manager1_id IS NULL THEN manager1_id := 2; END IF;
+    IF manager2_id IS NULL THEN manager2_id := 3; END IF;
+    IF branch_dir_id IS NULL THEN branch_dir_id := 4; END IF;
+    IF ceo_id IS NULL THEN ceo_id := 5; END IF;
+    IF hr_id IS NULL THEN hr_id := 6; END IF;
+
+    RAISE NOTICE 'Sử dụng employee IDs: emp1=%, emp2=%, manager1=%, manager2=%, branch_dir=%, ceo=%, hr=%', 
+        emp1_id, emp2_id, manager1_id, manager2_id, branch_dir_id, ceo_id, hr_id;
+
+    -- ============================================
+    -- BƯỚC 1: YÊU CẦU MỚI (PENDING_LEVEL_1)
+    -- ============================================
+    INSERT INTO travel_expense_requests (
+        employee_id, purpose, location, location_type, 
+        start_time, end_time, is_overnight, requires_ceo,
+        status, current_step,
+        company_name, company_address, requested_advance_amount,
+        living_allowance_amount, living_allowance_currency, continent,
+        created_at
+    ) VALUES 
+    (
+        emp1_id,
+        'Họp với đối tác tại Hà Nội về hợp đồng mới',
+        'Hà Nội, Việt Nam',
+        'DOMESTIC',
+        CURRENT_TIMESTAMP + INTERVAL '5 days',
+        CURRENT_TIMESTAMP + INTERVAL '6 days',
+        TRUE,
+        FALSE,
+        'PENDING_LEVEL_1',
+        'LEVEL_1',
+        'Công ty ABC',
+        '123 Đường ABC, Quận 1, Hà Nội',
+        5000000,
+        NULL,
+        NULL,
+        NULL,
+        CURRENT_TIMESTAMP - INTERVAL '2 days'
+    ),
+    (
+        emp1_id,
+        'Tham dự hội nghị công nghệ tại Tokyo',
+        'Tokyo, Japan',
+        'INTERNATIONAL',
+        CURRENT_TIMESTAMP + INTERVAL '10 days',
+        CURRENT_TIMESTAMP + INTERVAL '15 days',
+        TRUE,
+        TRUE,
+        'PENDING_LEVEL_1',
+        'LEVEL_1',
+        'Tech Conference Japan',
+        'Tokyo Convention Center',
+        20000000,
+        40,
+        'USD',
+        'ASIAN',
+        CURRENT_TIMESTAMP - INTERVAL '1 day'
+    ),
+    (
+        emp2_id,
+        'Đào tạo tại trụ sở chính ở Paris',
+        'Paris, France',
+        'INTERNATIONAL',
+        CURRENT_TIMESTAMP + INTERVAL '20 days',
+        CURRENT_TIMESTAMP + INTERVAL '25 days',
+        TRUE,
+        TRUE,
+        'PENDING_LEVEL_1',
+        'LEVEL_1',
+        'Headquarters Paris',
+        '123 Avenue des Champs-Élysées, Paris',
+        50000000,
+        60,
+        'USD',
+        'EU',
+        CURRENT_TIMESTAMP - INTERVAL '3 hours'
+    );
+
+    -- ============================================
+    -- BƯỚC 2: ĐÃ DUYỆT CẤP 1 (PENDING_LEVEL_2)
+    -- ============================================
+    INSERT INTO travel_expense_requests (
+        employee_id, purpose, location, location_type,
+        start_time, end_time, is_overnight, requires_ceo,
+        status, current_step,
+        company_name, company_address, requested_advance_amount,
+        living_allowance_amount, living_allowance_currency, continent,
+        manager_id, manager_decision, manager_notes, manager_decision_at,
+        created_at
+    ) VALUES 
+    (
+        emp1_id,
+        'Họp khách hàng tại TP.HCM',
+        'TP.HCM, Việt Nam',
+        'DOMESTIC',
+        CURRENT_TIMESTAMP + INTERVAL '7 days',
+        CURRENT_TIMESTAMP + INTERVAL '8 days',
+        TRUE,
+        FALSE,
+        'PENDING_LEVEL_2',
+        'LEVEL_2',
+        'Công ty XYZ',
+        '456 Đường XYZ, Quận 3, TP.HCM',
+        3000000,
+        NULL,
+        NULL,
+        NULL,
+        manager1_id,
+        'APPROVE',
+        'Đồng ý cho công tác này',
+        CURRENT_TIMESTAMP - INTERVAL '1 day',
+        CURRENT_TIMESTAMP - INTERVAL '3 days'
+    );
+
+    -- ============================================
+    -- BƯỚC 2.1 & 3: ĐÃ DUYỆT CẤP 2, CHỜ CEO (PENDING_CEO)
+    -- ============================================
+    INSERT INTO travel_expense_requests (
+        employee_id, purpose, location, location_type,
+        start_time, end_time, is_overnight, requires_ceo,
+        status, current_step,
+        company_name, company_address, requested_advance_amount,
+        living_allowance_amount, living_allowance_currency, continent,
+        manager_id, manager_decision, manager_notes, manager_decision_at,
+        branch_director_id, branch_director_decision, branch_director_notes, branch_director_decision_at,
+        created_at
+    ) VALUES 
+    (
+        emp2_id,
+        'Tham dự triển lãm công nghệ tại Singapore',
+        'Singapore',
+        'INTERNATIONAL',
+        CURRENT_TIMESTAMP + INTERVAL '12 days',
+        CURRENT_TIMESTAMP + INTERVAL '16 days',
+        TRUE,
+        TRUE,
+        'PENDING_CEO',
+        'CEO',
+        'Tech Expo Singapore',
+        'Marina Bay Sands Convention Center',
+        25000000,
+        40,
+        'USD',
+        'ASIAN',
+        manager2_id,
+        'APPROVE',
+        'Đồng ý cho công tác',
+        CURRENT_TIMESTAMP - INTERVAL '2 days',
+        branch_dir_id,
+        'APPROVE',
+        'Đồng ý, cần CEO phê duyệt',
+        CURRENT_TIMESTAMP - INTERVAL '1 day',
+        CURRENT_TIMESTAMP - INTERVAL '4 days'
+    );
+
+    -- ============================================
+    -- BƯỚC 3: ĐÃ DUYỆT CEO, CHỜ CẤP NGÂN SÁCH (PENDING_FINANCE)
+    -- ============================================
+    INSERT INTO travel_expense_requests (
+        employee_id, purpose, location, location_type,
+        start_time, end_time, is_overnight, requires_ceo,
+        status, current_step,
+        company_name, company_address, requested_advance_amount,
+        living_allowance_amount, living_allowance_currency, continent,
+        manager_id, manager_decision, manager_notes, manager_decision_at,
+        branch_director_id, branch_director_decision, branch_director_notes, branch_director_decision_at,
+        ceo_id, ceo_decision, ceo_notes, ceo_decision_at,
+        created_at
+    ) VALUES 
+    (
+        emp1_id,
+        'Đào tạo chuyên sâu tại London',
+        'London, UK',
+        'INTERNATIONAL',
+        CURRENT_TIMESTAMP + INTERVAL '18 days',
+        CURRENT_TIMESTAMP + INTERVAL '23 days',
+        TRUE,
+        TRUE,
+        'PENDING_FINANCE',
+        'FINANCE',
+        'Training Center London',
+        '123 Oxford Street, London',
+        60000000,
+        60,
+        'USD',
+        'EU',
+        manager1_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '5 days',
+        branch_dir_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '4 days',
+        ceo_id,
+        'APPROVE',
+        'Đồng ý cho công tác này',
+        CURRENT_TIMESTAMP - INTERVAL '2 days',
+        CURRENT_TIMESTAMP - INTERVAL '7 days'
+    ),
+    (
+        emp2_id,
+        'Họp với đối tác tại Đà Nẵng',
+        'Đà Nẵng, Việt Nam',
+        'DOMESTIC',
+        CURRENT_TIMESTAMP + INTERVAL '8 days',
+        CURRENT_TIMESTAMP + INTERVAL '9 days',
+        TRUE,
+        FALSE,
+        'PENDING_FINANCE',
+        'FINANCE',
+        'Công ty DEF',
+        '789 Đường DEF, Đà Nẵng',
+        4000000,
+        NULL,
+        NULL,
+        NULL,
+        manager2_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '3 days',
+        branch_dir_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '2 days',
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        CURRENT_TIMESTAMP - INTERVAL '5 days'
+    );
+
+    -- ============================================
+    -- BƯỚC 4: ĐÃ CẤP NGÂN SÁCH & TẠM ỨNG (PENDING_SETTLEMENT)
+    -- ============================================
+    INSERT INTO travel_expense_requests (
+        employee_id, purpose, location, location_type,
+        start_time, end_time, is_overnight, requires_ceo,
+        status, current_step,
+        company_name, company_address, requested_advance_amount,
+        living_allowance_amount, living_allowance_currency, continent,
+        manager_id, manager_decision, manager_notes, manager_decision_at,
+        branch_director_id, branch_director_decision, branch_director_notes, branch_director_decision_at,
+        ceo_id, ceo_decision, ceo_notes, ceo_decision_at,
+        approved_budget_amount, approved_budget_currency, approved_budget_exchange_rate,
+        budget_approved_at, budget_approved_by,
+        actual_advance_amount, advance_method, bank_account, advance_notes,
+        advance_status, advance_transferred_at, advance_transferred_by,
+        settlement_status,
+        created_at
+    ) VALUES 
+    (
+        emp1_id,
+        'Họp khách hàng tại Hà Nội',
+        'Hà Nội, Việt Nam',
+        'DOMESTIC',
+        CURRENT_TIMESTAMP - INTERVAL '2 days',
+        CURRENT_TIMESTAMP - INTERVAL '1 day',
+        TRUE,
+        FALSE,
+        'PENDING_SETTLEMENT',
+        'SETTLEMENT',
+        'Công ty GHI',
+        '321 Đường GHI, Hà Nội',
+        5000000,
+        NULL,
+        NULL,
+        NULL,
+        manager1_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '10 days',
+        branch_dir_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '9 days',
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        5000000,
+        'VND',
+        1.0,
+        CURRENT_TIMESTAMP - INTERVAL '8 days',
+        hr_id,
+        5000000,
+        'BANK_TRANSFER',
+        '1234567890 - Ngân hàng ABC',
+        'Đã chuyển khoản',
+        'TRANSFERRED',
+        CURRENT_TIMESTAMP - INTERVAL '7 days',
+        hr_id,
+        'PENDING_EMPLOYEE_SUBMISSION',
+        CURRENT_TIMESTAMP - INTERVAL '12 days'
+    ),
+    (
+        emp2_id,
+        'Tham dự hội nghị tại Bangkok',
+        'Bangkok, Thailand',
+        'INTERNATIONAL',
+        CURRENT_TIMESTAMP - INTERVAL '5 days',
+        CURRENT_TIMESTAMP - INTERVAL '1 day',
+        TRUE,
+        TRUE,
+        'PENDING_SETTLEMENT',
+        'SETTLEMENT',
+        'Conference Center Bangkok',
+        'Siam Paragon, Bangkok',
+        20000000,
+        40,
+        'USD',
+        'ASIAN',
+        manager2_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '15 days',
+        branch_dir_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '14 days',
+        ceo_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '12 days',
+        20000000,
+        'VND',
+        1.0,
+        CURRENT_TIMESTAMP - INTERVAL '11 days',
+        hr_id,
+        20000000,
+        'BANK_TRANSFER',
+        '9876543210 - Ngân hàng XYZ',
+        'Đã chuyển khoản',
+        'TRANSFERRED',
+        CURRENT_TIMESTAMP - INTERVAL '10 days',
+        hr_id,
+        'SUBMITTED',
+        CURRENT_TIMESTAMP - INTERVAL '18 days'
+    );
+
+    -- ============================================
+    -- BƯỚC 5: ĐÃ GỬI BÁO CÁO, HR ĐÃ XÁC NHẬN (PENDING_ACCOUNTANT)
+    -- ============================================
+    INSERT INTO travel_expense_requests (
+        employee_id, purpose, location, location_type,
+        start_time, end_time, is_overnight, requires_ceo,
+        status, current_step,
+        company_name, company_address, requested_advance_amount,
+        living_allowance_amount, living_allowance_currency, continent,
+        manager_id, manager_decision, manager_notes, manager_decision_at,
+        branch_director_id, branch_director_decision, branch_director_notes, branch_director_decision_at,
+        ceo_id, ceo_decision, ceo_notes, ceo_decision_at,
+        approved_budget_amount, approved_budget_currency, approved_budget_exchange_rate,
+        budget_approved_at, budget_approved_by,
+        actual_advance_amount, advance_method, bank_account, advance_notes,
+        advance_status, advance_transferred_at, advance_transferred_by,
+        actual_expense, settlement_status, settlement_notes,
+        employee_confirmed_at, hr_confirmed_at, hr_confirmed_by,
+        created_at
+    ) VALUES 
+    (
+        emp1_id,
+        'Công tác tại TP.HCM',
+        'TP.HCM, Việt Nam',
+        'DOMESTIC',
+        CURRENT_TIMESTAMP - INTERVAL '10 days',
+        CURRENT_TIMESTAMP - INTERVAL '8 days',
+        TRUE,
+        FALSE,
+        'PENDING_ACCOUNTANT',
+        'ACCOUNTANT',
+        'Công ty JKL',
+        '456 Đường JKL, TP.HCM',
+        6000000,
+        NULL,
+        NULL,
+        NULL,
+        manager1_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '20 days',
+        branch_dir_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '19 days',
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        6000000,
+        'VND',
+        1.0,
+        CURRENT_TIMESTAMP - INTERVAL '18 days',
+        hr_id,
+        6000000,
+        'BANK_TRANSFER',
+        '1112223334 - Ngân hàng ABC',
+        'Đã chuyển khoản',
+        'TRANSFERRED',
+        CURRENT_TIMESTAMP - INTERVAL '17 days',
+        hr_id,
+        5500000,
+        'HR_CONFIRMED',
+        'Đã kiểm tra hóa đơn và chứng từ, hợp lệ',
+        CURRENT_TIMESTAMP - INTERVAL '7 days',
+        CURRENT_TIMESTAMP - INTERVAL '2 days',
+        hr_id,
+        CURRENT_TIMESTAMP - INTERVAL '22 days'
+    ),
+    (
+        emp2_id,
+        'Công tác tại Tokyo',
+        'Tokyo, Japan',
+        'INTERNATIONAL',
+        CURRENT_TIMESTAMP - INTERVAL '12 days',
+        CURRENT_TIMESTAMP - INTERVAL '7 days',
+        TRUE,
+        TRUE,
+        'PENDING_ACCOUNTANT',
+        'ACCOUNTANT',
+        'Tech Company Tokyo',
+        'Shibuya, Tokyo',
+        30000000,
+        40,
+        'USD',
+        'ASIAN',
+        manager2_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '25 days',
+        branch_dir_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '24 days',
+        ceo_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '22 days',
+        30000000,
+        'VND',
+        1.0,
+        CURRENT_TIMESTAMP - INTERVAL '21 days',
+        hr_id,
+        30000000,
+        'BANK_TRANSFER',
+        '5556667778 - Ngân hàng XYZ',
+        'Đã chuyển khoản',
+        'TRANSFERRED',
+        CURRENT_TIMESTAMP - INTERVAL '20 days',
+        hr_id,
+        35000000,
+        'HR_CONFIRMED',
+        'Chi phí có phần vượt ngân sách, cần kế toán kiểm tra',
+        CURRENT_TIMESTAMP - INTERVAL '6 days',
+        CURRENT_TIMESTAMP - INTERVAL '1 day',
+        hr_id,
+        CURRENT_TIMESTAMP - INTERVAL '27 days'
+    ),
+    (
+        emp1_id,
+        'Họp tại Hà Nội',
+        'Hà Nội, Việt Nam',
+        'DOMESTIC',
+        CURRENT_TIMESTAMP - INTERVAL '15 days',
+        CURRENT_TIMESTAMP - INTERVAL '13 days',
+        TRUE,
+        FALSE,
+        'PENDING_ACCOUNTANT',
+        'ACCOUNTANT',
+        'Công ty MNO',
+        '789 Đường MNO, Hà Nội',
+        4000000,
+        NULL,
+        NULL,
+        NULL,
+        manager1_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '28 days',
+        branch_dir_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '27 days',
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        4000000,
+        'VND',
+        1.0,
+        CURRENT_TIMESTAMP - INTERVAL '26 days',
+        hr_id,
+        4000000,
+        'BANK_TRANSFER',
+        '9998887776 - Ngân hàng ABC',
+        'Đã chuyển khoản',
+        'TRANSFERRED',
+        CURRENT_TIMESTAMP - INTERVAL '25 days',
+        hr_id,
+        4000000,
+        'HR_CONFIRMED',
+        'Chi phí đúng với ngân sách',
+        CURRENT_TIMESTAMP - INTERVAL '14 days',
+        CURRENT_TIMESTAMP - INTERVAL '3 days',
+        hr_id,
+        CURRENT_TIMESTAMP - INTERVAL '30 days'
+    );
+
+    -- ============================================
+    -- BƯỚC 6: ĐÃ QUYẾT TOÁN (SETTLED)
+    -- ============================================
+    INSERT INTO travel_expense_requests (
+        employee_id, purpose, location, location_type,
+        start_time, end_time, is_overnight, requires_ceo,
+        status, current_step,
+        company_name, company_address, requested_advance_amount,
+        living_allowance_amount, living_allowance_currency, continent,
+        manager_id, manager_decision, manager_notes, manager_decision_at,
+        branch_director_id, branch_director_decision, branch_director_notes, branch_director_decision_at,
+        ceo_id, ceo_decision, ceo_notes, ceo_decision_at,
+        approved_budget_amount, approved_budget_currency, approved_budget_exchange_rate,
+        budget_approved_at, budget_approved_by,
+        actual_advance_amount, advance_method, bank_account, advance_notes,
+        advance_status, advance_transferred_at, advance_transferred_by,
+        actual_expense, settlement_status, settlement_notes,
+        employee_confirmed_at, hr_confirmed_at, hr_confirmed_by,
+        accountant_checked_at, accountant_notes, reimbursement_amount, exceeds_budget, excess_amount,
+        created_at
+    ) VALUES 
+    (
+        emp2_id,
+        'Công tác tại Đà Nẵng',
+        'Đà Nẵng, Việt Nam',
+        'DOMESTIC',
+        CURRENT_TIMESTAMP - INTERVAL '20 days',
+        CURRENT_TIMESTAMP - INTERVAL '18 days',
+        TRUE,
+        FALSE,
+        'SETTLED',
+        'SETTLED',
+        'Công ty PQR',
+        '123 Đường PQR, Đà Nẵng',
+        3500000,
+        NULL,
+        NULL,
+        NULL,
+        manager2_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '35 days',
+        branch_dir_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '34 days',
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        3500000,
+        'VND',
+        1.0,
+        CURRENT_TIMESTAMP - INTERVAL '33 days',
+        hr_id,
+        3500000,
+        'BANK_TRANSFER',
+        '1234567890 - Ngân hàng ABC',
+        'Đã chuyển khoản',
+        'TRANSFERRED',
+        CURRENT_TIMESTAMP - INTERVAL '32 days',
+        hr_id,
+        3200000,
+        'HR_CONFIRMED',
+        'Đã kiểm tra và xác nhận',
+        CURRENT_TIMESTAMP - INTERVAL '19 days',
+        CURRENT_TIMESTAMP - INTERVAL '15 days',
+        hr_id,
+        CURRENT_TIMESTAMP - INTERVAL '5 days',
+        'Đã kiểm tra hóa đơn, hợp lệ. Hoàn ứng đầy đủ chi phí thực tế.',
+        3200000,
+        FALSE,
+        NULL,
+        CURRENT_TIMESTAMP - INTERVAL '37 days'
+    );
+
+    -- ============================================
+    -- BƯỚC 6.1: CHỜ PHÊ DUYỆT NGOẠI LỆ (PENDING_EXCEPTION_APPROVAL)
+    -- ============================================
+    INSERT INTO travel_expense_requests (
+        employee_id, purpose, location, location_type,
+        start_time, end_time, is_overnight, requires_ceo,
+        status, current_step,
+        company_name, company_address, requested_advance_amount,
+        living_allowance_amount, living_allowance_currency, continent,
+        manager_id, manager_decision, manager_notes, manager_decision_at,
+        branch_director_id, branch_director_decision, branch_director_notes, branch_director_decision_at,
+        ceo_id, ceo_decision, ceo_notes, ceo_decision_at,
+        approved_budget_amount, approved_budget_currency, approved_budget_exchange_rate,
+        budget_approved_at, budget_approved_by,
+        actual_advance_amount, advance_method, bank_account, advance_notes,
+        advance_status, advance_transferred_at, advance_transferred_by,
+        actual_expense, settlement_status, settlement_notes,
+        employee_confirmed_at, hr_confirmed_at, hr_confirmed_by,
+        accountant_checked_at, accountant_notes, reimbursement_amount, exceeds_budget, excess_amount,
+        created_at
+    ) VALUES 
+    (
+        emp1_id,
+        'Công tác tại Paris',
+        'Paris, France',
+        'INTERNATIONAL',
+        CURRENT_TIMESTAMP - INTERVAL '18 days',
+        CURRENT_TIMESTAMP - INTERVAL '13 days',
+        TRUE,
+        TRUE,
+        'PENDING_EXCEPTION_APPROVAL',
+        'EXCEPTION_APPROVAL',
+        'Headquarters Paris',
+        '123 Avenue des Champs-Élysées, Paris',
+        70000000,
+        60,
+        'USD',
+        'EU',
+        manager1_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '40 days',
+        branch_dir_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '39 days',
+        ceo_id,
+        'APPROVE',
+        'Đồng ý',
+        CURRENT_TIMESTAMP - INTERVAL '37 days',
+        70000000,
+        'VND',
+        1.0,
+        CURRENT_TIMESTAMP - INTERVAL '36 days',
+        hr_id,
+        70000000,
+        'BANK_TRANSFER',
+        '1112223334 - Ngân hàng ABC',
+        'Đã chuyển khoản',
+        'TRANSFERRED',
+        CURRENT_TIMESTAMP - INTERVAL '35 days',
+        hr_id,
+        80000000,
+        'HR_CONFIRMED',
+        'Chi phí vượt ngân sách, cần phê duyệt ngoại lệ',
+        CURRENT_TIMESTAMP - INTERVAL '17 days',
+        CURRENT_TIMESTAMP - INTERVAL '10 days',
+        hr_id,
+        CURRENT_TIMESTAMP - INTERVAL '4 days',
+        'Chi phí thực tế vượt ngân sách 10 triệu. Đã hoàn ứng 70 triệu theo ngân sách. Phần vượt cần phê duyệt ngoại lệ.',
+        70000000,
+        TRUE,
+        10000000,
+        CURRENT_TIMESTAMP - INTERVAL '42 days'
+    );
+
+    RAISE NOTICE '✅ Đã chèn mock data thành công!';
+    RAISE NOTICE 'Kiểm tra kết quả: SELECT id, employee_id, status, location FROM travel_expense_requests ORDER BY created_at DESC;';
+
+END $$;
+
+

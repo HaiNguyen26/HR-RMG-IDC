@@ -1,1141 +1,1087 @@
-import React, { useState, useEffect } from 'react';
-import { candidatesAPI } from '../../services/api';
-import { formatDateDisplay } from '../../utils/dateUtils';
+import React, { useState, useEffect, useRef } from 'react';
+import { employeesAPI, recruitmentRequestsAPI, interviewRequestsAPI, candidatesAPI, interviewEvaluationsAPI } from '../../services/api';
 import './InterviewApprovals.css';
 
-const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
-    const [statistics, setStatistics] = useState({
-        pending: 0,
-        pendingEvaluation: 0,
-        approved: 0,
-        rejected: 0,
-        total: 0
-    });
-    const [loadingStats, setLoadingStats] = useState(true);
-    const [selectedStatus, setSelectedStatus] = useState('PENDING'); // Default: "Chờ tôi duyệt"
-    const [requests, setRequests] = useState([]);
-    const [loadingRequests, setLoadingRequests] = useState(false);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedRequest, setSelectedRequest] = useState(null);
-    const [rejectionNotes, setRejectionNotes] = useState('');
-    const [showRejectionNotes, setShowRejectionNotes] = useState(false);
-    const [processingAction, setProcessingAction] = useState(false);
-    const [isEvaluationModalOpen, setIsEvaluationModalOpen] = useState(false);
-    const [evaluationData, setEvaluationData] = useState({
-        criteria: [
-            { id: 1, name: 'Kỹ năng Giao tiếp', score: '', comment: '' },
-            { id: 2, name: 'Thái độ Làm việc', score: '', comment: '' },
-            { id: 3, name: 'Kỹ năng Chuyên môn', score: '', comment: '' },
-            { id: 4, name: 'Khả năng Hợp tác', score: '', comment: '' },
-            { id: 5, name: 'Tiềm năng Phát triển', score: '', comment: '' }
-        ],
-        strengths: '',
-        areasForImprovement: '',
-        generalComments: '',
-        finalConclusion: '' // 'PASS', 'FAIL', 'HOLD'
-    });
-    const [submittingEvaluation, setSubmittingEvaluation] = useState(false);
-    const [hasEvaluated, setHasEvaluated] = useState(false);
-    const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
-    const [previewCandidate, setPreviewCandidate] = useState(null);
-    const [loadingCandidate, setLoadingCandidate] = useState(false);
-    const [isRecruitmentRequestModalOpen, setIsRecruitmentRequestModalOpen] = useState(false);
-    // State for manager's own recruitment requests
-    const [myRecruitmentRequests, setMyRecruitmentRequests] = useState([]);
-    const [loadingMyRecruitmentRequests, setLoadingMyRecruitmentRequests] = useState(false);
-    const [showMyRecruitmentRequests, setShowMyRecruitmentRequests] = useState(false);
-    const [selectedRecruitmentRequest, setSelectedRecruitmentRequest] = useState(null);
-    const [isRecruitmentRequestDetailModalOpen, setIsRecruitmentRequestDetailModalOpen] = useState(false);
-    const [recruitmentRequestForm, setRecruitmentRequestForm] = useState({
-        chucDanhCanTuyen: '',
-        soLuongYeuCau: '',
-        phongBan: '',
-        moTaCongViec: '', // 'co' or 'chua_co'
-        loaiLaoDong: '', // 'thoi_vu' or 'toan_thoi_gian'
-        lyDoTuyen: {
-            tuyenThayThe: false,
-            tenNguoiThayThe: '',
-            nhuCauTang: false,
-            viTriCongViecMoi: false
-        },
-        lyDoKhacGhiChu: '',
-        // PHẦN II: TIÊU CHUẨN TUYỂN CHỌN
-        tieuChuanTuyenChon: {
-            gioiTinh: {
-                nam: false,
-                nu: false
-            },
-            doTuoi: '',
-            trinhDoHocVan: {
-                ptth: false,
-                daiHoc: false,
-                trungCapNghe: false,
-                caoHocTroLen: false
-            },
-            yeuCauKhacHocVan: '',
-            kinhNghiem: {
-                khong: false,
-                soNamKinhNghiem: false,
-                soNam: ''
-            },
-            kienThuc: {
-                khong: false,
-                nganhNghe: false,
-                nganhNgheValue: ''
-            },
-            ngoaiNgu: {
-                tiengAnh: false,
-                trinhDoTiengAnh: '',
-                ngoaiNguKhac: false,
-                tenNgoaiNguKhac: '',
-                trinhDoNgoaiNguKhac: ''
-            },
-            viTinh: {
-                khong: false,
-                msOffice: false,
-                khac: false,
-                khacValue: ''
-            },
-            kyNang: {
-                kyNangGiaoTiep: '',
-                thaiDoLamViec: '',
-                kyNangQuanLy: '',
-                yeuCauKhac: ''
-            },
-        }
-    });
-    const [recruitmentRequestErrors, setRecruitmentRequestErrors] = useState({});
-    const [submittingRecruitmentRequest, setSubmittingRecruitmentRequest] = useState(false);
-    const [departments, setDepartments] = useState([]);
-    const [jobTitles, setJobTitles] = useState([]);
-    const [loadingFormData, setLoadingFormData] = useState(false);
-    const [showCustomPhongBan, setShowCustomPhongBan] = useState(false);
-    const [showCustomViTri, setShowCustomViTri] = useState(false);
-    const [customPhongBan, setCustomPhongBan] = useState('');
-    const [customViTri, setCustomViTri] = useState('');
+// Custom Dropdown Component
+const CustomDropdown = ({ id, name, value, onChange, options, placeholder, error, className = '' }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef(null);
+    const menuRef = useRef(null);
 
-    // Mapping vị trí ứng tuyển từ code sang tên đầy đủ
-    const viTriMap = {
-        'MUAHANG': 'Mua hàng',
-        'TAPVU_NAUAN': 'Tạp vụ & nấu ăn',
-        'HAN_BOMACH': 'Hàn bo mạch',
-        'CHATLUONG': 'Chất lượng',
-        'KHAOSAT_THIETKE': 'Khảo sát thiết kế',
-        'ADMIN_DUAN': 'Admin dự án',
-        'LAPRAP': 'Lắp ráp',
-        'LAPRAP_JIG_PALLET': 'Lắp ráp JIG, Pallet',
-        'DIEN_LAPTRINH_PLC': 'Điện lập trình PLC',
-        'THIETKE_MAY_TUDONG': 'Thiết kế máy tự động',
-        'VANHANH_MAY_CNC': 'Vận hành máy CNC',
-        'DICHVU_KYTHUAT': 'Dịch vụ Kỹ thuật',
-        'KETOAN_NOIBO': 'Kế toán nội bộ',
-        'KETOAN_BANHANG': 'Kế toán bán hàng'
-    };
+    const selectedOption = options.find(opt => String(opt.value) === String(value)) || null;
 
-    // Mapping phòng ban từ code sang tên đầy đủ
-    const phongBanMap = {
-        'MUAHANG': 'Mua hàng',
-        'HANHCHINH': 'Hành chính',
-        'DVDT': 'DVĐT',
-        'DTVT': 'DVĐT', // Alias
-        'QA': 'QA',
-        'KHAOSAT_THIETKE': 'Khảo sát thiết kế',
-        'TUDONG': 'Tự động',
-        'CNC': 'CNC',
-        'DICHVU_KYTHUAT': 'Dịch vụ kỹ thuật',
-        'KETOAN': 'Kế toán'
-    };
-
-    // Helper function để lấy tên đầy đủ từ code
-    const getViTriName = (code) => {
-        if (!code) return 'Chưa cập nhật';
-        return viTriMap[code] || code;
-    };
-
-    const getPhongBanName = (code) => {
-        if (!code) return 'Chưa cập nhật';
-        return phongBanMap[code] || code;
-    };
-
-    // Format date for display
-    const formatDate = (dateString) => {
-        if (!dateString) return '-';
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return '-';
-        return date.toLocaleDateString('vi-VN', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
-    };
-
-    // Format time for display
-    const formatTime = (timeString) => {
-        if (!timeString) return '-';
-        // timeString format: HH:mm or HH:mm:ss
-        const timeParts = timeString.split(':');
-        if (timeParts.length >= 2) {
-            return `${timeParts[0]}:${timeParts[1]}`;
-        }
-        return timeString;
-    };
-
-    // Format date and time for interview display
-    const formatInterviewDateTime = (dateString, timeString) => {
-        if (!dateString) return 'Chưa có thông tin';
-
-        // Handle date string (could be YYYY-MM-DD format)
-        let date;
-        if (typeof dateString === 'string' && dateString.includes('T')) {
-            // ISO format with time
-            date = new Date(dateString);
-        } else if (typeof dateString === 'string' && dateString.includes('-')) {
-            // YYYY-MM-DD format
-            date = new Date(dateString + 'T00:00:00');
-        } else {
-            date = new Date(dateString);
-        }
-
-        if (isNaN(date.getTime())) return 'Chưa có thông tin';
-
-        const formattedDate = date.toLocaleDateString('vi-VN', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            weekday: 'long'
-        });
-
-        const formattedTime = formatTime(timeString);
-        return formattedTime !== '-' ? `${formattedDate}, ${formattedTime}` : formattedDate;
-    };
-
-    // Fetch interview requests based on selected status
-    const fetchRequests = async () => {
-        if (!currentUser?.id) return;
-
-        setLoadingRequests(true);
-        try {
-            const params = {};
-            // Backend will automatically filter by current user (direct or indirect manager)
-
-            // Add status filter if not 'ALL'
-            if (selectedStatus !== 'ALL') {
-                params.status = selectedStatus;
-            }
-
-            const response = await candidatesAPI.getInterviewRequests(params);
-
-            if (response.data?.success && Array.isArray(response.data.data)) {
-                setRequests(response.data.data);
-            }
-        } catch (error) {
-            console.error('Error fetching interview requests:', error);
-            if (showToast) {
-                showToast('Không thể tải danh sách yêu cầu phỏng vấn.', 'error');
-            }
-        } finally {
-            setLoadingRequests(false);
-        }
-    };
-
-    // Fetch interview request statistics
     useEffect(() => {
-        const fetchStatistics = async () => {
-            if (!currentUser?.id) return;
-
-            setLoadingStats(true);
-            try {
-                // Không gửi managerId để backend tự động filter theo currentUser (cả direct và indirect manager)
-                const params = {};
-
-                const response = await candidatesAPI.getInterviewRequests(params);
-
-                if (response.data?.success && Array.isArray(response.data.data)) {
-                    const allRequests = response.data.data;
-                    const currentUserId = currentUser?.id;
-
-                    // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
-                    const pendingEvaluationCount = allRequests.filter(r => {
-                        if (r.status !== 'PENDING_EVALUATION') return false;
-
-                        // Nếu là quản lý trực tiếp
-                        if (r.manager_id === currentUserId) {
-                            return !r.direct_manager_evaluated;
-                        }
-
-                        // Nếu là quản lý gián tiếp
-                        if (r.indirect_manager_id === currentUserId) {
-                            return !r.indirect_manager_evaluated;
-                        }
-
-                        return false;
-                    }).length;
-
-                    const stats = {
-                        pending: allRequests.filter(r => r.status === 'PENDING').length,
-                        pendingEvaluation: pendingEvaluationCount,
-                        approved: allRequests.filter(r => r.status === 'APPROVED').length,
-                        rejected: allRequests.filter(r => r.status === 'REJECTED').length,
-                        total: allRequests.length
-                    };
-                    setStatistics(stats);
-                }
-            } catch (error) {
-                console.error('Error fetching interview request statistics:', error);
-            } finally {
-                setLoadingStats(false);
+        const handleClickOutside = (event) => {
+            if (
+                dropdownRef.current &&
+                !dropdownRef.current.contains(event.target) &&
+                menuRef.current &&
+                !menuRef.current.contains(event.target)
+            ) {
+                setIsOpen(false);
             }
         };
 
-        fetchStatistics();
-    }, [currentUser]);
-
-    // Fetch requests when status changes
-    useEffect(() => {
-        if (!showMyRecruitmentRequests) {
-            fetchRequests();
+        if (isOpen) {
+            setTimeout(() => {
+                document.addEventListener('mousedown', handleClickOutside);
+            }, 0);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedStatus, currentUser, showMyRecruitmentRequests]);
 
-    // Fetch my recruitment requests (for managers)
-    const fetchMyRecruitmentRequests = async () => {
-        setLoadingMyRecruitmentRequests(true);
-        try {
-            const response = await candidatesAPI.getMyRecruitmentRequests();
-            if (response.data?.success) {
-                setMyRecruitmentRequests(response.data.data || []);
-            } else {
-                throw new Error(response.data?.message || 'Lỗi khi tải danh sách yêu cầu tuyển dụng của tôi');
-            }
-        } catch (error) {
-            console.error('Error fetching my recruitment requests:', error);
-            if (showToast) {
-                const message = error.response?.data?.message || 'Không thể tải danh sách yêu cầu tuyển dụng của tôi';
-                showToast(message, 'error');
-            }
-            setMyRecruitmentRequests([]);
-        } finally {
-            setLoadingMyRecruitmentRequests(false);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isOpen]);
+
+    const handleSelect = (option, e) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
         }
-    };
-
-    // Fetch my recruitment requests when tab is selected
-    useEffect(() => {
-        if (showMyRecruitmentRequests) {
-            fetchMyRecruitmentRequests();
-        }
-    }, [showMyRecruitmentRequests]);
-
-    // Handle view recruitment request details
-    const handleViewRecruitmentRequestDetails = async (requestId) => {
-        try {
-            const response = await candidatesAPI.getRecruitmentRequestById(requestId);
-            if (response.data?.success) {
-                setSelectedRecruitmentRequest(response.data.data);
-                setIsRecruitmentRequestDetailModalOpen(true);
-            } else {
-                throw new Error(response.data?.message || 'Không thể tải chi tiết yêu cầu');
-            }
-        } catch (error) {
-            console.error('Error fetching recruitment request details:', error);
-            if (showToast) {
-                showToast(error.response?.data?.message || 'Không thể tải chi tiết yêu cầu', 'error');
-            }
-        }
-    };
-
-    // Handle status filter change
-    const handleStatusChange = (status) => {
-        setSelectedStatus(status);
-    };
-
-    // Handle view candidate details
-    const handleViewCandidateDetails = async (e, request) => {
-        e.stopPropagation(); // Prevent card click
-        if (!request.candidate_id) {
-            showToast?.('Không tìm thấy thông tin ứng viên', 'error');
+        if (option.value === '' || option.value === null || option.value === undefined) {
             return;
         }
+        const eventObject = {
+            target: {
+                name: name || id,
+                value: option.value
+            }
+        };
+        onChange(eventObject);
+        setIsOpen(false);
+    };
 
-        setLoadingCandidate(true);
-        setIsPreviewModalOpen(true);
-        try {
-            // Fetch candidate details
-            const response = await candidatesAPI.getAll({});
+    const displayOptions = options.filter(opt => {
+        if (!opt) return false;
+        if (opt.value === '' || opt.value === null || opt.value === undefined) return false;
+        if (opt.label === null || opt.label === undefined) return false;
+        return true;
+    });
 
-            if (response.data?.success && Array.isArray(response.data.data)) {
-                // Convert both IDs to numbers for comparison
-                const targetId = parseInt(request.candidate_id, 10);
+    return (
+        <div className={`interview-dropdown-wrapper ${className} ${error ? 'error' : ''} ${isOpen ? 'open' : ''}`} ref={dropdownRef}>
+            <button
+                type="button"
+                className={`interview-dropdown-trigger ${isOpen ? 'open' : ''} ${error ? 'error' : ''}`}
+                onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsOpen(!isOpen);
+                }}
+                onMouseDown={(e) => {
+                    if (!isOpen) {
+                        e.preventDefault();
+                    }
+                }}
+            >
+                <span className="interview-dropdown-value">
+                    {selectedOption && String(selectedOption.value) !== '' ? selectedOption.label : placeholder}
+                </span>
+                <svg className="interview-dropdown-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+            {isOpen && displayOptions.length > 0 && (
+                <div
+                    ref={menuRef}
+                    className="interview-dropdown-menu"
+                >
+                    {displayOptions.map((option, index) => (
+                        <button
+                            key={option.value !== null && option.value !== undefined && option.value !== ''
+                                ? String(option.value)
+                                : `option-${index}-${String(option.label || 'empty')}`}
+                            type="button"
+                            className={`interview-dropdown-option ${String(value) === String(option.value) ? 'selected' : ''}`}
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleSelect(option, e);
+                            }}
+                        >
+                            {option.label || ''}
+                        </button>
+                    ))}
+                </div>
+            )}
+            {isOpen && displayOptions.length === 0 && (
+                <div
+                    ref={menuRef}
+                    className="interview-dropdown-menu"
+                >
+                    <div style={{ padding: '0.75rem 1rem', color: '#94a3b8', fontSize: '0.9rem' }}>
+                        Không có dữ liệu
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
-                const candidate = response.data.data.find(c => {
-                    const candidateId = parseInt(c.id, 10);
-                    return candidateId === targetId;
+const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
+    const [selectedFilter, setSelectedFilter] = useState('all'); // 'all', 'ready', 'approved', 'rejected', 'recruitment'
+    const [isRecruitmentModalOpen, setIsRecruitmentModalOpen] = useState(false);
+    const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+    const [isBranchDirector, setIsBranchDirector] = useState(false);
+    const [recruitmentRequests, setRecruitmentRequests] = useState([]);
+    const [interviewRequests, setInterviewRequests] = useState([]);
+    const [readyInterviewRequests, setReadyInterviewRequests] = useState([]);
+    // Separate states for counts (for badges) and details (for table display)
+    const [interviewRequestsCount, setInterviewRequestsCount] = useState(0);
+    const [readyInterviewRequestsCount, setReadyInterviewRequestsCount] = useState(0);
+    const [selectedInterviewRequest, setSelectedInterviewRequest] = useState(null);
+    const [showInterviewRequestDetail, setShowInterviewRequestDetail] = useState(false);
+    const [viewingCandidate, setViewingCandidate] = useState(null);
+    const [showCandidateDetailModal, setShowCandidateDetailModal] = useState(false);
+    const [loadingCandidate, setLoadingCandidate] = useState(false);
+    const [selectedRequest, setSelectedRequest] = useState(null);
+    const [showRequestDetail, setShowRequestDetail] = useState(false);
+    const [isHrRecruitmentModalOpen, setIsHrRecruitmentModalOpen] = useState(false);
+    const [hrRecruitmentRequests, setHrRecruitmentRequests] = useState([]);
+    const [pendingRecruitmentCount, setPendingRecruitmentCount] = useState(0);
+    
+    // Evaluation modal state
+    const [showEvaluationModal, setShowEvaluationModal] = useState(false);
+    const [selectedEvaluationRequest, setSelectedEvaluationRequest] = useState(null);
+    const [evaluationForm, setEvaluationForm] = useState({
+        tenUngVien: '',
+        viTriUngTuyen: '',
+        capBac: '',
+        nguoiQuanLyTrucTiep: '',
+        nguoiPhongVan1: '',
+        ngayPhongVan: '',
+        diemKyNangGiaoTiep: '',
+        lyDoKyNangGiaoTiep: '',
+        diemThaiDoLamViec: '',
+        lyDoThaiDoLamViec: '',
+        diemKinhNghiemChuyenMon: '',
+        lyDoKinhNghiemChuyenMon: '',
+        diemKhaNangQuanLyDuAn: '',
+        lyDoKhaNangQuanLyDuAn: '',
+        diemNgoaiNgu: '',
+        lyDoNgoaiNgu: '',
+        diemKyNangQuanLy: '',
+        lyDoKyNangQuanLy: '',
+        diemManh: '',
+        diemCanCaiThien: '',
+        nhanXetChung: '',
+        ketLuan: ''
+    });
+    const [savingEvaluation, setSavingEvaluation] = useState(false);
+    const [currentUserHasEvaluated, setCurrentUserHasEvaluated] = useState(false);
+    const [bothEvaluated, setBothEvaluated] = useState(false);
+    const [isEvaluationReadOnly, setIsEvaluationReadOnly] = useState(false);
+
+    // Dropdown options
+    const [jobTitles, setJobTitles] = useState([]);
+    const [departments, setDepartments] = useState([]);
+    const [loadingOptions, setLoadingOptions] = useState(false);
+
+    // Form state for recruitment request
+    const [recruitmentForm, setRecruitmentForm] = useState({
+        // PHẦN I: Vị trí & Nhu cầu
+        chucDanhCanTuyen: '',
+        phongBanBoPhan: '',
+        nguoiQuanLyTrucTiep: '',
+        moTaCongViec: 'chua_co', // 'co' or 'chua_co'
+        yeuCauChiTietCongViec: '',
+        lyDoKhacGhiChu: '',
+        soLuongYeuCau: '1',
+        loaiLaoDong: 'toan_thoi_gian', // 'toan_thoi_gian' or 'thoi_vu'
+        nguoiQuanLyGianTiep: '',
+        lyDoTuyen: 'nhu_cau_tang', // 'thay_the', 'nhu_cau_tang', 'vi_tri_moi'
+        // PHẦN II: Tiêu chuẩn Tuyển chọn
+        gioiTinh: 'bat_ky', // 'bat_ky', 'nam', 'nu'
+        doTuoi: '',
+        trinhDoHocVanYeuCau: '',
+        kinhNghiemChuyenMon: 'khong_yeu_cau', // 'khong_yeu_cau' or 'co_yeu_cau'
+        chiTietKinhNghiem: '',
+        kienThucChuyenMonKhac: '',
+        yeuCauNgoaiNgu: '',
+        yeuCauViTinhKyNangKhac: '',
+        kyNangGiaoTiep: '',
+        thaiDoLamViec: '',
+        kyNangQuanLy: ''
+    });
+
+    const isHr = currentUser?.role === 'HR';
+
+    // Candidates data - sẽ được fetch từ API
+    const [candidates, setCandidates] = useState([]);
+
+    // Check if user is branch director
+    useEffect(() => {
+        const checkBranchDirector = async () => {
+            if (!currentUser?.id) return;
+
+            try {
+                const employeesRes = await employeesAPI.getAll();
+                const employeesData = employeesRes.data?.data || [];
+
+                const currentUserName = (currentUser.hoTen || currentUser.username || '').trim();
+                const removeVietnameseAccents = (str) => {
+                    if (!str) return '';
+                    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+                };
+
+                // Kiểm tra xem có nhân viên nào có quan_ly_gian_tiep trùng với tên user hiện tại không
+                // Hoặc kiểm tra xem user có phải là giám đốc chi nhánh không (dựa trên chức danh hoặc tên)
+                const branchDirectorNames = ['Châu Quang Hải', 'Nguyễn Ngọc Luyễn', 'Nguyễn Văn Khải'];
+                const isBranchDir = employeesData.some(emp => {
+                    const managerName = (emp.quan_ly_gian_tiep || '').trim();
+                    const normalizedManagerName = managerName.toLowerCase().replace(/\s+/g, ' ').trim();
+                    const normalizedCurrentName = currentUserName.toLowerCase().replace(/\s+/g, ' ').trim();
+                    const normalizedManagerNameNoAccents = removeVietnameseAccents(normalizedManagerName);
+                    const normalizedCurrentNameNoAccents = removeVietnameseAccents(normalizedCurrentName);
+
+                    // Kiểm tra theo quan_ly_gian_tiep
+                    if (normalizedManagerName === normalizedCurrentName ||
+                        normalizedManagerNameNoAccents === normalizedCurrentNameNoAccents ||
+                        normalizedManagerName.includes(normalizedCurrentName) ||
+                        normalizedCurrentName.includes(normalizedManagerName)) {
+                        return true;
+                    }
+
+                    // Kiểm tra xem user có phải là giám đốc chi nhánh không
+                    return branchDirectorNames.some(dirName => {
+                        const normalizedDirName = dirName.toLowerCase().replace(/\s+/g, ' ').trim();
+                        const normalizedDirNameNoAccents = removeVietnameseAccents(normalizedDirName);
+                        return normalizedDirName === normalizedCurrentName ||
+                            normalizedDirNameNoAccents === normalizedCurrentNameNoAccents ||
+                            normalizedDirName.includes(normalizedCurrentName) ||
+                            normalizedCurrentName.includes(normalizedDirName);
+                    });
                 });
 
-                if (candidate) {
-                    // Normalize candidate data - ensure all fields are available
-                    const normalizedCandidate = {
-                        ...candidate,
-                        // Personal info
-                        hoTen: candidate.hoTen || candidate.ho_ten || '',
-                        gioiTinh: candidate.gioiTinh || candidate.gioi_tinh || '',
-                        ngaySinh: candidate.ngaySinh || candidate.ngay_sinh || '',
-                        noiSinh: candidate.noiSinh || candidate.noi_sinh || '',
-                        tinhTrangHonNhan: candidate.tinhTrangHonNhan || candidate.tinh_trang_hon_nhan || '',
-                        danToc: candidate.danToc || candidate.dan_toc || '',
-                        quocTich: candidate.quocTich || candidate.quoc_tich || '',
-                        tonGiao: candidate.tonGiao || candidate.ton_giao || '',
-                        // Contact info
-                        soDienThoai: candidate.soDienThoai || candidate.so_dien_thoai || '',
-                        soDienThoaiKhac: candidate.soDienThoaiKhac || candidate.so_dien_thoai_khac || '',
-                        email: candidate.email || '',
-                        // CCCD info
-                        cccd: candidate.cccd || '',
-                        ngayCapCCCD: candidate.ngayCapCCCD || candidate.ngay_cap_cccd || '',
-                        noiCapCCCD: candidate.noiCapCCCD || candidate.noi_cap_cccd || '',
-                        nguyenQuan: candidate.nguyenQuan || candidate.nguyen_quan || '',
-                        // Address
-                        diaChiTamTru: candidate.diaChiTamTru || candidate.dia_chi_tam_tru || '',
-                        // Education
-                        trinhDoVanHoa: candidate.trinhDoVanHoa || candidate.trinh_do_van_hoa || '',
-                        trinhDoChuyenMon: candidate.trinhDoChuyenMon || candidate.trinh_do_chuyen_mon || '',
-                        chuyenNganh: candidate.chuyenNganh || candidate.chuyen_nganh || '',
-                        // Work experience, education, languages (already objects or strings from JSONB)
-                        kinhNghiemLamViec: candidate.kinhNghiemLamViec || candidate.kinh_nghiem_lam_viec || null,
-                        quaTrinhDaoTao: candidate.quaTrinhDaoTao || candidate.qua_trinh_dao_tao || null,
-                        trinhDoNgoaiNgu: candidate.trinhDoNgoaiNgu || candidate.trinh_do_ngoai_ngu || null,
-                    };
+                setIsBranchDirector(isBranchDir);
+            } catch (error) {
+                console.error('Error checking branch director:', error);
+            }
+        };
 
-                    setPreviewCandidate(normalizedCandidate);
-                } else {
-                    showToast?.('Không tìm thấy thông tin ứng viên', 'error');
-                    setIsPreviewModalOpen(false);
+        checkBranchDirector();
+    }, [currentUser]);
+
+    // Fetch recruitment requests for branch director
+    useEffect(() => {
+        const fetchRecruitmentRequests = async () => {
+            if (!isBranchDirector) return;
+
+            try {
+                // Fetch pending requests for badge count
+                const pendingResponse = await recruitmentRequestsAPI.getAll({
+                    branchDirectorId: currentUser?.id,
+                    status: 'PENDING'
+                });
+                const pendingRequests = pendingResponse.data?.data || [];
+                setPendingRecruitmentCount(pendingRequests.length);
+
+                // Fetch requests for current filter
+                if (selectedFilter === 'recruitment') {
+                    setRecruitmentRequests(pendingRequests);
                 }
-            } else {
-                showToast?.('Không thể tải thông tin ứng viên', 'error');
-                setIsPreviewModalOpen(false);
+            } catch (error) {
+                console.error('Error fetching recruitment requests:', error);
+            }
+        };
+
+        fetchRecruitmentRequests();
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchRecruitmentRequests, 30000);
+        return () => clearInterval(interval);
+    }, [isBranchDirector, selectedFilter, currentUser]);
+
+    // Fetch interview requests counts for badges (luôn fetch để hiển thị badge đúng)
+    useEffect(() => {
+        const fetchInterviewRequestCounts = async () => {
+            // Allow fetch for branch directors, managers, team leads, and employees
+            if (!['EMPLOYEE', 'MANAGER', 'TEAM_LEAD', 'BRANCH_DIRECTOR'].includes(currentUser?.role) && !isBranchDirector) return;
+            
+            try {
+                const params = {
+                    managerId: currentUser?.id,
+                    branchDirectorId: currentUser?.id
+                };
+                
+                // Fetch tất cả requests để đếm
+                const response = await interviewRequestsAPI.getAll(params);
+                const allRequests = response.data?.data || [];
+                
+                // Lọc và đếm "Chờ duyệt phỏng vấn"
+                const pendingRequests = allRequests.filter(req => 
+                    req.status === 'PENDING_INTERVIEW' || req.status === 'WAITING_FOR_OTHER_APPROVAL'
+                );
+                setInterviewRequestsCount(pendingRequests.length);
+                
+                // Lọc và đếm "Sẵn sàng PV"
+                const readyRequests = allRequests.filter(req => req.status === 'READY_FOR_INTERVIEW');
+                setReadyInterviewRequestsCount(readyRequests.length);
+            } catch (error) {
+                console.error('Error fetching interview request counts:', error);
+            }
+        };
+        fetchInterviewRequestCounts();
+    }, [isBranchDirector, currentUser]);
+
+    // Fetch interview requests details khi filter thay đổi (để hiển thị table)
+    useEffect(() => {
+        const fetchInterviewRequestsDetails = async () => {
+            // Allow fetch for branch directors, managers, team leads, and employees
+            if (!['EMPLOYEE', 'MANAGER', 'TEAM_LEAD', 'BRANCH_DIRECTOR'].includes(currentUser?.role) && !isBranchDirector) return;
+            
+            try {
+                const params = {
+                    managerId: currentUser?.id,
+                    branchDirectorId: currentUser?.id
+                };
+                
+                // Fetch "Chờ duyệt phỏng vấn" - PENDING_INTERVIEW hoặc WAITING_FOR_OTHER_APPROVAL
+                if (selectedFilter === 'interview') {
+                    const response = await interviewRequestsAPI.getAll(params);
+                    const allRequests = response.data?.data || [];
+                    const pendingRequests = allRequests.filter(req => 
+                        req.status === 'PENDING_INTERVIEW' || req.status === 'WAITING_FOR_OTHER_APPROVAL'
+                    );
+                    setInterviewRequests(pendingRequests);
+                }
+                
+                // Fetch "Sẵn sàng PV" - READY_FOR_INTERVIEW
+                if (selectedFilter === 'ready') {
+                    const readyParams = { ...params, status: 'READY_FOR_INTERVIEW' };
+                    const readyResponse = await interviewRequestsAPI.getAll(readyParams);
+                    setReadyInterviewRequests(readyResponse.data?.data || []);
+                }
+            } catch (error) {
+                console.error('Error fetching interview requests details:', error);
+            }
+        };
+        
+        // Chỉ fetch details khi filter là 'interview' hoặc 'ready'
+        if (selectedFilter === 'interview' || selectedFilter === 'ready') {
+            fetchInterviewRequestsDetails();
+        }
+    }, [isBranchDirector, currentUser, selectedFilter]);
+
+    // HR fetch approved recruitment requests
+    useEffect(() => {
+        const fetchHrApproved = async () => {
+            if (!isHrRecruitmentModalOpen || currentUser?.role !== 'HR') return;
+            try {
+                const res = await recruitmentRequestsAPI.getAll({ forHr: true });
+                setHrRecruitmentRequests(res.data?.data || []);
+            } catch (error) {
+                console.error('Error fetching HR recruitment requests:', error);
+            }
+        };
+
+        fetchHrApproved();
+    }, [isHrRecruitmentModalOpen, currentUser?.role]);
+
+    // Fetch dropdown options
+    useEffect(() => {
+        const fetchOptions = async () => {
+            setLoadingOptions(true);
+            try {
+                const [jobTitlesRes, departmentsRes, employeesRes] = await Promise.all([
+                    employeesAPI.getJobTitles(),
+                    employeesAPI.getDepartments(),
+                    employeesAPI.getAll()
+                ]);
+
+                const jobTitlesData = jobTitlesRes.data?.data || [];
+                const departmentsData = departmentsRes.data?.data || [];
+                const employeesData = employeesRes.data?.data || [];
+
+                setJobTitles(jobTitlesData.map(title => ({ value: title, label: title })));
+                setDepartments(departmentsData.map(dept => ({ value: dept, label: dept })));
+
+                // Tự động điền người quản lý trực tiếp = currentUser.hoTen
+                if (currentUser?.hoTen) {
+                    setRecruitmentForm(prev => ({
+                        ...prev,
+                        nguoiQuanLyTrucTiep: currentUser.hoTen
+                    }));
+                }
+
+                // Tự động điền người quản lý gián tiếp = giám đốc chi nhánh
+                if (currentUser?.chiNhanh || currentUser?.chi_nhanh) {
+                    const userBranch = currentUser.chiNhanh || currentUser.chi_nhanh;
+                    // Tìm giám đốc chi nhánh từ danh sách employees
+                    const branchDirectors = ['Châu Quang Hải', 'Nguyễn Ngọc Luyễn', 'Nguyễn Văn Khải'];
+                    const branchDirector = employeesData.find(emp =>
+                        branchDirectors.includes(emp.ho_ten) &&
+                        (emp.chi_nhanh === userBranch || emp.chiNhanh === userBranch)
+                    );
+
+                    if (branchDirector) {
+                        setRecruitmentForm(prev => ({
+                            ...prev,
+                            nguoiQuanLyGianTiep: branchDirector.ho_ten || branchDirector.hoTen
+                        }));
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching options:', error);
+            } finally {
+                setLoadingOptions(false);
+            }
+        };
+
+        if (isRecruitmentModalOpen) {
+            fetchOptions();
+        }
+    }, [isRecruitmentModalOpen, currentUser]);
+
+    // Fetch candidate detail
+    const handleViewCandidateDetail = async (candidateId) => {
+        if (!candidateId) return;
+        try {
+            setLoadingCandidate(true);
+            const response = await candidatesAPI.getById(candidateId);
+            if (response.data.success && response.data.data) {
+                setViewingCandidate(response.data.data);
+                setShowCandidateDetailModal(true);
             }
         } catch (error) {
-            console.error('Error fetching candidate details:', error);
-            showToast?.('Không thể tải thông tin ứng viên', 'error');
-            setIsPreviewModalOpen(false);
+            console.error('Error loading candidate:', error);
+            if (showToast) {
+                showToast('Lỗi khi tải thông tin ứng viên', 'error');
+            }
         } finally {
             setLoadingCandidate(false);
         }
     };
 
-    // Handle row click to open detail modal
-    const handleRequestClick = (request) => {
-        setSelectedRequest(request);
-        // If status is PENDING_EVALUATION, open evaluation modal instead
-        if (request.status === 'PENDING_EVALUATION') {
-            // Check if current user has already evaluated
-            const isDirectManager = request.manager_id === currentUser?.id;
-            const isIndirectManager = request.indirect_manager_id === currentUser?.id;
-
-            let existingEvaluation = null;
-            let userHasEvaluated = false;
-
-            if (isDirectManager && request.direct_manager_evaluated && request.direct_manager_evaluation_data) {
-                userHasEvaluated = true;
-                try {
-                    existingEvaluation = typeof request.direct_manager_evaluation_data === 'string'
-                        ? JSON.parse(request.direct_manager_evaluation_data)
-                        : request.direct_manager_evaluation_data;
-                } catch (e) {
-                    console.error('Error parsing direct manager evaluation:', e);
-                }
-            } else if (isIndirectManager && request.indirect_manager_evaluated && request.indirect_manager_evaluation_data) {
-                userHasEvaluated = true;
-                try {
-                    existingEvaluation = typeof request.indirect_manager_evaluation_data === 'string'
-                        ? JSON.parse(request.indirect_manager_evaluation_data)
-                        : request.indirect_manager_evaluation_data;
-                } catch (e) {
-                    console.error('Error parsing indirect manager evaluation:', e);
-                }
-            }
-
-            setHasEvaluated(userHasEvaluated);
-            setIsEvaluationModalOpen(true);
-            // Initialize with existing data if available, otherwise default
-            if (existingEvaluation) {
-                setEvaluationData({
-                    criteria: existingEvaluation.criteria?.map((c, idx) => ({
-                        id: idx + 1,
-                        name: [
-                            'Kỹ năng Giao tiếp',
-                            'Thái độ Làm việc',
-                            'Kỹ năng Chuyên môn',
-                            'Khả năng Hợp tác',
-                            'Tiềm năng Phát triển'
-                        ][idx],
-                        score: c.score || '',
-                        comment: c.comment || ''
-                    })) || [
-                            { id: 1, name: 'Kỹ năng Giao tiếp', score: '', comment: '' },
-                            { id: 2, name: 'Thái độ Làm việc', score: '', comment: '' },
-                            { id: 3, name: 'Kỹ năng Chuyên môn', score: '', comment: '' },
-                            { id: 4, name: 'Khả năng Hợp tác', score: '', comment: '' },
-                            { id: 5, name: 'Tiềm năng Phát triển', score: '', comment: '' }
-                        ],
-                    strengths: existingEvaluation.strengths || '',
-                    areasForImprovement: existingEvaluation.improvements || '',
-                    generalComments: existingEvaluation.generalComments || '',
-                    finalConclusion: existingEvaluation.finalConclusion || ''
-                });
-            } else {
-                setEvaluationData({
-                    criteria: [
-                        { id: 1, name: 'Kỹ năng Giao tiếp', score: '', comment: '' },
-                        { id: 2, name: 'Thái độ Làm việc', score: '', comment: '' },
-                        { id: 3, name: 'Kỹ năng Chuyên môn', score: '', comment: '' },
-                        { id: 4, name: 'Khả năng Hợp tác', score: '', comment: '' },
-                        { id: 5, name: 'Tiềm năng Phát triển', score: '', comment: '' }
-                    ],
-                    strengths: '',
-                    areasForImprovement: '',
-                    generalComments: '',
-                    finalConclusion: ''
-                });
-            }
-        } else {
-            setIsModalOpen(true);
-            setShowRejectionNotes(false);
-            setRejectionNotes('');
-        }
-    };
-
-    // Handle close modal
-    const handleCloseModal = () => {
-        setIsModalOpen(false);
-        setSelectedRequest(null);
-        setShowRejectionNotes(false);
-        setRejectionNotes('');
-        setProcessingAction(false);
-    };
-
-    // Handle close evaluation modal
-    const handleCloseEvaluationModal = () => {
-        setIsEvaluationModalOpen(false);
-        setSelectedRequest(null);
-        setEvaluationData({
-            criteria: [
-                { id: 1, name: 'Kỹ năng Giao tiếp', score: '', comment: '' },
-                { id: 2, name: 'Thái độ Làm việc', score: '', comment: '' },
-                { id: 3, name: 'Kỹ năng Chuyên môn', score: '', comment: '' },
-                { id: 4, name: 'Khả năng Hợp tác', score: '', comment: '' },
-                { id: 5, name: 'Tiềm năng Phát triển', score: '', comment: '' }
-            ],
-            strengths: '',
-            areasForImprovement: '',
-            generalComments: '',
-            finalConclusion: ''
-        });
-        setSubmittingEvaluation(false);
-    };
-
-    // Handle criteria score change
-    const handleCriteriaScoreChange = (criteriaId, value) => {
-        const numValue = parseInt(value);
-        if ((value === '' || (numValue >= 1 && numValue <= 5)) && !isNaN(numValue)) {
-            setEvaluationData({
-                ...evaluationData,
-                criteria: evaluationData.criteria.map(c =>
-                    c.id === criteriaId ? { ...c, score: value === '' ? '' : String(numValue) } : c
-                )
-            });
-        }
-    };
-
-    // Handle criteria comment change
-    const handleCriteriaCommentChange = (criteriaId, value) => {
-        setEvaluationData({
-            ...evaluationData,
-            criteria: evaluationData.criteria.map(c =>
-                c.id === criteriaId ? { ...c, comment: value } : c
-            )
-        });
-    };
-
-    // Handle submit evaluation
-    const handleSubmitEvaluation = async () => {
-        if (!selectedRequest) return;
-
-        // Validate: Check if all criteria have scores
-        const missingScores = evaluationData.criteria.filter(c => !c.score || c.score === '');
-        if (missingScores.length > 0) {
-            showToast?.('Vui lòng nhập điểm cho tất cả các tiêu chí', 'warning');
-            return;
-        }
-
-        // Validate: Check if final conclusion is selected
-        if (!evaluationData.finalConclusion) {
-            showToast?.('Vui lòng chọn kết luận cuối cùng', 'warning');
-            return;
-        }
-
-        setSubmittingEvaluation(true);
+    // Handle approve interview request
+    const handleApproveInterviewRequest = async (requestId) => {
         try {
-            const response = await candidatesAPI.submitInterviewEvaluation(selectedRequest.id, {
-                userId: currentUser?.id, // Include current user ID
-                criteria1: {
-                    score: evaluationData.criteria[0]?.score || null,
-                    comment: evaluationData.criteria[0]?.comment || ''
-                },
-                criteria2: {
-                    score: evaluationData.criteria[1]?.score || null,
-                    comment: evaluationData.criteria[1]?.comment || ''
-                },
-                criteria3: {
-                    score: evaluationData.criteria[2]?.score || null,
-                    comment: evaluationData.criteria[2]?.comment || ''
-                },
-                criteria4: {
-                    score: evaluationData.criteria[3]?.score || null,
-                    comment: evaluationData.criteria[3]?.comment || ''
-                },
-                criteria5: {
-                    score: evaluationData.criteria[4]?.score || null,
-                    comment: evaluationData.criteria[4]?.comment || ''
-                },
-                strengths: evaluationData.strengths,
-                improvements: evaluationData.areasForImprovement,
-                generalComments: evaluationData.generalComments,
-                finalConclusion: evaluationData.finalConclusion
+            const response = await interviewRequestsAPI.approve(requestId, {
+                approverId: currentUser?.id
             });
-
-            if (response.data?.success) {
+            if (response.data.success) {
+                const message = response.data.message || 'Đã duyệt yêu cầu phỏng vấn';
                 if (showToast) {
-                    showToast('Đã gửi đánh giá phỏng vấn về HR thành công!', 'success');
+                    showToast(message, 'success');
                 }
-                handleCloseEvaluationModal();
-                // Refresh requests and statistics
-                fetchRequests();
-                // Refetch statistics (không gửi managerId để backend tự động filter theo currentUser - cả direct và indirect)
-                const statsResponse = await candidatesAPI.getInterviewRequests({});
-                if (statsResponse.data?.success && Array.isArray(statsResponse.data.data)) {
-                    const allRequests = statsResponse.data.data;
-                    const currentUserId = currentUser.id;
-
-                    // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
-                    const pendingEvaluationCount = allRequests.filter(r => {
-                        if (r.status !== 'PENDING_EVALUATION') return false;
-
-                        // Nếu là quản lý trực tiếp
-                        if (r.manager_id === currentUserId) {
-                            return !r.direct_manager_evaluated;
-                        }
-
-                        // Nếu là quản lý gián tiếp
-                        if (r.indirect_manager_id === currentUserId) {
-                            return !r.indirect_manager_evaluated;
-                        }
-
-                        return false;
-                    }).length;
-
-                    setStatistics({
-                        pending: allRequests.filter(r => r.status === 'PENDING').length,
-                        pendingEvaluation: pendingEvaluationCount,
-                        approved: allRequests.filter(r => r.status === 'APPROVED').length,
-                        rejected: allRequests.filter(r => r.status === 'REJECTED').length,
-                        total: allRequests.length
-                    });
-                }
-            } else {
-                throw new Error(response.data?.message || 'Không thể gửi đánh giá');
-            }
-        } catch (error) {
-            console.error('Error submitting evaluation:', error);
-            if (showToast) {
-                showToast(error.response?.data?.message || 'Không thể gửi đánh giá. Vui lòng thử lại.', 'error');
-            }
-        } finally {
-            setSubmittingEvaluation(false);
-        }
-    };
-
-    // Handle start interview (change status to PENDING_EVALUATION)
-    const handleStartInterview = async () => {
-        if (!selectedRequest) {
-            console.error('No selected request');
-            return;
-        }
-
-        console.log('Starting interview for request:', selectedRequest.id, 'Current status:', selectedRequest.status);
-        setProcessingAction(true);
-        try {
-            const response = await candidatesAPI.updateInterviewRequestStatus(selectedRequest.id, {
-                status: 'PENDING_EVALUATION',
-                notes: ''
-            });
-
-            console.log('Response:', response);
-
-            if (response && response.data && response.data.success) {
-                if (showToast) {
-                    showToast('Đã chuyển sang chờ đánh giá tiêu chí!', 'success');
-                }
-                handleCloseModal();
-                // Refresh requests and statistics
-                await fetchRequests();
-                // Refetch statistics (không gửi managerId để backend tự động filter theo currentUser - cả direct và indirect)
-                const statsResponse = await candidatesAPI.getInterviewRequests({});
-                if (statsResponse.data?.success && Array.isArray(statsResponse.data.data)) {
-                    const allRequests = statsResponse.data.data;
-                    const currentUserId = currentUser.id;
-
-                    // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
-                    const pendingEvaluationCount = allRequests.filter(r => {
-                        if (r.status !== 'PENDING_EVALUATION') return false;
-
-                        // Nếu là quản lý trực tiếp
-                        if (r.manager_id === currentUserId) {
-                            return !r.direct_manager_evaluated;
-                        }
-
-                        // Nếu là quản lý gián tiếp
-                        if (r.indirect_manager_id === currentUserId) {
-                            return !r.indirect_manager_evaluated;
-                        }
-
-                        return false;
-                    }).length;
-
-                    setStatistics({
-                        pending: allRequests.filter(r => r.status === 'PENDING').length,
-                        pendingEvaluation: pendingEvaluationCount,
-                        approved: allRequests.filter(r => r.status === 'APPROVED').length,
-                        rejected: allRequests.filter(r => r.status === 'REJECTED').length,
-                        total: allRequests.length
-                    });
-                }
-            } else {
-                throw new Error(response.data?.message || 'Không thể chuyển trạng thái');
-            }
-        } catch (error) {
-            console.error('Error starting interview:', error);
-            console.error('Error response:', error.response);
-            if (showToast) {
-                showToast(error.response?.data?.message || error.message || 'Không thể chuyển trạng thái. Vui lòng thử lại.', 'error');
-            }
-        } finally {
-            setProcessingAction(false);
-        }
-    };
-
-    // Handle approve (after evaluation)
-    const handleApprove = async () => {
-        if (!selectedRequest) return;
-
-        setProcessingAction(true);
-        try {
-            const response = await candidatesAPI.updateInterviewRequestStatus(selectedRequest.id, {
-                status: 'APPROVED',
-                notes: rejectionNotes || null
-            });
-
-            if (response.data?.success) {
-                if (showToast) {
-                    showToast('Đã duyệt yêu cầu phỏng vấn thành công!', 'success');
-                }
-                handleCloseModal();
-                // Refresh requests and statistics
-                fetchRequests();
-                // Refetch statistics (không gửi managerId để backend tự động filter theo currentUser - cả direct và indirect)
-                const statsResponse = await candidatesAPI.getInterviewRequests({});
-                if (statsResponse.data?.success && Array.isArray(statsResponse.data.data)) {
-                    const allRequests = statsResponse.data.data;
-                    const currentUserId = currentUser.id;
-
-                    // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
-                    const pendingEvaluationCount = allRequests.filter(r => {
-                        if (r.status !== 'PENDING_EVALUATION') return false;
-
-                        // Nếu là quản lý trực tiếp
-                        if (r.manager_id === currentUserId) {
-                            return !r.direct_manager_evaluated;
-                        }
-
-                        // Nếu là quản lý gián tiếp
-                        if (r.indirect_manager_id === currentUserId) {
-                            return !r.indirect_manager_evaluated;
-                        }
-
-                        return false;
-                    }).length;
-
-                    setStatistics({
-                        pending: allRequests.filter(r => r.status === 'PENDING').length,
-                        pendingEvaluation: pendingEvaluationCount,
-                        approved: allRequests.filter(r => r.status === 'APPROVED').length,
-                        rejected: allRequests.filter(r => r.status === 'REJECTED').length,
-                        total: allRequests.length
-                    });
-                }
-            } else {
-                throw new Error(response.data?.message || 'Không thể duyệt yêu cầu');
+                // Refresh list - lấy cả PENDING và WAITING_FOR_OTHER
+                const params = {
+                    managerId: currentUser?.id,
+                    branchDirectorId: currentUser?.id
+                };
+                const updatedResponse = await interviewRequestsAPI.getAll(params);
+                const allRequests = updatedResponse.data?.data || [];
+                // Lọc chỉ lấy PENDING_INTERVIEW và WAITING_FOR_OTHER_APPROVAL
+                const pendingRequests = allRequests.filter(req => 
+                    req.status === 'PENDING_INTERVIEW' || req.status === 'WAITING_FOR_OTHER_APPROVAL'
+                );
+                setInterviewRequests(pendingRequests);
+                setInterviewRequestsCount(pendingRequests.length);
+                
+                // Refresh ready list nếu có
+                const readyRequests = allRequests.filter(req => req.status === 'READY_FOR_INTERVIEW');
+                setReadyInterviewRequests(readyRequests);
+                setReadyInterviewRequestsCount(readyRequests.length);
+                
+                setShowInterviewRequestDetail(false);
+                setSelectedInterviewRequest(null);
             }
         } catch (error) {
             console.error('Error approving interview request:', error);
             if (showToast) {
-                showToast(error.response?.data?.message || 'Không thể duyệt yêu cầu. Vui lòng thử lại.', 'error');
+                showToast('Có lỗi xảy ra khi duyệt yêu cầu', 'error');
             }
-        } finally {
-            setProcessingAction(false);
         }
     };
 
-    // Handle reject
-    const handleReject = async () => {
-        if (!selectedRequest) return;
+    // Handle reject interview request
+    const handleRejectInterviewRequest = async (requestId) => {
+        if (!showConfirm) return;
 
-        // Show rejection notes textarea if not shown
-        if (!showRejectionNotes) {
-            setShowRejectionNotes(true);
-            return;
-        }
+        const confirmed = await showConfirm({
+            title: 'Từ chối yêu cầu phỏng vấn',
+            message: 'Bạn có muốn từ chối yêu cầu phỏng vấn này không?',
+            confirmText: 'Từ chối',
+            cancelText: 'Hủy',
+            type: 'warning'
+        });
 
-        // Require rejection notes
-        if (!rejectionNotes.trim()) {
-            if (showToast) {
-                showToast('Vui lòng nhập lý do từ chối.', 'error');
-            }
-            return;
-        }
+        if (!confirmed) return;
 
-        setProcessingAction(true);
         try {
-            const response = await candidatesAPI.updateInterviewRequestStatus(selectedRequest.id, {
-                status: 'REJECTED',
-                notes: rejectionNotes
+            const response = await interviewRequestsAPI.reject(requestId, {
+                rejectionReason: 'Đã từ chối bởi quản lý/giám đốc chi nhánh'
             });
-
-            if (response.data?.success) {
+            if (response.data.success) {
                 if (showToast) {
-                    showToast('Đã từ chối yêu cầu phỏng vấn.', 'success');
+                    showToast('Đã từ chối yêu cầu phỏng vấn', 'success');
                 }
-                handleCloseModal();
-                // Refresh requests and statistics
-                fetchRequests();
-                // Refetch statistics (không gửi managerId để backend tự động filter theo currentUser - cả direct và indirect)
-                const statsResponse = await candidatesAPI.getInterviewRequests({});
-                if (statsResponse.data?.success && Array.isArray(statsResponse.data.data)) {
-                    const allRequests = statsResponse.data.data;
-                    const currentUserId = currentUser.id;
-
-                    // Đếm PENDING_EVALUATION: chỉ đếm những request mà user chưa đánh giá
-                    const pendingEvaluationCount = allRequests.filter(r => {
-                        if (r.status !== 'PENDING_EVALUATION') return false;
-
-                        // Nếu là quản lý trực tiếp
-                        if (r.manager_id === currentUserId) {
-                            return !r.direct_manager_evaluated;
-                        }
-
-                        // Nếu là quản lý gián tiếp
-                        if (r.indirect_manager_id === currentUserId) {
-                            return !r.indirect_manager_evaluated;
-                        }
-
-                        return false;
-                    }).length;
-
-                    setStatistics({
-                        pending: allRequests.filter(r => r.status === 'PENDING').length,
-                        pendingEvaluation: pendingEvaluationCount,
-                        approved: allRequests.filter(r => r.status === 'APPROVED').length,
-                        rejected: allRequests.filter(r => r.status === 'REJECTED').length,
-                        total: allRequests.length
-                    });
-                }
-            } else {
-                throw new Error(response.data?.message || 'Không thể từ chối yêu cầu');
+                // Refresh list - fetch tất cả để cập nhật counts
+                const params = {
+                    managerId: currentUser?.id,
+                    branchDirectorId: currentUser?.id
+                };
+                const updatedResponse = await interviewRequestsAPI.getAll(params);
+                const allRequests = updatedResponse.data?.data || [];
+                // Lọc chỉ lấy PENDING_INTERVIEW và WAITING_FOR_OTHER_APPROVAL
+                const pendingRequests = allRequests.filter(req => 
+                    req.status === 'PENDING_INTERVIEW' || req.status === 'WAITING_FOR_OTHER_APPROVAL'
+                );
+                setInterviewRequests(pendingRequests);
+                setInterviewRequestsCount(pendingRequests.length);
+                
+                // Cập nhật ready count
+                const readyRequests = allRequests.filter(req => req.status === 'READY_FOR_INTERVIEW');
+                setReadyInterviewRequestsCount(readyRequests.length);
+                setShowInterviewRequestDetail(false);
+                setSelectedInterviewRequest(null);
             }
         } catch (error) {
             console.error('Error rejecting interview request:', error);
             if (showToast) {
-                showToast(error.response?.data?.message || 'Không thể từ chối yêu cầu. Vui lòng thử lại.', 'error');
+                showToast('Có lỗi xảy ra khi từ chối yêu cầu', 'error');
             }
-        } finally {
-            setProcessingAction(false);
         }
     };
 
-    // Handle recruitment request form changes
-    const handleRecruitmentRequestChange = (field, value) => {
-        setRecruitmentRequestForm(prev => ({
-            ...prev,
-            [field]: value
-        }));
-        // Clear error for this field
-        if (recruitmentRequestErrors[field]) {
-            setRecruitmentRequestErrors(prev => ({
-                ...prev,
-                [field]: ''
-            }));
+    // Load evaluation data
+    const loadEvaluationData = async (request) => {
+        if (!request || !request.id) {
+            console.error('Invalid request object:', request);
+            return;
         }
-    };
 
-    const handleRecruitmentRequestLyDoChange = (field, value) => {
-        setRecruitmentRequestForm(prev => ({
-            ...prev,
-            lyDoTuyen: {
-                ...prev.lyDoTuyen,
-                [field]: value
-            }
-        }));
-    };
-
-    const handleRecruitmentRequestTieuChuanChange = (field, value) => {
-        setRecruitmentRequestForm(prev => ({
-            ...prev,
-            tieuChuan: {
-                ...prev.tieuChuan,
-                [field]: value
-            }
-        }));
-    };
-
-    const handleRecruitmentRequestTieuChuanNestedChange = (parentField, field, value) => {
-        setRecruitmentRequestForm(prev => ({
-            ...prev,
-            tieuChuan: {
-                ...prev.tieuChuan,
-                [parentField]: {
-                    ...prev.tieuChuan[parentField],
-                    [field]: value
+        try {
+            // Load all evaluations for this interview request
+            const allEvalsResponse = await interviewEvaluationsAPI.getAll({
+                interviewRequestId: request.id
+            });
+            
+            // Load current user's evaluation
+            const evalResponse = await interviewEvaluationsAPI.getAll({
+                interviewRequestId: request.id,
+                evaluatorId: currentUser?.id
+            });
+            
+            // Check if current user has evaluated
+            const currentUserEval = evalResponse.data.success && evalResponse.data.data && evalResponse.data.data.length > 0
+                ? evalResponse.data.data[0]
+                : null;
+            setCurrentUserHasEvaluated(!!currentUserEval);
+            
+            // Check if both manager and branch director have evaluated
+            const allEvals = allEvalsResponse.data.success && allEvalsResponse.data.data 
+                ? allEvalsResponse.data.data 
+                : [];
+            const managerEval = allEvals.find(e => e.evaluator_id === request.manager_id);
+            const branchDirectorEval = allEvals.find(e => e.evaluator_id === request.branch_director_id);
+            const bothHaveEvaluated = !!(managerEval && branchDirectorEval);
+            setBothEvaluated(bothHaveEvaluated);
+            
+            // Set readonly if current user has evaluated OR both have evaluated
+            setIsEvaluationReadOnly(!!currentUserEval || bothHaveEvaluated);
+            
+            const formatDateTime = (dateValue) => {
+                if (!dateValue) return '';
+                try {
+                    const date = new Date(dateValue);
+                    if (isNaN(date.getTime())) return '';
+                    return date.toISOString().slice(0, 16);
+                } catch (e) {
+                    console.error('Error formatting date:', e);
+                    return '';
                 }
+            };
+
+            const getUserName = () => {
+                return currentUser?.ho_ten || currentUser?.hoTen || currentUser?.name || '';
+            };
+            
+            if (currentUserEval) {
+                setEvaluationForm({
+                    tenUngVien: currentUserEval.ten_ung_vien || request.candidate_name || '',
+                    viTriUngTuyen: currentUserEval.vi_tri_ung_tuyen || request.vi_tri_ung_tuyen || request.chuc_danh_can_tuyen || '',
+                    capBac: currentUserEval.cap_bac || '',
+                    nguoiQuanLyTrucTiep: currentUserEval.nguoi_quan_ly_truc_tiep || request.manager_name || '',
+                    nguoiPhongVan1: currentUserEval.nguoi_phong_van_1 || getUserName(),
+                    ngayPhongVan: formatDateTime(currentUserEval.ngay_phong_van) || formatDateTime(request.interview_time),
+                    diemKyNangGiaoTiep: currentUserEval.diem_ky_nang_giao_tiep || '',
+                    lyDoKyNangGiaoTiep: currentUserEval.ly_do_ky_nang_giao_tiep || '',
+                    diemThaiDoLamViec: currentUserEval.diem_thai_do_lam_viec || '',
+                    lyDoThaiDoLamViec: currentUserEval.ly_do_thai_do_lam_viec || '',
+                    diemKinhNghiemChuyenMon: currentUserEval.diem_kinh_nghiem_chuyen_mon || '',
+                    lyDoKinhNghiemChuyenMon: currentUserEval.ly_do_kinh_nghiem_chuyen_mon || '',
+                    diemKhaNangQuanLyDuAn: currentUserEval.diem_kha_nang_quan_ly_du_an || '',
+                    lyDoKhaNangQuanLyDuAn: currentUserEval.ly_do_kha_nang_quan_ly_du_an || '',
+                    diemNgoaiNgu: currentUserEval.diem_ngoai_ngu || '',
+                    lyDoNgoaiNgu: currentUserEval.ly_do_ngoai_ngu || '',
+                    diemKyNangQuanLy: currentUserEval.diem_ky_nang_quan_ly || '',
+                    lyDoKyNangQuanLy: currentUserEval.ly_do_ky_nang_quan_ly || '',
+                    diemManh: currentUserEval.diem_manh || '',
+                    diemCanCaiThien: currentUserEval.diem_can_cai_thien || '',
+                    nhanXetChung: currentUserEval.nhan_xet_chung || '',
+                    ketLuan: currentUserEval.ket_luan || ''
+                });
+            } else {
+                // Initialize form with request data
+                const formatDateTime = (dateValue) => {
+                    if (!dateValue) return '';
+                    try {
+                        const date = new Date(dateValue);
+                        if (isNaN(date.getTime())) return '';
+                        return date.toISOString().slice(0, 16);
+                    } catch (e) {
+                        console.error('Error formatting date:', e);
+                        return '';
+                    }
+                };
+
+                const getUserName = () => {
+                    return currentUser?.ho_ten || currentUser?.hoTen || currentUser?.name || '';
+                };
+
+                setEvaluationForm({
+                    tenUngVien: request.candidate_name || '',
+                    viTriUngTuyen: request.vi_tri_ung_tuyen || request.chuc_danh_can_tuyen || '',
+                    capBac: '',
+                    nguoiQuanLyTrucTiep: request.manager_name || '',
+                    nguoiPhongVan1: getUserName(),
+                    ngayPhongVan: formatDateTime(request.interview_time),
+                    diemKyNangGiaoTiep: '',
+                    lyDoKyNangGiaoTiep: '',
+                    diemThaiDoLamViec: '',
+                    lyDoThaiDoLamViec: '',
+                    diemKinhNghiemChuyenMon: '',
+                    lyDoKinhNghiemChuyenMon: '',
+                    diemKhaNangQuanLyDuAn: '',
+                    lyDoKhaNangQuanLyDuAn: '',
+                    diemNgoaiNgu: '',
+                    lyDoNgoaiNgu: '',
+                    diemKyNangQuanLy: '',
+                    lyDoKyNangQuanLy: '',
+                    diemManh: '',
+                    diemCanCaiThien: '',
+                    nhanXetChung: '',
+                    ketLuan: ''
+                });
             }
-        }));
+        } catch (error) {
+            console.error('Error loading evaluation data:', error);
+            // Initialize with request data anyway
+            const formatDateTime = (dateValue) => {
+                if (!dateValue) return '';
+                try {
+                    const date = new Date(dateValue);
+                    if (isNaN(date.getTime())) return '';
+                    return date.toISOString().slice(0, 16);
+                } catch (e) {
+                    console.error('Error formatting date:', e);
+                    return '';
+                }
+            };
+
+            const getUserName = () => {
+                return currentUser?.ho_ten || currentUser?.hoTen || currentUser?.name || '';
+            };
+
+            setEvaluationForm({
+                tenUngVien: request?.candidate_name || '',
+                viTriUngTuyen: request?.vi_tri_ung_tuyen || request?.chuc_danh_can_tuyen || '',
+                capBac: '',
+                nguoiQuanLyTrucTiep: request?.manager_name || '',
+                nguoiPhongVan1: getUserName(),
+                ngayPhongVan: formatDateTime(request?.interview_time),
+                diemKyNangGiaoTiep: '',
+                lyDoKyNangGiaoTiep: '',
+                diemThaiDoLamViec: '',
+                lyDoThaiDoLamViec: '',
+                diemKinhNghiemChuyenMon: '',
+                lyDoKinhNghiemChuyenMon: '',
+                diemKhaNangQuanLyDuAn: '',
+                lyDoKhaNangQuanLyDuAn: '',
+                diemNgoaiNgu: '',
+                lyDoNgoaiNgu: '',
+                diemKyNangQuanLy: '',
+                lyDoKyNangQuanLy: '',
+                diemManh: '',
+                diemCanCaiThien: '',
+                nhanXetChung: '',
+                ketLuan: ''
+            });
+        }
     };
 
-    const handleTieuChuanTuyenChonChange = (field, value) => {
-        setRecruitmentRequestForm(prev => ({
-            ...prev,
-            tieuChuanTuyenChon: {
-                ...prev.tieuChuanTuyenChon,
-                [field]: value
-            }
-        }));
-    };
-
-    const handleTieuChuanTuyenChonNestedChange = (section, field, value) => {
-        setRecruitmentRequestForm(prev => ({
-            ...prev,
-            tieuChuanTuyenChon: {
-                ...prev.tieuChuanTuyenChon,
-                [section]: {
-                    ...prev.tieuChuanTuyenChon[section],
-                    [field]: value
-                }
-            }
-        }));
-    };
-
-    // Fetch form data (departments from candidates, positions from candidates) when recruitment request modal opens
-    useEffect(() => {
-        const fetchFormData = async () => {
-            if (!isRecruitmentRequestModalOpen) return;
-
-            setLoadingFormData(true);
-            try {
-                // Fetch từng API riêng để tránh một API fail làm ảnh hưởng đến các API khác
-                const fetchPromises = [
-                    candidatesAPI.getDepartments().catch(err => {
-                        console.error('❌ Error fetching departments:', err);
-                        return { data: { success: false, data: [] } };
-                    }),
-                    candidatesAPI.getPositions().catch(err => {
-                        console.error('❌ Error fetching positions:', err);
-                        return { data: { success: false, data: [] } };
-                    })
-                ];
-
-                const [departmentsRes, positionsRes] = await Promise.all(fetchPromises);
-
-                // Xử lý departments
-                if (departmentsRes.data?.success) {
-                    const deptList = departmentsRes.data.data || [];
-                    setDepartments(deptList);
-                    console.log('✅ Departments loaded:', deptList);
-                } else {
-                    console.error('❌ Failed to load departments:', departmentsRes.data);
-                    setDepartments([]);
-                }
-
-                // Xử lý positions
-                if (positionsRes.data?.success) {
-                    const positionList = positionsRes.data.data || [];
-                    setJobTitles(positionList);
-                    console.log('✅ Positions loaded:', positionList);
-                } else {
-                    console.error('❌ Failed to load positions:', positionsRes.data);
-                    setJobTitles([]);
-                }
-            } catch (error) {
-                console.error('Error fetching form data:', error);
-                if (showToast) {
-                    showToast('Lỗi khi tải dữ liệu form', 'error');
-                }
-            } finally {
-                setLoadingFormData(false);
-            }
-        };
-
-        fetchFormData();
-    }, [isRecruitmentRequestModalOpen, showToast]);
-
-    const handleCloseRecruitmentRequestModal = () => {
-        setIsRecruitmentRequestModalOpen(false);
-        setShowCustomPhongBan(false);
-        setShowCustomViTri(false);
-        setCustomPhongBan('');
-        setCustomViTri('');
-        setRecruitmentRequestForm({
-            chucDanhCanTuyen: '',
-            soLuongYeuCau: '',
-            phongBan: '',
-            moTaCongViec: '',
-            loaiLaoDong: '',
-            lyDoTuyen: {
-                tuyenThayThe: false,
-                tenNguoiThayThe: '',
-                nhuCauTang: false,
-                viTriCongViecMoi: false
-            },
-            lyDoKhacGhiChu: '',
-            tieuChuanTuyenChon: {
-                gioiTinh: {
-                    nam: false,
-                    nu: false
-                },
-                doTuoi: '',
-                trinhDoHocVan: {
-                    ptth: false,
-                    daiHoc: false,
-                    trungCapNghe: false,
-                    caoHocTroLen: false
-                },
-                yeuCauKhacHocVan: '',
-                kinhNghiem: {
-                    khong: false,
-                    soNamKinhNghiem: false,
-                    soNam: ''
-                },
-                kienThuc: {
-                    khong: false,
-                    nganhNghe: false,
-                    nganhNgheValue: ''
-                },
-                ngoaiNgu: {
-                    tiengAnh: false,
-                    trinhDoTiengAnh: '',
-                    ngoaiNguKhac: false,
-                    tenNgoaiNguKhac: '',
-                    trinhDoNgoaiNguKhac: ''
-                },
-                viTinh: {
-                    khong: false,
-                    msOffice: false,
-                    khac: false,
-                    khacValue: ''
-                },
-                kyNang: {
-                    kyNangGiaoTiep: '',
-                    thaiDoLamViec: '',
-                    kyNangQuanLy: '',
-                    yeuCauKhac: ''
-                },
-            }
-        });
-        setRecruitmentRequestErrors({});
-    };
-
-    const handleSubmitRecruitmentRequest = async (e) => {
-        e.preventDefault();
-        console.log('handleSubmitRecruitmentRequest called', {
-            formData: recruitmentRequestForm,
-            submitting: submittingRecruitmentRequest
-        });
-
-        // Validation
-        const errors = {};
-        if (!recruitmentRequestForm.chucDanhCanTuyen.trim()) {
-            errors.chucDanhCanTuyen = 'Vui lòng nhập chức danh cần tuyển';
-        }
-        if (!recruitmentRequestForm.soLuongYeuCau.trim()) {
-            errors.soLuongYeuCau = 'Vui lòng nhập số lượng yêu cầu';
-        }
-        if (!recruitmentRequestForm.phongBan.trim()) {
-            errors.phongBan = 'Vui lòng nhập phòng ban';
-        }
-        if (!recruitmentRequestForm.moTaCongViec) {
-            errors.moTaCongViec = 'Vui lòng chọn trạng thái mô tả công việc';
-        }
-        if (!recruitmentRequestForm.loaiLaoDong) {
-            errors.loaiLaoDong = 'Vui lòng chọn loại lao động';
-        }
-        const hasLyDo = recruitmentRequestForm.lyDoTuyen.tuyenThayThe ||
-            recruitmentRequestForm.lyDoTuyen.nhuCauTang ||
-            recruitmentRequestForm.lyDoTuyen.viTriCongViecMoi ||
-            recruitmentRequestForm.lyDoKhacGhiChu.trim();
-        if (!hasLyDo) {
-            errors.lyDoTuyen = 'Vui lòng chọn ít nhất một lý do tuyển hoặc điền lý do khác';
-        }
-        if (recruitmentRequestForm.lyDoTuyen.tuyenThayThe && !recruitmentRequestForm.lyDoTuyen.tenNguoiThayThe.trim()) {
-            errors.tenNguoiThayThe = 'Vui lòng nhập họ tên người được thay thế';
-        }
-
-        if (Object.keys(errors).length > 0) {
-            setRecruitmentRequestErrors(errors);
+    // Handle save evaluation
+    const handleSaveEvaluation = async () => {
+        if (!selectedEvaluationRequest || !selectedEvaluationRequest.id) {
             if (showToast) {
-                showToast('Vui lòng điền đầy đủ thông tin bắt buộc', 'warning');
+                showToast('Lỗi: Không tìm thấy thông tin yêu cầu phỏng vấn', 'error');
             }
             return;
         }
 
-        setSubmittingRecruitmentRequest(true);
+        if (!currentUser?.id) {
+            if (showToast) {
+                showToast('Lỗi: Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.', 'error');
+            }
+            return;
+        }
+        
+        // Validate required fields
+        if (!evaluationForm.ketLuan) {
+            if (showToast) {
+                showToast('Vui lòng chọn kết luận đánh giá', 'warning');
+            }
+            return;
+        }
+        
         try {
-            // Determine manager type (DIRECT or INDIRECT)
-            // For now, we'll determine based on current user role or use a default
-            const managerType = 'DIRECT'; // TODO: Determine based on user role
+            setSavingEvaluation(true);
+            
+            // Check if evaluation exists
+            const checkResponse = await interviewEvaluationsAPI.getAll({
+                interviewRequestId: selectedEvaluationRequest.id,
+                evaluatorId: currentUser.id
+            });
+            
+            const existingEval = checkResponse.data.success && checkResponse.data.data && checkResponse.data.data.length > 0
+                ? checkResponse.data.data[0]
+                : null;
+            
+            const evaluationData = {
+                interviewRequestId: selectedEvaluationRequest.id,
+                candidateId: selectedEvaluationRequest.candidate_id,
+                evaluatorId: currentUser.id,
+                ...evaluationForm
+            };
+            
+            let response;
+            if (existingEval) {
+                // Update existing evaluation
+                response = await interviewEvaluationsAPI.update(existingEval.id, evaluationData);
+            } else {
+                // Create new evaluation
+                response = await interviewEvaluationsAPI.create(evaluationData);
+            }
+            
+            if (response.data.success) {
+                if (showToast) {
+                    showToast('Đã lưu đánh giá phỏng vấn thành công', 'success');
+                }
+                setShowEvaluationModal(false);
+                setSelectedEvaluationRequest(null);
+                // Refresh ready list và counts
+                const params = {
+                    managerId: currentUser?.id,
+                    branchDirectorId: currentUser?.id
+                };
+                const updatedResponse = await interviewRequestsAPI.getAll(params);
+                const allRequests = updatedResponse.data?.data || [];
+                const readyRequests = allRequests.filter(req => req.status === 'READY_FOR_INTERVIEW');
+                setReadyInterviewRequests(readyRequests);
+                setReadyInterviewRequestsCount(readyRequests.length);
+                
+                // Cập nhật interview count
+                const pendingRequests = allRequests.filter(req => 
+                    req.status === 'PENDING_INTERVIEW' || req.status === 'WAITING_FOR_OTHER_APPROVAL'
+                );
+                setInterviewRequestsCount(pendingRequests.length);
+            }
+        } catch (error) {
+            console.error('Error saving evaluation:', error);
+            if (showToast) {
+                showToast('Có lỗi xảy ra khi lưu đánh giá', 'error');
+            }
+        } finally {
+            setSavingEvaluation(false);
+        }
+    };
 
+    // Format date helper
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('vi-VN');
+        } catch (e) {
+            return dateString;
+        }
+    };
+
+    const filters = [
+        { key: 'all', label: 'Tất cả', gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)', count: null },
+        { key: 'approved', label: 'Đã Duyệt', gradient: 'linear-gradient(135deg, #22c55e, #16a34a)', count: null },
+        { key: 'rejected', label: 'Đã Từ chối', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)', count: null },
+        ...((isBranchDirector || ['EMPLOYEE', 'MANAGER', 'TEAM_LEAD'].includes(currentUser?.role)) ? [
+            { key: 'interview', label: 'Chờ duyệt phỏng vấn', gradient: 'linear-gradient(135deg, #f59e0b, #f97316)', count: interviewRequestsCount },
+            { key: 'ready', label: 'Sẵn sàng PV', gradient: 'linear-gradient(135deg, #10b981, #059669)', count: readyInterviewRequestsCount }
+        ] : []),
+        ...(isBranchDirector ? [{ key: 'recruitment', label: 'Yêu cầu tuyển dụng', gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', count: pendingRecruitmentCount }] : [])
+    ];
+
+    const handleApprove = (candidateId) => {
+        console.log('Approve candidate:', candidateId);
+        // TODO: Implement approve logic
+    };
+
+    const handleReject = (candidateId) => {
+        console.log('Reject candidate:', candidateId);
+        // TODO: Implement reject logic
+    };
+
+    // Handle submit recruitment request
+    const handleSubmitRecruitmentRequest = async (e) => {
+        e.preventDefault();
+
+        // Validate required fields
+        if (!recruitmentForm.chucDanhCanTuyen || !recruitmentForm.phongBanBoPhan || !recruitmentForm.nguoiQuanLyTrucTiep) {
+            if (showToast) {
+                showToast('Vui lòng điền đầy đủ thông tin bắt buộc (Chức danh, Phòng ban, Người quản lý trực tiếp)', 'error');
+            }
+            return;
+        }
+
+        if (!currentUser?.id) {
+            if (showToast) {
+                showToast('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.', 'error');
+            }
+            return;
+        }
+
+        try {
+            console.log('Submitting recruitment request:', {
+                form: recruitmentForm,
+                userId: currentUser.id,
+                userName: currentUser.hoTen
+            });
+
+            // Thêm userId và userName vào request body để backend có thể tìm employee
             const requestData = {
-                managerId: currentUser?.id || currentUser?.employeeId || currentUser?.employee_id,
-                managerType: managerType,
-                chucDanhCanTuyen: recruitmentRequestForm.chucDanhCanTuyen,
-                soLuongYeuCau: recruitmentRequestForm.soLuongYeuCau,
-                phongBan: recruitmentRequestForm.phongBan,
-                moTaCongViec: recruitmentRequestForm.moTaCongViec,
-                loaiLaoDong: recruitmentRequestForm.loaiLaoDong,
-                lyDoTuyen: recruitmentRequestForm.lyDoTuyen,
-                lyDoKhacGhiChu: recruitmentRequestForm.lyDoKhacGhiChu,
-                tieuChuanTuyenChon: recruitmentRequestForm.tieuChuanTuyenChon
+                ...recruitmentForm,
+                userId: currentUser.id,
+                userName: currentUser.hoTen || currentUser.username
             };
 
-            const response = await candidatesAPI.createRecruitmentRequest(requestData);
-
-            if (response.data?.success) {
+            const response = await recruitmentRequestsAPI.create(requestData);
+            if (response.data.success) {
                 if (showToast) {
-                    showToast('Yêu cầu tuyển dụng đã được gửi thành công!', 'success');
+                    showToast('Đã gửi yêu cầu tuyển dụng thành công', 'success');
                 }
-                handleCloseRecruitmentRequestModal();
-            } else {
-                throw new Error(response.data?.message || 'Không thể gửi yêu cầu');
+                setIsRecruitmentModalOpen(false);
+                // Reset form
+                setRecruitmentForm({
+                    chucDanhCanTuyen: '',
+                    phongBanBoPhan: '',
+                    nguoiQuanLyTrucTiep: currentUser?.hoTen || '',
+                    moTaCongViec: 'chua_co',
+                    yeuCauChiTietCongViec: '',
+                    lyDoKhacGhiChu: '',
+                    soLuongYeuCau: '1',
+                    loaiLaoDong: 'toan_thoi_gian',
+                    nguoiQuanLyGianTiep: '',
+                    lyDoTuyen: 'nhu_cau_tang',
+                    gioiTinh: 'bat_ky',
+                    doTuoi: '',
+                    trinhDoHocVanYeuCau: '',
+                    kinhNghiemChuyenMon: 'khong_yeu_cau',
+                    chiTietKinhNghiem: '',
+                    kienThucChuyenMonKhac: '',
+                    yeuCauNgoaiNgu: '',
+                    yeuCauViTinhKyNangKhac: '',
+                    kyNangGiaoTiep: '',
+                    thaiDoLamViec: '',
+                    kyNangQuanLy: ''
+                });
             }
         } catch (error) {
             console.error('Error submitting recruitment request:', error);
             if (showToast) {
-                showToast(error.response?.data?.message || 'Không thể gửi yêu cầu. Vui lòng thử lại.', 'error');
+                showToast('Có lỗi xảy ra khi gửi yêu cầu', 'error');
             }
-        } finally {
-            setSubmittingRecruitmentRequest(false);
         }
     };
 
+    // Handle approve recruitment request
+    const handleApproveRecruitmentRequest = async (requestId) => {
+        try {
+            const response = await recruitmentRequestsAPI.approve(requestId);
+            if (response.data.success) {
+                if (showToast) {
+                    showToast('Đã duyệt yêu cầu tuyển dụng', 'success');
+                }
+                // Refresh list
+                const updatedResponse = await recruitmentRequestsAPI.getAll({
+                    branchDirectorId: currentUser?.id,
+                    status: 'PENDING'
+                });
+                setRecruitmentRequests(updatedResponse.data?.data || []);
+                setShowRequestDetail(false);
+                setSelectedRequest(null);
+            }
+        } catch (error) {
+            console.error('Error approving recruitment request:', error);
+            if (showToast) {
+                showToast('Có lỗi xảy ra khi duyệt yêu cầu', 'error');
+            }
+        }
+    };
+
+    // Handle reject recruitment request
+    const handleRejectRecruitmentRequest = async (requestId) => {
+        if (!showConfirm) return;
+
+        const confirmed = await showConfirm({
+            title: 'Từ chối yêu cầu',
+            message: 'Bạn có muốn từ chối yêu cầu tuyển dụng này không?',
+            confirmText: 'Từ chối',
+            cancelText: 'Hủy',
+            type: 'warning'
+        });
+
+        if (!confirmed) return;
+
+        try {
+            const response = await recruitmentRequestsAPI.reject(requestId, {
+                rejectionReason: 'Đã từ chối bởi giám đốc chi nhánh'
+            });
+            if (response.data.success) {
+                if (showToast) {
+                    showToast('Đã từ chối yêu cầu tuyển dụng', 'success');
+                }
+                // Refresh list
+                const updatedResponse = await recruitmentRequestsAPI.getAll({
+                    branchDirectorId: currentUser?.id,
+                    status: 'PENDING'
+                });
+                setRecruitmentRequests(updatedResponse.data?.data || []);
+                setShowRequestDetail(false);
+                setSelectedRequest(null);
+            }
+        } catch (error) {
+            console.error('Error rejecting recruitment request:', error);
+            if (showToast) {
+                showToast('Có lỗi xảy ra khi từ chối yêu cầu', 'error');
+            }
+        }
+    };
+
+    // Filter candidates based on selected filter
+    const filteredCandidates = selectedFilter === 'all'
+        ? candidates
+        : candidates.filter(candidate => candidate.status === selectedFilter);
+
+    const renderReadyInterviewRequestsTable = () => (
+        <div className="interview-approvals-table-wrapper">
+            <table className="interview-approvals-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Ứng viên</th>
+                        <th>Vị trí</th>
+                        <th>Phòng ban</th>
+                        <th>Thời gian PV</th>
+                        <th>Trạng thái</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {readyInterviewRequests.length === 0 ? (
+                        <tr>
+                            <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                                Không có ứng viên sẵn sàng phỏng vấn
+                            </td>
+                        </tr>
+                    ) : (
+                        readyInterviewRequests.map((req, index) => (
+                            <tr
+                                key={req.id}
+                                className={index % 2 === 1 ? 'even-row-bg' : ''}
+                                onClick={async () => {
+                                    if (!req || !req.id) {
+                                        console.error('Invalid request:', req);
+                                        if (showToast) {
+                                            showToast('Lỗi: Không tìm thấy thông tin yêu cầu phỏng vấn', 'error');
+                                        }
+                                        return;
+                                    }
+                                    setSelectedEvaluationRequest(req);
+                                    setShowEvaluationModal(true);
+                                    // Load existing evaluation if any
+                                    await loadEvaluationData(req);
+                                }}
+                                style={{ cursor: 'pointer' }}
+                            >
+                                <td>{index + 1}</td>
+                                <td>{req.candidate_name || '---'}</td>
+                                <td>{req.vi_tri_ung_tuyen || req.chuc_danh_can_tuyen || '---'}</td>
+                                <td>{req.phong_ban || req.phong_ban_bo_phan || '---'}</td>
+                                <td>{req.interview_time ? new Date(req.interview_time).toLocaleString('vi-VN') : '---'}</td>
+                                <td>
+                                    <span className="interview-approvals-status-badge ready">Đang chờ đánh giá</span>
+                                </td>
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+            </table>
+        </div>
+    );
+
+    const renderInterviewRequestsTable = () => (
+        <div className="interview-approvals-table-wrapper">
+            <table className="interview-approvals-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Ứng viên</th>
+                        <th>Vị trí</th>
+                        <th>Phòng ban</th>
+                        <th>Người gửi</th>
+                        <th>Thời gian PV</th>
+                        <th>Trạng thái</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {interviewRequests.length === 0 ? (
+                        <tr>
+                            <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                                Không có yêu cầu phỏng vấn
+                            </td>
+                        </tr>
+                    ) : (
+                        interviewRequests.map((req, index) => (
+                            <tr
+                                key={req.id}
+                                className={index % 2 === 1 ? 'even-row-bg' : ''}
+                                onClick={() => {
+                                    setSelectedInterviewRequest(req);
+                                    setShowInterviewRequestDetail(true);
+                                }}
+                                style={{ cursor: 'pointer' }}
+                            >
+                                <td>{index + 1}</td>
+                                <td>{req.candidate_name || '---'}</td>
+                                <td>{req.vi_tri_ung_tuyen || req.chuc_danh_can_tuyen || '---'}</td>
+                                <td>{req.phong_ban || req.phong_ban_bo_phan || '---'}</td>
+                                <td>{req.manager_id ? 'Quản lý trực tiếp' : req.branch_director_id ? 'Giám đốc chi nhánh' : '---'}</td>
+                                <td>{req.interview_time ? new Date(req.interview_time).toLocaleString('vi-VN') : '---'}</td>
+                                <td>
+                                    {req.status === 'WAITING_FOR_OTHER_APPROVAL' ? (
+                                        <span className="interview-approvals-status-badge waiting">
+                                            {req.manager_approved && !req.branch_director_approved 
+                                                ? `Đang chờ giám đốc chi nhánh${req.branch_director_name ? ` - ${req.branch_director_name}` : ''}`
+                                                : !req.manager_approved && req.branch_director_approved
+                                                ? `Đang chờ quản lý trực tiếp${req.manager_name ? ` - ${req.manager_name}` : ''}`
+                                                : 'Đang chờ người kia duyệt phỏng vấn'}
+                                        </span>
+                                    ) : (
+                                        <span className="interview-approvals-status-badge pending">Chờ duyệt phỏng vấn</span>
+                                    )}
+                                </td>
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+            </table>
+        </div>
+    );
     return (
         <div className="interview-approvals-container">
             {/* Header Section */}
@@ -1147,294 +1093,206 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                         </svg>
                     </div>
                     <div style={{ flex: 1 }}>
-                        <h1 className="interview-approvals-title">Phỏng vấn</h1>
+                        <h1 className="interview-approvals-title">Phỏng vấn & Duyệt ứng viên</h1>
                         <p className="interview-approvals-subtitle">
-                            Xem và xử lý các yêu cầu phỏng vấn ứng viên được HR gửi đến bạn.
+                            Xem và xử lý các yêu cầu phỏng vấn ứng viên được HR gửi đến bạn
                         </p>
                     </div>
                     <button
                         type="button"
-                        className="interview-approvals-recruitment-request-btn"
-                        onClick={() => setIsRecruitmentRequestModalOpen(true)}
+                        className="interview-approvals-recruitment-btn"
+                        onClick={() => setIsRecruitmentModalOpen(true)}
                     >
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
                         </svg>
-                        <span>Yêu cầu tuyển dụng</span>
+                        <span>Yêu cầu Tuyển dụng</span>
                     </button>
-                </div>
-            </div>
-
-            {/* Statistics Cards Section */}
-            <div className="interview-approvals-statistics">
-                {/* Chờ duyệt Card */}
-                <div className="interview-stat-card interview-stat-card--pending">
-                    <div className="interview-stat-card-content">
-                        <div className="interview-stat-card-label">Chờ duyệt</div>
-                        <div className="interview-stat-card-value">
-                            {loadingStats ? '...' : statistics.pending}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Chờ đánh giá Card */}
-                <div className="interview-stat-card interview-stat-card--pending-evaluation">
-                    <div className="interview-stat-card-content">
-                        <div className="interview-stat-card-label">Chờ đánh giá</div>
-                        <div className="interview-stat-card-value">
-                            {loadingStats ? '...' : statistics.pendingEvaluation}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Đã duyệt Card */}
-                <div className="interview-stat-card interview-stat-card--approved">
-                    <div className="interview-stat-card-content">
-                        <div className="interview-stat-card-label">Đã duyệt</div>
-                        <div className="interview-stat-card-value">
-                            {loadingStats ? '...' : statistics.approved}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Đã từ chối Card */}
-                <div className="interview-stat-card interview-stat-card--rejected">
-                    <div className="interview-stat-card-content">
-                        <div className="interview-stat-card-label">Đã từ chối</div>
-                        <div className="interview-stat-card-value">
-                            {loadingStats ? '...' : statistics.rejected}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Tổng cộng Card */}
-                <div className="interview-stat-card interview-stat-card--total">
-                    <div className="interview-stat-card-content">
-                        <div className="interview-stat-card-label">Tổng cộng</div>
-                        <div className="interview-stat-card-value">
-                            {loadingStats ? '...' : statistics.total}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Status Filter Mini-Tabs */}
-            <div className="interview-approvals-filter-tabs">
-                <button
-                    type="button"
-                    className={`interview-filter-tab ${selectedStatus === 'PENDING' ? 'active' : ''} ${statistics.pending > 0 ? 'has-pending' : ''}`}
-                    onClick={() => handleStatusChange('PENDING')}
-                >
-                    Chờ tôi duyệt
-                    {statistics.pending > 0 && (
-                        <span className="interview-filter-tab-badge">{statistics.pending}</span>
-                    )}
-                </button>
-                <button
-                    type="button"
-                    className={`interview-filter-tab ${selectedStatus === 'PENDING_EVALUATION' ? 'active' : ''} ${statistics.pendingEvaluation > 0 ? 'has-pending' : ''}`}
-                    onClick={() => handleStatusChange('PENDING_EVALUATION')}
-                >
-                    Chờ đánh giá
-                    {statistics.pendingEvaluation > 0 && (
-                        <span className="interview-filter-tab-badge">{statistics.pendingEvaluation}</span>
-                    )}
-                </button>
-                <button
-                    type="button"
-                    className={`interview-filter-tab ${selectedStatus === 'APPROVED' ? 'active' : ''}`}
-                    onClick={() => handleStatusChange('APPROVED')}
-                >
-                    Đã duyệt
-                    {statistics.approved > 0 && (
-                        <span className="interview-filter-tab-badge">{statistics.approved}</span>
-                    )}
-                </button>
-                <button
-                    type="button"
-                    className={`interview-filter-tab ${selectedStatus === 'REJECTED' ? 'active' : ''}`}
-                    onClick={() => handleStatusChange('REJECTED')}
-                >
-                    Đã từ chối
-                    {statistics.rejected > 0 && (
-                        <span className="interview-filter-tab-badge">{statistics.rejected}</span>
-                    )}
-                </button>
-                <button
-                    type="button"
-                    className={`interview-filter-tab ${selectedStatus === 'ALL' ? 'active' : ''}`}
-                    onClick={() => handleStatusChange('ALL')}
-                >
-                    Tất cả
-                </button>
-
-                {/* My Recruitment Requests Tab - For managers only, separated */}
-                {currentUser && currentUser.role && currentUser.role !== 'HR' && currentUser.role !== 'ADMIN' && (
-                    <>
-                        <div style={{ width: '1px', height: '2rem', background: '#e5e7eb', margin: '0 0.5rem' }}></div>
+                    {isHr && (
                         <button
                             type="button"
-                            className={`interview-filter-tab ${showMyRecruitmentRequests ? 'active' : ''}`}
-                            onClick={() => {
-                                setShowMyRecruitmentRequests(!showMyRecruitmentRequests);
-                                if (!showMyRecruitmentRequests) {
-                                    setSelectedStatus(null); // Clear other status selection
-                                }
-                            }}
+                            className="interview-approvals-recruitment-btn secondary"
+                            onClick={() => setIsHrRecruitmentModalOpen(true)}
                         >
-                            Danh sách yêu cầu tuyển dụng
-                            {myRecruitmentRequests.length > 0 && (
-                                <span style={{ marginLeft: '0.5rem', background: showMyRecruitmentRequests ? '#1e40af' : '#6b7280', color: '#ffffff', padding: '0.125rem 0.5rem', borderRadius: '0.75rem', fontSize: '0.75rem' }}>
-                                    {myRecruitmentRequests.length}
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>Phiếu tuyển nhân sự</span>
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Main Container: Candidate List */}
+            <div className="interview-approvals-main-card">
+                {/* Pill Filters */}
+                <div className="interview-approvals-filters">
+                    {filters.map((filter) => (
+                        <button
+                            key={filter.key}
+                            type="button"
+                            className={`interview-approvals-filter-pill ${selectedFilter === filter.key ? 'active' : ''} ${filter.key === 'all' ? 'filter-all' : ''}`}
+                            onClick={() => setSelectedFilter(filter.key)}
+                            style={selectedFilter === filter.key && filter.key !== 'all' ? { background: filter.gradient } : {}}
+                        >
+                            <span>{filter.label}</span>
+                            {filter.count !== null && (
+                                <span className={`interview-approvals-filter-badge ${filter.count > 0 ? 'pulse' : 'zero'}`}>
+                                    {filter.count}
                                 </span>
                             )}
                         </button>
-                    </>
-                )}
-            </div>
+                    ))}
+                </div>
 
-            {/* Requests List View */}
-            <div className="interview-approvals-list">
-                {showMyRecruitmentRequests ? (
-                    // Display my recruitment requests for managers
-                    loadingMyRecruitmentRequests ? (
-                        <div className="interview-approvals-loading">
-                            <div className="interview-approvals-spinner"></div>
-                            <span>Đang tải danh sách yêu cầu tuyển dụng...</span>
-                        </div>
-                    ) : myRecruitmentRequests.length === 0 ? (
-                        <div className="interview-approvals-empty">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                            </svg>
-                            <p>Chưa có yêu cầu tuyển dụng nào</p>
-                        </div>
+                {/* Table */}
+                <div className="interview-approvals-table-wrapper">
+                    {selectedFilter === 'recruitment' ? (
+                        <table className="interview-approvals-table">
+                            <thead>
+                                <tr>
+                                    <th>STT</th>
+                                    <th>Người gửi</th>
+                                    <th>Chức danh cần tuyển</th>
+                                    <th>Phòng ban</th>
+                                    <th>Số lượng</th>
+                                    <th>Ngày gửi</th>
+                                    <th>Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {recruitmentRequests.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                                            Chưa có yêu cầu tuyển dụng nào
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    recruitmentRequests.map((request, index) => (
+                                        <tr key={request.id} className={index % 2 === 1 ? 'even-row-bg' : ''}>
+                                            <td>{index + 1}</td>
+                                            <td>{request.created_by_name || '-'}</td>
+                                            <td>{request.chuc_danh_can_tuyen}</td>
+                                            <td>{request.phong_ban_bo_phan}</td>
+                                            <td>{request.so_luong_yeu_cau}</td>
+                                            <td>{new Date(request.created_at).toLocaleDateString('vi-VN')}</td>
+                                            <td>
+                                                <div className="interview-approvals-action-buttons">
+                                                    <button
+                                                        type="button"
+                                                        className="interview-approvals-action-btn interview-approvals-action-btn--approve"
+                                                        onClick={() => {
+                                                            setSelectedRequest(request);
+                                                            setShowRequestDetail(true);
+                                                        }}
+                                                        title="Xem chi tiết"
+                                                    >
+                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    ) : selectedFilter === 'interview' ? (
+                        renderInterviewRequestsTable()
+                    ) : selectedFilter === 'ready' ? (
+                        renderReadyInterviewRequestsTable()
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {myRecruitmentRequests.map((request) => {
-                                const statusConfig = {
-                                    'PENDING': { label: 'Chờ duyệt', color: '#f59e0b', bg: '#fef3c7' },
-                                    'APPROVED': { label: 'Đã duyệt', color: '#10b981', bg: '#d1fae5' },
-                                    'REJECTED': { label: 'Từ chối', color: '#ef4444', bg: '#fee2e2' },
-                                    'IN_PROGRESS': { label: 'Đang xử lý', color: '#3b82f6', bg: '#dbeafe' },
-                                    'COMPLETED': { label: 'Hoàn thành', color: '#8b5cf6', bg: '#ede9fe' }
-                                };
-                                const status = statusConfig[request.status] || statusConfig.PENDING;
-                                const createdDate = request.created_at ? formatDateDisplay(request.created_at) : '-';
-
-                                return (
-                                    <div
-                                        key={request.id}
-                                        className="interview-request-card"
-                                        onClick={() => handleViewRecruitmentRequestDetails(request.id)}
-                                        style={{ cursor: 'pointer' }}
-                                    >
-                                        <div className="interview-request-card-content">
-                                            <div className="interview-request-position">
-                                                {request.chuc_danh_can_tuyen || request.chucDanhCanTuyen || 'Chức danh chưa xác định'}
-                                            </div>
-                                            <div className="interview-request-department">
-                                                Phòng ban: {request.phong_ban || request.phongBan || '-'}
-                                            </div>
-                                            <div className="interview-request-date">
-                                                Ngày gửi: {createdDate}
-                                            </div>
-                                        </div>
-                                        <div style={{
-                                            padding: '0.5rem 1rem',
-                                            background: status.bg,
-                                            color: status.color,
-                                            borderRadius: '0.5rem',
-                                            fontSize: '0.875rem',
-                                            fontWeight: '600',
-                                            marginTop: '0.5rem'
-                                        }}>
-                                            {status.label}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )
-                ) : loadingRequests ? (
-                    <div className="interview-approvals-loading">
-                        <div className="interview-approvals-spinner"></div>
-                        <span>Đang tải danh sách yêu cầu...</span>
-                    </div>
-                ) : requests.length === 0 ? (
-                    <div className="interview-approvals-empty">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                        <p>Chưa có yêu cầu phỏng vấn nào</p>
-                    </div>
-                ) : (
-                    <div className="interview-approvals-list-content">
-                        {requests.map((request) => (
-                            <div
-                                key={request.id}
-                                className="interview-request-card"
-                                onClick={() => handleRequestClick(request)}
-                            >
-                                <div className="interview-request-card-content">
-                                    {/* Vị trí Ứng tuyển - Electric Blue Đậm (nổi bật nhất) */}
-                                    <div className="interview-request-position">
-                                        {getViTriName(request.vi_tri_ung_tuyen)}
-                                    </div>
-
-                                    {/* Phòng ban - Xám Trung tính */}
-                                    <div className="interview-request-department">
-                                        {getPhongBanName(request.phong_ban)}
-                                    </div>
-
-                                    {/* Ngày gửi - Xám Nhạt */}
-                                    <div className="interview-request-date">
-                                        Ngày gửi: {formatDate(request.created_at)}
-                                    </div>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="interview-request-actions" onClick={(e) => e.stopPropagation()}>
-                                    <button
-                                        type="button"
-                                        className="interview-request-view-details-btn"
-                                        onClick={(e) => handleViewCandidateDetails(e, request)}
-                                        title="Xem chi tiết thông tin ứng viên"
-                                    >
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                        </svg>
-                                        <span>Xem chi tiết</span>
-                                    </button>
-                                </div>
-
-                                {/* Trạng thái Tag - Vàng/Cam Pastel */}
-                                <div className="interview-request-status">
-                                    <span className={`interview-request-status-badge interview-request-status-badge--${request.status?.toLowerCase().replace('_', '-')}`}>
-                                        {request.status === 'PENDING' && 'Chờ duyệt'}
-                                        {request.status === 'PENDING_EVALUATION' && 'Chờ đánh giá tiêu chí'}
-                                        {request.status === 'APPROVED' && 'Đã duyệt'}
-                                        {request.status === 'REJECTED' && 'Đã từ chối'}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                        <table className="interview-approvals-table">
+                            <thead>
+                                <tr>
+                                    <th>STT</th>
+                                    <th>Họ và Tên</th>
+                                    <th>Vị trí ứng tuyển</th>
+                                    <th>Phòng ban</th>
+                                    <th>Ngày gửi CV</th>
+                                    <th>Trạng thái</th>
+                                    <th>Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredCandidates.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                                            {candidates.length === 0 ? 'Chưa có ứng viên nào' : 'Không có ứng viên nào phù hợp với bộ lọc'}
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredCandidates.map((candidate, index) => (
+                                        <tr key={candidate.id} className={index % 2 === 1 ? 'even-row-bg' : ''}>
+                                            <td>{index + 1}</td>
+                                            <td>{candidate.name}</td>
+                                            <td>{candidate.position}</td>
+                                            <td>{candidate.department}</td>
+                                            <td>{candidate.date}</td>
+                                            <td>
+                                                <span className={`interview-approvals-status-badge status-${candidate.status}`}>
+                                                    {candidate.status === 'ready' ? 'Sẵn sàng PV' :
+                                                        candidate.status === 'approved' ? 'Đã Duyệt' :
+                                                            candidate.status === 'rejected' ? 'Đã Từ chối' : candidate.status}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div className="interview-approvals-action-buttons">
+                                                    <button
+                                                        type="button"
+                                                        className="interview-approvals-action-btn interview-approvals-action-btn--approve"
+                                                        onClick={() => handleApprove(candidate.id)}
+                                                        title="Duyệt"
+                                                    >
+                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                                        </svg>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="interview-approvals-action-btn interview-approvals-action-btn--reject"
+                                                        onClick={() => handleReject(candidate.id)}
+                                                        title="Từ chối"
+                                                    >
+                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
             </div>
 
-            {/* Detail Modal */}
-            {isModalOpen && selectedRequest && (
-                <div className="interview-detail-modal-overlay" onClick={handleCloseModal}>
-                    <div className="interview-detail-modal-container" onClick={(e) => e.stopPropagation()}>
+            {/* Secondary Container: Request History */}
+            <div className="interview-approvals-history-card">
+                <h3 className="interview-approvals-history-title">Lịch sử Yêu cầu</h3>
+                <div className="interview-approvals-history-list">
+                    {/* Request history - sẽ được fetch từ API */}
+                    <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                        Chưa có lịch sử yêu cầu nào
+                    </div>
+                </div>
+            </div>
+
+            {/* Recruitment Request Modal */}
+            {isRecruitmentModalOpen && (
+                <div className="interview-approvals-modal-overlay" onClick={() => setIsRecruitmentModalOpen(false)}>
+                    <div className="interview-approvals-modal-container" onClick={(e) => e.stopPropagation()}>
                         {/* Modal Header */}
-                        <div className="interview-detail-modal-header">
-                            <h2 className="interview-detail-modal-title">Chi tiết Yêu cầu Phỏng vấn</h2>
+                        <div className="interview-approvals-modal-header">
+                            <h2 className="interview-approvals-modal-title">Yêu cầu Tuyển dụng</h2>
                             <button
                                 type="button"
-                                className="interview-detail-modal-close"
-                                onClick={handleCloseModal}
+                                className="interview-approvals-modal-close"
+                                onClick={() => setIsRecruitmentModalOpen(false)}
                             >
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -1442,126 +1300,863 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                             </button>
                         </div>
 
-                        {/* Modal Content - Read-only Information */}
-                        <div className="interview-detail-modal-content">
-                            <div className="interview-detail-section">
-                                <div className="interview-detail-field">
-                                    <label className="interview-detail-label">Tên ứng viên</label>
-                                    <div className="interview-detail-value interview-detail-value--candidate-name">
-                                        {selectedRequest.candidate_name || '-'}
+                        {/* Modal Body */}
+                        <div className="interview-approvals-modal-body">
+                            <form id="recruitment-form" className="interview-approvals-recruitment-form" onSubmit={handleSubmitRecruitmentRequest}>
+                                {/* PHẦN I: Vị trí & Nhu cầu */}
+                                <fieldset className="interview-approvals-fieldset interview-approvals-fieldset-part1">
+                                    <legend className="interview-approvals-legend">PHẦN I: Vị trí & Nhu cầu *</legend>
+
+                                    <div className="interview-approvals-form-grid">
+                                        {/* Left Column */}
+                                        <div className="interview-approvals-form-column">
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">
+                                                    Chức danh cần tuyển <span className="required">*</span>
+                                                </label>
+                                                <CustomDropdown
+                                                    id="chucDanhCanTuyen"
+                                                    name="chucDanhCanTuyen"
+                                                    value={recruitmentForm.chucDanhCanTuyen}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, chucDanhCanTuyen: e.target.value })}
+                                                    options={jobTitles}
+                                                    placeholder={loadingOptions ? "Đang tải..." : "Chọn chức danh"}
+                                                />
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">
+                                                    Phòng ban/Bộ phận <span className="required">*</span>
+                                                </label>
+                                                <CustomDropdown
+                                                    id="phongBanBoPhan"
+                                                    name="phongBanBoPhan"
+                                                    value={recruitmentForm.phongBanBoPhan}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, phongBanBoPhan: e.target.value })}
+                                                    options={departments}
+                                                    placeholder={loadingOptions ? "Đang tải..." : "Chọn phòng ban"}
+                                                />
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">
+                                                    Người quản lý trực tiếp <span className="required">*</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    className="interview-approvals-form-input"
+                                                    value={recruitmentForm.nguoiQuanLyTrucTiep}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, nguoiQuanLyTrucTiep: e.target.value })}
+                                                    placeholder="Họ và tên"
+                                                    readOnly={true}
+                                                    style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+                                                />
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">
+                                                    Mô tả công việc (MTCV) <span className="required">*</span>
+                                                </label>
+                                                <div className="interview-approvals-radio-group">
+                                                    <label className="interview-approvals-radio-label">
+                                                        <input
+                                                            type="radio"
+                                                            name="moTaCongViec"
+                                                            value="co"
+                                                            checked={recruitmentForm.moTaCongViec === 'co'}
+                                                            onChange={(e) => setRecruitmentForm({ ...recruitmentForm, moTaCongViec: e.target.value })}
+                                                        />
+                                                        <span>Đã có MTCV</span>
+                                                    </label>
+                                                    <label className="interview-approvals-radio-label">
+                                                        <input
+                                                            type="radio"
+                                                            name="moTaCongViec"
+                                                            value="chua_co"
+                                                            checked={recruitmentForm.moTaCongViec === 'chua_co'}
+                                                            onChange={(e) => setRecruitmentForm({ ...recruitmentForm, moTaCongViec: e.target.value })}
+                                                        />
+                                                        <span>Chưa có MTCV</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">
+                                                    Yêu cầu chi tiết về công việc/Vị trí mới:
+                                                </label>
+                                                <textarea
+                                                    className="interview-approvals-form-textarea"
+                                                    value={recruitmentForm.yeuCauChiTietCongViec}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, yeuCauChiTietCongViec: e.target.value })}
+                                                    placeholder="Mô tả tóm tắt yêu cầu, nếu chưa có MTCV."
+                                                    rows="3"
+                                                />
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">
+                                                    Lý do khác / Ghi chú
+                                                </label>
+                                                <textarea
+                                                    className="interview-approvals-form-textarea"
+                                                    value={recruitmentForm.lyDoKhacGhiChu}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, lyDoKhacGhiChu: e.target.value })}
+                                                    placeholder="Ghi chú chi tiết thêm..."
+                                                    rows="3"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Right Column */}
+                                        <div className="interview-approvals-form-column">
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">
+                                                    Số lượng yêu cầu <span className="required">*</span>
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    className="interview-approvals-form-input"
+                                                    value={recruitmentForm.soLuongYeuCau}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, soLuongYeuCau: e.target.value })}
+                                                    min="1"
+                                                />
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">
+                                                    Loại lao động <span className="required">*</span>
+                                                </label>
+                                                <select
+                                                    className="interview-approvals-form-select"
+                                                    value={recruitmentForm.loaiLaoDong}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, loaiLaoDong: e.target.value })}
+                                                >
+                                                    <option value="toan_thoi_gian">Toàn thời gian (Full-time)</option>
+                                                    <option value="thoi_vu">Thời vụ</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">
+                                                    Người quản lý gián tiếp (nếu có)
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    className="interview-approvals-form-input"
+                                                    value={recruitmentForm.nguoiQuanLyGianTiep}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, nguoiQuanLyGianTiep: e.target.value })}
+                                                    placeholder="Họ và tên"
+                                                    readOnly={true}
+                                                    style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+                                                />
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">
+                                                    Lý do tuyển <span className="required">*</span>
+                                                </label>
+                                                <div className="interview-approvals-radio-group">
+                                                    <label className="interview-approvals-radio-label">
+                                                        <input
+                                                            type="radio"
+                                                            name="lyDoTuyen"
+                                                            value="thay_the"
+                                                            checked={recruitmentForm.lyDoTuyen === 'thay_the'}
+                                                            onChange={(e) => setRecruitmentForm({ ...recruitmentForm, lyDoTuyen: e.target.value })}
+                                                        />
+                                                        <span>Thay thế</span>
+                                                    </label>
+                                                    <label className="interview-approvals-radio-label">
+                                                        <input
+                                                            type="radio"
+                                                            name="lyDoTuyen"
+                                                            value="nhu_cau_tang"
+                                                            checked={recruitmentForm.lyDoTuyen === 'nhu_cau_tang'}
+                                                            onChange={(e) => setRecruitmentForm({ ...recruitmentForm, lyDoTuyen: e.target.value })}
+                                                        />
+                                                        <span>Nhu cầu tăng</span>
+                                                    </label>
+                                                    <label className="interview-approvals-radio-label">
+                                                        <input
+                                                            type="radio"
+                                                            name="lyDoTuyen"
+                                                            value="vi_tri_moi"
+                                                            checked={recruitmentForm.lyDoTuyen === 'vi_tri_moi'}
+                                                            onChange={(e) => setRecruitmentForm({ ...recruitmentForm, lyDoTuyen: e.target.value })}
+                                                        />
+                                                        <span>Vị trí mới</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
+                                </fieldset>
 
-                                <div className="interview-detail-field">
-                                    <label className="interview-detail-label">Ngày giờ phỏng vấn</label>
-                                    <div className="interview-detail-value interview-detail-value--highlight">
-                                        {formatInterviewDateTime(
-                                            selectedRequest.interview_date || selectedRequest.interviewDate,
-                                            selectedRequest.interview_time || selectedRequest.interviewTime
-                                        )}
+                                {/* PHẦN II: Tiêu chuẩn Tuyển chọn */}
+                                <fieldset className="interview-approvals-fieldset interview-approvals-fieldset-part2">
+                                    <legend className="interview-approvals-legend">PHẦN II: Tiêu chuẩn Tuyển chọn *</legend>
+
+                                    <div className="interview-approvals-form-grid">
+                                        {/* Left Column */}
+                                        <div className="interview-approvals-form-column">
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">Giới tính</label>
+                                                <select
+                                                    className="interview-approvals-form-select"
+                                                    value={recruitmentForm.gioiTinh}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, gioiTinh: e.target.value })}
+                                                >
+                                                    <option value="bat_ky">Bất kỳ</option>
+                                                    <option value="nam">Nam</option>
+                                                    <option value="nu">Nữ</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">Độ tuổi</label>
+                                                <input
+                                                    type="text"
+                                                    className="interview-approvals-form-input"
+                                                    value={recruitmentForm.doTuoi}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, doTuoi: e.target.value })}
+                                                    placeholder="VD: 25 - 35 hoặc Bất kỳ"
+                                                />
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">Trình độ học vấn yêu cầu</label>
+                                                <input
+                                                    type="text"
+                                                    className="interview-approvals-form-input"
+                                                    value={recruitmentForm.trinhDoHocVanYeuCau}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, trinhDoHocVanYeuCau: e.target.value })}
+                                                    placeholder="VD: Đại học trở lên ngành Kỹ thuật hoặc Trung cấp..."
+                                                />
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">Kinh nghiệm chuyên môn</label>
+                                                <div className="interview-approvals-radio-group">
+                                                    <label className="interview-approvals-radio-label">
+                                                        <input
+                                                            type="radio"
+                                                            name="kinhNghiemChuyenMon"
+                                                            value="khong_yeu_cau"
+                                                            checked={recruitmentForm.kinhNghiemChuyenMon === 'khong_yeu_cau'}
+                                                            onChange={(e) => setRecruitmentForm({ ...recruitmentForm, kinhNghiemChuyenMon: e.target.value })}
+                                                        />
+                                                        <span>Không yêu cầu</span>
+                                                    </label>
+                                                    <label className="interview-approvals-radio-label">
+                                                        <input
+                                                            type="radio"
+                                                            name="kinhNghiemChuyenMon"
+                                                            value="co_yeu_cau"
+                                                            checked={recruitmentForm.kinhNghiemChuyenMon === 'co_yeu_cau'}
+                                                            onChange={(e) => setRecruitmentForm({ ...recruitmentForm, kinhNghiemChuyenMon: e.target.value })}
+                                                        />
+                                                        <span>Có yêu cầu</span>
+                                                    </label>
+                                                </div>
+                                                {recruitmentForm.kinhNghiemChuyenMon === 'co_yeu_cau' && (
+                                                    <textarea
+                                                        className="interview-approvals-form-textarea"
+                                                        value={recruitmentForm.chiTietKinhNghiem}
+                                                        onChange={(e) => setRecruitmentForm({ ...recruitmentForm, chiTietKinhNghiem: e.target.value })}
+                                                        placeholder="Ghi rõ số năm, loại kinh nghiệm chuyên môn (VD: Tối thiểu 3 năm kinh nghiệm lập trình PLC)"
+                                                        rows="3"
+                                                    />
+                                                )}
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">Kiến thức chuyên môn khác / Ngành nghề liên quan</label>
+                                                <textarea
+                                                    className="interview-approvals-form-textarea"
+                                                    value={recruitmentForm.kienThucChuyenMonKhac}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, kienThucChuyenMonKhac: e.target.value })}
+                                                    placeholder="VD: Có học hoặc hiểu biết về Hệ thống ERP..."
+                                                    rows="3"
+                                                />
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">Yêu cầu Ngoại ngữ</label>
+                                                <textarea
+                                                    className="interview-approvals-form-textarea"
+                                                    value={recruitmentForm.yeuCauNgoaiNgu}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, yeuCauNgoaiNgu: e.target.value })}
+                                                    placeholder="VD: Tiếng Anh (Trình độ B, Khả năng sử dụng: Khá)"
+                                                    rows="3"
+                                                />
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">Yêu cầu Vi tính / Kỹ năng khác</label>
+                                                <textarea
+                                                    className="interview-approvals-form-textarea"
+                                                    value={recruitmentForm.yeuCauViTinhKyNangKhac}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, yeuCauViTinhKyNangKhac: e.target.value })}
+                                                    placeholder="VD: MS Office (Word/Excel/Access), Phần mềm thiết kế 3D..."
+                                                    rows="3"
+                                                />
+                                            </div>
+
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">Kỹ năng giao tiếp</label>
+                                                <textarea
+                                                    className="interview-approvals-form-textarea"
+                                                    value={recruitmentForm.kyNangGiaoTiep}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, kyNangGiaoTiep: e.target.value })}
+                                                    placeholder="VD: Có khả năng thuyết trình, đàm phán tốt..."
+                                                    rows="3"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Right Column */}
+                                        <div className="interview-approvals-form-column">
+                                            <div className="interview-approvals-form-group">
+                                                <label className="interview-approvals-form-label">Thái độ làm việc</label>
+                                                <textarea
+                                                    className="interview-approvals-form-textarea"
+                                                    value={recruitmentForm.thaiDoLamViec}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, thaiDoLamViec: e.target.value })}
+                                                    placeholder="VD: Tinh thần trách nhiệm cao, chịu áp lực..."
+                                                    rows="3"
+                                                />
+                                            </div>
+
+                                            <div className="interview-approvals-form-group interview-approvals-form-group-full">
+                                                <label className="interview-approvals-form-label">
+                                                    Kỹ năng quản lý (Áp dụng cho Trưởng phòng trở lên)
+                                                </label>
+                                                <textarea
+                                                    className="interview-approvals-form-textarea"
+                                                    value={recruitmentForm.kyNangQuanLy}
+                                                    onChange={(e) => setRecruitmentForm({ ...recruitmentForm, kyNangQuanLy: e.target.value })}
+                                                    placeholder="VD: Có kinh nghiệm xây dựng đội nhóm, phân công công việc..."
+                                                    rows="3"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-
-                                <div className="interview-detail-field">
-                                    <label className="interview-detail-label">Vị trí ứng tuyển</label>
-                                    <div className="interview-detail-value interview-detail-value--highlight">
-                                        {getViTriName(selectedRequest.vi_tri_ung_tuyen)}
-                                    </div>
-                                </div>
-
-                                <div className="interview-detail-field">
-                                    <label className="interview-detail-label">Phòng ban</label>
-                                    <div className="interview-detail-value">{getPhongBanName(selectedRequest.phong_ban)}</div>
-                                </div>
-
-                                <div className="interview-detail-field">
-                                    <label className="interview-detail-label">Số điện thoại</label>
-                                    <div className="interview-detail-value">{selectedRequest.so_dien_thoai || '-'}</div>
-                                </div>
-
-                                <div className="interview-detail-field">
-                                    <label className="interview-detail-label">Ngày gửi yêu cầu</label>
-                                    <div className="interview-detail-value">{formatDate(selectedRequest.created_at)}</div>
-                                </div>
-
-                                {selectedRequest.notes && (
-                                    <div className="interview-detail-field">
-                                        <label className="interview-detail-label">Ghi chú từ HR</label>
-                                        <div className="interview-detail-value">{selectedRequest.notes}</div>
-                                    </div>
-                                )}
-
-                                {/* Rejection Notes Textarea (shown when clicking reject) */}
-                                {showRejectionNotes && (
-                                    <div className="interview-detail-field">
-                                        <label className="interview-detail-label">
-                                            Lý do từ chối <span className="interview-detail-required">*</span>
-                                        </label>
-                                        <textarea
-                                            className="interview-detail-textarea"
-                                            value={rejectionNotes}
-                                            onChange={(e) => setRejectionNotes(e.target.value)}
-                                            placeholder="Nhập lý do từ chối yêu cầu phỏng vấn..."
-                                            rows={4}
-                                            autoFocus
-                                        />
-                                    </div>
-                                )}
-                            </div>
+                                </fieldset>
+                            </form>
                         </div>
 
-                        {/* Action Bar */}
-                        <div className="interview-detail-modal-actions">
-                            {selectedRequest.candidate_id && (
-                                <button
-                                    type="button"
-                                    className="interview-detail-action-btn interview-detail-action-btn--cv"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        const cvUrl = candidatesAPI.getCVUrl(selectedRequest.candidate_id);
-                                        window.open(cvUrl, '_blank');
-                                    }}
-                                    disabled={processingAction}
-                                    title="Xem file CV đính kèm"
-                                >
-                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                    </svg>
-                                    <span>Xem CV</span>
-                                </button>
-                            )}
+                        {/* Modal Footer */}
+                        <div className="interview-approvals-modal-footer">
                             <button
                                 type="button"
-                                className="interview-detail-action-btn interview-detail-action-btn--preview"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleViewCandidateDetails(e, selectedRequest);
-                                }}
-                                disabled={processingAction}
+                                className="interview-approvals-modal-btn interview-approvals-modal-btn--cancel"
+                                onClick={() => setIsRecruitmentModalOpen(false)}
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button
+                                type="button"
+                                className="interview-approvals-modal-btn interview-approvals-modal-btn--preview"
+                                onClick={() => setIsPreviewModalOpen(true)}
                             >
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                                 </svg>
-                                <span>Xem chi tiết ứng viên</span>
+                                Preview
                             </button>
                             <button
-                                type="button"
-                                className="interview-detail-action-btn interview-detail-action-btn--cancel"
-                                onClick={handleCloseModal}
-                                disabled={processingAction}
+                                type="submit"
+                                className="interview-approvals-modal-btn interview-approvals-modal-btn--submit"
+                                form="recruitment-form"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    handleSubmitRecruitmentRequest(e);
+                                }}
                             >
-                                Hủy
+                                Gửi Yêu cầu
                             </button>
-                            {selectedRequest.status === 'PENDING' && (
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* HR Approved Recruitment Requests Modal */}
+            {isHr && isHrRecruitmentModalOpen && (
+                <div className="interview-approvals-modal-overlay" onClick={() => setIsHrRecruitmentModalOpen(false)}>
+                    <div className="interview-approvals-modal-container" onClick={(e) => e.stopPropagation()}>
+                        <div className="interview-approvals-modal-header">
+                            <div style={{ flex: 1 }}>
+                                <h2 className="interview-approvals-modal-title">Phiếu tuyển nhân sự đã duyệt</h2>
+                                {hrRecruitmentRequests.length > 0 && (
+                                    <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem', color: '#6b7280' }}>
+                                        Tổng cộng: <strong style={{ color: '#059669', fontWeight: 700, fontSize: '1rem' }}>{hrRecruitmentRequests.length}</strong> phiếu đã được duyệt
+                                    </p>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                className="interview-approvals-modal-close"
+                                onClick={() => setIsHrRecruitmentModalOpen(false)}
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="interview-approvals-modal-body">
+                            <div className="interview-approvals-table-wrapper">
+                                <table className="interview-approvals-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Người gửi</th>
+                                            <th>Chức danh</th>
+                                            <th>Phòng ban</th>
+                                            <th>Số lượng</th>
+                                            <th>Ngày duyệt</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {hrRecruitmentRequests.length === 0 && (
+                                            <tr>
+                                                <td colSpan="5" style={{ textAlign: 'center', padding: '1rem' }}>Không có phiếu đã duyệt</td>
+                                            </tr>
+                                        )}
+                                        {hrRecruitmentRequests.map((req) => (
+                                            <tr
+                                                key={req.id}
+                                                className="clickable"
+                                                onClick={() => {
+                                                    setSelectedRequest(req);
+                                                    setShowRequestDetail(true);
+                                                }}
+                                            >
+                                                <td>{req.created_by_name || req.nguoi_gui || '-'}</td>
+                                                <td>{req.chuc_danh_can_tuyen}</td>
+                                                <td>{req.phong_ban_bo_phan}</td>
+                                                <td>{req.so_luong_yeu_cau}</td>
+                                                <td>{req.approved_at ? new Date(req.approved_at).toLocaleString('vi-VN') : '-'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div className="interview-approvals-modal-footer">
+                            <button
+                                type="button"
+                                className="interview-approvals-modal-btn interview-approvals-modal-btn--cancel"
+                                onClick={() => setIsHrRecruitmentModalOpen(false)}
+                            >
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Recruitment Request Detail Modal */}
+            {showRequestDetail && selectedRequest && (
+                <div className="interview-approvals-modal-overlay" onClick={() => {
+                    setShowRequestDetail(false);
+                    setSelectedRequest(null);
+                }}>
+                    <div className="interview-approvals-modal-container interview-approvals-detail-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="interview-approvals-modal-header interview-approvals-detail-header">
+                            <div className="interview-approvals-detail-header-content">
+                                <div className="interview-approvals-detail-icon-wrapper">
+                                    <svg className="interview-approvals-detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 className="interview-approvals-modal-title interview-approvals-detail-title">Chi tiết Yêu cầu Tuyển dụng</h2>
+                                    <p className="interview-approvals-detail-subtitle">Thông tin chi tiết về yêu cầu tuyển dụng</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                className="interview-approvals-modal-close"
+                                onClick={() => {
+                                    setShowRequestDetail(false);
+                                    setSelectedRequest(null);
+                                }}
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="interview-approvals-modal-body interview-approvals-detail-body">
+                            {/* PHẦN I: Vị trí & Nhu cầu */}
+                            <div className="interview-approvals-detail-section">
+                                <div className="interview-approvals-detail-section-title">
+                                    <svg className="interview-approvals-detail-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    <span>PHẦN I: Vị trí & Nhu cầu</span>
+                                </div>
+                                <div className="interview-approvals-detail-grid">
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Người gửi</div>
+                                            <div className="interview-approvals-detail-item-value">{selectedRequest.created_by_name}</div>
+                                        </div>
+                                    </div>
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Chức danh cần tuyển</div>
+                                            <div className="interview-approvals-detail-item-value">{selectedRequest.chuc_danh_can_tuyen}</div>
+                                        </div>
+                                    </div>
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Phòng ban/Bộ phận</div>
+                                            <div className="interview-approvals-detail-item-value">{selectedRequest.phong_ban_bo_phan}</div>
+                                        </div>
+                                    </div>
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Người quản lý trực tiếp</div>
+                                            <div className="interview-approvals-detail-item-value">{selectedRequest.nguoi_quan_ly_truc_tiep}</div>
+                                        </div>
+                                    </div>
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Mô tả công việc (MTCV)</div>
+                                            <div className="interview-approvals-detail-item-value">
+                                                {selectedRequest.mo_ta_cong_viec === 'co' ? 'Đã có MTCV' :
+                                                    selectedRequest.mo_ta_cong_viec === 'chua_co' ? 'Chưa có MTCV' :
+                                                        selectedRequest.mo_ta_cong_viec || '-'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Số lượng yêu cầu</div>
+                                            <div className="interview-approvals-detail-item-value">{selectedRequest.so_luong_yeu_cau}</div>
+                                        </div>
+                                    </div>
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Loại lao động</div>
+                                            <div className="interview-approvals-detail-item-value">
+                                                {selectedRequest.loai_lao_dong === 'toan_thoi_gian' ? 'Toàn thời gian (Full-time)' :
+                                                    selectedRequest.loai_lao_dong === 'thoi_vu' ? 'Thời vụ' :
+                                                        selectedRequest.loai_lao_dong || '-'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Người quản lý gián tiếp</div>
+                                            <div className="interview-approvals-detail-item-value">{selectedRequest.nguoi_quan_ly_gian_tiep || '-'}</div>
+                                        </div>
+                                    </div>
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Lý do tuyển</div>
+                                            <div className="interview-approvals-detail-item-value">
+                                                {selectedRequest.ly_do_tuyen === 'thay_the' ? 'Thay thế' :
+                                                    selectedRequest.ly_do_tuyen === 'nhu_cau_tang' ? 'Nhu cầu tăng' :
+                                                        selectedRequest.ly_do_tuyen === 'vi_tri_moi' ? 'Vị trí mới' :
+                                                            selectedRequest.ly_do_tuyen || '-'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {selectedRequest.yeu_cau_chi_tiet_cong_viec && (
+                                    <div className="interview-approvals-detail-item-full">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Yêu cầu chi tiết về công việc/Vị trí mới</div>
+                                            <div className="interview-approvals-detail-item-value interview-approvals-detail-textarea">{selectedRequest.yeu_cau_chi_tiet_cong_viec}</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {selectedRequest.ly_do_khac_ghi_chu && (
+                                    <div className="interview-approvals-detail-item-full">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Lý do khác / Ghi chú</div>
+                                            <div className="interview-approvals-detail-item-value interview-approvals-detail-textarea">{selectedRequest.ly_do_khac_ghi_chu}</div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* PHẦN II: Tiêu chuẩn Tuyển chọn */}
+                            <div className="interview-approvals-detail-section">
+                                <div className="interview-approvals-detail-section-title">
+                                    <svg className="interview-approvals-detail-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                                    </svg>
+                                    <span>PHẦN II: Tiêu chuẩn Tuyển chọn</span>
+                                </div>
+                                <div className="interview-approvals-detail-grid">
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Giới tính</div>
+                                            <div className="interview-approvals-detail-item-value">
+                                                {selectedRequest.gioi_tinh === 'bat_ky' ? 'Bất kỳ' :
+                                                    selectedRequest.gioi_tinh === 'nam' ? 'Nam' :
+                                                        selectedRequest.gioi_tinh === 'nu' ? 'Nữ' :
+                                                            selectedRequest.gioi_tinh || '-'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Độ tuổi</div>
+                                            <div className="interview-approvals-detail-item-value">{selectedRequest.do_tuoi || '-'}</div>
+                                        </div>
+                                    </div>
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Trình độ học vấn yêu cầu</div>
+                                            <div className="interview-approvals-detail-item-value">{selectedRequest.trinh_do_hoc_van_yeu_cau || '-'}</div>
+                                        </div>
+                                    </div>
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Kinh nghiệm chuyên môn</div>
+                                            <div className="interview-approvals-detail-item-value">
+                                                {selectedRequest.kinh_nghiem_chuyen_mon === 'khong_yeu_cau' ? 'Không yêu cầu' :
+                                                    selectedRequest.kinh_nghiem_chuyen_mon === 'co_yeu_cau' ? 'Có yêu cầu' :
+                                                        selectedRequest.kinh_nghiem_chuyen_mon || '-'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {selectedRequest.chi_tiet_kinh_nghiem && (
+                                    <div className="interview-approvals-detail-item-full">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Chi tiết kinh nghiệm</div>
+                                            <div className="interview-approvals-detail-item-value interview-approvals-detail-textarea">{selectedRequest.chi_tiet_kinh_nghiem}</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {selectedRequest.kien_thuc_chuyen_mon_khac && (
+                                    <div className="interview-approvals-detail-item-full">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Kiến thức chuyên môn khác / Ngành nghề liên quan</div>
+                                            <div className="interview-approvals-detail-item-value interview-approvals-detail-textarea">{selectedRequest.kien_thuc_chuyen_mon_khac}</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {selectedRequest.yeu_cau_ngoai_ngu && (
+                                    <div className="interview-approvals-detail-item-full">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Yêu cầu Ngoại ngữ</div>
+                                            <div className="interview-approvals-detail-item-value interview-approvals-detail-textarea">{selectedRequest.yeu_cau_ngoai_ngu}</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {selectedRequest.yeu_cau_vi_tinh_ky_nang_khac && (
+                                    <div className="interview-approvals-detail-item-full">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Yêu cầu Vi tính / Kỹ năng khác</div>
+                                            <div className="interview-approvals-detail-item-value interview-approvals-detail-textarea">{selectedRequest.yeu_cau_vi_tinh_ky_nang_khac}</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {selectedRequest.ky_nang_giao_tiep && (
+                                    <div className="interview-approvals-detail-item-full">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Kỹ năng giao tiếp</div>
+                                            <div className="interview-approvals-detail-item-value interview-approvals-detail-textarea">{selectedRequest.ky_nang_giao_tiep}</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {selectedRequest.thai_do_lam_viec && (
+                                    <div className="interview-approvals-detail-item-full">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Thái độ làm việc</div>
+                                            <div className="interview-approvals-detail-item-value interview-approvals-detail-textarea">{selectedRequest.thai_do_lam_viec}</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {selectedRequest.ky_nang_quan_ly && (
+                                    <div className="interview-approvals-detail-item-full">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Kỹ năng quản lý</div>
+                                            <div className="interview-approvals-detail-item-value interview-approvals-detail-textarea">{selectedRequest.ky_nang_quan_ly}</div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Thông tin bổ sung */}
+                            <div className="interview-approvals-detail-section">
+                                <div className="interview-approvals-detail-section-title">
+                                    <svg className="interview-approvals-detail-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    <span>Thông tin bổ sung</span>
+                                </div>
+                                <div className="interview-approvals-detail-grid">
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-icon">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                            </svg>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-content">
+                                            <div className="interview-approvals-detail-item-label">Ngày gửi</div>
+                                            <div className="interview-approvals-detail-item-value">{new Date(selectedRequest.created_at).toLocaleString('vi-VN')}</div>
+                                        </div>
+                                    </div>
+                                    {selectedRequest.status && (
+                                        <div className="interview-approvals-detail-item">
+                                            <div className="interview-approvals-detail-item-icon">
+                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                            </div>
+                                            <div className="interview-approvals-detail-item-content">
+                                                <div className="interview-approvals-detail-item-label">Trạng thái</div>
+                                                <div className="interview-approvals-detail-item-value">
+                                                    {selectedRequest.status === 'PENDING' ? 'Chờ duyệt' :
+                                                        selectedRequest.status === 'APPROVED' ? 'Đã duyệt' :
+                                                            selectedRequest.status === 'REJECTED' ? 'Đã từ chối' :
+                                                                selectedRequest.status === 'CANCELLED' ? 'Đã hủy' :
+                                                                    selectedRequest.status}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="interview-approvals-modal-footer interview-approvals-detail-footer">
+                            <button
+                                type="button"
+                                className="interview-approvals-modal-btn interview-approvals-modal-btn--cancel interview-approvals-detail-btn-cancel"
+                                onClick={() => {
+                                    setShowRequestDetail(false);
+                                    setSelectedRequest(null);
+                                }}
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                                <span>Đóng</span>
+                            </button>
+                            {isBranchDirector && (
                                 <>
                                     <button
                                         type="button"
-                                        className="interview-detail-action-btn interview-detail-action-btn--reject"
-                                        onClick={handleReject}
-                                        disabled={processingAction}
+                                        className="interview-approvals-modal-btn interview-approvals-modal-btn--reject interview-approvals-detail-btn-reject"
+                                        onClick={() => handleRejectRecruitmentRequest(selectedRequest.id)}
                                     >
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -1570,19 +2165,13 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                     </button>
                                     <button
                                         type="button"
-                                        className="interview-detail-action-btn interview-detail-action-btn--approve"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            console.log('Phỏng vấn button clicked');
-                                            handleStartInterview();
-                                        }}
-                                        disabled={processingAction}
+                                        className="interview-approvals-modal-btn interview-approvals-modal-btn--approve interview-approvals-detail-btn-approve"
+                                        onClick={() => handleApproveRecruitmentRequest(selectedRequest.id)}
                                     >
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                                         </svg>
-                                        <span>Phỏng vấn</span>
+                                        <span>Duyệt</span>
                                     </button>
                                 </>
                             )}
@@ -1591,254 +2180,269 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 </div>
             )}
 
-            {/* Evaluation Modal */}
-            {isEvaluationModalOpen && selectedRequest && (
-                <div className="interview-detail-modal-overlay" onClick={handleCloseEvaluationModal}>
-                    <div className="interview-detail-modal-container" onClick={(e) => e.stopPropagation()}>
-                        {/* Modal Header */}
-                        <div className="interview-evaluation-modal-header">
-                            <h2 className="interview-evaluation-modal-title">
-                                Đánh giá Ứng viên: {selectedRequest.candidate_name || 'N/A'}
-                            </h2>
+            {/* Interview Request Detail Modal */}
+            {showInterviewRequestDetail && selectedInterviewRequest && (
+                <div className="interview-approvals-modal-overlay" onClick={() => {
+                    setShowInterviewRequestDetail(false);
+                    setSelectedInterviewRequest(null);
+                }}>
+                    <div className="interview-approvals-modal-container" onClick={(e) => e.stopPropagation()}>
+                        <div className="interview-approvals-modal-header">
+                            <h2 className="interview-approvals-modal-title">Chi tiết yêu cầu phỏng vấn</h2>
                             <button
                                 type="button"
-                                className="interview-evaluation-modal-close"
-                                onClick={handleCloseEvaluationModal}
+                                className="interview-approvals-modal-close"
+                                onClick={() => {
+                                    setShowInterviewRequestDetail(false);
+                                    setSelectedInterviewRequest(null);
+                                }}
                             >
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
                                 </svg>
                             </button>
                         </div>
-
-                        {/* Modal Content - Evaluation Form */}
-                        <div className="interview-evaluation-modal-content">
-                            {/* 2.1. Phần 1: Đánh giá Theo Tiêu chí Cụ thể (Bảng) */}
-                            <div className="interview-evaluation-section">
-                                <h3 className="interview-evaluation-section-title">
-                                    2.1. Đánh giá Theo Tiêu chí Cụ thể
-                                </h3>
-                                <div className="interview-evaluation-table-wrapper">
-                                    <table className="interview-evaluation-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Tiêu chí</th>
-                                                <th>Điểm (1-5)</th>
-                                                <th>Bình luận</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {evaluationData.criteria.map((criterion, index) => (
-                                                <tr key={criterion.id}>
-                                                    <td className="interview-evaluation-criterion-name">
-                                                        {criterion.name}
-                                                    </td>
-                                                    <td className="interview-evaluation-score-cell">
-                                                        <input
-                                                            type="number"
-                                                            min="1"
-                                                            max="5"
-                                                            className="interview-evaluation-score-input"
-                                                            value={criterion.score}
-                                                            onChange={(e) => handleCriteriaScoreChange(criterion.id, e.target.value)}
-                                                            placeholder="1-5"
-                                                            required
-                                                            disabled={hasEvaluated}
-                                                            readOnly={hasEvaluated}
-                                                        />
-                                                    </td>
-                                                    <td className="interview-evaluation-comment-cell">
-                                                        <input
-                                                            type="text"
-                                                            className="interview-evaluation-comment-input"
-                                                            value={criterion.comment}
-                                                            onChange={(e) => handleCriteriaCommentChange(criterion.id, e.target.value)}
-                                                            placeholder="Nhập bình luận chi tiết..."
-                                                            disabled={hasEvaluated}
-                                                            readOnly={hasEvaluated}
-                                                        />
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            {/* 2.2. Phần 2: Nhận xét Chi tiết (Form Tự do) */}
-                            <div className="interview-evaluation-section">
-                                <h3 className="interview-evaluation-section-title">
-                                    2.2. Nhận xét Chi tiết
-                                </h3>
-                                <div className="interview-evaluation-comments">
-                                    <div className="interview-evaluation-form-group">
-                                        <label className="interview-evaluation-form-label">
-                                            Điểm mạnh (Strengths)
-                                        </label>
-                                        <textarea
-                                            className="interview-evaluation-textarea"
-                                            rows="4"
-                                            value={evaluationData.strengths}
-                                            onChange={(e) => setEvaluationData({ ...evaluationData, strengths: e.target.value })}
-                                            placeholder="Nhập các điểm mạnh của ứng viên..."
-                                            disabled={hasEvaluated}
-                                            readOnly={hasEvaluated}
-                                        />
+                        <div className="interview-approvals-modal-body">
+                            {/* Header với tên và status */}
+                            <div className="interview-approvals-detail-header-section">
+                                <div className="interview-approvals-detail-header-content">
+                                    <div className="interview-approvals-detail-header-icon">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                        </svg>
                                     </div>
-
-                                    <div className="interview-evaluation-form-group">
-                                        <label className="interview-evaluation-form-label">
-                                            Điểm cần cải thiện (Areas for Improvement)
-                                        </label>
-                                        <textarea
-                                            className="interview-evaluation-textarea"
-                                            rows="4"
-                                            value={evaluationData.areasForImprovement}
-                                            onChange={(e) => setEvaluationData({ ...evaluationData, areasForImprovement: e.target.value })}
-                                            placeholder="Nhập các điểm cần cải thiện..."
-                                            disabled={hasEvaluated}
-                                            readOnly={hasEvaluated}
-                                        />
-                                    </div>
-
-                                    <div className="interview-evaluation-form-group">
-                                        <label className="interview-evaluation-form-label">
-                                            Nhận xét chung / Đề xuất Mức lương
-                                        </label>
-                                        <textarea
-                                            className="interview-evaluation-textarea"
-                                            rows="4"
-                                            value={evaluationData.generalComments}
-                                            onChange={(e) => setEvaluationData({ ...evaluationData, generalComments: e.target.value })}
-                                            placeholder="Nhập nhận xét chung và đề xuất mức lương nếu có..."
-                                            disabled={hasEvaluated}
-                                            readOnly={hasEvaluated}
-                                        />
+                                    <div className="interview-approvals-detail-header-text">
+                                        <h3 className="interview-approvals-detail-header-title">
+                                            {selectedInterviewRequest.candidate_name || '---'}
+                                        </h3>
+                                        <span className={`interview-approvals-detail-status-badge ${
+                                            selectedInterviewRequest.status === 'WAITING_FOR_OTHER_APPROVAL' ? 'status-waiting' : 
+                                            selectedInterviewRequest.status === 'READY_FOR_INTERVIEW' ? 'status-ready' : 'status-pending'
+                                        }`}>
+                                            {selectedInterviewRequest.status === 'WAITING_FOR_OTHER_APPROVAL' ? (
+                                                selectedInterviewRequest.manager_approved && !selectedInterviewRequest.branch_director_approved 
+                                                    ? `Đang chờ giám đốc chi nhánh${selectedInterviewRequest.branch_director_name ? ` - ${selectedInterviewRequest.branch_director_name}` : ''}`
+                                                    : !selectedInterviewRequest.manager_approved && selectedInterviewRequest.branch_director_approved
+                                                    ? `Đang chờ quản lý trực tiếp${selectedInterviewRequest.manager_name ? ` - ${selectedInterviewRequest.manager_name}` : ''}`
+                                                    : 'Đang chờ người kia duyệt phỏng vấn'
+                                            ) : selectedInterviewRequest.status === 'READY_FOR_INTERVIEW' ? (
+                                                'Sẵn sàng phỏng vấn'
+                                            ) : (
+                                                'Chờ duyệt phỏng vấn'
+                                            )}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* 2.3. Phần 3: Kết luận Cuối cùng (Radio Buttons) */}
-                            <div className="interview-evaluation-section">
-                                <h3 className="interview-evaluation-section-title">
-                                    2.3. Kết luận Cuối cùng <span className="required">*</span>
-                                </h3>
-                                <div className="interview-evaluation-conclusion">
-                                    <label className={`interview-evaluation-radio-label ${evaluationData.finalConclusion === 'PASS' ? 'selected' : ''}`}>
-                                        <input
-                                            type="radio"
-                                            name="finalConclusion"
-                                            value="PASS"
-                                            checked={evaluationData.finalConclusion === 'PASS'}
-                                            onChange={(e) => setEvaluationData({ ...evaluationData, finalConclusion: e.target.value })}
-                                            className="interview-evaluation-radio"
-                                            disabled={hasEvaluated}
-                                        />
-                                        <span className="interview-evaluation-radio-text interview-evaluation-radio-text--pass">
-                                            ĐẠT (PASS)
-                                        </span>
-                                    </label>
-
-                                    <label className={`interview-evaluation-radio-label ${evaluationData.finalConclusion === 'FAIL' ? 'selected' : ''}`}>
-                                        <input
-                                            type="radio"
-                                            name="finalConclusion"
-                                            value="FAIL"
-                                            checked={evaluationData.finalConclusion === 'FAIL'}
-                                            onChange={(e) => setEvaluationData({ ...evaluationData, finalConclusion: e.target.value })}
-                                            className="interview-evaluation-radio"
-                                            disabled={hasEvaluated}
-                                        />
-                                        <span className="interview-evaluation-radio-text interview-evaluation-radio-text--fail">
-                                            KHÔNG ĐẠT (FAIL)
-                                        </span>
-                                    </label>
-
-                                    <label className={`interview-evaluation-radio-label ${evaluationData.finalConclusion === 'HOLD' ? 'selected' : ''}`}>
-                                        <input
-                                            type="radio"
-                                            name="finalConclusion"
-                                            value="HOLD"
-                                            checked={evaluationData.finalConclusion === 'HOLD'}
-                                            onChange={(e) => setEvaluationData({ ...evaluationData, finalConclusion: e.target.value })}
-                                            className="interview-evaluation-radio"
-                                            disabled={hasEvaluated}
-                                        />
-                                        <span className="interview-evaluation-radio-text interview-evaluation-radio-text--hold">
-                                            LƯU HỒ SƠ (HOLD)
-                                        </span>
-                                    </label>
+                            {/* Thông tin gọn gàng */}
+                            <div className="interview-approvals-detail-grid">
+                                <div className="interview-approvals-detail-item">
+                                    <div className="interview-approvals-detail-item-label">
+                                        <svg className="interview-approvals-detail-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                        </svg>
+                                        <span className="interview-approvals-detail-item-label-text">Vị trí ứng tuyển</span>
+                                    </div>
+                                    <div className="interview-approvals-detail-item-value">
+                                        {selectedInterviewRequest.vi_tri_ung_tuyen || selectedInterviewRequest.chuc_danh_can_tuyen || '---'}
+                                    </div>
                                 </div>
+                                <div className="interview-approvals-detail-item">
+                                    <div className="interview-approvals-detail-item-label">
+                                        <svg className="interview-approvals-detail-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                        </svg>
+                                        <span className="interview-approvals-detail-item-label-text">Phòng ban</span>
+                                    </div>
+                                    <div className="interview-approvals-detail-item-value">
+                                        {selectedInterviewRequest.phong_ban || selectedInterviewRequest.phong_ban_bo_phan || '---'}
+                                    </div>
+                                </div>
+                                <div className="interview-approvals-detail-item">
+                                    <div className="interview-approvals-detail-item-label">
+                                        <svg className="interview-approvals-detail-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <span className="interview-approvals-detail-item-label-text">Thời gian phỏng vấn</span>
+                                    </div>
+                                    <div className="interview-approvals-detail-item-value">
+                                        {selectedInterviewRequest.interview_time ? new Date(selectedInterviewRequest.interview_time).toLocaleString('vi-VN') : '---'}
+                                    </div>
+                                </div>
+                                <div className="interview-approvals-detail-item">
+                                    <div className="interview-approvals-detail-item-label">
+                                        <svg className="interview-approvals-detail-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                        </svg>
+                                        <span className="interview-approvals-detail-item-label-text">Người gửi</span>
+                                    </div>
+                                    <div className="interview-approvals-detail-item-value">
+                                        {selectedInterviewRequest.manager_id ? (
+                                            <span>
+                                                Quản lý trực tiếp{selectedInterviewRequest.manager_name ? ` - ${selectedInterviewRequest.manager_name}` : ''}
+                                            </span>
+                                        ) : selectedInterviewRequest.branch_director_id ? (
+                                            <span>
+                                                Giám đốc chi nhánh{selectedInterviewRequest.branch_director_name ? ` - ${selectedInterviewRequest.branch_director_name}` : ''}
+                                            </span>
+                                        ) : '---'}
+                                    </div>
+                                </div>
+                                {selectedInterviewRequest.manager_id && (
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-label">
+                                            <svg className="interview-approvals-detail-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                            </svg>
+                                            <span className="interview-approvals-detail-item-label-text">Quản lý trực tiếp</span>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-value">
+                                            {selectedInterviewRequest.manager_approved ? (
+                                                <span style={{ color: '#059669', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <svg style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                    Đã duyệt{selectedInterviewRequest.manager_approved_at ? ` (${new Date(selectedInterviewRequest.manager_approved_at).toLocaleString('vi-VN')})` : ''}
+                                                </span>
+                                            ) : (
+                                                <span style={{ color: '#f59e0b', fontWeight: '600' }}>Chờ duyệt</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                {selectedInterviewRequest.branch_director_id && (
+                                    <div className="interview-approvals-detail-item">
+                                        <div className="interview-approvals-detail-item-label">
+                                            <svg className="interview-approvals-detail-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                                            </svg>
+                                            <span className="interview-approvals-detail-item-label-text">Giám đốc chi nhánh</span>
+                                        </div>
+                                        <div className="interview-approvals-detail-item-value">
+                                            {selectedInterviewRequest.branch_director_approved ? (
+                                                <span style={{ color: '#059669', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <svg style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                    Đã duyệt{selectedInterviewRequest.branch_director_approved_at ? ` (${new Date(selectedInterviewRequest.branch_director_approved_at).toLocaleString('vi-VN')})` : ''}
+                                                </span>
+                                            ) : (
+                                                <span style={{ color: '#f59e0b', fontWeight: '600' }}>Chờ duyệt</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
+                        <div className="interview-approvals-modal-footer">
+                            <button
+                                type="button"
+                                className="interview-approvals-modal-btn interview-approvals-modal-btn--info"
+                                onClick={() => {
+                                    if (selectedInterviewRequest.candidate_id) {
+                                        handleViewCandidateDetail(selectedInterviewRequest.candidate_id);
+                                    }
+                                }}
+                                disabled={loadingCandidate || !selectedInterviewRequest.candidate_id}
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px', marginRight: '8px' }}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                </svg>
+                                Xem thông tin ứng viên
+                            </button>
+                            <button
+                                type="button"
+                                className="interview-approvals-modal-btn interview-approvals-modal-btn--info"
+                                onClick={async () => {
+                                    if (!selectedInterviewRequest.candidate_id) return;
 
-                        {/* Footer (Chân Modal) */}
-                        <div className="interview-evaluation-modal-footer">
-                            {hasEvaluated ? (
-                                <>
-                                    <div className="interview-evaluation-readonly-notice">
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg>
-                                        <span>Bạn đã hoàn thành đánh giá. Đây là chế độ xem chỉ đọc.</span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className="interview-evaluation-footer-btn interview-evaluation-footer-btn--cancel"
-                                        onClick={handleCloseEvaluationModal}
-                                    >
-                                        Đóng
-                                    </button>
-                                </>
-                            ) : (
-                                <>
-                                    <button
-                                        type="button"
-                                        className="interview-evaluation-footer-btn interview-evaluation-footer-btn--cancel"
-                                        onClick={handleCloseEvaluationModal}
-                                        disabled={submittingEvaluation}
-                                    >
-                                        Hủy
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="interview-evaluation-footer-btn interview-evaluation-footer-btn--submit"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            console.log('Submit evaluation button clicked');
-                                            handleSubmitEvaluation();
-                                        }}
-                                        disabled={submittingEvaluation || !evaluationData.finalConclusion}
-                                    >
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                                        </svg>
-                                        <span>Lưu & Gửi Đánh giá</span>
-                                    </button>
-                                </>
-                            )}
+                                    // Fetch candidate to get CV path
+                                    try {
+                                        const response = await candidatesAPI.getById(selectedInterviewRequest.candidate_id);
+                                        if (response.data.success && response.data.data) {
+                                            const candidate = response.data.data;
+                                            if (candidate.cv_dinh_kem_path) {
+                                                // CV path is stored in database, construct URL
+                                                const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+                                                const cvUrl = candidate.cv_dinh_kem_path.startsWith('http')
+                                                    ? candidate.cv_dinh_kem_path
+                                                    : `${apiUrl}${candidate.cv_dinh_kem_path}`;
+                                                window.open(cvUrl, '_blank');
+                                            } else {
+                                                if (showToast) {
+                                                    showToast('Ứng viên chưa có CV đính kèm', 'warning');
+                                                }
+                                            }
+                                        }
+                                    } catch (error) {
+                                        console.error('Error loading CV:', error);
+                                        if (showToast) {
+                                            showToast('Lỗi khi tải CV', 'error');
+                                        }
+                                    }
+                                }}
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px', marginRight: '8px' }}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Xem CV đính kèm
+                            </button>
+                            <button
+                                type="button"
+                                className="interview-approvals-modal-btn interview-approvals-modal-btn--approve"
+                                onClick={() => handleApproveInterviewRequest(selectedInterviewRequest.id)}
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px', marginRight: '8px' }}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Duyệt
+                            </button>
+                            <button
+                                type="button"
+                                className="interview-approvals-modal-btn interview-approvals-modal-btn--reject"
+                                onClick={() => handleRejectInterviewRequest(selectedInterviewRequest.id)}
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px', marginRight: '8px' }}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                                Từ chối
+                            </button>
+                            <button
+                                type="button"
+                                className="interview-approvals-modal-btn interview-approvals-modal-btn--cancel"
+                                onClick={() => {
+                                    setShowInterviewRequestDetail(false);
+                                    setSelectedInterviewRequest(null);
+                                }}
+                            >
+                                Đóng
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Candidate Preview Modal */}
+            {/* Preview Modal - Design Mới */}
             {isPreviewModalOpen && (
-                <div className="interview-detail-modal-overlay" onClick={() => setIsPreviewModalOpen(false)}>
-                    <div className="candidate-preview-modal-box" onClick={(e) => e.stopPropagation()}>
-                        {/* Modal Header */}
-                        <div className="candidate-modal-header">
-                            <h2 className="candidate-modal-title">
-                                <svg className="candidate-modal-title-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                </svg>
-                                <span>Xem trước thông tin ứng viên</span>
-                            </h2>
+                <div className="preview-modal-overlay" onClick={() => setIsPreviewModalOpen(false)}>
+                    <div className="preview-modal-container" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="preview-modal-header">
+                            <div className="preview-modal-header-content">
+                                <div className="preview-modal-icon">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 className="preview-modal-title">Xem Trước Yêu Cầu Tuyển Dụng</h2>
+                                    <p className="preview-modal-subtitle">Kiểm tra thông tin trước khi gửi</p>
+                                </div>
+                            </div>
                             <button
                                 type="button"
-                                className="candidate-modal-close"
+                                className="preview-modal-close"
                                 onClick={() => setIsPreviewModalOpen(false)}
                             >
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1847,254 +2451,171 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                             </button>
                         </div>
 
-                        {/* Preview Content */}
-                        {loadingCandidate ? (
-                            <div className="interview-approvals-loading" style={{ padding: '3rem' }}>
-                                <div className="interview-approvals-spinner"></div>
-                                <span>Đang tải thông tin ứng viên...</span>
-                            </div>
-                        ) : previewCandidate ? (
-                            <div className="candidate-preview-content-wrapper">
-                                <div className="candidate-preview-content">
-                                    {/* Section I: THÔNG TIN CÁ NHÂN */}
-                                    <div className="candidate-preview-section">
-                                        <h3 className="candidate-preview-section-title">I. THÔNG TIN CÁ NHÂN</h3>
-
-                                        <div className="candidate-preview-table">
-                                            <table className="candidate-preview-info-table">
-                                                <tbody>
-                                                    <tr>
-                                                        <td className="candidate-preview-label">Họ và tên</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.hoTen || previewCandidate.ho_ten || '-'}</td>
-                                                        <td className="candidate-preview-label">Giới tính</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.gioiTinh || previewCandidate.gioi_tinh || '-'}</td>
-                                                        <td className="candidate-preview-label">Ngày sinh</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.ngaySinh ? formatDateDisplay(previewCandidate.ngaySinh) : '-'}</td>
-                                                        <td className="candidate-preview-label">Nơi sinh</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.noiSinh || previewCandidate.noi_sinh || '-'}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="candidate-preview-label">Tình trạng hôn nhân</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.tinhTrangHonNhan || previewCandidate.tinh_trang_hon_nhan || '-'}</td>
-                                                        <td className="candidate-preview-label">Dân tộc</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.danToc || previewCandidate.dan_toc || '-'}</td>
-                                                        <td className="candidate-preview-label">Quốc tịch</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.quocTich || previewCandidate.quoc_tich || '-'}</td>
-                                                        <td className="candidate-preview-label">Tôn giáo</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.tonGiao || previewCandidate.ton_giao || '-'}</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-
-                                        <div className="candidate-preview-table">
-                                            <table className="candidate-preview-info-table">
-                                                <tbody>
-                                                    <tr>
-                                                        <td className="candidate-preview-label">Số CCCD</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.cccd || '-'}</td>
-                                                        <td className="candidate-preview-label">Ngày cấp</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.ngayCapCCCD ? formatDateDisplay(previewCandidate.ngayCapCCCD) : '-'}</td>
-                                                        <td className="candidate-preview-label">Nơi cấp</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.noiCapCCCD || previewCandidate.noi_cap_cccd || '-'}</td>
-                                                        <td className="candidate-preview-label">Nguyên quán</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.nguyenQuan || previewCandidate.nguyen_quan || '-'}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="candidate-preview-label">Điện thoại di động</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.soDienThoai || previewCandidate.so_dien_thoai || '-'}</td>
-                                                        <td className="candidate-preview-label">Điện thoại khác</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.soDienThoaiKhac || previewCandidate.so_dien_thoai_khac || '-'}</td>
-                                                        <td className="candidate-preview-label" colSpan="2">Email</td>
-                                                        <td className="candidate-preview-value" colSpan="2">{previewCandidate.email || '-'}</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-
-                                        <div className="candidate-preview-table">
-                                            <table className="candidate-preview-info-table">
-                                                <tbody>
-                                                    <tr>
-                                                        <td className="candidate-preview-label" rowSpan="2">Địa chỉ</td>
-                                                        <td className="candidate-preview-sub-label">Địa chỉ thường trú</td>
-                                                        <td className="candidate-preview-value" colSpan="4">{previewCandidate.diaChiTamTru || previewCandidate.dia_chi_tam_tru || '-'}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="candidate-preview-sub-label">Địa chỉ liên lạc</td>
-                                                        <td className="candidate-preview-value" colSpan="4">{previewCandidate.diaChiTamTru || previewCandidate.dia_chi_tam_tru || '-'}</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-
-                                        <div className="candidate-preview-table">
-                                            <table className="candidate-preview-info-table">
-                                                <tbody>
-                                                    <tr>
-                                                        <td className="candidate-preview-label">Trình độ văn hóa</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.trinhDoVanHoa || previewCandidate.trinh_do_van_hoa || '-'}</td>
-                                                        <td className="candidate-preview-label">Trình độ chuyên môn</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.trinhDoChuyenMon || previewCandidate.trinh_do_chuyen_mon || '-'}</td>
-                                                        <td className="candidate-preview-label">Chuyên ngành</td>
-                                                        <td className="candidate-preview-value">{previewCandidate.chuyenNganh || previewCandidate.chuyen_nganh || '-'}</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
+                        {/* Body */}
+                        <div className="preview-modal-body">
+                            {/* Section 1: Thông Tin Cơ Bản */}
+                            <div className="preview-section">
+                                <div className="preview-section-header">
+                                    <h3 className="preview-section-title">
+                                        <svg className="preview-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                        </svg>
+                                        Thông Tin Vị Trí
+                                    </h3>
+                                </div>
+                                <div className="preview-grid">
+                                    <div className="preview-field">
+                                        <span className="preview-label">Chức danh</span>
+                                        <span className="preview-value">{recruitmentForm.chucDanhCanTuyen || 'Chưa nhập'}</span>
                                     </div>
-
-                                    {/* Section II: KINH NGHIỆM LÀM VIỆC */}
-                                    <div className="candidate-preview-section">
-                                        <h3 className="candidate-preview-section-title">
-                                            II. KINH NGHIỆM LÀM VIỆC
-                                            <span className="candidate-preview-section-subtitle">
-                                                (Nhập thông tin 05 kinh nghiệm gần nhất từ mới đến cũ)
-                                            </span>
-                                        </h3>
-
-                                        <div className="candidate-preview-table">
-                                            <table className="candidate-preview-data-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Ngày bắt đầu</th>
-                                                        <th>Ngày kết thúc</th>
-                                                        <th>Công ty</th>
-                                                        <th>Chức danh</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {(() => {
-                                                        try {
-                                                            let kinhNghiem = previewCandidate.kinhNghiemLamViec || previewCandidate.kinh_nghiem_lam_viec;
-                                                            if (typeof kinhNghiem === 'string') {
-                                                                kinhNghiem = JSON.parse(kinhNghiem);
-                                                            }
-                                                            if (!kinhNghiem || !Array.isArray(kinhNghiem) || kinhNghiem.length === 0) {
-                                                                return <tr><td colSpan="4" style={{ textAlign: 'center', color: '#94a3b8' }}>Chưa có thông tin</td></tr>;
-                                                            }
-                                                            return kinhNghiem.map((kn, index) => (
-                                                                <tr key={index}>
-                                                                    <td>{kn.ngayBatDau || kn.ngay_bat_dau ? formatDateDisplay(kn.ngayBatDau || kn.ngay_bat_dau) : '-'}</td>
-                                                                    <td>{kn.ngayKetThuc || kn.ngay_ket_thuc ? formatDateDisplay(kn.ngayKetThuc || kn.ngay_ket_thuc) : '-'}</td>
-                                                                    <td>{kn.congTy || kn.cong_ty || '-'}</td>
-                                                                    <td>{kn.chucDanh || kn.chuc_danh || '-'}</td>
-                                                                </tr>
-                                                            ));
-                                                        } catch (e) {
-                                                            console.error('Error parsing kinhNghiemLamViec:', e);
-                                                            return <tr><td colSpan="4" style={{ textAlign: 'center', color: '#94a3b8' }}>Chưa có thông tin</td></tr>;
-                                                        }
-                                                    })()}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                    <div className="preview-field">
+                                        <span className="preview-label">Phòng ban</span>
+                                        <span className="preview-value">{recruitmentForm.phongBanBoPhan || 'Chưa nhập'}</span>
                                     </div>
-
-                                    {/* Section III: QUÁ TRÌNH ĐÀO TẠO */}
-                                    <div className="candidate-preview-section">
-                                        <h3 className="candidate-preview-section-title">
-                                            III. QUÁ TRÌNH ĐÀO TẠO
-                                            <span className="candidate-preview-section-subtitle">
-                                                (Nhập thông tin 05 văn bằng/ chứng chỉ chính từ mới đến cũ)
-                                            </span>
-                                        </h3>
-
-                                        <div className="candidate-preview-table">
-                                            <table className="candidate-preview-data-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Ngày bắt đầu</th>
-                                                        <th>Ngày kết thúc</th>
-                                                        <th>Trường đào tạo</th>
-                                                        <th>Chuyên ngành đào tạo</th>
-                                                        <th>Văn bằng/ Chứng chỉ</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {(() => {
-                                                        try {
-                                                            let daoTao = previewCandidate.quaTrinhDaoTao || previewCandidate.qua_trinh_dao_tao;
-                                                            if (typeof daoTao === 'string') {
-                                                                daoTao = JSON.parse(daoTao);
-                                                            }
-                                                            if (!daoTao || !Array.isArray(daoTao) || daoTao.length === 0) {
-                                                                return <tr><td colSpan="5" style={{ textAlign: 'center', color: '#94a3b8' }}>Chưa có thông tin</td></tr>;
-                                                            }
-                                                            return daoTao.map((dt, index) => (
-                                                                <tr key={index}>
-                                                                    <td>{dt.ngayBatDau || dt.ngay_bat_dau ? formatDateDisplay(dt.ngayBatDau || dt.ngay_bat_dau) : '-'}</td>
-                                                                    <td>{dt.ngayKetThuc || dt.ngay_ket_thuc ? formatDateDisplay(dt.ngayKetThuc || dt.ngay_ket_thuc) : '-'}</td>
-                                                                    <td>{dt.truongDaoTao || dt.truong_dao_tao || '-'}</td>
-                                                                    <td>{dt.chuyenNganhDaoTao || dt.chuyen_nganh_dao_tao || '-'}</td>
-                                                                    <td>{dt.vanBangChungChi || dt.van_bang_chung_chi || '-'}</td>
-                                                                </tr>
-                                                            ));
-                                                        } catch (e) {
-                                                            console.error('Error parsing quaTrinhDaoTao:', e);
-                                                            return <tr><td colSpan="5" style={{ textAlign: 'center', color: '#94a3b8' }}>Chưa có thông tin</td></tr>;
-                                                        }
-                                                    })()}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                    <div className="preview-field">
+                                        <span className="preview-label">Quản lý trực tiếp</span>
+                                        <span className="preview-value">{recruitmentForm.nguoiQuanLyTrucTiep || 'Chưa nhập'}</span>
                                     </div>
-
-                                    {/* Section IV: TRÌNH ĐỘ NGOẠI NGỮ */}
-                                    <div className="candidate-preview-section">
-                                        <h3 className="candidate-preview-section-title">
-                                            IV. TRÌNH ĐỘ NGOẠI NGỮ
-                                            <span className="candidate-preview-section-subtitle">
-                                                (Đánh giá Khả năng sử dụng theo mức độ: A: Giỏi, B: Khá, C: Trung bình, D: Kém)
-                                            </span>
-                                        </h3>
-
-                                        <div className="candidate-preview-table">
-                                            <table className="candidate-preview-data-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Ngoại ngữ</th>
-                                                        <th>Chứng chỉ</th>
-                                                        <th>Điểm</th>
-                                                        <th>Khả năng sử dụng</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {(() => {
-                                                        try {
-                                                            let ngoaiNgu = previewCandidate.trinhDoNgoaiNgu || previewCandidate.trinh_do_ngoai_ngu;
-                                                            if (typeof ngoaiNgu === 'string') {
-                                                                ngoaiNgu = JSON.parse(ngoaiNgu);
-                                                            }
-                                                            if (!ngoaiNgu || !Array.isArray(ngoaiNgu) || ngoaiNgu.length === 0) {
-                                                                return <tr><td colSpan="4" style={{ textAlign: 'center', color: '#94a3b8' }}>Chưa có thông tin</td></tr>;
-                                                            }
-                                                            return ngoaiNgu.map((nn, index) => (
-                                                                <tr key={index}>
-                                                                    <td>{nn.ngoaiNgu || nn.ngoai_ngu || '-'}</td>
-                                                                    <td>{nn.chungChi || nn.chung_chi || '-'}</td>
-                                                                    <td>{nn.diem || '-'}</td>
-                                                                    <td>{nn.khaNangSuDung || nn.kha_nang_su_dung || '-'}</td>
-                                                                </tr>
-                                                            ));
-                                                        } catch (e) {
-                                                            console.error('Error parsing trinhDoNgoaiNgu:', e);
-                                                            return <tr><td colSpan="4" style={{ textAlign: 'center', color: '#94a3b8' }}>Chưa có thông tin</td></tr>;
-                                                        }
-                                                    })()}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                    <div className="preview-field preview-field-highlight">
+                                        <span className="preview-label">Số lượng</span>
+                                        <span className="preview-value preview-value-highlight">{recruitmentForm.soLuongYeuCau || '---'}</span>
+                                    </div>
+                                    <div className="preview-field">
+                                        <span className="preview-label">Loại lao động</span>
+                                        <span className="preview-value">
+                                            {recruitmentForm.loaiLaoDong === 'toan_thoi_gian' ? 'Toàn thời gian' :
+                                                recruitmentForm.loaiLaoDong === 'thoi_vu' ? 'Thời vụ' : 'Chưa chọn'}
+                                        </span>
+                                    </div>
+                                    <div className="preview-field">
+                                        <span className="preview-label">Lý do tuyển</span>
+                                        <span className="preview-value">
+                                            {recruitmentForm.lyDoTuyen === 'thay_the' ? 'Thay thế' :
+                                                recruitmentForm.lyDoTuyen === 'nhu_cau_tang' ? 'Nhu cầu tăng' :
+                                                    recruitmentForm.lyDoTuyen === 'vi_tri_moi' ? 'Vị trí mới' : 'Chưa chọn'}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
-                        ) : null}
 
-                        {/* Preview Actions */}
-                        <div className="candidate-preview-actions">
+                            {/* Section 2: Tiêu Chuẩn Tuyển Chọn */}
+                            <div className="preview-section">
+                                <div className="preview-section-header">
+                                    <h3 className="preview-section-title">
+                                        <svg className="preview-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Tiêu Chuẩn Tuyển Chọn
+                                    </h3>
+                                </div>
+                                <div className="preview-grid">
+                                    <div className="preview-field">
+                                        <span className="preview-label">Giới tính</span>
+                                        <span className="preview-value">
+                                            {recruitmentForm.gioiTinh === 'bat_ky' ? 'Bất kỳ' :
+                                                recruitmentForm.gioiTinh === 'nam' ? 'Nam' :
+                                                    recruitmentForm.gioiTinh === 'nu' ? 'Nữ' : 'Chưa chọn'}
+                                        </span>
+                                    </div>
+                                    <div className="preview-field">
+                                        <span className="preview-label">Độ tuổi</span>
+                                        <span className="preview-value">{recruitmentForm.doTuoi || 'Không yêu cầu'}</span>
+                                    </div>
+                                    <div className="preview-field">
+                                        <span className="preview-label">Kinh nghiệm</span>
+                                        <span className="preview-value">
+                                            {recruitmentForm.kinhNghiemChuyenMon === 'khong_yeu_cau' ? 'Không yêu cầu' :
+                                                recruitmentForm.kinhNghiemChuyenMon === 'co_yeu_cau' ? 'Có yêu cầu' : 'Chưa chọn'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Section 3: Chi Tiết Yêu Cầu */}
+                            {(recruitmentForm.trinhDoHocVanYeuCau || recruitmentForm.chiTietKinhNghiem || recruitmentForm.kienThucChuyenMonKhac || 
+                              recruitmentForm.yeuCauNgoaiNgu || recruitmentForm.yeuCauViTinhKyNangKhac || recruitmentForm.kyNangGiaoTiep || 
+                              recruitmentForm.thaiDoLamViec || recruitmentForm.kyNangQuanLy || recruitmentForm.yeuCauChiTietCongViec || 
+                              recruitmentForm.lyDoKhacGhiChu) && (
+                                <div className="preview-section">
+                                    <div className="preview-section-header">
+                                        <h3 className="preview-section-title">
+                                            <svg className="preview-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                            Chi Tiết Yêu Cầu
+                                        </h3>
+                                    </div>
+                                    <div className="preview-text-cards">
+                                        {recruitmentForm.trinhDoHocVanYeuCau && (
+                                            <div className="preview-text-card">
+                                                <span className="preview-label">Trình độ học vấn</span>
+                                                <span className="preview-value">{recruitmentForm.trinhDoHocVanYeuCau}</span>
+                                            </div>
+                                        )}
+                                        {recruitmentForm.kinhNghiemChuyenMon === 'co_yeu_cau' && recruitmentForm.chiTietKinhNghiem && (
+                                            <div className="preview-text-card">
+                                                <span className="preview-label">Chi tiết kinh nghiệm</span>
+                                                <span className="preview-value">{recruitmentForm.chiTietKinhNghiem}</span>
+                                            </div>
+                                        )}
+                                        {recruitmentForm.kienThucChuyenMonKhac && (
+                                            <div className="preview-text-card">
+                                                <span className="preview-label">Kiến thức chuyên môn</span>
+                                                <span className="preview-value">{recruitmentForm.kienThucChuyenMonKhac}</span>
+                                            </div>
+                                        )}
+                                        {recruitmentForm.yeuCauNgoaiNgu && (
+                                            <div className="preview-text-card">
+                                                <span className="preview-label">Yêu cầu ngoại ngữ</span>
+                                                <span className="preview-value">{recruitmentForm.yeuCauNgoaiNgu}</span>
+                                            </div>
+                                        )}
+                                        {recruitmentForm.yeuCauViTinhKyNangKhac && (
+                                            <div className="preview-text-card">
+                                                <span className="preview-label">Vi tính / Kỹ năng</span>
+                                                <span className="preview-value">{recruitmentForm.yeuCauViTinhKyNangKhac}</span>
+                                            </div>
+                                        )}
+                                        {recruitmentForm.kyNangGiaoTiep && (
+                                            <div className="preview-text-card">
+                                                <span className="preview-label">Kỹ năng giao tiếp</span>
+                                                <span className="preview-value">{recruitmentForm.kyNangGiaoTiep}</span>
+                                            </div>
+                                        )}
+                                        {recruitmentForm.thaiDoLamViec && (
+                                            <div className="preview-text-card">
+                                                <span className="preview-label">Thái độ làm việc</span>
+                                                <span className="preview-value">{recruitmentForm.thaiDoLamViec}</span>
+                                            </div>
+                                        )}
+                                        {recruitmentForm.kyNangQuanLy && (
+                                            <div className="preview-text-card">
+                                                <span className="preview-label">Kỹ năng quản lý</span>
+                                                <span className="preview-value">{recruitmentForm.kyNangQuanLy}</span>
+                                            </div>
+                                        )}
+                                        {recruitmentForm.yeuCauChiTietCongViec && (
+                                            <div className="preview-text-card">
+                                                <span className="preview-label">Yêu cầu chi tiết công việc</span>
+                                                <span className="preview-value">{recruitmentForm.yeuCauChiTietCongViec}</span>
+                                            </div>
+                                        )}
+                                        {recruitmentForm.lyDoKhacGhiChu && (
+                                            <div className="preview-text-card">
+                                                <span className="preview-label">Ghi chú</span>
+                                                <span className="preview-value">{recruitmentForm.lyDoKhacGhiChu}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="preview-modal-footer">
                             <button
                                 type="button"
-                                className="interview-detail-action-btn interview-detail-action-btn--cancel"
+                                className="preview-modal-btn"
                                 onClick={() => setIsPreviewModalOpen(false)}
                             >
                                 Đóng
@@ -2104,711 +2625,21 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 </div>
             )}
 
-            {/* Recruitment Request Modal */}
-            {isRecruitmentRequestModalOpen && (
-                <div className="interview-approvals-modal-overlay" onClick={handleCloseRecruitmentRequestModal}>
-                    <div className="recruitment-request-modal-box" onClick={(e) => e.stopPropagation()}>
-                        <div className="recruitment-request-modal-header">
-                            <h2 className="recruitment-request-modal-title">Yêu cầu tuyển dụng</h2>
-                            <button
-                                type="button"
-                                className="recruitment-request-modal-close-btn"
-                                onClick={handleCloseRecruitmentRequestModal}
-                            >
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleSubmitRecruitmentRequest} className="recruitment-request-modal-form">
-                            {/* PHẦN I: VỊ TRÍ TUYỂN DỤNG */}
-                            <div className="recruitment-request-section">
-                                <div className="recruitment-request-section-header">
-                                    <h3 className="recruitment-request-section-title">PHẦN I: VỊ TRÍ TUYỂN DỤNG</h3>
-                                    <div className="recruitment-request-section-divider"></div>
-                                </div>
-
-                                <div className="recruitment-request-form-content">
-                                    {/* Chức danh cần tuyển và Số lượng yêu cầu - Cùng dòng */}
-                                    <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
-                                        <div className="recruitment-request-form-field">
-                                            <label className="recruitment-request-form-label">
-                                                Vị trí ứng tuyển <span className="required">*</span>
-                                            </label>
-                                            <select
-                                                className={`recruitment-request-form-input recruitment-request-form-select ${recruitmentRequestErrors.chucDanhCanTuyen ? 'error' : ''}`}
-                                                value={recruitmentRequestForm.chucDanhCanTuyen}
-                                                onChange={(e) => {
-                                                    const value = e.target.value;
-                                                    if (value === 'OTHER') {
-                                                        setShowCustomViTri(true);
-                                                        handleRecruitmentRequestChange('chucDanhCanTuyen', '');
-                                                    } else {
-                                                        setShowCustomViTri(false);
-                                                        setCustomViTri('');
-                                                        handleRecruitmentRequestChange('chucDanhCanTuyen', value);
-                                                    }
-                                                }}
-                                                disabled={loadingFormData}
-                                            >
-                                                <option value="">-- Chọn vị trí ứng tuyển --</option>
-                                                {jobTitles.map((position, index) => (
-                                                    <option key={index} value={position}>{position}</option>
-                                                ))}
-                                                <option value="OTHER">-- Khác (Nhập mới) --</option>
-                                            </select>
-                                            {showCustomViTri && (
-                                                <input
-                                                    type="text"
-                                                    className={`recruitment-request-form-input ${recruitmentRequestErrors.chucDanhCanTuyen ? 'error' : ''}`}
-                                                    value={customViTri}
-                                                    onChange={(e) => {
-                                                        const value = e.target.value;
-                                                        setCustomViTri(value);
-                                                        handleRecruitmentRequestChange('chucDanhCanTuyen', value);
-                                                    }}
-                                                    placeholder="Nhập vị trí ứng tuyển mới"
-                                                    style={{ marginTop: '8px' }}
-                                                />
-                                            )}
-                                            {recruitmentRequestErrors.chucDanhCanTuyen && (
-                                                <span className="recruitment-request-error-text">{recruitmentRequestErrors.chucDanhCanTuyen}</span>
-                                            )}
-                                        </div>
-                                        <div className="recruitment-request-form-field">
-                                            <label className="recruitment-request-form-label">
-                                                Số lượng yêu cầu <span className="required">*</span>
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                className={`recruitment-request-form-input ${recruitmentRequestErrors.soLuongYeuCau ? 'error' : ''}`}
-                                                value={recruitmentRequestForm.soLuongYeuCau}
-                                                onChange={(e) => handleRecruitmentRequestChange('soLuongYeuCau', e.target.value)}
-                                                placeholder="Nhập số lượng"
-                                            />
-                                            {recruitmentRequestErrors.soLuongYeuCau && (
-                                                <span className="recruitment-request-error-text">{recruitmentRequestErrors.soLuongYeuCau}</span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Ghi chú 1 */}
-                                    <div className="recruitment-request-note">
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', color: '#6b7280', flexShrink: 0 }}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg>
-                                        <span>Trường hợp tuyển nhiều vị trí khác nhau (hơn 5 vị trí): sử dụng biểu mẫu Kế hoạch nhân sự.</span>
-                                    </div>
-
-                                    {/* Ghi chú 2 */}
-                                    <div className="recruitment-request-note">
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', color: '#6b7280', flexShrink: 0 }}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg>
-                                        <span>Trường hợp tuyển dụng vị trí mới (chưa có Mô tả công việc trước đó): phải đính kèm Mô tả công việc.</span>
-                                    </div>
-
-                                    {/* Phòng ban */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">
-                                            Phòng ban <span className="required">*</span>
-                                        </label>
-                                        <select
-                                            className={`recruitment-request-form-input recruitment-request-form-select ${recruitmentRequestErrors.phongBan ? 'error' : ''}`}
-                                            value={recruitmentRequestForm.phongBan}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                if (value === 'OTHER') {
-                                                    setShowCustomPhongBan(true);
-                                                    handleRecruitmentRequestChange('phongBan', '');
-                                                } else {
-                                                    setShowCustomPhongBan(false);
-                                                    setCustomPhongBan('');
-                                                    handleRecruitmentRequestChange('phongBan', value);
-                                                }
-                                            }}
-                                            disabled={loadingFormData}
-                                        >
-                                            <option value="">-- Chọn phòng ban --</option>
-                                            {departments.map((dept, index) => (
-                                                <option key={index} value={dept}>{dept}</option>
-                                            ))}
-                                            <option value="OTHER">-- Khác (Nhập mới) --</option>
-                                        </select>
-                                        {showCustomPhongBan && (
-                                            <input
-                                                type="text"
-                                                className={`recruitment-request-form-input ${recruitmentRequestErrors.phongBan ? 'error' : ''}`}
-                                                value={customPhongBan}
-                                                onChange={(e) => {
-                                                    const value = e.target.value;
-                                                    setCustomPhongBan(value);
-                                                    handleRecruitmentRequestChange('phongBan', value);
-                                                }}
-                                                placeholder="Nhập phòng ban mới"
-                                                style={{ marginTop: '8px' }}
-                                            />
-                                        )}
-                                        {recruitmentRequestErrors.phongBan && (
-                                            <span className="recruitment-request-error-text">{recruitmentRequestErrors.phongBan}</span>
-                                        )}
-                                    </div>
-
-                                    {/* Mô tả công việc */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">
-                                            Mô tả công việc <span className="required">*</span>
-                                        </label>
-                                        <div className="recruitment-request-checkbox-group">
-                                            <label className="recruitment-request-checkbox-label">
-                                                <input
-                                                    type="radio"
-                                                    name="moTaCongViec"
-                                                    value="co"
-                                                    checked={recruitmentRequestForm.moTaCongViec === 'co'}
-                                                    onChange={(e) => handleRecruitmentRequestChange('moTaCongViec', e.target.value)}
-                                                />
-                                                <span>Có</span>
-                                            </label>
-                                            <label className="recruitment-request-checkbox-label">
-                                                <input
-                                                    type="radio"
-                                                    name="moTaCongViec"
-                                                    value="chua_co"
-                                                    checked={recruitmentRequestForm.moTaCongViec === 'chua_co'}
-                                                    onChange={(e) => handleRecruitmentRequestChange('moTaCongViec', e.target.value)}
-                                                />
-                                                <span>Chưa có</span>
-                                            </label>
-                                        </div>
-                                        {recruitmentRequestErrors.moTaCongViec && (
-                                            <span className="recruitment-request-error-text">{recruitmentRequestErrors.moTaCongViec}</span>
-                                        )}
-                                    </div>
-
-                                    {/* Loại lao động */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">
-                                            Loại lao động <span className="required">*</span>
-                                        </label>
-                                        <div className="recruitment-request-checkbox-group">
-                                            <label className="recruitment-request-checkbox-label">
-                                                <input
-                                                    type="radio"
-                                                    name="loaiLaoDong"
-                                                    value="thoi_vu"
-                                                    checked={recruitmentRequestForm.loaiLaoDong === 'thoi_vu'}
-                                                    onChange={(e) => handleRecruitmentRequestChange('loaiLaoDong', e.target.value)}
-                                                />
-                                                <span>Thời vụ</span>
-                                            </label>
-                                            <label className="recruitment-request-checkbox-label">
-                                                <input
-                                                    type="radio"
-                                                    name="loaiLaoDong"
-                                                    value="toan_thoi_gian"
-                                                    checked={recruitmentRequestForm.loaiLaoDong === 'toan_thoi_gian'}
-                                                    onChange={(e) => handleRecruitmentRequestChange('loaiLaoDong', e.target.value)}
-                                                />
-                                                <span>Toàn thời gian</span>
-                                            </label>
-                                        </div>
-                                        {recruitmentRequestErrors.loaiLaoDong && (
-                                            <span className="recruitment-request-error-text">{recruitmentRequestErrors.loaiLaoDong}</span>
-                                        )}
-                                    </div>
-
-                                    {/* Lý do tuyển */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">
-                                            Lý do tuyển <span className="required">*</span>
-                                        </label>
-                                        <div className="recruitment-request-lydo-group">
-                                            <label className="recruitment-request-checkbox-label recruitment-request-checkbox-label-with-input">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={recruitmentRequestForm.lyDoTuyen.tuyenThayThe}
-                                                    onChange={(e) => handleRecruitmentRequestLyDoChange('tuyenThayThe', e.target.checked)}
-                                                />
-                                                <span>Tuyển thay thế (họ tên) :</span>
-                                                <input
-                                                    type="text"
-                                                    className={`recruitment-request-form-input recruitment-request-form-input-inline ${recruitmentRequestErrors.tenNguoiThayThe ? 'error' : ''}`}
-                                                    value={recruitmentRequestForm.lyDoTuyen.tenNguoiThayThe}
-                                                    onChange={(e) => handleRecruitmentRequestLyDoChange('tenNguoiThayThe', e.target.value)}
-                                                    placeholder="Nhập họ tên"
-                                                    disabled={!recruitmentRequestForm.lyDoTuyen.tuyenThayThe}
-                                                />
-                                            </label>
-                                            {recruitmentRequestForm.lyDoTuyen.tuyenThayThe && recruitmentRequestErrors.tenNguoiThayThe && (
-                                                <span className="recruitment-request-error-text" style={{ marginLeft: '2rem' }}>{recruitmentRequestErrors.tenNguoiThayThe}</span>
-                                            )}
-                                            <label className="recruitment-request-checkbox-label">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={recruitmentRequestForm.lyDoTuyen.nhuCauTang}
-                                                    onChange={(e) => handleRecruitmentRequestLyDoChange('nhuCauTang', e.target.checked)}
-                                                />
-                                                <span>Nhu cầu tăng</span>
-                                            </label>
-                                            <label className="recruitment-request-checkbox-label">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={recruitmentRequestForm.lyDoTuyen.viTriCongViecMoi}
-                                                    onChange={(e) => handleRecruitmentRequestLyDoChange('viTriCongViecMoi', e.target.checked)}
-                                                />
-                                                <span>Vị trí công việc mới</span>
-                                            </label>
-                                        </div>
-                                        {recruitmentRequestErrors.lyDoTuyen && (
-                                            <span className="recruitment-request-error-text">{recruitmentRequestErrors.lyDoTuyen}</span>
-                                        )}
-                                    </div>
-
-                                    {/* Lý do khác / ghi chú */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Lý do khác / ghi chú</label>
-                                        <textarea
-                                            className="recruitment-request-form-textarea"
-                                            value={recruitmentRequestForm.lyDoKhacGhiChu}
-                                            onChange={(e) => handleRecruitmentRequestChange('lyDoKhacGhiChu', e.target.value)}
-                                            placeholder="Nhập lý do khác hoặc ghi chú (nếu có)"
-                                            rows="4"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* PHẦN II: TIÊU CHUẨN TUYỂN CHỌN */}
-                            <div className="recruitment-request-section">
-                                <div className="recruitment-request-section-header">
-                                    <h3 className="recruitment-request-section-title">PHẦN II: TIÊU CHUẨN TUYỂN CHỌN</h3>
-                                    <div className="recruitment-request-section-divider"></div>
-                                </div>
-
-                                <div className="recruitment-request-form-content">
-                                    {/* Giới tính và Độ tuổi */}
-                                    <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
-                                        <div className="recruitment-request-form-field">
-                                            <label className="recruitment-request-form-label">Giới tính</label>
-                                            <div className="recruitment-request-checkbox-group">
-                                                <label className="recruitment-request-checkbox-label">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={recruitmentRequestForm.tieuChuanTuyenChon.gioiTinh.nam}
-                                                        onChange={(e) => handleTieuChuanTuyenChonNestedChange('gioiTinh', 'nam', e.target.checked)}
-                                                    />
-                                                    <span>Nam</span>
-                                                </label>
-                                                <label className="recruitment-request-checkbox-label">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={recruitmentRequestForm.tieuChuanTuyenChon.gioiTinh.nu}
-                                                        onChange={(e) => handleTieuChuanTuyenChonNestedChange('gioiTinh', 'nu', e.target.checked)}
-                                                    />
-                                                    <span>Nữ</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                        <div className="recruitment-request-form-field">
-                                            <label className="recruitment-request-form-label">Độ tuổi</label>
-                                            <input
-                                                type="text"
-                                                className="recruitment-request-form-input"
-                                                value={recruitmentRequestForm.tieuChuanTuyenChon.doTuoi}
-                                                onChange={(e) => handleTieuChuanTuyenChonChange('doTuoi', e.target.value)}
-                                                placeholder="Ví dụ: 25-35"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Trình độ học vấn */}
-                                    <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
-                                        <div className="recruitment-request-form-field">
-                                            <label className="recruitment-request-form-label">Trình độ học vấn</label>
-                                            <div className="recruitment-request-checkbox-group" style={{ flexDirection: 'column', gap: '0.5rem' }}>
-                                                <div style={{ display: 'flex', gap: '1.5rem' }}>
-                                                    <label className="recruitment-request-checkbox-label">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={recruitmentRequestForm.tieuChuanTuyenChon.trinhDoHocVan.ptth}
-                                                            onChange={(e) => handleTieuChuanTuyenChonNestedChange('trinhDoHocVan', 'ptth', e.target.checked)}
-                                                        />
-                                                        <span>PTTH</span>
-                                                    </label>
-                                                    <label className="recruitment-request-checkbox-label">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={recruitmentRequestForm.tieuChuanTuyenChon.trinhDoHocVan.daiHoc}
-                                                            onChange={(e) => handleTieuChuanTuyenChonNestedChange('trinhDoHocVan', 'daiHoc', e.target.checked)}
-                                                        />
-                                                        <span>Đại học</span>
-                                                    </label>
-                                                </div>
-                                                <div style={{ display: 'flex', gap: '1.5rem' }}>
-                                                    <label className="recruitment-request-checkbox-label">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={recruitmentRequestForm.tieuChuanTuyenChon.trinhDoHocVan.trungCapNghe}
-                                                            onChange={(e) => handleTieuChuanTuyenChonNestedChange('trinhDoHocVan', 'trungCapNghe', e.target.checked)}
-                                                        />
-                                                        <span>Trung cấp nghề</span>
-                                                    </label>
-                                                    <label className="recruitment-request-checkbox-label">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={recruitmentRequestForm.tieuChuanTuyenChon.trinhDoHocVan.caoHocTroLen}
-                                                            onChange={(e) => handleTieuChuanTuyenChonNestedChange('trinhDoHocVan', 'caoHocTroLen', e.target.checked)}
-                                                        />
-                                                        <span>Cao học trở lên</span>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="recruitment-request-form-field">
-                                            <label className="recruitment-request-form-label">Yêu cầu khác</label>
-                                            <input
-                                                type="text"
-                                                className="recruitment-request-form-input"
-                                                value={recruitmentRequestForm.tieuChuanTuyenChon.yeuCauKhacHocVan}
-                                                onChange={(e) => handleTieuChuanTuyenChonChange('yeuCauKhacHocVan', e.target.value)}
-                                                placeholder="Nhập yêu cầu khác"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Kinh nghiệm */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Kinh nghiệm</label>
-                                        <div className="recruitment-request-checkbox-group">
-                                            <label className="recruitment-request-checkbox-label">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={recruitmentRequestForm.tieuChuanTuyenChon.kinhNghiem.khong}
-                                                    onChange={(e) => {
-                                                        handleTieuChuanTuyenChonNestedChange('kinhNghiem', 'khong', e.target.checked);
-                                                        if (e.target.checked) {
-                                                            handleTieuChuanTuyenChonNestedChange('kinhNghiem', 'soNamKinhNghiem', false);
-                                                            handleTieuChuanTuyenChonNestedChange('kinhNghiem', 'soNam', '');
-                                                        }
-                                                    }}
-                                                />
-                                                <span>Không</span>
-                                            </label>
-                                            <label className="recruitment-request-checkbox-label recruitment-request-checkbox-label-with-input">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={recruitmentRequestForm.tieuChuanTuyenChon.kinhNghiem.soNamKinhNghiem}
-                                                    onChange={(e) => {
-                                                        handleTieuChuanTuyenChonNestedChange('kinhNghiem', 'soNamKinhNghiem', e.target.checked);
-                                                        if (e.target.checked) {
-                                                            handleTieuChuanTuyenChonNestedChange('kinhNghiem', 'khong', false);
-                                                        }
-                                                    }}
-                                                />
-                                                <span>Số năm kinh nghiệm:</span>
-                                                <input
-                                                    type="text"
-                                                    className="recruitment-request-form-input recruitment-request-form-input-inline"
-                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.kinhNghiem.soNam}
-                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('kinhNghiem', 'soNam', e.target.value)}
-                                                    placeholder="Ví dụ: 2-5 năm"
-                                                    disabled={!recruitmentRequestForm.tieuChuanTuyenChon.kinhNghiem.soNamKinhNghiem}
-                                                />
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    {/* Kiến thức */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Kiến thức</label>
-                                        <div className="recruitment-request-checkbox-group">
-                                            <label className="recruitment-request-checkbox-label">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={recruitmentRequestForm.tieuChuanTuyenChon.kienThuc.khong}
-                                                    onChange={(e) => {
-                                                        handleTieuChuanTuyenChonNestedChange('kienThuc', 'khong', e.target.checked);
-                                                        if (e.target.checked) {
-                                                            handleTieuChuanTuyenChonNestedChange('kienThuc', 'nganhNghe', false);
-                                                            handleTieuChuanTuyenChonNestedChange('kienThuc', 'nganhNgheValue', '');
-                                                        }
-                                                    }}
-                                                />
-                                                <span>Không</span>
-                                            </label>
-                                            <label className="recruitment-request-checkbox-label recruitment-request-checkbox-label-with-input">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={recruitmentRequestForm.tieuChuanTuyenChon.kienThuc.nganhNghe}
-                                                    onChange={(e) => {
-                                                        handleTieuChuanTuyenChonNestedChange('kienThuc', 'nganhNghe', e.target.checked);
-                                                        if (e.target.checked) {
-                                                            handleTieuChuanTuyenChonNestedChange('kienThuc', 'khong', false);
-                                                        }
-                                                    }}
-                                                />
-                                                <span>Ngành nghề:</span>
-                                                <input
-                                                    type="text"
-                                                    className="recruitment-request-form-input recruitment-request-form-input-inline"
-                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.kienThuc.nganhNgheValue}
-                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('kienThuc', 'nganhNgheValue', e.target.value)}
-                                                    placeholder="Nhập ngành nghề"
-                                                    disabled={!recruitmentRequestForm.tieuChuanTuyenChon.kienThuc.nganhNghe}
-                                                />
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    {/* Ngoại ngữ */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Ngoại ngữ</label>
-                                        <div className="recruitment-request-lydo-group">
-                                            <label className="recruitment-request-checkbox-label recruitment-request-checkbox-label-with-input">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={recruitmentRequestForm.tieuChuanTuyenChon.ngoaiNgu.tiengAnh}
-                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('ngoaiNgu', 'tiengAnh', e.target.checked)}
-                                                />
-                                                <span>Tiếng Anh</span>
-                                                <span style={{ marginLeft: '0.5rem' }}>Trình độ:</span>
-                                                <input
-                                                    type="text"
-                                                    className="recruitment-request-form-input recruitment-request-form-input-inline"
-                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.ngoaiNgu.trinhDoTiengAnh}
-                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('ngoaiNgu', 'trinhDoTiengAnh', e.target.value)}
-                                                    placeholder="Ví dụ: TOEIC 600"
-                                                    disabled={!recruitmentRequestForm.tieuChuanTuyenChon.ngoaiNgu.tiengAnh}
-                                                />
-                                            </label>
-                                            <label className="recruitment-request-checkbox-label recruitment-request-checkbox-label-with-input">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={recruitmentRequestForm.tieuChuanTuyenChon.ngoaiNgu.ngoaiNguKhac}
-                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('ngoaiNgu', 'ngoaiNguKhac', e.target.checked)}
-                                                />
-                                                <input
-                                                    type="text"
-                                                    className="recruitment-request-form-input recruitment-request-form-input-inline"
-                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.ngoaiNgu.tenNgoaiNguKhac}
-                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('ngoaiNgu', 'tenNgoaiNguKhac', e.target.value)}
-                                                    placeholder="Ngoại ngữ khác"
-                                                    disabled={!recruitmentRequestForm.tieuChuanTuyenChon.ngoaiNgu.ngoaiNguKhac}
-                                                    style={{ width: '150px' }}
-                                                />
-                                                <span style={{ marginLeft: '0.5rem' }}>Trình độ:</span>
-                                                <input
-                                                    type="text"
-                                                    className="recruitment-request-form-input recruitment-request-form-input-inline"
-                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.ngoaiNgu.trinhDoNgoaiNguKhac}
-                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('ngoaiNgu', 'trinhDoNgoaiNguKhac', e.target.value)}
-                                                    placeholder="Trình độ"
-                                                    disabled={!recruitmentRequestForm.tieuChuanTuyenChon.ngoaiNgu.ngoaiNguKhac}
-                                                />
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    {/* Vi tính */}
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Vi tính</label>
-                                        <div className="recruitment-request-lydo-group">
-                                            <label className="recruitment-request-checkbox-label">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={recruitmentRequestForm.tieuChuanTuyenChon.viTinh.khong}
-                                                    onChange={(e) => {
-                                                        handleTieuChuanTuyenChonNestedChange('viTinh', 'khong', e.target.checked);
-                                                        if (e.target.checked) {
-                                                            handleTieuChuanTuyenChonNestedChange('viTinh', 'msOffice', false);
-                                                            handleTieuChuanTuyenChonNestedChange('viTinh', 'khac', false);
-                                                            handleTieuChuanTuyenChonNestedChange('viTinh', 'khacValue', '');
-                                                        }
-                                                    }}
-                                                />
-                                                <span>Không</span>
-                                            </label>
-                                            <label className="recruitment-request-checkbox-label">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={recruitmentRequestForm.tieuChuanTuyenChon.viTinh.msOffice}
-                                                    onChange={(e) => {
-                                                        handleTieuChuanTuyenChonNestedChange('viTinh', 'msOffice', e.target.checked);
-                                                        if (e.target.checked) {
-                                                            handleTieuChuanTuyenChonNestedChange('viTinh', 'khong', false);
-                                                        }
-                                                    }}
-                                                />
-                                                <span>MS Office (Word / Excel / Access)</span>
-                                            </label>
-                                            <label className="recruitment-request-checkbox-label recruitment-request-checkbox-label-with-input">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={recruitmentRequestForm.tieuChuanTuyenChon.viTinh.khac}
-                                                    onChange={(e) => {
-                                                        handleTieuChuanTuyenChonNestedChange('viTinh', 'khac', e.target.checked);
-                                                        if (e.target.checked) {
-                                                            handleTieuChuanTuyenChonNestedChange('viTinh', 'khong', false);
-                                                        }
-                                                    }}
-                                                />
-                                                <span>Khác:</span>
-                                                <input
-                                                    type="text"
-                                                    className="recruitment-request-form-input recruitment-request-form-input-inline"
-                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.viTinh.khacValue}
-                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('viTinh', 'khacValue', e.target.value)}
-                                                    placeholder="Nhập kỹ năng vi tính khác"
-                                                    disabled={!recruitmentRequestForm.tieuChuanTuyenChon.viTinh.khac}
-                                                />
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    {/* Kỹ năng */}
-                                    <div className="recruitment-request-form-field">
-                                        <div className="recruitment-request-skills-table">
-                                            <div className="recruitment-request-skills-row">
-                                                <label className="recruitment-request-skills-label">Kỹ năng giao tiếp</label>
-                                                <input
-                                                    type="text"
-                                                    className="recruitment-request-form-input recruitment-request-skills-input"
-                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.kyNang.kyNangGiaoTiep || ''}
-                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('kyNang', 'kyNangGiaoTiep', e.target.value)}
-                                                    placeholder="Nhập kỹ năng giao tiếp"
-                                                />
-                                            </div>
-                                            <div className="recruitment-request-skills-row">
-                                                <label className="recruitment-request-skills-label">Thái độ làm việc <span className="recruitment-request-skills-note">(Trách nhiệm,...)</span></label>
-                                                <input
-                                                    type="text"
-                                                    className="recruitment-request-form-input recruitment-request-skills-input"
-                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.kyNang.thaiDoLamViec || ''}
-                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('kyNang', 'thaiDoLamViec', e.target.value)}
-                                                    placeholder="Nhập thái độ làm việc"
-                                                />
-                                            </div>
-                                            <div className="recruitment-request-skills-row">
-                                                <label className="recruitment-request-skills-label">Kỹ năng quản lý <span className="recruitment-request-skills-note">(Áp dụng cho Trưởng phòng trở lên)</span></label>
-                                                <input
-                                                    type="text"
-                                                    className="recruitment-request-form-input recruitment-request-skills-input"
-                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.kyNang.kyNangQuanLy || ''}
-                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('kyNang', 'kyNangQuanLy', e.target.value)}
-                                                    placeholder="Nhập kỹ năng quản lý"
-                                                />
-                                            </div>
-                                            <div className="recruitment-request-skills-row">
-                                                <label className="recruitment-request-skills-label">Yêu cầu khác</label>
-                                                <input
-                                                    type="text"
-                                                    className="recruitment-request-form-input recruitment-request-skills-input"
-                                                    value={recruitmentRequestForm.tieuChuanTuyenChon.kyNang.yeuCauKhac || ''}
-                                                    onChange={(e) => handleTieuChuanTuyenChonNestedChange('kyNang', 'yeuCauKhac', e.target.value)}
-                                                    placeholder="Nhập yêu cầu khác"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Modal Actions */}
-                            <div className="recruitment-request-modal-actions">
-                                <button
-                                    type="button"
-                                    className="recruitment-request-modal-btn recruitment-request-modal-btn-secondary"
-                                    onClick={handleCloseRecruitmentRequestModal}
-                                    disabled={submittingRecruitmentRequest}
-                                >
-                                    Hủy
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="recruitment-request-modal-btn recruitment-request-modal-btn-primary"
-                                    disabled={submittingRecruitmentRequest}
-                                    onClick={(e) => {
-                                        console.log('Submit button clicked', {
-                                            submitting: submittingRecruitmentRequest,
-                                            loading: loadingFormData,
-                                            formData: recruitmentRequestForm
-                                        });
-                                        if (!submittingRecruitmentRequest) {
-                                            // Let form submission proceed normally
-                                            console.log('Allowing form submission');
-                                        } else {
-                                            e.preventDefault();
-                                            console.log('Preventing submission - already submitting');
-                                        }
-                                    }}
-                                >
-                                    {submittingRecruitmentRequest ? 'Đang gửi...' : 'Gửi yêu cầu'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Recruitment Request Detail Modal */}
-            {isRecruitmentRequestDetailModalOpen && selectedRecruitmentRequest && (
-                <div className="candidate-modal-overlay" onClick={() => setIsRecruitmentRequestDetailModalOpen(false)} style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000
+            {/* Candidate Detail Modal */}
+            {showCandidateDetailModal && viewingCandidate && (
+                <div className="recruitment-view-candidate-modal-overlay" onClick={() => {
+                    setShowCandidateDetailModal(false);
+                    setViewingCandidate(null);
                 }}>
-                    <div className="recruitment-request-detail-modal-box" onClick={(e) => e.stopPropagation()} style={{
-                        background: '#ffffff',
-                        borderRadius: '1rem',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                        width: '100%',
-                        maxWidth: '1200px',
-                        maxHeight: '90vh',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        overflow: 'hidden'
-                    }}>
-                        <div className="recruitment-request-detail-modal-header" style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '1.5rem 2rem',
-                            borderBottom: '1px solid #e5e7eb',
-                            background: 'linear-gradient(135deg, #dbeafe 0%, #ecfdf5 50%, #e0e7ff 100%)',
-                            flexShrink: 0
-                        }}>
-                            <h2 className="recruitment-request-detail-modal-title" style={{
-                                fontSize: '1.5rem',
-                                fontWeight: '700',
-                                color: '#1f2937',
-                                margin: 0
-                            }}>Chi tiết yêu cầu tuyển dụng</h2>
+                    <div className="recruitment-view-candidate-modal-container" onClick={(e) => e.stopPropagation()}>
+                        <div className="recruitment-view-candidate-modal-header">
+                            <h2 className="recruitment-view-candidate-modal-title">Thông tin Ứng viên</h2>
                             <button
                                 type="button"
-                                className="recruitment-request-detail-modal-close-btn"
-                                onClick={() => setIsRecruitmentRequestDetailModalOpen(false)}
-                                style={{
-                                    width: '2rem',
-                                    height: '2rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    border: 'none',
-                                    background: 'transparent',
-                                    color: '#6b7280',
-                                    cursor: 'pointer',
-                                    borderRadius: '0.5rem',
-                                    transition: 'all 0.2s ease'
+                                className="recruitment-view-candidate-modal-close"
+                                onClick={() => {
+                                    setShowCandidateDetailModal(false);
+                                    setViewingCandidate(null);
                                 }}
                             >
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2816,220 +2647,672 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                 </svg>
                             </button>
                         </div>
+                        <div className="recruitment-view-candidate-modal-body">
+                            {/* Section: FILE ĐÍNH KÈM */}
+                            {(viewingCandidate.anh_dai_dien_path || viewingCandidate.cv_dinh_kem_path) && (
+                                <div className="recruitment-view-candidate-section">
+                                    <h3 className="recruitment-view-candidate-section-title">
+                                        <svg className="recruitment-view-candidate-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
+                                        </svg>
+                                        FILE ĐÍNH KÈM
+                                    </h3>
+                                    <div className="recruitment-view-candidate-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                                        {/* Ảnh đại diện */}
+                                        {viewingCandidate.anh_dai_dien_path && (
+                                            <div className="recruitment-view-candidate-field" style={{ gridColumn: 'span 1' }}>
+                                                <div className="recruitment-view-candidate-field-label">
+                                                    <svg className="recruitment-view-candidate-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                                    </svg>
+                                                    Ảnh đại diện
+                                                </div>
+                                                <div className="recruitment-view-candidate-field-value" style={{ padding: '1rem', textAlign: 'center' }}>
+                                                    <img
+                                                        src={`${process.env.REACT_APP_API_URL || 'http://localhost:3000/api'}${viewingCandidate.anh_dai_dien_path}`}
+                                                        alt="Ảnh đại diện"
+                                                        style={{
+                                                            maxWidth: '200px',
+                                                            maxHeight: '250px',
+                                                            borderRadius: '8px',
+                                                            border: '2px solid #e5e7eb',
+                                                            objectFit: 'cover',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                        onClick={() => {
+                                                            const imgUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3000/api'}${viewingCandidate.anh_dai_dien_path}`;
+                                                            window.open(imgUrl, '_blank');
+                                                        }}
+                                                        onError={(e) => {
+                                                            e.target.style.display = 'none';
+                                                            e.target.nextSibling.style.display = 'block';
+                                                        }}
+                                                    />
+                                                    <div style={{ display: 'none', color: '#9ca3af', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                                                        Không thể tải ảnh
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
 
-                        <div className="recruitment-request-detail-modal-content" style={{
-                            flex: 1,
-                            overflowY: 'auto',
-                            padding: '2rem',
-                            minHeight: 0
-                        }}>
-                            <RecruitmentRequestDetailView request={selectedRecruitmentRequest} />
+                                        {/* CV đính kèm */}
+                                        {viewingCandidate.cv_dinh_kem_path && (
+                                            <div className="recruitment-view-candidate-field" style={{ gridColumn: 'span 1' }}>
+                                                <div className="recruitment-view-candidate-field-label">
+                                                    <svg className="recruitment-view-candidate-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                    </svg>
+                                                    CV đính kèm
+                                                </div>
+                                                <div className="recruitment-view-candidate-field-value" style={{ padding: '1rem' }}>
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '1rem',
+                                                        padding: '1rem',
+                                                        backgroundColor: '#f3f4f6',
+                                                        borderRadius: '8px',
+                                                        border: '2px solid #e5e7eb'
+                                                    }}>
+                                                        <svg style={{ width: '48px', height: '48px', color: '#ef4444' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                                        </svg>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                                                CV đính kèm
+                                                            </div>
+                                                            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                                                CV đính kèm
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const cvUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3000/api'}${viewingCandidate.cv_dinh_kem_path}`;
+                                                                window.open(cvUrl, '_blank');
+                                                            }}
+                                                            style={{
+                                                                padding: '0.5rem 1rem',
+                                                                backgroundColor: '#3b82f6',
+                                                                color: 'white',
+                                                                border: 'none',
+                                                                borderRadius: '6px',
+                                                                cursor: 'pointer',
+                                                                fontSize: '0.875rem',
+                                                                fontWeight: '500',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '0.5rem',
+                                                                transition: 'background-color 0.2s'
+                                                            }}
+                                                            onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                                                            onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                                                        >
+                                                            <svg style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                                            </svg>
+                                                            Xem CV
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Section I: THÔNG TIN CÁ NHÂN */}
+                            <div className="recruitment-view-candidate-section">
+                                <h3 className="recruitment-view-candidate-section-title">
+                                    <svg className="recruitment-view-candidate-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                    </svg>
+                                    I. THÔNG TIN CÁ NHÂN
+                                </h3>
+                                <div className="recruitment-view-candidate-grid">
+                                    <div className="recruitment-view-candidate-field">
+                                        <div className="recruitment-view-candidate-field-label">
+                                            <svg className="recruitment-view-candidate-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                            </svg>
+                                            Họ và tên
+                                        </div>
+                                        <div className="recruitment-view-candidate-field-value">{viewingCandidate.ho_ten || '---'}</div>
+                                    </div>
+                                    <div className="recruitment-view-candidate-field">
+                                        <div className="recruitment-view-candidate-field-label">
+                                            <svg className="recruitment-view-candidate-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            Ngày sinh
+                                        </div>
+                                        <div className="recruitment-view-candidate-field-value">{formatDate(viewingCandidate.ngay_sinh) || '---'}</div>
+                                    </div>
+                                    <div className="recruitment-view-candidate-field">
+                                        <div className="recruitment-view-candidate-field-label">
+                                            <svg className="recruitment-view-candidate-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+                                            </svg>
+                                            Số điện thoại
+                                        </div>
+                                        <div className="recruitment-view-candidate-field-value">{viewingCandidate.so_dien_thoai || '---'}</div>
+                                    </div>
+                                    <div className="recruitment-view-candidate-field">
+                                        <div className="recruitment-view-candidate-field-label">
+                                            <svg className="recruitment-view-candidate-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                            </svg>
+                                            Email
+                                        </div>
+                                        <div className="recruitment-view-candidate-field-value">{viewingCandidate.email || '---'}</div>
+                                    </div>
+                                    <div className="recruitment-view-candidate-field">
+                                        <div className="recruitment-view-candidate-field-label">
+                                            <svg className="recruitment-view-candidate-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                            </svg>
+                                            Vị trí ứng tuyển
+                                        </div>
+                                        <div className="recruitment-view-candidate-field-value">{viewingCandidate.vi_tri_ung_tuyen || '---'}</div>
+                                    </div>
+                                    <div className="recruitment-view-candidate-field">
+                                        <div className="recruitment-view-candidate-field-label">
+                                            <svg className="recruitment-view-candidate-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                            </svg>
+                                            Phòng ban
+                                        </div>
+                                        <div className="recruitment-view-candidate-field-value">{viewingCandidate.phong_ban || '---'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Section II: QUÁ TRÌNH CÔNG TÁC */}
+                            {viewingCandidate.workExperiences && viewingCandidate.workExperiences.length > 0 && (
+                                <div className="recruitment-view-candidate-section">
+                                    <h3 className="recruitment-view-candidate-section-title">
+                                        <svg className="recruitment-view-candidate-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                        </svg>
+                                        II. QUÁ TRÌNH CÔNG TÁC
+                                    </h3>
+                                    <div className="recruitment-view-candidate-work-experience">
+                                        {viewingCandidate.workExperiences.map((exp, idx) => (
+                                            <div key={idx} className="recruitment-view-candidate-work-item">
+                                                <div className="recruitment-view-candidate-work-header">
+                                                    <svg className="recruitment-view-candidate-work-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                                    </svg>
+                                                    <div>
+                                                        <div className="recruitment-view-candidate-work-company">{exp.cong_ty || exp.congTy || '---'}</div>
+                                                        <div className="recruitment-view-candidate-work-position">{exp.chuc_danh || exp.chucDanh || '---'}</div>
+                                                        <div className="recruitment-view-candidate-work-period">
+                                                            {formatDate(exp.ngay_bat_dau || exp.ngayBatDau) || '---'} - {formatDate(exp.ngay_ket_thuc || exp.ngayKetThuc) || 'Hiện tại'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Section III: QUÁ TRÌNH ĐÀO TẠO */}
+                            {viewingCandidate.trainingProcesses && viewingCandidate.trainingProcesses.length > 0 && (
+                                <div className="recruitment-view-candidate-section">
+                                    <h3 className="recruitment-view-candidate-section-title">
+                                        <svg className="recruitment-view-candidate-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                                        </svg>
+                                        III. QUÁ TRÌNH ĐÀO TẠO
+                                    </h3>
+                                    <div className="recruitment-view-candidate-training">
+                                        {viewingCandidate.trainingProcesses.map((tp, idx) => (
+                                            <div key={idx} className="recruitment-view-candidate-training-item">
+                                                <div className="recruitment-view-candidate-training-header">
+                                                    <svg className="recruitment-view-candidate-training-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                                                    </svg>
+                                                    <div>
+                                                        <div className="recruitment-view-candidate-training-school">{tp.truong_dao_tao || tp.truongDaoTao || '---'}</div>
+                                                        <div className="recruitment-view-candidate-training-major">{tp.chuyen_nganh || tp.chuyenNganh || '---'}</div>
+                                                        <div className="recruitment-view-candidate-training-period">
+                                                            {formatDate(tp.ngay_bat_dau || tp.ngayBatDau) || '---'} - {formatDate(tp.ngay_ket_thuc || tp.ngayKetThuc) || 'Hiện tại'}
+                                                        </div>
+                                                        {tp.van_bang && (
+                                                            <div className="recruitment-view-candidate-training-degree">Văn bằng: {tp.van_bang}</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Section IV: TRÌNH ĐỘ NGOẠI NGỮ */}
+                            {viewingCandidate.foreignLanguages && viewingCandidate.foreignLanguages.length > 0 && (
+                                <div className="recruitment-view-candidate-section">
+                                    <h3 className="recruitment-view-candidate-section-title">
+                                        <svg className="recruitment-view-candidate-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
+                                        </svg>
+                                        IV. TRÌNH ĐỘ NGOẠI NGỮ
+                                    </h3>
+                                    <div className="recruitment-view-candidate-languages">
+                                        {viewingCandidate.foreignLanguages.map((fl, idx) => (
+                                            <div key={idx} className="recruitment-view-candidate-language-item">
+                                                <div className="recruitment-view-candidate-language-header">
+                                                    <svg className="recruitment-view-candidate-language-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
+                                                    </svg>
+                                                    <div>
+                                                        <div className="recruitment-view-candidate-language-name">{fl.ngoai_ngu || fl.ngoaiNgu || '---'}</div>
+                                                        {fl.chung_chi && (
+                                                            <div className="recruitment-view-candidate-language-cert">Chứng chỉ: {fl.chung_chi}</div>
+                                                        )}
+                                                        {fl.diem && (
+                                                            <div className="recruitment-view-candidate-language-score">Điểm: {fl.diem}</div>
+                                                        )}
+                                                        {fl.kha_nang_su_dung && (
+                                                            <div className="recruitment-view-candidate-language-level">Khả năng: {fl.kha_nang_su_dung}</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="recruitment-view-candidate-modal-footer">
+                            <button
+                                type="button"
+                                className="recruitment-view-candidate-modal-btn recruitment-view-candidate-modal-btn--close"
+                                onClick={() => {
+                                    setShowCandidateDetailModal(false);
+                                    setViewingCandidate(null);
+                                }}
+                            >
+                                Đóng
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
-        </div>
-    );
-};
 
-// Component to display recruitment request details (reused from CandidateManagement)
-const RecruitmentRequestDetailView = ({ request }) => {
-    // Parse JSONB fields if needed
-    const lyDoTuyen = request.ly_do_tuyen || request.lyDoTuyen || {};
-    const tieuChuanTuyenChon = request.tieu_chuan_tuyen_chon || request.tieuChuanTuyenChon || {};
-
-    return (
-        <div className="recruitment-request-detail-view">
-            {/* PHẦN I: VỊ TRÍ TUYỂN DỤNG */}
-            <div className="recruitment-request-section">
-                <div className="recruitment-request-section-header">
-                    <h3 className="recruitment-request-section-title">PHẦN I: VỊ TRÍ TUYỂN DỤNG</h3>
-                    <div className="recruitment-request-section-divider"></div>
-                </div>
-
-                <div className="recruitment-request-form-content">
-                    {/* Display all fields from PHẦN I - Layout 2 cột */}
-                    <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
-                        <div className="recruitment-request-form-field">
-                            <label className="recruitment-request-form-label">Chức danh cần tuyển</label>
-                            <div className="recruitment-request-form-value">{request.chuc_danh_can_tuyen || request.chucDanhCanTuyen || '-'}</div>
+            {/* Evaluation Modal */}
+            {showEvaluationModal && selectedEvaluationRequest && (
+                <div className="interview-evaluation-modal-overlay" onClick={() => {
+                    setShowEvaluationModal(false);
+                    setSelectedEvaluationRequest(null);
+                }}>
+                    <div className="interview-evaluation-modal-container" onClick={(e) => e.stopPropagation()}>
+                        <div className="interview-evaluation-modal-header">
+                            <h2 className="interview-evaluation-modal-title">Đánh giá ứng viên phỏng vấn</h2>
+                            <button
+                                type="button"
+                                className="interview-evaluation-modal-close"
+                                onClick={() => {
+                                    setShowEvaluationModal(false);
+                                    setSelectedEvaluationRequest(null);
+                                }}
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
                         </div>
-                        <div className="recruitment-request-form-field">
-                            <label className="recruitment-request-form-label">Số lượng yêu cầu</label>
-                            <div className="recruitment-request-form-value">{request.so_luong_yeu_cau || request.soLuongYeuCau || '-'}</div>
-                        </div>
-                    </div>
-
-                    <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
-                        <div className="recruitment-request-form-field">
-                            <label className="recruitment-request-form-label">Phòng ban</label>
-                            <div className="recruitment-request-form-value">{request.phong_ban || request.phongBan || '-'}</div>
-                        </div>
-                    </div>
-
-                    <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
-                        <div className="recruitment-request-form-field">
-                            <label className="recruitment-request-form-label">Mô tả công việc</label>
-                            <div className="recruitment-request-form-value">{request.mo_ta_cong_viec === 'co' || request.moTaCongViec === 'co' ? 'Có' : request.mo_ta_cong_viec === 'chua_co' || request.moTaCongViec === 'chua_co' ? 'Chưa có' : '-'}</div>
-                        </div>
-                        <div className="recruitment-request-form-field">
-                            <label className="recruitment-request-form-label">Loại lao động</label>
-                            <div className="recruitment-request-form-value">
-                                {request.loai_lao_dong === 'thoi_vu' || request.loaiLaoDong === 'thoi_vu' ? 'Thời vụ' :
-                                    request.loai_lao_dong === 'toan_thoi_gian' || request.loaiLaoDong === 'toan_thoi_gian' ? 'Toàn thời gian' : '-'}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="recruitment-request-form-field">
-                        <label className="recruitment-request-form-label">Lý do tuyển</label>
-                        <div className="recruitment-request-form-value">
-                            {lyDoTuyen.tuyenThayThe || lyDoTuyen.tuyen_thay_the ? `Tuyển thay thế: ${lyDoTuyen.tenNguoiThayThe || lyDoTuyen.ten_nguoi_thay_the || ''}` : ''}
-                            {lyDoTuyen.nhuCauTang || lyDoTuyen.nhu_cau_tang ? 'Nhu cầu tăng' : ''}
-                            {lyDoTuyen.viTriCongViecMoi || lyDoTuyen.vi_tri_cong_viec_moi ? 'Vị trí công việc mới' : ''}
-                            {!lyDoTuyen.tuyenThayThe && !lyDoTuyen.nhuCauTang && !lyDoTuyen.viTriCongViecMoi && '-'}
-                        </div>
-                    </div>
-
-                    {request.ly_do_khac_ghi_chu || request.lyDoKhacGhiChu ? (
-                        <div className="recruitment-request-form-field">
-                            <label className="recruitment-request-form-label">Lý do khác / ghi chú</label>
-                            <div className="recruitment-request-form-value">{request.ly_do_khac_ghi_chu || request.lyDoKhacGhiChu}</div>
-                        </div>
-                    ) : null}
-                </div>
-            </div>
-
-            {/* PHẦN II: TIÊU CHUẨN TUYỂN CHỌN */}
-            {tieuChuanTuyenChon && Object.keys(tieuChuanTuyenChon).length > 0 && (
-                <div className="recruitment-request-section">
-                    <div className="recruitment-request-section-header">
-                        <h3 className="recruitment-request-section-title">PHẦN II: TIÊU CHUẨN TUYỂN CHỌN</h3>
-                        <div className="recruitment-request-section-divider"></div>
-                    </div>
-
-                    <div className="recruitment-request-form-content">
-                        {/* Display all fields from PHẦN II - Similar structure to CandidateManagement */}
-                        {/* Giới tính */}
-                        {tieuChuanTuyenChon.gioiTinh && (
-                            <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
-                                <div className="recruitment-request-form-field">
-                                    <label className="recruitment-request-form-label">Giới tính</label>
-                                    <div className="recruitment-request-form-value">
-                                        {tieuChuanTuyenChon.gioiTinh.nam ? 'Nam' : ''}
-                                        {tieuChuanTuyenChon.gioiTinh.nam && tieuChuanTuyenChon.gioiTinh.nu ? ', ' : ''}
-                                        {tieuChuanTuyenChon.gioiTinh.nu ? 'Nữ' : ''}
-                                        {!tieuChuanTuyenChon.gioiTinh.nam && !tieuChuanTuyenChon.gioiTinh.nu ? '-' : ''}
+                        <div className="interview-evaluation-modal-body">
+                            {/* Basic Information Section */}
+                            <div className="interview-evaluation-section">
+                                <h3 className="interview-evaluation-section-title">Thông tin ứng viên và phỏng vấn</h3>
+                                <div className="interview-evaluation-form-grid">
+                                    <div className="interview-evaluation-form-group">
+                                        <label>Tên ứng viên</label>
+                                        <input
+                                            type="text"
+                                            value={evaluationForm.tenUngVien}
+                                            readOnly={true}
+                                            placeholder="Nhập tên ứng viên"
+                                        />
                                     </div>
-                                </div>
-                                <div className="recruitment-request-form-field">
-                                    <label className="recruitment-request-form-label">Độ tuổi</label>
-                                    <div className="recruitment-request-form-value">{tieuChuanTuyenChon.doTuoi || '-'}</div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Trình độ học vấn */}
-                        {tieuChuanTuyenChon.trinhDoHocVan && (
-                            <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
-                                <div className="recruitment-request-form-field">
-                                    <label className="recruitment-request-form-label">Trình độ học vấn</label>
-                                    <div className="recruitment-request-form-value">
-                                        {[
-                                            tieuChuanTuyenChon.trinhDoHocVan.ptth && 'PTTH',
-                                            tieuChuanTuyenChon.trinhDoHocVan.daiHoc && 'Đại học',
-                                            tieuChuanTuyenChon.trinhDoHocVan.trungCapNghe && 'Trung cấp nghề',
-                                            tieuChuanTuyenChon.trinhDoHocVan.caoHocTroLen && 'Cao học trở lên'
-                                        ].filter(Boolean).join(', ') || '-'}
+                                    <div className="interview-evaluation-form-group">
+                                        <label>Vị trí ứng tuyển</label>
+                                        <input
+                                            type="text"
+                                            value={evaluationForm.viTriUngTuyen}
+                                            readOnly={true}
+                                            placeholder="Nhập vị trí ứng tuyển"
+                                        />
                                     </div>
-                                </div>
-                                <div className="recruitment-request-form-field">
-                                    <label className="recruitment-request-form-label">Yêu cầu khác</label>
-                                    <div className="recruitment-request-form-value">{tieuChuanTuyenChon.yeuCauKhacHocVan || '-'}</div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Kinh nghiệm và Kiến thức */}
-                        {(tieuChuanTuyenChon.kinhNghiem || tieuChuanTuyenChon.kienThuc) && (
-                            <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
-                                {tieuChuanTuyenChon.kinhNghiem && (
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Kinh nghiệm</label>
-                                        <div className="recruitment-request-form-value">
-                                            {tieuChuanTuyenChon.kinhNghiem.khong ? 'Không' :
-                                                tieuChuanTuyenChon.kinhNghiem.soNamKinhNghiem && tieuChuanTuyenChon.kinhNghiem.soNam ?
-                                                    `Số năm kinh nghiệm: ${tieuChuanTuyenChon.kinhNghiem.soNam}` : '-'}
-                                        </div>
+                                    <div className="interview-evaluation-form-group">
+                                        <label>Cấp bậc</label>
+                                        <input
+                                            type="text"
+                                            value={evaluationForm.capBac}
+                                            readOnly={true}
+                                            placeholder="Nhập cấp bậc"
+                                        />
                                     </div>
-                                )}
-                                {tieuChuanTuyenChon.kienThuc && (
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Kiến thức</label>
-                                        <div className="recruitment-request-form-value">
-                                            {tieuChuanTuyenChon.kienThuc.khong ? 'Không' :
-                                                tieuChuanTuyenChon.kienThuc.nganhNghe && tieuChuanTuyenChon.kienThuc.nganhNgheValue ?
-                                                    `Ngành nghề: ${tieuChuanTuyenChon.kienThuc.nganhNgheValue}` : '-'}
-                                        </div>
+                                    <div className="interview-evaluation-form-group">
+                                        <label>Người quản lý trực tiếp</label>
+                                        <input
+                                            type="text"
+                                            value={evaluationForm.nguoiQuanLyTrucTiep}
+                                            readOnly={true}
+                                            placeholder="Nhập tên người quản lý trực tiếp"
+                                        />
                                     </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Ngoại ngữ và Vi tính */}
-                        {(tieuChuanTuyenChon.ngoaiNgu || tieuChuanTuyenChon.viTinh) && (
-                            <div className="recruitment-request-form-row recruitment-request-form-row-2cols">
-                                {tieuChuanTuyenChon.ngoaiNgu && (
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Ngoại ngữ</label>
-                                        <div className="recruitment-request-form-value">
-                                            {[
-                                                tieuChuanTuyenChon.ngoaiNgu.tiengAnh && `Tiếng Anh${tieuChuanTuyenChon.ngoaiNgu.trinhDoTiengAnh ? ` (${tieuChuanTuyenChon.ngoaiNgu.trinhDoTiengAnh})` : ''}`,
-                                                tieuChuanTuyenChon.ngoaiNgu.ngoaiNguKhac && tieuChuanTuyenChon.ngoaiNgu.tenNgoaiNguKhac &&
-                                                `${tieuChuanTuyenChon.ngoaiNgu.tenNgoaiNguKhac}${tieuChuanTuyenChon.ngoaiNgu.trinhDoNgoaiNguKhac ? ` (${tieuChuanTuyenChon.ngoaiNgu.trinhDoNgoaiNguKhac})` : ''}`
-                                            ].filter(Boolean).join(', ') || '-'}
-                                        </div>
+                                    <div className="interview-evaluation-form-group">
+                                        <label>Người phỏng vấn 1</label>
+                                        <input
+                                            type="text"
+                                            value={evaluationForm.nguoiPhongVan1}
+                                            readOnly={true}
+                                            placeholder="Nhập tên người phỏng vấn"
+                                        />
                                     </div>
-                                )}
-                                {tieuChuanTuyenChon.viTinh && (
-                                    <div className="recruitment-request-form-field">
-                                        <label className="recruitment-request-form-label">Vi tính</label>
-                                        <div className="recruitment-request-form-value">
-                                            {tieuChuanTuyenChon.viTinh.khong ? 'Không' :
-                                                [
-                                                    tieuChuanTuyenChon.viTinh.msOffice && 'MS Office (Word / Excel / Access)',
-                                                    tieuChuanTuyenChon.viTinh.khac && tieuChuanTuyenChon.viTinh.khacValue &&
-                                                    `Khác: ${tieuChuanTuyenChon.viTinh.khacValue}`
-                                                ].filter(Boolean).join(', ') || '-'}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Kỹ năng - Display as table */}
-                        {tieuChuanTuyenChon.kyNang && (
-                            <div className="recruitment-request-form-field">
-                                <div className="recruitment-request-skills-table">
-                                    <div className="recruitment-request-skills-row">
-                                        <label className="recruitment-request-skills-label">Kỹ năng giao tiếp</label>
-                                        <div className="recruitment-request-skills-value">{tieuChuanTuyenChon.kyNang.kyNangGiaoTiep || tieuChuanTuyenChon.kyNang?.ky_nang_giao_tiep || '-'}</div>
-                                    </div>
-                                    <div className="recruitment-request-skills-row">
-                                        <label className="recruitment-request-skills-label">Thái độ làm việc <span className="recruitment-request-skills-note">(Trách nhiệm,...)</span></label>
-                                        <div className="recruitment-request-skills-value">{tieuChuanTuyenChon.kyNang.thaiDoLamViec || tieuChuanTuyenChon.kyNang?.thai_do_lam_viec || '-'}</div>
-                                    </div>
-                                    <div className="recruitment-request-skills-row">
-                                        <label className="recruitment-request-skills-label">Kỹ năng quản lý <span className="recruitment-request-skills-note">(Áp dụng cho Trưởng phòng trở lên)</span></label>
-                                        <div className="recruitment-request-skills-value">{tieuChuanTuyenChon.kyNang.kyNangQuanLy || tieuChuanTuyenChon.kyNang?.ky_nang_quan_ly || '-'}</div>
-                                    </div>
-                                    <div className="recruitment-request-skills-row">
-                                        <label className="recruitment-request-skills-label">Yêu cầu khác</label>
-                                        <div className="recruitment-request-skills-value">{tieuChuanTuyenChon.kyNang.yeuCauKhac || tieuChuanTuyenChon.kyNang?.yeu_cau_khac || '-'}</div>
+                                    <div className="interview-evaluation-form-group">
+                                        <label>Ngày phỏng vấn</label>
+                                        <input
+                                            type="datetime-local"
+                                            value={evaluationForm.ngayPhongVan}
+                                            readOnly={true}
+                                        />
                                     </div>
                                 </div>
                             </div>
-                        )}
+
+                            {/* Evaluation Criteria Table */}
+                            <div className="interview-evaluation-section">
+                                <h3 className="interview-evaluation-section-title">Tiêu chí đánh giá</h3>
+                                <div className="interview-evaluation-table-wrapper">
+                                    <table className="interview-evaluation-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Tiêu chí đánh giá</th>
+                                                <th style={{ width: '120px' }}>Điểm/5</th>
+                                                <th>Lý do</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>Kỹ năng giao tiếp</td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="5"
+                                                        value={evaluationForm.diemKyNangGiaoTiep}
+                                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, diemKyNangGiaoTiep: e.target.value })}
+                                                        readOnly={isEvaluationReadOnly}
+                                                        className="interview-evaluation-score-input"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        value={evaluationForm.lyDoKyNangGiaoTiep}
+                                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, lyDoKyNangGiaoTiep: e.target.value })}
+                                                        readOnly={isEvaluationReadOnly}
+                                                        placeholder="Nhập lý do"
+                                                        className="interview-evaluation-reason-input"
+                                                    />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Thái độ làm việc (nghiêm túc, trách nhiệm...)</td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="5"
+                                                        value={evaluationForm.diemThaiDoLamViec}
+                                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, diemThaiDoLamViec: e.target.value })}
+                                                        readOnly={isEvaluationReadOnly}
+                                                        className="interview-evaluation-score-input"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        value={evaluationForm.lyDoThaiDoLamViec}
+                                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, lyDoThaiDoLamViec: e.target.value })}
+                                                        readOnly={isEvaluationReadOnly}
+                                                        placeholder="Nhập lý do"
+                                                        className="interview-evaluation-reason-input"
+                                                    />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Kinh nghiệm chuyên môn</td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="5"
+                                                        value={evaluationForm.diemKinhNghiemChuyenMon}
+                                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, diemKinhNghiemChuyenMon: e.target.value })}
+                                                        readOnly={isEvaluationReadOnly}
+                                                        className="interview-evaluation-score-input"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        value={evaluationForm.lyDoKinhNghiemChuyenMon}
+                                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, lyDoKinhNghiemChuyenMon: e.target.value })}
+                                                        readOnly={isEvaluationReadOnly}
+                                                        placeholder="Nhập lý do"
+                                                        className="interview-evaluation-reason-input"
+                                                    />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Khả năng quản lý dự án</td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="5"
+                                                        value={evaluationForm.diemKhaNangQuanLyDuAn}
+                                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, diemKhaNangQuanLyDuAn: e.target.value })}
+                                                        readOnly={isEvaluationReadOnly}
+                                                        className="interview-evaluation-score-input"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        value={evaluationForm.lyDoKhaNangQuanLyDuAn}
+                                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, lyDoKhaNangQuanLyDuAn: e.target.value })}
+                                                        readOnly={isEvaluationReadOnly}
+                                                        placeholder="Nhập lý do"
+                                                        className="interview-evaluation-reason-input"
+                                                    />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Ngoại ngữ (nếu tính chất công việc yêu cầu)</td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="5"
+                                                        value={evaluationForm.diemNgoaiNgu}
+                                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, diemNgoaiNgu: e.target.value })}
+                                                        readOnly={isEvaluationReadOnly}
+                                                        className="interview-evaluation-score-input"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        value={evaluationForm.lyDoNgoaiNgu}
+                                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, lyDoNgoaiNgu: e.target.value })}
+                                                        readOnly={isEvaluationReadOnly}
+                                                        placeholder="Nhập lý do"
+                                                        className="interview-evaluation-reason-input"
+                                                    />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Kỹ năng quản lý (áp dụng từ cấp Trưởng phòng trở lên)</td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="5"
+                                                        value={evaluationForm.diemKyNangQuanLy}
+                                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, diemKyNangQuanLy: e.target.value })}
+                                                        readOnly={isEvaluationReadOnly}
+                                                        className="interview-evaluation-score-input"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        value={evaluationForm.lyDoKyNangQuanLy}
+                                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, lyDoKyNangQuanLy: e.target.value })}
+                                                        readOnly={isEvaluationReadOnly}
+                                                        placeholder="Nhập lý do"
+                                                        className="interview-evaluation-reason-input"
+                                                    />
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Comments Section */}
+                            <div className="interview-evaluation-section">
+                                <h3 className="interview-evaluation-section-title">Nhận xét</h3>
+                                <div className="interview-evaluation-form-group">
+                                    <label>Điểm mạnh</label>
+                                    <textarea
+                                        rows="4"
+                                        value={evaluationForm.diemManh}
+                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, diemManh: e.target.value })}
+                                        readOnly={isEvaluationReadOnly}
+                                        placeholder="Nhập điểm mạnh của ứng viên"
+                                        className="interview-evaluation-textarea"
+                                    />
+                                </div>
+                                <div className="interview-evaluation-form-group">
+                                    <label>Điểm cần cải thiện</label>
+                                    <textarea
+                                        rows="4"
+                                        value={evaluationForm.diemCanCaiThien}
+                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, diemCanCaiThien: e.target.value })}
+                                        readOnly={isEvaluationReadOnly}
+                                        placeholder="Nhập điểm cần cải thiện"
+                                        className="interview-evaluation-textarea"
+                                    />
+                                </div>
+                                <div className="interview-evaluation-form-group">
+                                    <label>Nhận xét chung</label>
+                                    <textarea
+                                        rows="4"
+                                        value={evaluationForm.nhanXetChung}
+                                        onChange={(e) => setEvaluationForm({ ...evaluationForm, nhanXetChung: e.target.value })}
+                                        readOnly={isEvaluationReadOnly}
+                                        placeholder="Nhập nhận xét chung"
+                                        className="interview-evaluation-textarea"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Conclusion Section */}
+                            <div className="interview-evaluation-section">
+                                <h3 className="interview-evaluation-section-title">KẾT LUẬN</h3>
+                                <div className="interview-evaluation-conclusion-group">
+                                    <label className="interview-evaluation-radio-label">
+                                        <input
+                                            type="radio"
+                                            name="ketLuan"
+                                            value="DAT_YEU_CAU"
+                                            checked={evaluationForm.ketLuan === 'DAT_YEU_CAU'}
+                                            onChange={(e) => setEvaluationForm({ ...evaluationForm, ketLuan: e.target.value })}
+                                            disabled={isEvaluationReadOnly}
+                                        />
+                                        <span>Đạt yêu cầu</span>
+                                    </label>
+                                    <label className="interview-evaluation-radio-label">
+                                        <input
+                                            type="radio"
+                                            name="ketLuan"
+                                            value="KHONG_DAT_YEU_CAU"
+                                            checked={evaluationForm.ketLuan === 'KHONG_DAT_YEU_CAU'}
+                                            onChange={(e) => setEvaluationForm({ ...evaluationForm, ketLuan: e.target.value })}
+                                            disabled={isEvaluationReadOnly}
+                                        />
+                                        <span>Không đạt yêu cầu</span>
+                                    </label>
+                                    <label className="interview-evaluation-radio-label">
+                                        <input
+                                            type="radio"
+                                            name="ketLuan"
+                                            value="LUU_HO_SO"
+                                            checked={evaluationForm.ketLuan === 'LUU_HO_SO'}
+                                            onChange={(e) => setEvaluationForm({ ...evaluationForm, ketLuan: e.target.value })}
+                                            disabled={isEvaluationReadOnly}
+                                        />
+                                        <span>Lưu hồ sơ</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="interview-evaluation-modal-footer">
+                            {bothEvaluated && (
+                                <div className="interview-evaluation-status-message" style={{ 
+                                    padding: '0.75rem 1rem', 
+                                    background: '#10b981', 
+                                    color: 'white', 
+                                    borderRadius: '0.5rem',
+                                    marginBottom: '1rem',
+                                    textAlign: 'center'
+                                }}>
+                                    ✓ Cả hai người đã hoàn thành đánh giá
+                                </div>
+                            )}
+                            {currentUserHasEvaluated && !bothEvaluated && (
+                                <div className="interview-evaluation-status-message" style={{ 
+                                    padding: '0.75rem 1rem', 
+                                    background: '#f59e0b', 
+                                    color: 'white', 
+                                    borderRadius: '0.5rem',
+                                    marginBottom: '1rem',
+                                    textAlign: 'center'
+                                }}>
+                                    ⏳ Bạn đã đánh giá. Đang chờ người kia đánh giá...
+                                </div>
+                            )}
+                            <button
+                                type="button"
+                                className="interview-evaluation-btn interview-evaluation-btn--cancel"
+                                onClick={() => {
+                                    setShowEvaluationModal(false);
+                                    setSelectedEvaluationRequest(null);
+                                    setCurrentUserHasEvaluated(false);
+                                    setBothEvaluated(false);
+                                    setIsEvaluationReadOnly(false);
+                                }}
+                            >
+                                Đóng
+                            </button>
+                            {!isEvaluationReadOnly && (
+                                <button
+                                    type="button"
+                                    className="interview-evaluation-btn interview-evaluation-btn--save"
+                                    onClick={handleSaveEvaluation}
+                                    disabled={savingEvaluation}
+                                >
+                                    {savingEvaluation ? 'Đang lưu...' : 'Lưu đánh giá'}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

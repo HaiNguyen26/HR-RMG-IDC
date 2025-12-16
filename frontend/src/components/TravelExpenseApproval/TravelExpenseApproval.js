@@ -33,35 +33,68 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
            normalized2.includes(normalized1);
   };
 
+  // Function to determine user role (without request context)
+  const determineUserRole = () => {
+    if (!currentUser) return null;
+
+    const currentUserName = (currentUser.hoTen || currentUser.username || '').trim();
+    const currentUserChucDanh = (currentUser.chucDanh || '').trim();
+
+    // Check if user is CEO (Tổng giám đốc)
+    if (namesMatch(currentUserName, 'Lê Thanh Tùng')) {
+      return 'CEO';
+    }
+
+    // Check if user is Finance (Kế toán)
+    if (namesMatch(currentUserName, 'Nguyễn Thị Ngọc Thúy') && 
+        (currentUserChucDanh.includes('Kế toán Trưởng') || currentUserChucDanh.includes('Kế toán'))) {
+      return 'FINANCE';
+    }
+
+    return null;
+  };
+
   // Function to determine actorRole based on currentUser and request status
   const determineActorRole = async (request) => {
     if (!currentUser || !request) return null;
 
     const currentUserName = (currentUser.hoTen || currentUser.username || '').trim();
     const currentUserChucDanh = (currentUser.chucDanh || '').trim();
+    const currentUserChiNhanh = (currentUser.chiNhanh || currentUser.chi_nhanh || '').trim();
 
-    // 1. Check if user is CEO (Tổng giám đốc)
-    if (namesMatch(currentUserName, 'Lê Thanh Tùng')) {
+    // 1. Check if user is CEO (Tổng giám đốc) - for PENDING_CEO requests
+    if (request.status === 'PENDING_CEO' && namesMatch(currentUserName, 'Lê Thanh Tùng')) {
       return 'CEO';
     }
 
-    // 2. Check if user is Finance (Kế toán)
-    if (namesMatch(currentUserName, 'Nguyễn Thị Ngọc Thúy') && 
-        (currentUserChucDanh.includes('Kế toán Trưởng') || currentUserChucDanh.includes('Kế toán'))) {
-      return 'FINANCE';
-    }
+    // 2. Check if user is Finance (Kế toán) - already handled in determineUserRole
 
     // 3. Check if user is Branch Director (Giám đốc chi nhánh) - based on chuc_danh
-    if (currentUserChucDanh && (
+    // Chỉ áp dụng cho requests có status PENDING_LEVEL_2
+    if (request.status === 'PENDING_LEVEL_2' && currentUserChucDanh && (
         currentUserChucDanh.includes('Giám đốc') || 
         currentUserChucDanh.includes('Giam doc')
       )) {
-      return 'MANAGER'; // Giám đốc chi nhánh cũng là MANAGER
+      // Kiểm tra xem có cùng chi nhánh với employee trong request không (nếu có thông tin)
+      if (request.employee_id && employeesList.length > 0) {
+        const requestEmployee = employeesList.find(emp => emp.id === request.employee_id);
+        if (requestEmployee && requestEmployee.chi_nhanh) {
+          // Nếu có thông tin chi nhánh, kiểm tra khớp
+          if (currentUserChiNhanh && currentUserChiNhanh.toLowerCase() === requestEmployee.chi_nhanh.toLowerCase()) {
+            return 'BRANCH_DIRECTOR';
+          }
+        } else {
+          // Nếu không có thông tin chi nhánh, vẫn cho phép nếu là Giám đốc
+          return 'BRANCH_DIRECTOR';
+        }
+      } else {
+        // Nếu không có thông tin employee, vẫn cho phép nếu là Giám đốc
+        return 'BRANCH_DIRECTOR';
+      }
     }
 
-    // 4. Check if user is Direct Manager (Quản lý trực tiếp)
-    // Fetch employee info to check quan_ly_truc_tiep
-    if (request.employee_id && employeesList.length > 0) {
+    // 4. Check if user is Direct Manager (Quản lý trực tiếp) - chỉ áp dụng cho PENDING_LEVEL_1
+    if (request.status === 'PENDING_LEVEL_1' && request.employee_id && employeesList.length > 0) {
       const requestEmployee = employeesList.find(emp => emp.id === request.employee_id);
       if (requestEmployee && requestEmployee.quan_ly_truc_tiep) {
         const managerName = requestEmployee.quan_ly_truc_tiep.trim();
@@ -73,6 +106,50 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
 
     // Default: return null if cannot determine
     return null;
+  };
+
+  // Helper function to format and filter requests
+  const formatAndFilterRequests = async (allRequestsData) => {
+    const allRequests = allRequestsData.map(req => {
+      const startDate = req.start_time ? new Date(req.start_time) : null;
+      const endDate = req.end_time ? new Date(req.end_time) : null;
+
+      return {
+        id: req.id,
+        code: `CTX-${req.id}`,
+        employeeName: req.employee_name || 'N/A',
+        branch: req.employee_branch || 'N/A',
+        scope: req.location_type === 'INTERNATIONAL' ? 'NN' : 'NĐ',
+        purpose: req.purpose || '',
+        destination: req.location || '',
+        startDate: startDate ? startDate.toLocaleDateString('vi-VN') : '',
+        startTime: startDate ? startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+        endDate: endDate ? endDate.toLocaleDateString('vi-VN') : '',
+        endTime: endDate ? endDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+        status: req.status || '',
+        employee_id: req.employeeId || req.employee_id,
+        location_type: req.locationType || req.location_type,
+        employee_branch: req.employee_branch
+      };
+    });
+
+    // Filter requests based on user role - only show requests user can approve
+    const filteredRequests = [];
+    for (const req of allRequests) {
+      const actorRole = await determineActorRole(req);
+      if (actorRole === 'MANAGER' && req.status === 'PENDING_LEVEL_1') {
+        filteredRequests.push(req);
+      } else if (actorRole === 'BRANCH_DIRECTOR' && req.status === 'PENDING_LEVEL_2') {
+        filteredRequests.push(req);
+      } else if (actorRole === 'CEO' && req.status === 'PENDING_CEO') {
+        // CEO chỉ thấy requests nước ngoài đã được Cấp 1 & Cấp 2 duyệt
+        if (req.location_type === 'INTERNATIONAL') {
+          filteredRequests.push(req);
+        }
+      }
+    }
+
+    return filteredRequests;
   };
 
   // Fetch employees list for checking quan_ly_truc_tiep
@@ -97,34 +174,22 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
     const fetchPendingRequests = async () => {
       setLoading(true);
       try {
-        // Fetch requests pending approval (status PENDING_LEVEL_1 or PENDING_LEVEL_2)
+        // Determine which status to fetch based on user role
+        const userRole = determineUserRole();
+        let statusFilter = 'PENDING_LEVEL_1,PENDING_LEVEL_2';
+        
+        if (userRole === 'CEO') {
+          statusFilter = 'PENDING_CEO';
+        }
+
+        // Fetch requests based on status filter
         const response = await travelExpensesAPI.getAll({
-          status: 'PENDING_LEVEL_1,PENDING_LEVEL_2'
+          status: statusFilter
         });
 
         if (response.data && response.data.success) {
-          const formattedRequests = response.data.data.map(req => {
-            const startDate = req.start_time ? new Date(req.start_time) : null;
-            const endDate = req.end_time ? new Date(req.end_time) : null;
-
-            return {
-              id: req.id,
-              code: `CTX-${req.id}`,
-              employeeName: req.employee_name || 'N/A',
-              branch: req.employee_branch || 'N/A',
-              scope: req.location_type === 'INTERNATIONAL' ? 'NN' : 'NĐ',
-              purpose: req.purpose || '',
-              destination: req.location || '',
-              startDate: startDate ? startDate.toLocaleDateString('vi-VN') : '',
-              startTime: startDate ? startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-              endDate: endDate ? endDate.toLocaleDateString('vi-VN') : '',
-              endTime: endDate ? endDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-              status: req.status || '',
-              employee_id: req.employee_id,
-              location_type: req.location_type
-            };
-          });
-          setRequests(formattedRequests);
+          const filteredRequests = await formatAndFilterRequests(response.data.data);
+          setRequests(filteredRequests);
         }
       } catch (error) {
         console.error('Error fetching pending travel expense requests:', error);
@@ -156,9 +221,13 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
             </svg>
           </div>
           <div>
-            <h1 className="travel-expense-approval-title">Phê duyệt công tác</h1>
+            <h1 className="travel-expense-approval-title">
+              {determineUserRole() === 'CEO' ? 'Phê duyệt công tác - Cấp Đặc biệt' : 'Phê duyệt công tác'}
+            </h1>
             <p className="travel-expense-approval-subtitle">
-              Xem và phê duyệt các yêu cầu kinh phí công tác từ nhân viên trong bộ phận của bạn.
+              {determineUserRole() === 'CEO' 
+                ? 'Xem và phê duyệt các yêu cầu công tác nước ngoài đã được Cấp 1 & Cấp 2 duyệt.'
+                : 'Xem và phê duyệt các yêu cầu kinh phí công tác từ nhân viên trong bộ phận của bạn.'}
             </p>
           </div>
         </div>
@@ -172,9 +241,21 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
           <div className="travel-expense-approval-list-column">
             {/* Nền Cột */}
             <div className="travel-expense-approval-list-container">
-              {/* Tiêu đề: YÊU CẦU CHỜ DUYỆT CẤP 1/2 (Teal đậm) */}
+              {/* Tiêu đề: YÊU CẦU CHỜ DUYỆT (Teal đậm) */}
               <h2 className="travel-expense-approval-list-title">
-                YÊU CẦU CHỜ DUYỆT CẤP 1/2
+                {(() => {
+                  const userRole = determineUserRole();
+                  if (userRole === 'CEO') {
+                    return 'YÊU CẦU CHỜ DUYỆT CẤP ĐẶC BIỆT';
+                  }
+                  if (requests.length > 0 && requests[0].status === 'PENDING_LEVEL_1') {
+                    return 'YÊU CẦU CHỜ DUYỆT CẤP 1';
+                  }
+                  if (requests.length > 0 && requests[0].status === 'PENDING_LEVEL_2') {
+                    return 'YÊU CẦU CHỜ DUYỆT CẤP 2';
+                  }
+                  return 'YÊU CẦU CHỜ DUYỆT CẤP 1/2';
+                })()}
               </h2>
 
               {/* Thanh Tìm kiếm */}
@@ -251,18 +332,25 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
                       )}
                     </div>
                     <div className="travel-expense-approval-flow-content">
-                      {selectedRequest.scope === 'NN' ? (
+                      {determineUserRole() === 'CEO' ? (
+                        <>
+                          <h3 className="travel-expense-approval-flow-title">Phê duyệt Cấp Đặc biệt</h3>
+                          <p className="travel-expense-approval-flow-description">
+                            Yêu cầu này là <strong>Công tác Nước ngoài</strong> và đã được <strong>Cấp 1 (Quản lý Trực tiếp)</strong> và <strong>Cấp 2 (Giám đốc Chi nhánh)</strong> duyệt. Sau khi bạn duyệt, sẽ chuyển đến <strong>CẤP NGÂN SÁCH (BƯỚC 4)</strong> để phân bổ kinh phí.
+                          </p>
+                        </>
+                      ) : selectedRequest.scope === 'NN' ? (
                         <>
                           <h3 className="travel-expense-approval-flow-title">Công tác Nước ngoài</h3>
                           <p className="travel-expense-approval-flow-description">
-                            Yêu cầu này là <strong>Công tác Nước ngoài</strong>. Sau khi duyệt, sẽ chuyển thẳng đến <strong>TỔNG GIÁM ĐỐC (BƯỚC 3)</strong> để phê duyệt đặc biệt.
+                            Yêu cầu này là <strong>Công tác Nước ngoài</strong>. Sau khi duyệt, sẽ chuyển đến <strong>GIÁM ĐỐC CHI NHÁNH (CẤP 2)</strong>, sau đó đến <strong>TỔNG GIÁM ĐỐC (BƯỚC 3)</strong> để phê duyệt đặc biệt.
                           </p>
                         </>
                       ) : (
                         <>
                           <h3 className="travel-expense-approval-flow-title">Công tác Nội địa</h3>
                           <p className="travel-expense-approval-flow-description">
-                            Yêu cầu là <strong>Nội địa</strong>. Sau khi duyệt, sẽ chuyển đến <strong>CẤP NGÂN SÁCH (BƯỚC 4)</strong> để phân bổ kinh phí.
+                            Yêu cầu là <strong>Nội địa</strong>. Sau khi duyệt, sẽ chuyển đến <strong>GIÁM ĐỐC CHI NHÁNH (CẤP 2)</strong>, sau đó đến <strong>CẤP NGÂN SÁCH (BƯỚC 4)</strong> để phân bổ kinh phí.
                           </p>
                         </>
                       )}
@@ -371,32 +459,14 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
                             setApprovalNote('');
 
                             // Refresh requests list
-                            const response = await travelExpensesAPI.getAll({
-                              status: 'PENDING_LEVEL_1,PENDING_LEVEL_2'
+                            const userRole = determineUserRole();
+                            const statusFilter = userRole === 'CEO' ? 'PENDING_CEO' : 'PENDING_LEVEL_1,PENDING_LEVEL_2';
+                            const refreshResponse = await travelExpensesAPI.getAll({
+                              status: statusFilter
                             });
-                            if (response.data && response.data.success) {
-                              const formattedRequests = response.data.data.map(req => {
-                                const startDate = req.start_time ? new Date(req.start_time) : null;
-                                const endDate = req.end_time ? new Date(req.end_time) : null;
-
-                                return {
-                                  id: req.id,
-                                  code: `CTX-${req.id}`,
-                                  employeeName: req.employee_name || 'N/A',
-                                  branch: req.employee_branch || 'N/A',
-                                  scope: req.location_type === 'INTERNATIONAL' ? 'NN' : 'NĐ',
-                                  purpose: req.purpose || '',
-                                  destination: req.location || '',
-                                  startDate: startDate ? startDate.toLocaleDateString('vi-VN') : '',
-                                  startTime: startDate ? startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-                                  endDate: endDate ? endDate.toLocaleDateString('vi-VN') : '',
-                                  endTime: endDate ? endDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-                                  status: req.status || '',
-                                  employee_id: req.employee_id,
-                                  location_type: req.location_type
-                                };
-                              });
-                              setRequests(formattedRequests);
+                            if (refreshResponse.data && refreshResponse.data.success) {
+                              const filteredRequests = await formatAndFilterRequests(refreshResponse.data.data);
+                              setRequests(filteredRequests);
                             }
                           } catch (error) {
                             console.error('Error approving request:', error);
@@ -445,32 +515,14 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
                             setApprovalNote('');
 
                             // Refresh requests list
-                            const response = await travelExpensesAPI.getAll({
-                              status: 'PENDING_LEVEL_1,PENDING_LEVEL_2'
+                            const userRole = determineUserRole();
+                            const statusFilter = userRole === 'CEO' ? 'PENDING_CEO' : 'PENDING_LEVEL_1,PENDING_LEVEL_2';
+                            const refreshResponse = await travelExpensesAPI.getAll({
+                              status: statusFilter
                             });
-                            if (response.data && response.data.success) {
-                              const formattedRequests = response.data.data.map(req => {
-                                const startDate = req.start_time ? new Date(req.start_time) : null;
-                                const endDate = req.end_time ? new Date(req.end_time) : null;
-
-                                return {
-                                  id: req.id,
-                                  code: `CTX-${req.id}`,
-                                  employeeName: req.employee_name || 'N/A',
-                                  branch: req.employee_branch || 'N/A',
-                                  scope: req.location_type === 'INTERNATIONAL' ? 'NN' : 'NĐ',
-                                  purpose: req.purpose || '',
-                                  destination: req.location || '',
-                                  startDate: startDate ? startDate.toLocaleDateString('vi-VN') : '',
-                                  startTime: startDate ? startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-                                  endDate: endDate ? endDate.toLocaleDateString('vi-VN') : '',
-                                  endTime: endDate ? endDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-                                  status: req.status || '',
-                                  employee_id: req.employee_id,
-                                  location_type: req.location_type
-                                };
-                              });
-                              setRequests(formattedRequests);
+                            if (refreshResponse.data && refreshResponse.data.success) {
+                              const filteredRequests = await formatAndFilterRequests(refreshResponse.data.data);
+                              setRequests(filteredRequests);
                             }
                           } catch (error) {
                             console.error('Error rejecting request:', error);

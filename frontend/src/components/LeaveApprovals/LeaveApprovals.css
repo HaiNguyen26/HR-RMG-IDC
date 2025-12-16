@@ -23,13 +23,15 @@
 }
 
 .leave-approvals::-webkit-scrollbar-track {
-  background: rgba(224, 242, 254, 0.3); /* Sky blue nhạt với transparency */
+  background: rgba(224, 242, 254, 0.3);
+  /* Sky blue nhạt với transparency */
   border-radius: 4px;
   backdrop-filter: blur(5px);
 }
 
 .leave-approvals::-webkit-scrollbar-thumb {
-  background: rgba(14, 165, 233, 0.4); /* Sky blue với transparency */
+  background: rgba(14, 165, 233, 0.4);
+  /* Sky blue với transparency */
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -41,7 +43,8 @@
 /* Màu Chủ Đạo: Gradient Calm Integrity - Gradient xanh dương/xanh lá nhạt tạo cảm giác yên bình và chuyên nghiệp */
 /* Header với tiêu đề chính */
 .leave-approvals-header {
-  margin-bottom: 0; /* Không cần margin vì container đã có gap: 1.5rem */
+  margin-bottom: 0;
+  /* Không cần margin vì container đã có gap: 1.5rem */
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -52,7 +55,8 @@
 .leave-approvals-header-content {
   display: flex;
   align-items: center;
-  gap: 1.5rem; /* Đồng bộ với CandidateManagement */
+  gap: 1.5rem;
+  /* Đồng bộ với CandidateManagement */
   flex: 1;
   /* Gradient Calm Integrity: from-sky-50 to-emerald-50 */
   background: linear-gradient(to right, #e0f2fe, #ecfdf5);
@@ -68,17 +72,22 @@
 
 /* Icon Banner Block - Glass Block Xanh Dương Nhạt */
 .leave-approvals-icon-wrapper {
-  width: 4.5rem; /* Đồng bộ với CandidateManagement */
-  height: 4.5rem; /* Đồng bộ với CandidateManagement */
-  border-radius: 0.75rem; /* rounded-xl */
-  background: rgba(239, 246, 255, 0.7); /* bg-blue-50/70 - Glass Block Xanh Dương Nhạt */
+  width: 4.5rem;
+  /* Đồng bộ với CandidateManagement */
+  height: 4.5rem;
+  /* Đồng bộ với CandidateManagement */
+  border-radius: 0.75rem;
+  /* rounded-xl */
+  background: rgba(239, 246, 255, 0.7);
+  /* bg-blue-50/70 - Glass Block Xanh Dương Nhạt */
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  /* shadow-md */
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
 }
@@ -89,9 +98,12 @@
 }
 
 .leave-approvals-icon {
-  width: 2.5rem; /* Đồng bộ với CandidateManagement */
-  height: 2.5rem; /* Đồng bộ với CandidateManagement */
-  color: #3b82f6; /* text-blue-500 - Xanh Dương Sáng */
+  width: 2.5rem;
+  /* Đồng bộ với CandidateManagement */
+  height: 2.5rem;
+  /* Đồng bộ với CandidateManagement */
+  color: #3b82f6;
+  /* text-blue-500 - Xanh Dương Sáng */
   stroke-width: 2;
 }
 
@@ -101,7 +113,8 @@
   /* text-2xl */
   font-weight: 700;
   /* font-bold */
-  color: #000000; /* Màu đen */
+  color: #000000;
+  /* Màu đen */
   margin: 0 0 0.375rem 0;
   line-height: 1.2;
   text-transform: uppercase;
@@ -111,7 +124,8 @@
 .leave-approvals-subtitle {
   font-size: 0.875rem;
   /* text-sm */
-  color: #000000; /* Màu đen */
+  color: #000000;
+  /* Màu đen */
   margin: 0;
   line-height: 1.5;
 }
@@ -122,8 +136,10 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  min-height: 0; /* Cho phép flex child shrink */
-  overflow: visible; /* Cho phép hiệu ứng hover không bị cắt */
+  min-height: 0;
+  /* Cho phép flex child shrink */
+  overflow: visible;
+  /* Cho phép hiệu ứng hover không bị cắt */
 }
 
 /* Main Filter Bar - Lọc theo Loại Yêu cầu */
@@ -132,7 +148,8 @@
   padding-bottom: 1rem;
   margin-bottom: 0.5rem;
   border-bottom: 1px solid rgba(226, 232, 240, 0.6);
-  overflow: visible; /* Cho phép hiệu ứng hover không bị cắt */
+  overflow: visible;
+  /* Cho phép hiệu ứng hover không bị cắt */
   position: relative;
   z-index: 1;
 }
@@ -150,11 +167,14 @@
   justify-content: center;
   padding: 0.5rem 1rem;
   border-radius: 0.625rem;
-  border: 1px solid #d1d5db; /* border-gray-300 */
-  background: rgba(255, 255, 255, 0.7); /* bg-white/70 - Neutral/Glass Tab */
+  border: 1px solid #d1d5db;
+  /* border-gray-300 */
+  background: rgba(255, 255, 255, 0.7);
+  /* bg-white/70 - Neutral/Glass Tab */
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: #374151; /* text-gray-700 */
+  color: #374151;
+  /* text-gray-700 */
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
@@ -165,7 +185,8 @@
 
 .request-type-filter-chip:hover {
   background: rgba(255, 255, 255, 0.85);
-  border-color: #9ca3af; /* border-gray-400 */
+  border-color: #9ca3af;
+  /* border-gray-400 */
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
 }
@@ -197,10 +218,13 @@
 }
 
 @keyframes badge-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.7;
     transform: scale(1.1);
@@ -213,10 +237,12 @@
 }
 
 @keyframes pulse-glow-module {
+
   0%,
   100% {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
   }
+
   50% {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 4px rgba(239, 68, 68, 0.2);
   }
@@ -227,10 +253,12 @@
 }
 
 @keyframes pulse-glow-module-active {
+
   0%,
   100% {
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2), 0 1px 4px rgba(59, 130, 246, 0.15);
   }
+
   50% {
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2), 0 1px 4px rgba(59, 130, 246, 0.15), 0 0 0 4px rgba(239, 68, 68, 0.3);
   }
@@ -238,56 +266,219 @@
 
 /* Tab Active (Đơn xin nghỉ) - Accent Blue */
 .request-type-filter-chip.leave.active {
-  background: #3b82f6; /* bg-blue-500 - Accent Blue */
-  color: #ffffff; /* text-white */
+  background: #3b82f6;
+  /* bg-blue-500 - Accent Blue */
+  color: #ffffff;
+  /* text-white */
   border-color: #3b82f6;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  /* shadow-md */
 }
 
 .request-type-filter-chip.leave:hover:not(.active) {
   border-color: rgba(59, 130, 246, 0.4);
-  color: #3b82f6; /* text-blue-500 */
+  color: #3b82f6;
+  /* text-blue-500 */
 }
 
 .request-type-filter-chip.leave.active:hover {
-  background: #2563eb; /* bg-blue-600 */
-  box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.12), 0 3px 5px -1px rgba(0, 0, 0, 0.08); /* shadow-lg */
+  background: #2563eb;
+  /* bg-blue-600 */
+  box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.12), 0 3px 5px -1px rgba(0, 0, 0, 0.08);
+  /* shadow-lg */
 }
 
 /* Tab Active (Đơn tăng ca) - Accent Blue */
 .request-type-filter-chip.overtime.active {
-  background: #3b82f6; /* bg-blue-500 - Accent Blue */
-  color: #ffffff; /* text-white */
+  background: #3b82f6;
+  /* bg-blue-500 - Accent Blue */
+  color: #ffffff;
+  /* text-white */
   border-color: #3b82f6;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  /* shadow-md */
 }
 
 .request-type-filter-chip.overtime:hover:not(.active) {
   border-color: rgba(59, 130, 246, 0.4);
-  color: #3b82f6; /* text-blue-500 */
+  color: #3b82f6;
+  /* text-blue-500 */
 }
 
 .request-type-filter-chip.overtime.active:hover {
-  background: #2563eb; /* bg-blue-600 */
-  box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.12), 0 3px 5px -1px rgba(0, 0, 0, 0.08); /* shadow-lg */
+  background: #2563eb;
+  /* bg-blue-600 */
+  box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.12), 0 3px 5px -1px rgba(0, 0, 0, 0.08);
+  /* shadow-lg */
 }
 
 /* Tab Active (Đơn bổ sung công) - Accent Blue */
 .request-type-filter-chip.attendance.active {
-  background: #3b82f6; /* bg-blue-500 - Accent Blue */
-  color: #ffffff; /* text-white */
+  background: #3b82f6;
+  /* bg-blue-500 - Accent Blue */
+  color: #ffffff;
+  /* text-white */
   border-color: #3b82f6;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  /* shadow-md */
 }
 
 .request-type-filter-chip.attendance:hover:not(.active) {
   border-color: rgba(59, 130, 246, 0.4);
-  color: #3b82f6; /* text-blue-500 */
+  color: #3b82f6;
+  /* text-blue-500 */
 }
 
 .request-type-filter-chip.attendance.active:hover {
-  background: #2563eb; /* bg-blue-600 */
-  box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.12), 0 3px 5px -1px rgba(0, 0, 0, 0.08); /* shadow-lg */
+  background: #2563eb;
+  /* bg-blue-600 */
+  box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.12), 0 3px 5px -1px rgba(0, 0, 0, 0.08);
+  /* shadow-lg */
+}
+
+/* Tab Active (Tất cả đơn) - Accent Blue */
+.request-type-filter-chip.all.active {
+  background: linear-gradient(135deg, #3b82f6, #10b981);
+  /* Gradient Blue to Green */
+  color: #ffffff;
+  /* text-white */
+  border-color: #3b82f6;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  /* shadow-md */
+}
+
+.request-type-filter-chip.all:hover:not(.active) {
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #3b82f6;
+  /* text-blue-500 */
+}
+
+.request-type-filter-chip.all.active:hover {
+  background: linear-gradient(135deg, #2563eb, #059669);
+  /* Gradient Blue-600 to Green-600 */
+  box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.12), 0 3px 5px -1px rgba(0, 0, 0, 0.08);
+  /* shadow-lg */
+}
+
+/* Request Type Badge (for "all" mode) */
+.request-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.request-type-badge.leave {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #1e40af;
+  border: 1px solid #93c5fd;
+}
+
+.request-type-badge.overtime {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.request-type-badge.attendance {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+
+/* Summary Cards - Gradient Glass Style */
+.leave-approvals-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.leave-approvals-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.leave-approvals-summary-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.leave-approvals-summary-card:hover::before {
+  opacity: 1;
+}
+
+.leave-approvals-summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.15), 0 4px 8px -2px rgba(0, 0, 0, 0.1);
+}
+
+.leave-approvals-summary-card.active {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 8px 16px -4px rgba(59, 130, 246, 0.2), 0 4px 8px -2px rgba(59, 130, 246, 0.15), inset 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.summary-card-icon {
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+.summary-card-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.summary-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.summary-card-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+  opacity: 0.9;
+}
+
+.summary-card-count {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1;
+}
+
+.leave-approvals-summary-card.active .summary-card-count {
+  color: #1e40af;
 }
 
 /* Status Filter Bar - Lọc theo Trạng thái Xử lý */
@@ -301,7 +492,8 @@
   margin-bottom: 0.5rem;
   border-bottom: 1px solid rgba(226, 232, 240, 0.6);
   flex-wrap: wrap;
-  overflow: visible; /* Cho phép hiệu ứng hover không bị cắt */
+  overflow: visible;
+  /* Cho phép hiệu ứng hover không bị cắt */
   position: relative;
   z-index: 1;
 }
@@ -311,8 +503,10 @@
   gap: 0.5rem;
   flex-wrap: wrap;
   flex: 1;
-  padding: 0.25rem 0; /* Thêm padding để có không gian cho hiệu ứng hover */
-  overflow: visible; /* Cho phép hiệu ứng hover không bị cắt */
+  padding: 0.25rem 0;
+  /* Thêm padding để có không gian cho hiệu ứng hover */
+  overflow: visible;
+  /* Cho phép hiệu ứng hover không bị cắt */
   position: relative;
   z-index: 1;
 }
@@ -365,24 +559,31 @@
 
 /* Status Tab: Chờ tôi duyệt (Pending) - Amber */
 .status-filter-chip.pending:not(.active) {
-  border-left: 3px solid #fbbf24; /* border-amber-400 */
+  border-left: 3px solid #fbbf24;
+  /* border-amber-400 */
 }
 
 .status-filter-chip.pending:hover:not(.active) {
-  background: rgba(254, 243, 199, 0.5); /* bg-amber-100/50 */
+  background: rgba(254, 243, 199, 0.5);
+  /* bg-amber-100/50 */
   border-color: rgba(251, 191, 36, 0.4);
-  color: #92400e; /* text-amber-800 */
+  color: #92400e;
+  /* text-amber-800 */
 }
 
 .status-filter-chip.pending.active {
-  background: #fef3c7; /* bg-amber-100 - Phối màu Chức năng */
-  color: #92400e; /* text-amber-800 */
-  border-color: #fbbf24; /* border-amber-400 */
+  background: #fef3c7;
+  /* bg-amber-100 - Phối màu Chức năng */
+  color: #92400e;
+  /* text-amber-800 */
+  border-color: #fbbf24;
+  /* border-amber-400 */
   border-left-color: #fbbf24;
 }
 
 .status-filter-chip.pending.active:hover {
-  background: #fde68a; /* bg-amber-200 */
+  background: #fde68a;
+  /* bg-amber-200 */
 }
 
 /* Đang chờ QL Gián tiếp - Xanh Dương Nhạt */
@@ -410,46 +611,60 @@
 
 /* Status Tab: Đã duyệt (Approved) - Emerald */
 .status-filter-chip.approved:not(.active) {
-  border-left: 3px solid #34d399; /* border-emerald-400 */
+  border-left: 3px solid #34d399;
+  /* border-emerald-400 */
 }
 
 .status-filter-chip.approved:hover:not(.active) {
-  background: rgba(209, 250, 229, 0.5); /* bg-emerald-100/50 */
+  background: rgba(209, 250, 229, 0.5);
+  /* bg-emerald-100/50 */
   border-color: rgba(52, 211, 153, 0.4);
-  color: #065f46; /* text-emerald-800 */
+  color: #065f46;
+  /* text-emerald-800 */
 }
 
 .status-filter-chip.approved.active {
-  background: #d1fae5; /* bg-emerald-100 - Phối màu Chức năng */
-  color: #065f46; /* text-emerald-800 */
-  border-color: #34d399; /* border-emerald-400 */
+  background: #d1fae5;
+  /* bg-emerald-100 - Phối màu Chức năng */
+  color: #065f46;
+  /* text-emerald-800 */
+  border-color: #34d399;
+  /* border-emerald-400 */
   border-left-color: #34d399;
 }
 
 .status-filter-chip.approved.active:hover {
-  background: #a7f3d0; /* bg-emerald-200 */
+  background: #a7f3d0;
+  /* bg-emerald-200 */
 }
 
 /* Status Tab: Đã từ chối (Rejected) - Rose */
 .status-filter-chip.rejected:not(.active) {
-  border-left: 3px solid #fb7185; /* border-rose-400 */
+  border-left: 3px solid #fb7185;
+  /* border-rose-400 */
 }
 
 .status-filter-chip.rejected:hover:not(.active) {
-  background: rgba(255, 228, 230, 0.5); /* bg-rose-100/50 */
+  background: rgba(255, 228, 230, 0.5);
+  /* bg-rose-100/50 */
   border-color: rgba(251, 113, 133, 0.4);
-  color: #991b1b; /* text-rose-800 */
+  color: #991b1b;
+  /* text-rose-800 */
 }
 
 .status-filter-chip.rejected.active {
-  background: #ffe4e6; /* bg-rose-100 - Phối màu Chức năng */
-  color: #991b1b; /* text-rose-800 */
-  border-color: #fb7185; /* border-rose-400 */
+  background: #ffe4e6;
+  /* bg-rose-100 - Phối màu Chức năng */
+  color: #991b1b;
+  /* text-rose-800 */
+  border-color: #fb7185;
+  /* border-rose-400 */
   border-left-color: #fb7185;
 }
 
 .status-filter-chip.rejected.active:hover {
-  background: #fecdd3; /* bg-rose-200 */
+  background: #fecdd3;
+  /* bg-rose-200 */
 }
 
 /* Tất cả - Mặc định */
@@ -492,10 +707,12 @@
 }
 
 @keyframes pulse-glow-leave {
+
   0%,
   100% {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
   }
+
   50% {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 4px rgba(239, 68, 68, 0.2);
   }
@@ -506,10 +723,12 @@
 }
 
 @keyframes pulse-glow-leave-active {
+
   0%,
   100% {
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2), 0 1px 4px rgba(59, 130, 246, 0.15);
   }
+
   50% {
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2), 0 1px 4px rgba(59, 130, 246, 0.15), 0 0 0 4px rgba(239, 68, 68, 0.3);
   }
@@ -593,7 +812,8 @@
   overflow: hidden;
   overflow-x: auto;
   overflow-y: auto;
-  max-height: calc(100vh - 400px); /* Đảm bảo bảng không vượt quá viewport */
+  max-height: calc(100vh - 400px);
+  /* Đảm bảo bảng không vượt quá viewport */
   position: relative;
 }
 
@@ -1065,7 +1285,8 @@
   .leave-approvals-table-container {
     overflow-x: auto;
     overflow-y: auto;
-    max-height: calc(100vh - 350px); /* Điều chỉnh cho mobile */
+    max-height: calc(100vh - 350px);
+    /* Điều chỉnh cho mobile */
     -webkit-overflow-scrolling: touch;
   }
 
@@ -1258,6 +1479,40 @@
   font-style: italic;
   padding-top: 0.5rem;
   border-top: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.leave-approvals-modal-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border: 1px solid #ef4444;
+  border-radius: 0.75rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+  animation: slideInDown 0.3s ease-out;
+}
+
+.leave-approvals-modal-warning .warning-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #dc2626;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.leave-approvals-modal-warning .warning-content {
+  color: #991b1b;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.leave-approvals-modal-warning .warning-content strong {
+  font-weight: 700;
+  color: #7f1d1d;
 }
 
 .leave-approvals-modal-section {
@@ -1456,6 +1711,146 @@
 
 .leave-approvals-steps .step.completed .step-title {
   color: #059669;
+}
+
+/* Timeline - Modern Vertical Timeline */
+.leave-approvals-timeline {
+  position: relative;
+  padding-left: 2rem;
+}
+
+.timeline-step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding-bottom: 2rem;
+}
+
+.timeline-step:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-step-connector {
+  position: absolute;
+  left: 0.75rem;
+  top: 2.5rem;
+  width: 2px;
+  height: calc(100% - 1rem);
+  background: #e5e7eb;
+  z-index: 0;
+}
+
+.timeline-step:last-child .timeline-step-connector {
+  display: none;
+}
+
+.timeline-step.completed .timeline-step-connector {
+  background: linear-gradient(180deg, #10b981, #e5e7eb);
+}
+
+.timeline-step.current .timeline-step-connector {
+  background: linear-gradient(180deg, #10b981 0%, #3b82f6 50%, #e5e7eb 100%);
+}
+
+.timeline-step-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  color: #6b7280;
+  position: relative;
+  z-index: 1;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.timeline-step.completed .timeline-step-icon {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+.timeline-step.current .timeline-step-icon {
+  background: linear-gradient(135deg, #3b82f6, #10b981);
+  border-color: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  animation: pulse-timeline 2s ease-in-out infinite;
+}
+
+@keyframes pulse-timeline {
+
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  }
+
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
+  }
+}
+
+.timeline-step-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.timeline-step-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
+}
+
+.timeline-step-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.timeline-step-date {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.timeline-step-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  width: fit-content;
+  margin-top: 0.25rem;
+}
+
+.timeline-step-badge.current-badge {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(16, 185, 129, 0.15));
+  color: #1e40af;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.timeline-step-badge.success-badge {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(22, 163, 74, 0.15));
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.timeline-step-badge.error-badge {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.15));
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 /* Responsive modal */

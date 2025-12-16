@@ -1,62 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import './TravelExpenseManagement.css';
-import { travelExpensesAPI } from '../../services/api';
+import { travelExpensesAPI, employeesAPI } from '../../services/api';
 
 const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedRequestId, setSelectedRequestId] = useState(null);
-    const [activeTab, setActiveTab] = useState('A'); // 'A' hoặc 'B'
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(false);
-
-    // State cho Tab A: Cấp Ngân Sách Tối Đa
-    const [tabAForm, setTabAForm] = useState({
-        budgetAmount: '',
-        currencyType: 'VND',
-        exchangeRate: '1'
-    });
-
-    // State để lưu ngân sách đã được cấp (từ Tab A)
-    const [approvedBudget, setApprovedBudget] = useState(null);
-
-    // State cho Tab B: Form Xử Lý Chuyển Khoản
-    const [tabBForm, setTabBForm] = useState({
-        actualAmount: '',           // Số tiền Thực Tạm ứng
-        advanceMethod: '',          // Hình thức Tạm ứng
-        bankAccount: '',            // Tài khoản Ngân hàng nhận (readonly - từ hồ sơ nhân viên)
-        transferNotes: ''           // Ghi chú (Nội dung Chuyển khoản)
-    });
-
-    // Tự động set tỷ giá khi chọn loại tiền
-    const handleCurrencyChange = (currency) => {
-        if (currency === 'VND') {
-            setTabAForm({ ...tabAForm, currencyType: currency, exchangeRate: '1' });
-        } else {
-            setTabAForm({ ...tabAForm, currencyType: currency, exchangeRate: tabAForm.exchangeRate || '' });
-        }
-    };
-
-    // Tính toán quy đổi tự động
-    const getConvertedAmount = () => {
-        if (!tabAForm.budgetAmount || !tabAForm.exchangeRate) return 0;
-        const amount = parseFloat(tabAForm.budgetAmount);
-        const rate = parseFloat(tabAForm.exchangeRate);
-        if (isNaN(amount) || isNaN(rate)) return 0;
-        return amount * rate;
-    };
 
     // Fetch travel expense requests from API
     useEffect(() => {
         const fetchRequests = async () => {
             setLoading(true);
             try {
-                // Fetch requests with status PENDING_LEVEL_1, PENDING_LEVEL_2, or PENDING_FINANCE (approved by manager/CEO, waiting for budget allocation or already have budget)
-                const response = await travelExpensesAPI.getAll({
-                    status: 'PENDING_LEVEL_1,PENDING_LEVEL_2,PENDING_FINANCE'
+                // Quy trình mới: Chỉ fetch PENDING_SETTLEMENT requests (bỏ bước cấp ngân sách & tạm ứng)
+                const settlementResponse = await travelExpensesAPI.getAll({
+                    status: 'PENDING_SETTLEMENT'
                 });
 
-                if (response.data && response.data.success) {
-                    const formattedRequests = response.data.data.map(req => ({
+                if (settlementResponse.data && settlementResponse.data.success) {
+                    // Fetch attachments for each request
+                    const requestsWithAttachments = await Promise.all(
+                        (settlementResponse.data.data || []).map(async (req) => {
+                            try {
+                                const attachmentsResponse = await travelExpensesAPI.getAttachments(req.id);
+                                return {
+                                    ...req,
+                                    attachments: attachmentsResponse.data?.data || []
+                                };
+                            } catch (error) {
+                                console.error(`Error fetching attachments for request ${req.id}:`, error);
+                                return { ...req, attachments: [] };
+                            }
+                        })
+                    );
+
+                    const formattedRequests = requestsWithAttachments.map(req => ({
                         id: req.id,
                         code: `CTX-${req.id}`,
                         employeeName: req.employee_name || req.employeeName || 'N/A',
@@ -66,7 +45,9 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                         startDate: req.startTime ? new Date(req.startTime).toLocaleDateString('vi-VN') : '',
                         endDate: req.endTime ? new Date(req.endTime).toLocaleDateString('vi-VN') : '',
                         status: req.status || '',
-                        employee_id: req.employeeId
+                        employee_id: req.employeeId || req.employee_id,
+                        settlement: req.settlement || null,
+                        attachments: req.attachments || []
                     }));
                     setRequests(formattedRequests);
                 }
@@ -93,37 +74,68 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
     const selectedRequestFull = selectedRequest ? {
         ...selectedRequest,
         locationFull: selectedRequest.isDomestic ? `${selectedRequest.location} (Trong nước)` : `${selectedRequest.location} (Nước ngoài)`,
-        bankAccount: '' // TODO: Fetch from employee profile using employee_id
+        settlement: selectedRequest.settlement || null,
+        attachments: selectedRequest.attachments || []
     } : null;
 
-
-
-    // Format currency input
-    const handleAmountChange = (e) => {
-        let value = e.target.value.replace(/[^\d]/g, '');
-        setTabBForm({ ...tabBForm, actualAmount: value });
-    };
-
-    // Get formatted amount for display
-    const getFormattedAmount = () => {
-        if (!tabBForm.actualAmount) return '';
-        return parseInt(tabBForm.actualAmount).toLocaleString('vi-VN');
-    };
-
-    // Validate form
-    const validateTabBForm = () => {
-        if (!tabBForm.actualAmount) return 'Vui lòng nhập số tiền thực tạm ứng.';
-        if (!tabBForm.advanceMethod) return 'Vui lòng chọn hình thức tạm ứng.';
-        if (!tabBForm.transferNotes.trim()) return 'Vui lòng nhập ghi chú (nội dung chuyển khoản).';
-
-        const amount = parseInt(tabBForm.actualAmount);
-        if (isNaN(amount) || amount <= 0) return 'Số tiền phải lớn hơn 0.';
-
-        if (approvedBudget && amount > approvedBudget.amount) {
-            return `Số tiền không được vượt quá ngân sách tối đa đã được cấp (${approvedBudget.amount.toLocaleString('vi-VN')} VND).`;
+    // Handle settlement confirmation
+    const handleConfirmSettlement = async () => {
+        if (!selectedRequestId) {
+            showToast?.('Vui lòng chọn yêu cầu cần xác nhận', 'warning');
+            return;
         }
 
-        return null;
+        try {
+            const response = await travelExpensesAPI.confirmSettlement(selectedRequestId, {
+                confirmedBy: currentUser?.id || null
+            });
+
+            if (response.data && response.data.success) {
+                showToast?.('Đã xác nhận hoàn ứng thành công!', 'success');
+
+                // Refresh requests list
+                const refreshResponse = await travelExpensesAPI.getAll({
+                    status: 'PENDING_SETTLEMENT'
+                });
+                if (refreshResponse.data && refreshResponse.data.success) {
+                    // Fetch attachments for each request
+                    const requestsWithAttachments = await Promise.all(
+                        (refreshResponse.data.data || []).map(async (req) => {
+                            try {
+                                const attachmentsResponse = await travelExpensesAPI.getAttachments(req.id);
+                                return {
+                                    ...req,
+                                    attachments: attachmentsResponse.data?.data || []
+                                };
+                            } catch (error) {
+                                console.error(`Error fetching attachments for request ${req.id}:`, error);
+                                return { ...req, attachments: [] };
+                            }
+                        })
+                    );
+
+                    const formattedRequests = requestsWithAttachments.map(req => ({
+                        id: req.id,
+                        code: `CTX-${req.id}`,
+                        employeeName: req.employee_name || req.employeeName || 'N/A',
+                        location: req.location || '',
+                        isDomestic: req.locationType === 'DOMESTIC',
+                        purpose: req.purpose || '',
+                        startDate: req.startTime ? new Date(req.startTime).toLocaleDateString('vi-VN') : '',
+                        endDate: req.endTime ? new Date(req.endTime).toLocaleDateString('vi-VN') : '',
+                        status: req.status || '',
+                        employee_id: req.employeeId || req.employee_id,
+                        settlement: req.settlement || null,
+                        attachments: req.attachments || []
+                    }));
+                    setRequests(formattedRequests);
+                    setSelectedRequestId(null);
+                }
+            }
+        } catch (error) {
+            console.error('Error confirming settlement:', error);
+            showToast?.('Lỗi khi xác nhận hoàn ứng: ' + (error.response?.data?.message || error.message), 'error');
+        }
     };
 
     return (
@@ -155,7 +167,7 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                             Quản Lý Kinh Phí Công Tác
                         </h2>
                         <p className="travel-expense-management-subtitle">
-                            Xem và xử lý các yêu cầu kinh phí công tác, cấp ngân sách và quản lý tạm ứng
+                            Xác nhận hoàn ứng cho các yêu cầu công tác đã được nhân viên gửi báo cáo
                         </p>
                     </div>
                 </div>
@@ -171,7 +183,7 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                         <div className="travel-expense-list-column-container">
                             {/* Tiêu đề: text-xl font-bold text-indigo-600 */}
                             <h2 className="travel-expense-list-title">
-                                Danh Sách Chờ Cấp Ngân Sách
+                                Danh Sách Chờ Xác Nhận Hoàn Ứng
                             </h2>
 
                             {/* Thanh Tìm kiếm */}
@@ -228,7 +240,7 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                         </div>
                     </div>
 
-                    {/* III. CỘT PHẢI: CHI TIẾT CẤP NGÂN SÁCH (65% Width) */}
+                    {/* III. CỘT PHẢI: CHI TIẾT XÁC NHẬN HOÀN ỨNG (65% Width) */}
                     <div className="travel-expense-management-detail-column">
                         {/* Nền Cột: bg-white (Solid), rounded-xl, shadow-lg - Nền trắng tinh khiết, sạch sẽ */}
                         <div className="travel-expense-detail-column-container">
@@ -271,363 +283,82 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                                         </div>
                                     </div>
 
-                                    {/* A.2. Tab Menu: flex border-b border-gray-200 - Chứa 2 nút chuyển đổi nội dung */}
+                                    {/* A.2. Tab Menu: Chỉ còn Tab C - Xác Nhận Hoàn Ứng */}
                                     <div className="travel-expense-tab-menu">
-                                        {/* Tab Active (A): Nút Solid Blue - bg-blue-600, text-white, font-semibold, shadow-lg */}
                                         <button
-                                            className={`travel-expense-tab-button ${activeTab === 'A' ? 'active' : ''}`}
-                                            onClick={() => setActiveTab('A')}
+                                            className="travel-expense-tab-button active"
+                                            disabled
                                         >
-                                            A. Xác Định Ngân Sách
-                                        </button>
-                                        {/* Tab Inactive (B): Nút Grey - bg-gray-100, text-gray-600, hover:bg-gray-200 */}
-                                        <button
-                                            className={`travel-expense-tab-button ${activeTab === 'B' ? 'active' : ''}`}
-                                            onClick={() => setActiveTab('B')}
-                                        >
-                                            B. Xử Lý Tạm Ứng
+                                            C. Xác Nhận Hoàn Ứng
                                         </button>
                                     </div>
 
-                                    {/* B. Nội dung Tab */}
+                                    {/* B. Nội dung Tab - Chỉ hiển thị Tab C */}
                                     <div className="travel-expense-tab-content">
-                                        {/* Tab A: Cấp Ngân Sách Tối Đa */}
-                                        {activeTab === 'A' && (
-                                            <div className="travel-expense-tab-a">
-                                                {/* Tiêu đề Form: text-xl font-bold text-blue-700 - Dùng màu Xanh Dương đậm để phân cấp cho Form */}
+                                        {/* Tab C: Xác Nhận Hoàn Ứng */}
+                                        {selectedRequestFull && selectedRequestFull.settlement && selectedRequestFull.settlement.status === 'SUBMITTED' ? (
+                                            <div className="travel-expense-tab-c">
                                                 <h3 className="travel-expense-form-title">
-                                                    Cấp Ngân Sách Tối Đa
+                                                    Xác Nhận Hoàn Ứng
                                                 </h3>
 
-                                                <div className="travel-expense-form-group">
-                                                    {/* Label: text-sm font-semibold text-gray-700 - Label rõ ràng */}
-                                                    <label className="travel-expense-form-label">
-                                                        Trợ cấp Cố định / Ngân sách Tối đa
-                                                    </label>
-                                                    {/* Input Fields: shadow-inner, focus:border-blue-500 - Input màu trắng, áp dụng hiệu ứng Fluent Focus */}
-                                                    <input
-                                                        type="number"
-                                                        className="travel-expense-form-input"
-                                                        value={tabAForm.budgetAmount}
-                                                        onChange={(e) => setTabAForm({ ...tabAForm, budgetAmount: e.target.value })}
-                                                        placeholder="Nhập số tiền tối đa được phép chi"
-                                                        required
-                                                    />
-                                                </div>
-
-                                                <div className="travel-expense-form-group">
-                                                    <label className="travel-expense-form-label">
-                                                        Loại Tiền
-                                                    </label>
-                                                    <select
-                                                        className="travel-expense-form-select"
-                                                        value={tabAForm.currencyType}
-                                                        onChange={(e) => handleCurrencyChange(e.target.value)}
-                                                    >
-                                                        <option value="VND">VND</option>
-                                                        <option value="USD">USD</option>
-                                                        <option value="EUR">EUR</option>
-                                                        <option value="JPY">JPY (Yên Nhật)</option>
-                                                        <option value="CNY">CNY (Nhân dân tệ Trung Quốc)</option>
-                                                    </select>
-                                                </div>
-
-                                                <div className="travel-expense-form-group">
-                                                    <label className="travel-expense-form-label">
-                                                        Tỷ Giá Áp Dụng (1 {tabAForm.currencyType} = VND)
-                                                    </label>
-                                                    <input
-                                                        type="number"
-                                                        className="travel-expense-form-input"
-                                                        value={tabAForm.exchangeRate}
-                                                        onChange={(e) => setTabAForm({ ...tabAForm, exchangeRate: e.target.value })}
-                                                        placeholder={tabAForm.currencyType === 'VND' ? 'Tự động = 1' : 'Nhập tỷ giá quy đổi'}
-                                                        disabled={tabAForm.currencyType === 'VND'}
-                                                        required
-                                                    />
-                                                </div>
-
-                                                {/* TOTAL Ngân Sách: Khối Cảnh báo/Kết quả - bg-teal-50, border-l-4 border-teal-400 */}
-                                                {/* Dùng màu Teal để nhấn mạnh đây là KẾT QUẢ TÀI CHÍNH (tính năng hoàn tất) */}
-                                                <div className="travel-expense-total-budget-block">
-                                                    <div className="travel-expense-total-budget-label">
-                                                        {tabAForm.currencyType === 'VND'
-                                                            ? 'Tổng Ngân Sách (VND)'
-                                                            : `Tổng Ngân Sách Quy Đổi (VND) - Tự động tính từ ${tabAForm.budgetAmount || '0'} ${tabAForm.currencyType}`
-                                                        }
+                                                {/* Settlement Information */}
+                                                <div className="travel-expense-settlement-info">
+                                                    <div className="travel-expense-settlement-info-item">
+                                                        <span className="travel-expense-settlement-info-label">Chi phí thực tế:</span>
+                                                        <span className="travel-expense-settlement-info-value">
+                                                            {selectedRequestFull.settlement.actualExpense?.toLocaleString('vi-VN')} VND
+                                                        </span>
                                                     </div>
-                                                    {/* Số tiền: text-3xl font-extrabold text-teal-600 - Phải cực kỳ nổi bật */}
-                                                    <div className="travel-expense-total-budget-amount">
-                                                        {getConvertedAmount().toLocaleString('vi-VN')} VND
-                                                    </div>
+                                                    {selectedRequestFull.settlement.notes && (
+                                                        <div className="travel-expense-settlement-info-item">
+                                                            <span className="travel-expense-settlement-info-label">Ghi chú:</span>
+                                                            <span className="travel-expense-settlement-info-value">
+                                                                {selectedRequestFull.settlement.notes}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {selectedRequestFull.attachments && selectedRequestFull.attachments.length > 0 && (
+                                                        <div className="travel-expense-settlement-info-item">
+                                                            <span className="travel-expense-settlement-info-label">Hóa đơn/Chứng từ:</span>
+                                                            <div className="travel-expense-settlement-attachments">
+                                                                {selectedRequestFull.attachments.map((att, idx) => (
+                                                                    <a
+                                                                        key={idx}
+                                                                        href={`${process.env.REACT_APP_API_URL || ''}/uploads/travel-expenses/${att.filePath.split(/[/\\]/).pop()}`}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="travel-expense-settlement-attachment-link"
+                                                                    >
+                                                                        📄 {att.fileName}
+                                                                    </a>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
 
-                                                {/* Nút Hành động */}
+                                                {/* Confirm Button */}
                                                 <div className="travel-expense-form-actions">
-                                                    {/* Nút Chính (Xác Nhận): Fluent Lift Button - bg-blue-600 gradient, text-white */}
-                                                    {/* hover:translate-y-[-2px], shadow-lg shadow-blue-400/50 */}
                                                     <button
+                                                        type="button"
                                                         className="travel-expense-primary-button"
-                                                        onClick={async () => {
-                                                            if (!tabAForm.budgetAmount || !tabAForm.exchangeRate) {
-                                                                showToast?.('Vui lòng nhập đầy đủ thông tin', 'warning');
-                                                                return;
-                                                            }
-                                                            if (!selectedRequestId) {
-                                                                showToast?.('Vui lòng chọn yêu cầu cần cấp ngân sách', 'warning');
-                                                                return;
-                                                            }
-
-                                                            try {
-                                                                const response = await travelExpensesAPI.approveBudget(selectedRequestId, {
-                                                                    budgetAmount: tabAForm.budgetAmount,
-                                                                    currencyType: tabAForm.currencyType,
-                                                                    exchangeRate: tabAForm.exchangeRate,
-                                                                    approvedBy: currentUser?.id || null
-                                                                });
-
-                                                                if (response.data && response.data.success) {
-                                                                    // Lưu thông tin ngân sách đã được cấp
-                                                                    setApprovedBudget({
-                                                                        amount: getConvertedAmount(),
-                                                                        originalAmount: tabAForm.budgetAmount,
-                                                                        currency: tabAForm.currencyType,
-                                                                        exchangeRate: tabAForm.exchangeRate
-                                                                    });
-                                                                    showToast?.('Đã cấp ngân sách thành công!', 'success');
-                                                                    
-                                                                    // Reset form
-                                                                    setTabAForm({ budgetAmount: '', currencyType: 'VND', exchangeRate: '1' });
-                                                                    
-                                                                    // Refresh requests list
-                                                                    const refreshResponse = await travelExpensesAPI.getAll({
-                                                                        status: 'PENDING_LEVEL_1,PENDING_LEVEL_2'
-                                                                    });
-                                                                    if (refreshResponse.data && refreshResponse.data.success) {
-                                                                        const formattedRequests = refreshResponse.data.data.map(req => ({
-                                                                            id: req.id,
-                                                                            code: `CTX-${req.id}`,
-                                                                            employeeName: req.employee_name || req.employeeName || 'N/A',
-                                                                            location: req.location || '',
-                                                                            isDomestic: req.locationType === 'DOMESTIC',
-                                                                            purpose: req.purpose || '',
-                                                                            startDate: req.startTime ? new Date(req.startTime).toLocaleDateString('vi-VN') : '',
-                                                                            endDate: req.endTime ? new Date(req.endTime).toLocaleDateString('vi-VN') : '',
-                                                                            status: req.status || '',
-                                                                            employee_id: req.employeeId
-                                                                        }));
-                                                                        setRequests(formattedRequests);
-                                                                    }
-                                                                }
-                                                            } catch (error) {
-                                                                console.error('Error approving budget:', error);
-                                                                showToast?.('Lỗi khi cấp ngân sách: ' + (error.response?.data?.message || error.message), 'error');
-                                                            }
-                                                        }}
+                                                        onClick={handleConfirmSettlement}
                                                     >
-                                                        💾 Xác Nhận Cấp Ngân Sách
-                                                    </button>
-                                                    {/* Nút Phụ (Hủy): bg-gray-200, text-gray-700 - Nút trung tính */}
-                                                    <button
-                                                        className="travel-expense-secondary-button"
-                                                        onClick={() => {
-                                                            setTabAForm({ budgetAmount: '', currencyType: 'VND', exchangeRate: '1' });
-                                                        }}
-                                                    >
-                                                        Hủy
+                                                        ✅ Xác Nhận Hoàn Ứng
                                                     </button>
                                                 </div>
                                             </div>
-                                        )}
-                                        {activeTab === 'B' && (
-                                            <div className="travel-expense-tab-b">
-                                                {/* Tiêu đề Tab B */}
+                                        ) : selectedRequestFull ? (
+                                            <div className="travel-expense-tab-c">
                                                 <h3 className="travel-expense-form-title">
-                                                    Xử Lý Tạm Ứng
+                                                    Xác Nhận Hoàn Ứng
                                                 </h3>
-
-                                                {/* 1. Khối Thông Báo Xác Nhận (Indigo Alert Box) */}
-                                                {approvedBudget && (
-                                                    <div className="travel-expense-indigo-alert">
-                                                        <div className="travel-expense-indigo-alert-header">
-                                                            <svg className="travel-expense-indigo-alert-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                                            </svg>
-                                                            <span className="travel-expense-indigo-alert-title">Thông tin đã xác định (HR)</span>
-                                                        </div>
-                                                        <div className="travel-expense-indigo-alert-content">
-                                                            <p className="travel-expense-indigo-alert-message">
-                                                                Ngân sách tối đa đã được cấp cho yêu cầu này:
-                                                            </p>
-                                                            <div className="travel-expense-indigo-alert-amount">
-                                                                <span className="travel-expense-indigo-alert-amount-value">
-                                                                    {approvedBudget.amount.toLocaleString('vi-VN')} VND
-                                                                </span>
-                                                                {approvedBudget.currency !== 'VND' && (
-                                                                    <span className="travel-expense-indigo-alert-amount-original">
-                                                                        ({approvedBudget.originalAmount} {approvedBudget.currency} × {approvedBudget.exchangeRate})
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <p className="travel-expense-indigo-alert-warning">
-                                                                ⚠️ <strong>Lưu ý:</strong> Vui lòng không chuyển khoản vượt quá giới hạn ngân sách tối đa đã được phê duyệt.
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {!approvedBudget && (
-                                                    <div className="travel-expense-indigo-alert travel-expense-indigo-alert--info">
-                                                        <div className="travel-expense-indigo-alert-header">
-                                                            <svg className="travel-expense-indigo-alert-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                                            </svg>
-                                                            <span className="travel-expense-indigo-alert-title">Chưa có thông tin ngân sách</span>
-                                                        </div>
-                                                        <div className="travel-expense-indigo-alert-content">
-                                                            <p className="travel-expense-indigo-alert-message">
-                                                                Vui lòng chuyển sang tab <strong>"A. Xác Định Ngân Sách"</strong> để cấp ngân sách tối đa trước khi xử lý tạm ứng.
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* 2. Form Xử Lý Chuyển Khoản (Main Form) */}
-                                                {approvedBudget && (
-                                                    <div className="travel-expense-advance-form">
-                                                        <h4 className="travel-expense-form-section-title">
-                                                            2. Form Xử Lý Chuyển Khoản
-                                                        </h4>
-                                                        <p className="travel-expense-form-section-description">
-                                                            Các trường dữ liệu Kế toán cần xác nhận hoặc nhập vào để hoàn tất việc chuyển tiền.
-                                                        </p>
-
-                                                        <div className="travel-expense-advance-form-content">
-                                                            {/* 1. Số tiền Thực Tạm ứng */}
-                                                            <div className="travel-expense-form-group">
-                                                                <label htmlFor="actualAmount" className="travel-expense-form-label">
-                                                                    1. Số tiền Thực Tạm ứng <span className="required">*</span>
-                                                                </label>
-                                                                <div className="travel-expense-currency-input-wrapper">
-                                                                    <input
-                                                                        type="text"
-                                                                        id="actualAmount"
-                                                                        className="travel-expense-form-input travel-expense-currency-input"
-                                                                        value={getFormattedAmount()}
-                                                                        onChange={handleAmountChange}
-                                                                        placeholder="Nhập số tiền thực tế sẽ chuyển khoản"
-                                                                        required
-                                                                    />
-                                                                    <span className="travel-expense-currency-suffix">VND</span>
-                                                                </div>
-                                                                <p className="travel-expense-input-hint">
-                                                                    Mặc dù đã có ngân sách tối đa, Kế toán có thể chuyển một số tiền nhỏ hơn theo quy định.
-                                                                </p>
-                                                                {tabBForm.actualAmount && approvedBudget && parseInt(tabBForm.actualAmount) > approvedBudget.amount && (
-                                                                    <p className="travel-expense-input-error">
-                                                                        ⚠️ Số tiền vượt quá ngân sách tối đa ({approvedBudget.amount.toLocaleString('vi-VN')} VND)
-                                                                    </p>
-                                                                )}
-                                                            </div>
-
-                                                            {/* 2. Hình thức Tạm ứng */}
-                                                            <div className="travel-expense-form-group">
-                                                                <label htmlFor="advanceMethod" className="travel-expense-form-label">
-                                                                    2. Hình thức Tạm ứng <span className="required">*</span>
-                                                                </label>
-                                                                <select
-                                                                    id="advanceMethod"
-                                                                    className="travel-expense-form-select"
-                                                                    value={tabBForm.advanceMethod}
-                                                                    onChange={(e) => setTabBForm({ ...tabBForm, advanceMethod: e.target.value })}
-                                                                    required
-                                                                >
-                                                                    <option value="">Chọn hình thức thanh toán</option>
-                                                                    <option value="bank_transfer">Chuyển khoản Ngân hàng</option>
-                                                                    <option value="cash">Tiền mặt</option>
-                                                                    <option value="company_card">Thẻ công ty</option>
-                                                                </select>
-                                                                <p className="travel-expense-input-hint">
-                                                                    Cho phép Kế toán chọn hình thức thanh toán.
-                                                                </p>
-                                                            </div>
-
-                                                            {/* 3. Tài khoản Ngân hàng nhận */}
-                                                            <div className="travel-expense-form-group">
-                                                                <label htmlFor="bankAccount" className="travel-expense-form-label">
-                                                                    3. Tài khoản Ngân hàng nhận
-                                                                </label>
-                                                                <input
-                                                                    type="text"
-                                                                    id="bankAccount"
-                                                                    className="travel-expense-form-input travel-expense-form-input-readonly"
-                                                                    value={tabBForm.bankAccount}
-                                                                    readOnly
-                                                                    disabled
-                                                                    placeholder="Thông tin tài khoản từ hồ sơ nhân viên"
-                                                                />
-                                                                <p className="travel-expense-input-hint">
-                                                                    Hiển thị thông tin tài khoản của nhân viên đã được trích xuất từ hồ sơ. Kế toán chỉ cần xác nhận mà không cần nhập lại.
-                                                                </p>
-                                                            </div>
-
-                                                            {/* 4. Ghi chú (Nội dung Chuyển khoản) */}
-                                                            <div className="travel-expense-form-group">
-                                                                <label htmlFor="transferNotes" className="travel-expense-form-label">
-                                                                    4. Ghi chú (Nội dung Chuyển khoản) <span className="required">*</span>
-                                                                </label>
-                                                                <textarea
-                                                                    id="transferNotes"
-                                                                    className="travel-expense-form-textarea"
-                                                                    rows="4"
-                                                                    value={tabBForm.transferNotes}
-                                                                    onChange={(e) => setTabBForm({ ...tabBForm, transferNotes: e.target.value })}
-                                                                    placeholder="Nhập nội dung chuyển khoản (ví dụ: Tạm ứng công tác CTX-20240901 - Lê Thanh Tùng)"
-                                                                    required
-                                                                />
-                                                                <p className="travel-expense-input-hint">
-                                                                    Trường bắt buộc để nhập nội dung chuyển khoản rõ ràng (Ví dụ: Tạm ứng công tác, Mã Yêu cầu, Tên nhân viên).
-                                                                </p>
-                                                            </div>
-
-                                                            {/* Form Actions */}
-                                                            <div className="travel-expense-form-actions">
-                                                                <button
-                                                                    type="button"
-                                                                    className="travel-expense-primary-button"
-                                                                    onClick={() => {
-                                                                        const error = validateTabBForm();
-                                                                        if (error) {
-                                                                            showToast?.(error, 'warning');
-                                                                            return;
-                                                                        }
-                                                                        showToast?.('Đã xác nhận xử lý chuyển khoản', 'success');
-                                                                        // TODO: Logic xử lý chuyển khoản
-                                                                        console.log('Advance form data:', tabBForm);
-                                                                    }}
-                                                                >
-                                                                    💰 Xác Nhận Chuyển Khoản
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="travel-expense-secondary-button"
-                                                                    onClick={() => {
-                                                                        setTabBForm({
-                                                                            actualAmount: '',
-                                                                            advanceMethod: '',
-                                                                            bankAccount: selectedRequestFull?.bankAccount || '',
-                                                                            transferNotes: ''
-                                                                        });
-                                                                    }}
-                                                                >
-                                                                    Đặt lại
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
+                                                <p className="travel-expense-settlement-empty-message">
+                                                    Nhân viên chưa gửi báo cáo hoàn ứng cho yêu cầu này.
+                                                </p>
                                             </div>
-                                        )}
+                                        ) : null}
                                     </div>
                                 </>
                             ) : (

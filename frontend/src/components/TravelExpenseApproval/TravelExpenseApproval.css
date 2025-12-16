@@ -6,7 +6,7 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 2rem;
+  padding: 1.5rem;
   /* Calm Integrity Gradient: Sky Blue 50 → White (50%) → Emerald 50 */
   background: linear-gradient(135deg, #e0f2fe 0%, #ffffff 50%, #ecfdf5 100%);
   backdrop-filter: blur(1px);
@@ -14,7 +14,6 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 1.5rem;
   box-sizing: border-box;
   position: relative;
@@ -23,7 +22,6 @@
 /* Header với tiêu đề chính */
 .travel-expense-approval-header {
   width: 100%;
-  max-width: 80rem;
   margin-bottom: 0;
   flex-shrink: 0;
   display: flex;
@@ -126,13 +124,10 @@
 /* Main Container: Glass Card lớn ở trung tâm */
 .travel-expense-approval-main-container {
   width: 100%;
-  max-width: 80rem;
-  /* max-width 7xl (1280px) */
   height: 951px;
   /* Chiều cao cố định giống TravelExpenseManagement */
   min-height: 951px;
   /* Chiều cao tối thiểu */
-  margin: 0 auto;
   padding: 0;
   /* Glass Card */
   background: rgba(255, 255, 255, 0.85);

@@ -60,7 +60,8 @@
     /* (Nền Ngoại vi: Sky Blue 50 → White → Indigo 50) */
     background: linear-gradient(135deg, #dbeafe 0%, #ecfdf5 50%, #e0e7ff 100%);
     padding: 1.25rem 1.75rem;
-    border-radius: 1rem; /* Bo tròn 4 góc */
+    border-radius: 1rem;
+    /* Bo tròn 4 góc */
     box-shadow: 0 4px 12px rgba(14, 165, 233, 0.08);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -73,10 +74,14 @@
 .overtime-request-icon-wrapper {
     width: 4rem;
     height: 4rem;
-    background: rgba(255, 255, 255, 0.9); /* bg-white/90 */
-    padding: 1rem; /* p-4 */
-    border-radius: 0.75rem; /* rounded-xl */
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+    background: rgba(255, 255, 255, 0.9);
+    /* bg-white/90 */
+    padding: 1rem;
+    /* p-4 */
+    border-radius: 0.75rem;
+    /* rounded-xl */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    /* shadow-md */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -93,7 +98,8 @@
 .overtime-request-icon {
     width: 2rem;
     height: 2rem;
-    color: #3b82f6; /* text-blue-500 hoặc #3b82f6 */
+    color: #3b82f6;
+    /* text-blue-500 hoặc #3b82f6 */
     stroke-width: 2;
 }
 
@@ -101,7 +107,8 @@
 .overtime-request-title {
     font-size: 1.5rem;
     font-weight: 700;
-    color: #1f2937; /* Gray-800 for titles */
+    color: #1f2937;
+    /* Gray-800 for titles */
     margin: 0 0 0.375rem 0;
     line-height: 1.2;
     text-transform: uppercase;
@@ -110,15 +117,18 @@
 /* Mô tả - Neutral Gray (#6b7280 / Gray-500) */
 .overtime-request-subtitle {
     font-size: 0.875rem;
-    color: #6b7280; /* Gray-500 for detail text */
+    color: #6b7280;
+    /* Gray-500 for detail text */
     margin: 0;
     line-height: 1.5;
 }
 
 /* I. THẺ FORM CONTAINER (Form Card Container) - Soft Shadow Floating Effect */
 .overtime-request-form-wrapper {
-    background: #ffffff; /* White background for card */
-    border-radius: 1rem; /* rounded-xl (12px) */
+    background: #ffffff;
+    /* White background for card */
+    border-radius: 1rem;
+    /* rounded-xl (12px) */
     /* Soft shadow for floating effect: 0 10px 30px rgba(0, 0, 0, 0.08) */
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
     overflow: hidden;
@@ -161,6 +171,38 @@
 }
 
 /* Error Message */
+.overtime-request-warning {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    border: 1px solid #ef4444;
+    border-radius: 0.75rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+    animation: slideInDown 0.3s ease-out;
+}
+
+.overtime-request-warning .warning-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    color: #dc2626;
+    flex-shrink: 0;
+}
+
+.overtime-request-warning span {
+    color: #991b1b;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+.overtime-request-warning span strong {
+    color: #7f1d1d;
+    font-weight: 700;
+}
+
 .overtime-request-error {
     display: flex;
     align-items: center;
@@ -212,37 +254,44 @@
 .overtime-form-section {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem; /* Reduced gap to save space */
+    gap: 0.75rem;
+    /* Reduced gap to save space */
 }
 
 /* Approver Box (II. Thông tin Duyệt): Light gray background to separate from input fields */
 .overtime-approver-section {
-    background: #edf2f7 !important; /* Light gray background for approver section */
+    background: #edf2f7 !important;
+    /* Light gray background for approver section */
     padding: 1rem;
-    border-radius: 0.75rem; /* rounded-xl */
+    border-radius: 0.75rem;
+    /* rounded-xl */
     margin-top: 1rem;
 }
 
 .overtime-section-title {
     font-size: 1.125rem;
     font-weight: 700;
-    color: #6366f1; /* Indigo-500 for section titles */
+    color: #6366f1;
+    /* Indigo-500 for section titles */
     margin: 0;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid #6366f1; /* Indigo-500 for section title underline - thinner */
+    border-bottom: 1px solid #6366f1;
+    /* Indigo-500 for section title underline - thinner */
 }
 
 /* Form Fields */
 .overtime-form-fields {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem; /* Reduced gap to save space */
+    gap: 0.75rem;
+    /* Reduced gap to save space */
 }
 
 .overtime-form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.75rem; /* Reduced gap to save space */
+    gap: 0.75rem;
+    /* Reduced gap to save space */
     align-items: start;
 }
 
@@ -261,9 +310,11 @@
 
 /* Approver Box (II. Thông tin Duyệt): Light gray background to separate from input fields */
 .overtime-approver-section {
-    background: #edf2f7 !important; /* Light gray background for approver section */
+    background: #edf2f7 !important;
+    /* Light gray background for approver section */
     padding: 1rem;
-    border-radius: 0.75rem; /* rounded-xl */
+    border-radius: 0.75rem;
+    /* rounded-xl */
     margin-top: 1rem;
 }
 
@@ -271,7 +322,8 @@
 .overtime-form-group {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem; /* Reduced gap to save space */
+    gap: 0.375rem;
+    /* Reduced gap to save space */
     flex-shrink: 0;
 }
 
@@ -280,7 +332,8 @@
 .overtime-form-label {
     font-size: 0.875rem;
     font-weight: 600;
-    color: #1f2937; /* Gray-800 for labels */
+    color: #1f2937;
+    /* Gray-800 for labels */
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
@@ -292,7 +345,8 @@
 .overtime-form-label span:has-text("*")::after,
 .overtime-form-label:has-text("*")::after {
     content: '*';
-    color: #ef4444; /* Red-500 for required field indicator */
+    color: #ef4444;
+    /* Red-500 for required field indicator */
     margin-left: 0.25rem;
 }
 
@@ -331,7 +385,8 @@
     transform: translateY(-50%);
     width: 1.5rem;
     height: 1.5rem;
-    color: #93c5fd; /* text-blue-300 hoặc text-gray-400 */
+    color: #93c5fd;
+    /* text-blue-300 hoặc text-gray-400 */
     pointer-events: none;
     z-index: 1;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -346,8 +401,10 @@
     width: 100%;
     padding: 0.75rem 3rem 0.75rem 1rem;
     border: 1px solid #e5e7eb;
-    border-radius: 0.75rem; /* rounded-xl (12px) */
-    background: #f7f9fc; /* Light gray background */
+    border-radius: 0.75rem;
+    /* rounded-xl (12px) */
+    background: #f7f9fc;
+    /* Light gray background */
     font-size: 0.9375rem;
     color: #1f2937;
     transition: all 0.2s ease;
@@ -356,9 +413,12 @@
 
 /* Datepicker Focus - Border Indigo, outer blurred border, background to white */
 .overtime-form-datepicker:focus {
-    border-color: #6366f1; /* Indigo border */
-    background: #ffffff; /* White background when focused */
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); /* Outer blurred border */
+    border-color: #6366f1;
+    /* Indigo border */
+    background: #ffffff;
+    /* White background when focused */
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    /* Outer blurred border */
     outline: none;
 }
 
@@ -374,7 +434,8 @@
     transform: translateY(-50%);
     width: 1.35rem;
     height: 1.35rem;
-    color: #93c5fd; /* text-blue-300 hoặc text-gray-400 */
+    color: #93c5fd;
+    /* text-blue-300 hoặc text-gray-400 */
     pointer-events: none;
     z-index: 1;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -389,8 +450,10 @@
     width: 100%;
     padding: 0.75rem 3rem 0.75rem 1rem;
     border: 1px solid #e5e7eb;
-    border-radius: 0.75rem; /* rounded-xl (12px) */
-    background: #f7f9fc; /* Light gray background */
+    border-radius: 0.75rem;
+    /* rounded-xl (12px) */
+    background: #f7f9fc;
+    /* Light gray background */
     font-size: 0.9375rem;
     color: #1f2937;
     transition: all 0.2s ease;
@@ -400,9 +463,12 @@
 
 /* Timepicker Focus - Border Indigo, outer blurred border, background to white */
 .overtime-form-timepicker:focus {
-    border-color: #6366f1; /* Indigo border */
-    background: #ffffff; /* White background when focused */
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); /* Outer blurred border */
+    border-color: #6366f1;
+    /* Indigo border */
+    background: #ffffff;
+    /* White background when focused */
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    /* Outer blurred border */
     outline: none;
 }
 
@@ -511,8 +577,10 @@
     width: 100%;
     padding: 0.75rem 1rem;
     border: 1px solid #e5e7eb;
-    border-radius: 0.75rem; /* rounded-xl (12px) */
-    background: #f7f9fc; /* Light gray background like in image */
+    border-radius: 0.75rem;
+    /* rounded-xl (12px) */
+    background: #f7f9fc;
+    /* Light gray background like in image */
     font-size: 0.9375rem;
     color: #1f2937;
     transition: all 0.2s ease;
@@ -521,17 +589,23 @@
 
 /* Input Focus State: Border Indigo, outer blurred border, background to white */
 .overtime-form-input:focus {
-    border-color: #6366f1; /* Indigo border */
-    background: #ffffff; /* White background when focused */
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); /* Outer blurred border */
+    border-color: #6366f1;
+    /* Indigo border */
+    background: #ffffff;
+    /* White background when focused */
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    /* Outer blurred border */
     outline: none;
 }
 
 /* Read-only Manager Fields */
 .overtime-form-input-readonly {
-    background: #f7f9fc !important; /* Light gray background */
-    color: #6b7280 !important; /* Gray-500 for readonly text */
-    font-weight: 400; /* Normal weight */
+    background: #f7f9fc !important;
+    /* Light gray background */
+    color: #6b7280 !important;
+    /* Gray-500 for readonly text */
+    font-weight: 400;
+    /* Normal weight */
     cursor: not-allowed;
     border: 1px solid #e5e7eb !important;
 }
@@ -544,14 +618,19 @@
 /* Textarea */
 .overtime-form-textarea {
     width: 100%;
-    padding: 0.625rem 0.875rem; /* Reduced padding to save space */
+    padding: 0.625rem 0.875rem;
+    /* Reduced padding to save space */
     border: 1px solid #e5e7eb;
-    border-radius: 0.75rem; /* rounded-xl (12px) */
-    background: #f7f9fc; /* Light gray background */
-    font-size: 0.875rem; /* Slightly smaller font */
+    border-radius: 0.75rem;
+    /* rounded-xl (12px) */
+    background: #f7f9fc;
+    /* Light gray background */
+    font-size: 0.875rem;
+    /* Slightly smaller font */
     color: #1f2937;
     font-family: inherit;
-    line-height: 1.4; /* Tighter line height */
+    line-height: 1.4;
+    /* Tighter line height */
     resize: none;
     transition: all 0.2s ease;
     outline: none;
@@ -560,14 +639,18 @@
 
 /* Textarea Focus State: Border Indigo, outer blurred border, background to white */
 .overtime-form-textarea:focus {
-    border-color: #6366f1; /* Indigo border */
-    background: #ffffff; /* White background when focused */
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); /* Outer blurred border */
+    border-color: #6366f1;
+    /* Indigo border */
+    background: #ffffff;
+    /* White background when focused */
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    /* Outer blurred border */
     outline: none;
 }
 
 .overtime-form-textarea::placeholder {
-    color: #9ca3af; /* Gray-400 for placeholder */
+    color: #9ca3af;
+    /* Gray-400 for placeholder */
 }
 
 /* Large Textarea for Reason */
@@ -602,12 +685,14 @@
     /* Primary Button Gradient: #4c77a8 to #68a0d4 */
     background: linear-gradient(to right, #4c77a8, #68a0d4);
     /* Chữ & Icon - Trắng Tinh Khiết */
-    color: #ffffff; /* text-white */
+    color: #ffffff;
+    /* text-white */
     font-size: 0.875rem;
     font-weight: 700;
     cursor: pointer;
     /* Shadow - Đổ bóng rực rỡ (Glow) */
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(96, 165, 250, 0.5); /* shadow-xl shadow-blue-400/50 */
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(96, 165, 250, 0.5);
+    /* shadow-xl shadow-blue-400/50 */
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     outline: none;
     flex-shrink: 0;
@@ -635,9 +720,12 @@
 
 /* Primary Button Hover: translateY(-1px) and deeper shadow */
 .overtime-submit-button:hover:not(:disabled) {
-    transform: translateY(-1px); /* Subtle lift on hover */
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08); /* Deeper shadow */
-    background: linear-gradient(to right, #5a8bc4, #7ab0e0); /* Slightly lighter gradient on hover */
+    transform: translateY(-1px);
+    /* Subtle lift on hover */
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
+    /* Deeper shadow */
+    background: linear-gradient(to right, #5a8bc4, #7ab0e0);
+    /* Slightly lighter gradient on hover */
 }
 
 .overtime-submit-button:active:not(:disabled) {
@@ -700,4 +788,3 @@
         height: 1.5rem;
     }
 }
-

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { candidatesAPI, employeesAPI } from '../../services/api';
+import { employeesAPI } from '../../services/api';
 import './ProbationList.css';
 
 const ProbationList = ({ currentUser, showToast }) => {
@@ -72,14 +72,12 @@ const ProbationList = ({ currentUser, showToast }) => {
     const fetchCandidates = async () => {
         setLoading(true);
         try {
-            const response = await candidatesAPI.getProbationCandidates();
-            if (response.data?.success) {
-                setCandidates(response.data.data || []);
-            }
+            // Module tuyển dụng đã bị xóa
+            setCandidates([]);
         } catch (error) {
             console.error('Error fetching probation candidates:', error);
             if (showToast) {
-                showToast('Không thể tải danh sách ứng viên đang thử việc', 'error');
+                showToast('Module tuyển dụng đã bị xóa', 'error');
             }
         } finally {
             setLoading(false);
@@ -100,19 +98,19 @@ const ProbationList = ({ currentUser, showToast }) => {
         if (!jobOfferDate) return null;
         const offerDate = new Date(jobOfferDate);
         if (isNaN(offerDate.getTime())) return null;
-        
+
         // Đặt thời gian về 00:00:00 của ngày xuất thư để tính chính xác
         const offerDateStart = new Date(offerDate);
         offerDateStart.setHours(0, 0, 0, 0);
-        
+
         // Tính thời gian còn lại đến ngày đánh giá (45 ngày sau)
         const targetDate = new Date(offerDateStart);
         targetDate.setDate(targetDate.getDate() + 45);
         targetDate.setHours(23, 59, 59, 999);
-        
+
         const diffTime = targetDate.getTime() - currentTime.getTime();
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        
+
         return {
             daysSince: Math.floor((currentTime.getTime() - offerDateStart.getTime()) / (1000 * 60 * 60 * 24)),
             daysRemaining: diffDays,
@@ -155,20 +153,8 @@ const ProbationList = ({ currentUser, showToast }) => {
 
         setSubmitting(true);
         try {
-            const response = await candidatesAPI.evaluateProbation(selectedCandidate.id, {
-                result: evaluationData.result,
-                notes: evaluationData.notes || null
-            });
-
-            if (response.data?.success) {
-                if (showToast) {
-                    showToast(`Đã đánh giá quá trình thử việc: ${evaluationData.result === 'PASSED' ? 'Đạt' : 'Không đạt'}`, 'success');
-                }
-                setIsEvaluationModalOpen(false);
-                setSelectedCandidate(null);
-                setEvaluationData({ result: '', notes: '' });
-                fetchCandidates();
-            }
+            // Module tuyển dụng đã bị xóa
+            throw new Error('Module tuyển dụng đã bị xóa');
         } catch (error) {
             console.error('Error evaluating probation:', error);
             if (showToast) {
@@ -281,7 +267,7 @@ const ProbationList = ({ currentUser, showToast }) => {
                                 {candidates.map((candidate, index) => {
                                     const countdownData = calculateDaysSinceJobOffer(candidate.job_offer_sent_date);
                                     const canEval = canEvaluate(candidate.job_offer_sent_date);
-                                    
+
                                     // Tính toán thời gian còn lại chính xác đến giây
                                     let formattedTime = '00:00:00';
                                     if (countdownData && countdownData.totalSeconds > 0) {

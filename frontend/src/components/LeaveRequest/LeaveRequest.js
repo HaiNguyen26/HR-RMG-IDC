@@ -337,7 +337,6 @@ const LeaveRequest = ({ currentUser, showToast }) => {
                     <DatePicker
                       selected={startDateValue}
                       onChange={handleDateChange('startDate')}
-                      minDate={today()}
                       dateFormat="dd/MM/yyyy"
                       locale={DATE_PICKER_LOCALE}
                       placeholderText="dd/mm/yyyy"
@@ -353,24 +352,24 @@ const LeaveRequest = ({ currentUser, showToast }) => {
 
                 <div className="leave-form-group">
                   <label className="leave-form-label">Ngày kết thúc nghỉ *</label>
-                    <div className="leave-date-picker-wrapper">
-                      <DatePicker
-                        selected={endDateValue}
-                        onChange={handleDateChange('endDate')}
-                        minDate={startDateValue || today()}
-                        dateFormat="dd/MM/yyyy"
-                        locale={DATE_PICKER_LOCALE}
-                        placeholderText="dd/mm/yyyy"
-                        className="leave-form-datepicker"
-                        required
-                        disabled={!startDateValue}
-                        autoComplete="off"
-                      />
-                      <svg className="leave-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                      </svg>
-                    </div>
+                  <div className="leave-date-picker-wrapper">
+                    <DatePicker
+                      selected={endDateValue}
+                      onChange={handleDateChange('endDate')}
+                      minDate={startDateValue || null}
+                      dateFormat="dd/MM/yyyy"
+                      locale={DATE_PICKER_LOCALE}
+                      placeholderText="dd/mm/yyyy"
+                      className="leave-form-datepicker"
+                      required
+                      disabled={!startDateValue}
+                      autoComplete="off"
+                    />
+                    <svg className="leave-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
                   </div>
+                </div>
               </div>
 
               {/* Calculated Fields - Chỉ hiển thị khi có đủ thông tin */}

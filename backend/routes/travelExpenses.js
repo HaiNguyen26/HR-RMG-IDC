@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -103,6 +106,130 @@ const ensureTable = async () => {
         END $$;
     `;
     await pool.query(addStep1Fields);
+
+    // Add branch director fields if they don't exist (for existing databases)
+    const addBranchDirectorFields = `
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='branch_director_id') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN branch_director_id INTEGER;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='branch_director_decision') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN branch_director_decision VARCHAR(20);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='branch_director_notes') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN branch_director_notes TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='branch_director_decision_at') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN branch_director_decision_at TIMESTAMP WITHOUT TIME ZONE;
+            END IF;
+        END $$;
+    `;
+    await pool.query(addBranchDirectorFields);
+
+    // Add advance fields if they don't exist (for existing databases)
+    const addAdvanceFields = `
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='actual_advance_amount') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN actual_advance_amount NUMERIC(12, 2);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='advance_method') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN advance_method VARCHAR(50);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='bank_account') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN bank_account TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='advance_notes') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN advance_notes TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='advance_status') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN advance_status VARCHAR(50);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='advance_transferred_at') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN advance_transferred_at TIMESTAMP WITHOUT TIME ZONE;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='advance_transferred_by') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN advance_transferred_by INTEGER;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='advance_processed_at') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN advance_processed_at TIMESTAMP WITHOUT TIME ZONE;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='advance_processed_by') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN advance_processed_by INTEGER;
+            END IF;
+        END $$;
+    `;
+    await pool.query(addAdvanceFields);
+
+    // Add settlement fields if they don't exist (for existing databases)
+    const addSettlementFields = `
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='actual_expense') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN actual_expense NUMERIC(12, 2);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='settlement_status') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN settlement_status VARCHAR(50);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='employee_confirmed_at') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN employee_confirmed_at TIMESTAMP WITHOUT TIME ZONE;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='hr_confirmed_at') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN hr_confirmed_at TIMESTAMP WITHOUT TIME ZONE;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='hr_confirmed_by') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN hr_confirmed_by INTEGER;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='settlement_notes') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN settlement_notes TEXT;
+            END IF;
+        END $$;
+    `;
+    await pool.query(addSettlementFields);
+
+    // Create attachments table if not exists
+    const createAttachmentsTable = `
+        CREATE TABLE IF NOT EXISTS travel_expense_attachments (
+            id SERIAL PRIMARY KEY,
+            travel_expense_request_id INTEGER NOT NULL REFERENCES travel_expense_requests(id) ON DELETE CASCADE,
+            file_name VARCHAR(255) NOT NULL,
+            file_path TEXT NOT NULL,
+            file_size INTEGER,
+            file_type VARCHAR(100),
+            uploaded_by INTEGER,
+            uploaded_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            description TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_travel_expense_attachments_request ON travel_expense_attachments(travel_expense_request_id);
+    `;
+    await pool.query(createAttachmentsTable);
+
+    // Add accountant fields if they don't exist (for existing databases)
+    const addAccountantFields = `
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='accountant_checked_at') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN accountant_checked_at TIMESTAMP WITHOUT TIME ZONE;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='accountant_notes') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN accountant_notes TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='accountant_checked_by') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN accountant_checked_by INTEGER;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='reimbursement_amount') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN reimbursement_amount NUMERIC(12, 2);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='exceeds_budget') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN exceeds_budget BOOLEAN DEFAULT FALSE;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='excess_amount') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN excess_amount NUMERIC(12, 2);
+            END IF;
+        END $$;
+    `;
+    await pool.query(addAccountantFields);
 };
 
 ensureTable().catch((error) => {
@@ -148,7 +275,7 @@ const detectLocationTypeFromText = (location) => {
 const detectContinentFromLocation = (location) => {
     if (!location) return null;
     const normalizedLocation = normalizeText(location);
-    
+
     // Danh sách các quốc gia Châu Âu (EU)
     const europeanCountries = [
         'austria', 'belgium', 'bulgaria', 'croatia', 'cyprus', 'czech', 'denmark',
@@ -160,7 +287,7 @@ const detectContinentFromLocation = (location) => {
         'stockholm', 'copenhagen', 'dublin', 'lisbon', 'warsaw', 'prague', 'budapest',
         'athens', 'helsinki', 'oslo', 'reykjavik', 'zurich', 'geneva'
     ];
-    
+
     // Danh sách các quốc gia Châu Á
     const asianCountries = [
         'china', 'japan', 'south korea', 'north korea', 'india', 'indonesia', 'thailand',
@@ -176,21 +303,21 @@ const detectContinentFromLocation = (location) => {
         'kuwait city', 'manama', 'muscat', 'sanaa', 'amman', 'beirut', 'damascus',
         'jerusalem', 'tel aviv', 'ankara', 'istanbul', 'ulaanbaatar', 'astana', 'tashkent'
     ];
-    
+
     // Kiểm tra Châu Âu
     for (const country of europeanCountries) {
         if (normalizedLocation.includes(country)) {
             return 'EU';
         }
     }
-    
+
     // Kiểm tra Châu Á
     for (const country of asianCountries) {
         if (normalizedLocation.includes(country)) {
             return 'ASIAN';
         }
     }
-    
+
     return null;
 };
 
@@ -242,14 +369,29 @@ const mapRowToResponse = (row) => {
             decidedAt: row.manager_decision_at,
             notes: row.manager_notes,
         },
+        {
+            key: 'STEP_BRANCH_DIRECTOR',
+            order: 3,
+            actor: 'Giám đốc Chi nhánh',
+            action: 'Phê duyệt Cấp 2',
+            status: row.branch_director_decision
+                ? row.branch_director_decision === 'APPROVE' ? 'APPROVED' : 'REJECTED'
+                : row.status === 'PENDING_LEVEL_2' ? 'PENDING'
+                    : row.manager_decision === 'REJECT' ? 'REJECTED'
+                        : row.status === 'REJECTED' ? 'REJECTED'
+                            : row.manager_decision === 'APPROVE' ? 'PENDING' : 'PENDING',
+            decision: row.branch_director_decision,
+            decidedAt: row.branch_director_decision_at,
+            notes: row.branch_director_notes,
+        },
     ];
 
     if (row.requires_ceo) {
         flow.push({
             key: 'STEP_CEO',
-            order: 3,
+            order: 4,
             actor: 'Tổng Giám đốc',
-            action: 'Phê duyệt Cấp 2 bắt buộc',
+            action: 'Phê duyệt Cấp Đặc biệt',
             status: row.ceo_decision
                 ? row.ceo_decision === 'APPROVE' ? 'APPROVED' : 'REJECTED'
                 : row.status === 'PENDING_CEO'
@@ -269,7 +411,7 @@ const mapRowToResponse = (row) => {
 
     flow.push({
         key: 'STEP_FINANCE',
-        order: row.requires_ceo ? 4 : 3,
+        order: row.requires_ceo ? 5 : 4,
         actor: 'Kế toán / HR',
         action: 'Kiểm tra & Duyệt chi phí cuối',
         status: row.finance_decision
@@ -320,12 +462,43 @@ const mapRowToResponse = (row) => {
             approvedAt: row.budget_approved_at,
             approvedBy: row.budget_approved_by,
         } : null,
+        advance: row.actual_advance_amount ? {
+            amount: Number(row.actual_advance_amount),
+            method: row.advance_method,
+            bankAccount: row.bank_account,
+            notes: row.advance_notes,
+            status: row.advance_status,
+            transferredAt: row.advance_transferred_at,
+            transferredBy: row.advance_transferred_by,
+        } : null,
+        settlement: {
+            actualExpense: row.actual_expense ? Number(row.actual_expense) : null,
+            status: row.settlement_status || null,
+            employeeConfirmedAt: row.employee_confirmed_at || null,
+            hrConfirmedAt: row.hr_confirmed_at || null,
+            hrConfirmedBy: row.hr_confirmed_by || null,
+            notes: row.settlement_notes || null,
+        },
+        accountant: {
+            checkedAt: row.accountant_checked_at || null,
+            checkedBy: row.accountant_checked_by || null,
+            notes: row.accountant_notes || null,
+            reimbursementAmount: row.reimbursement_amount ? Number(row.reimbursement_amount) : null,
+            exceedsBudget: row.exceeds_budget || false,
+            excessAmount: row.excess_amount ? Number(row.excess_amount) : null,
+        },
         decisions: {
             manager: {
                 actorId: row.manager_id,
                 decision: row.manager_decision,
                 notes: row.manager_notes,
                 decidedAt: row.manager_decision_at,
+            },
+            branchDirector: {
+                actorId: row.branch_director_id,
+                decision: row.branch_director_decision,
+                notes: row.branch_director_notes,
+                decidedAt: row.branch_director_decision_at,
             },
             ceo: {
                 actorId: row.ceo_id,
@@ -507,7 +680,7 @@ router.post('/', async (req, res) => {
         let continent = null;
         let livingAllowanceAmount = null;
         let livingAllowanceCurrency = null;
-        
+
         if (normalizedLocationType === 'INTERNATIONAL') {
             continent = detectContinentFromLocation(location);
             if (continent) {
@@ -604,10 +777,10 @@ router.post('/:id/decision', async (req, res) => {
         }
 
         const normalizedRole = actorRole.toString().trim().toUpperCase();
-        if (!['MANAGER', 'CEO', 'FINANCE'].includes(normalizedRole)) {
+        if (!['MANAGER', 'BRANCH_DIRECTOR', 'CEO', 'FINANCE'].includes(normalizedRole)) {
             return res.status(400).json({
                 success: false,
-                message: 'actorRole không hợp lệ. Hãy sử dụng MANAGER, CEO hoặc FINANCE',
+                message: 'actorRole không hợp lệ. Hãy sử dụng MANAGER, BRANCH_DIRECTOR, CEO hoặc FINANCE',
             });
         }
 
@@ -648,22 +821,50 @@ router.post('/:id/decision', async (req, res) => {
                 await client.query('ROLLBACK');
                 return res.status(400).json({
                     success: false,
-                    message: 'Yêu cầu không nằm trong bước phê duyệt của Quản lý',
+                    message: 'Yêu cầu không nằm trong bước phê duyệt của Quản lý Trực tiếp (Cấp 1)',
                 });
             }
             applyDecision('manager');
 
             if (normalizedDecision === 'APPROVE') {
+                // Sau khi Cấp 1 duyệt → chuyển đến Cấp 2 (Giám đốc Chi nhánh)
+                nextStatus = 'PENDING_LEVEL_2';
+                nextStep = 'LEVEL_2';
+            } else {
+                nextStatus = 'REJECTED';
+                nextStep = 'LEVEL_1';
+            }
+        } else if (normalizedRole === 'BRANCH_DIRECTOR') {
+            if (request.status !== 'PENDING_LEVEL_2') {
+                await client.query('ROLLBACK');
+                return res.status(400).json({
+                    success: false,
+                    message: 'Yêu cầu không nằm trong bước phê duyệt của Giám đốc Chi nhánh (Cấp 2)',
+                });
+            }
+            // Kiểm tra xem Cấp 1 đã duyệt chưa
+            if (!request.manager_decision || request.manager_decision !== 'APPROVE') {
+                await client.query('ROLLBACK');
+                return res.status(400).json({
+                    success: false,
+                    message: 'Yêu cầu chưa được Quản lý Trực tiếp (Cấp 1) duyệt',
+                });
+            }
+            applyDecision('branch_director');
+
+            if (normalizedDecision === 'APPROVE') {
+                // Sau khi Cấp 2 duyệt → chuyển đến CEO (nếu nước ngoài) hoặc PENDING_SETTLEMENT (nếu trong nước)
                 if (request.requires_ceo) {
                     nextStatus = 'PENDING_CEO';
                     nextStep = 'CEO';
                 } else {
-                    nextStatus = 'PENDING_FINANCE';
-                    nextStep = 'FINANCE';
+                    // Quy trình mới: Bỏ bước cấp ngân sách & tạm ứng, chuyển thẳng sang settlement
+                    nextStatus = 'PENDING_SETTLEMENT';
+                    nextStep = 'SETTLEMENT';
                 }
             } else {
                 nextStatus = 'REJECTED';
-                nextStep = 'MANAGER';
+                nextStep = 'LEVEL_2';
             }
         } else if (normalizedRole === 'CEO') {
             if (!request.requires_ceo) {
@@ -680,11 +881,28 @@ router.post('/:id/decision', async (req, res) => {
                     message: 'Yêu cầu không nằm trong bước phê duyệt của Tổng Giám đốc',
                 });
             }
+            // Kiểm tra xem Cấp 1 đã duyệt chưa
+            if (!request.manager_decision || request.manager_decision !== 'APPROVE') {
+                await client.query('ROLLBACK');
+                return res.status(400).json({
+                    success: false,
+                    message: 'Yêu cầu chưa được Quản lý Trực tiếp (Cấp 1) duyệt',
+                });
+            }
+            // Kiểm tra xem Cấp 2 đã duyệt chưa
+            if (!request.branch_director_decision || request.branch_director_decision !== 'APPROVE') {
+                await client.query('ROLLBACK');
+                return res.status(400).json({
+                    success: false,
+                    message: 'Yêu cầu chưa được Giám đốc Chi nhánh (Cấp 2) duyệt',
+                });
+            }
             applyDecision('ceo');
 
             if (normalizedDecision === 'APPROVE') {
-                nextStatus = 'PENDING_FINANCE';
-                nextStep = 'FINANCE';
+                // Quy trình mới: Bỏ bước cấp ngân sách & tạm ứng, chuyển thẳng sang settlement
+                nextStatus = 'PENDING_SETTLEMENT';
+                nextStep = 'SETTLEMENT';
             } else {
                 nextStatus = 'REJECTED';
                 nextStep = 'CEO';
@@ -888,6 +1106,617 @@ router.post('/:id/budget', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Lỗi khi cấp ngân sách: ' + error.message,
+        });
+    } finally {
+        client.release();
+    }
+});
+
+// POST /api/travel-expenses/:id/advance/process - HR xử lý tạm ứng
+router.post('/:id/advance/process', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const { actualAmount, advanceMethod, bankAccount, notes, processedBy, advanceCase } = req.body;
+
+        if (!actualAmount || !advanceMethod || !notes) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu thông tin bắt buộc (actualAmount, advanceMethod, notes)',
+            });
+        }
+
+        const actualAmountNum = parseFloat(actualAmount);
+        if (isNaN(actualAmountNum) || actualAmountNum <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Số tiền tạm ứng không hợp lệ',
+            });
+        }
+
+        const validMethods = ['bank_transfer', 'cash', 'company_card'];
+        if (!validMethods.includes(advanceMethod)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Hình thức tạm ứng không hợp lệ',
+            });
+        }
+
+        await client.query('BEGIN');
+
+        // Check if request exists and is in correct status
+        const requestResult = await client.query(
+            'SELECT * FROM travel_expense_requests WHERE id = $1 FOR UPDATE',
+            [id]
+        );
+
+        if (!requestResult.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy yêu cầu chi phí công tác',
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Only allow advance processing if request is PENDING_FINANCE
+        if (request.status !== 'PENDING_FINANCE') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Yêu cầu không ở trạng thái phù hợp để xử lý tạm ứng (phải là PENDING_FINANCE)',
+            });
+        }
+
+        const timestamp = new Date().toISOString();
+
+        // Update advance fields - HR xử lý
+        const updateQuery = `
+            UPDATE travel_expense_requests
+            SET 
+                actual_advance_amount = $1,
+                advance_method = $2,
+                bank_account = $3,
+                advance_notes = $4,
+                advance_status = 'PENDING_ACCOUNTANT',
+                advance_processed_at = $5,
+                advance_processed_by = $6,
+                updated_at = $5
+            WHERE id = $7
+            RETURNING *
+        `;
+
+        const updateResult = await client.query(updateQuery, [
+            actualAmountNum,
+            advanceMethod,
+            bankAccount || null,
+            notes,
+            timestamp,
+            processedBy || null,
+            id
+        ]);
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Đã xử lý tạm ứng thành công. Yêu cầu đã được gửi đến Kế toán.',
+            data: mapRowToResponse(updateResult.rows[0]),
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error processing advance:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi xử lý tạm ứng: ' + error.message,
+        });
+    } finally {
+        client.release();
+    }
+});
+
+// POST /api/travel-expenses/:id/advance - Kế toán xác nhận chuyển khoản tạm ứng
+router.post('/:id/advance', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const { transferredBy } = req.body;
+
+        await client.query('BEGIN');
+
+        // Check if request exists and is in correct status
+        const requestResult = await client.query(
+            'SELECT * FROM travel_expense_requests WHERE id = $1 FOR UPDATE',
+            [id]
+        );
+
+        if (!requestResult.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy yêu cầu chi phí công tác',
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Only allow advance transfer confirmation if advance has been processed by HR
+        if (request.advance_status !== 'PENDING_ACCOUNTANT') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Yêu cầu chưa được HR xử lý tạm ứng. Vui lòng đợi HR xử lý trước.',
+            });
+        }
+
+        const timestamp = new Date().toISOString();
+
+        // Update advance fields - Kế toán xác nhận chuyển khoản
+        const updateQuery = `
+            UPDATE travel_expense_requests
+            SET 
+                advance_status = 'TRANSFERRED',
+                advance_transferred_at = $1,
+                advance_transferred_by = $2,
+                status = 'PENDING_SETTLEMENT',
+                updated_at = $1
+            WHERE id = $3
+            RETURNING *
+        `;
+
+        const updateResult = await client.query(updateQuery, [
+            timestamp,
+            transferredBy || null,
+            id
+        ]);
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Đã xác nhận chuyển khoản tạm ứng thành công',
+            data: mapRowToResponse(updateResult.rows[0]),
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error processing advance:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi xử lý tạm ứng: ' + error.message,
+        });
+    } finally {
+        client.release();
+    }
+});
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, '../uploads/travel-expenses');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'attachment-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+            'application/pdf',
+            'image/jpeg',
+            'image/png',
+            'image/jpg',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Chỉ chấp nhận file PDF, DOC, DOCX, JPG, PNG'));
+        }
+    }
+});
+
+// POST /api/travel-expenses/:id/settlement - Nhân viên submit báo cáo hoàn ứng
+router.post('/:id/settlement', upload.array('attachments', 10), async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const { actualExpense, notes } = req.body;
+        const files = req.files || [];
+
+        if (!actualExpense) {
+            // Delete uploaded files if validation fails
+            files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu thông tin bắt buộc (actualExpense)',
+            });
+        }
+
+        const actualExpenseNum = parseFloat(actualExpense);
+        if (isNaN(actualExpenseNum) || actualExpenseNum < 0) {
+            files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
+            return res.status(400).json({
+                success: false,
+                message: 'Chi phí thực tế không hợp lệ',
+            });
+        }
+
+        await client.query('BEGIN');
+
+        // Check if request exists and is in correct status
+        const requestResult = await client.query(
+            'SELECT * FROM travel_expense_requests WHERE id = $1 FOR UPDATE',
+            [id]
+        );
+
+        if (!requestResult.rows.length) {
+            await client.query('ROLLBACK');
+            files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy yêu cầu chi phí công tác',
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Only allow settlement if advance has been transferred
+        if (request.advance_status !== 'TRANSFERRED') {
+            await client.query('ROLLBACK');
+            files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
+            return res.status(400).json({
+                success: false,
+                message: 'Yêu cầu chưa được tạm ứng. Vui lòng đợi tạm ứng được chuyển khoản trước.',
+            });
+        }
+
+        // Check if already submitted
+        if (request.settlement_status === 'SUBMITTED' || request.settlement_status === 'HR_CONFIRMED') {
+            await client.query('ROLLBACK');
+            files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
+            return res.status(400).json({
+                success: false,
+                message: 'Báo cáo hoàn ứng đã được gửi. Không thể gửi lại.',
+            });
+        }
+
+        const timestamp = new Date().toISOString();
+
+        // Update settlement fields
+        const updateQuery = `
+            UPDATE travel_expense_requests
+            SET 
+                actual_expense = $1,
+                settlement_status = 'SUBMITTED',
+                employee_confirmed_at = $2,
+                settlement_notes = $3,
+                status = 'PENDING_SETTLEMENT',
+                updated_at = $2
+            WHERE id = $4
+            RETURNING *
+        `;
+
+        const updateResult = await client.query(updateQuery, [
+            actualExpenseNum,
+            timestamp,
+            notes || null,
+            id
+        ]);
+
+        // Save uploaded files
+        const attachmentIds = [];
+        for (const file of files) {
+            const attachmentResult = await client.query(
+                `INSERT INTO travel_expense_attachments 
+                 (travel_expense_request_id, file_name, file_path, file_size, file_type, uploaded_by, description)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)
+                 RETURNING id`,
+                [
+                    id,
+                    file.originalname,
+                    file.path,
+                    file.size,
+                    file.mimetype,
+                    request.employee_id,
+                    null
+                ]
+            );
+            attachmentIds.push(attachmentResult.rows[0].id);
+        }
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Đã gửi báo cáo hoàn ứng thành công',
+            data: {
+                ...mapRowToResponse(updateResult.rows[0]),
+                attachmentIds
+            },
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        // Delete uploaded files on error
+        if (req.files) {
+            req.files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
+        }
+        console.error('Error submitting settlement:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi gửi báo cáo hoàn ứng: ' + error.message,
+        });
+    } finally {
+        client.release();
+    }
+});
+
+// GET /api/travel-expenses/:id/attachments - Lấy danh sách file đính kèm
+router.get('/:id/attachments', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            'SELECT * FROM travel_expense_attachments WHERE travel_expense_request_id = $1 ORDER BY uploaded_at DESC',
+            [id]
+        );
+
+        res.json({
+            success: true,
+            message: 'Danh sách file đính kèm',
+            data: result.rows.map(row => ({
+                id: row.id,
+                fileName: row.file_name,
+                filePath: row.file_path,
+                fileSize: row.file_size,
+                fileType: row.file_type,
+                uploadedAt: row.uploaded_at,
+                description: row.description
+            })),
+        });
+    } catch (error) {
+        console.error('Error fetching attachments:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy danh sách file đính kèm: ' + error.message,
+        });
+    }
+});
+
+// POST /api/travel-expenses/:id/settlement/confirm - HR xác nhận settlement
+router.post('/:id/settlement/confirm', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const { confirmedBy } = req.body;
+
+        await client.query('BEGIN');
+
+        const requestResult = await client.query(
+            'SELECT * FROM travel_expense_requests WHERE id = $1 FOR UPDATE',
+            [id]
+        );
+
+        if (!requestResult.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy yêu cầu chi phí công tác',
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        if (request.settlement_status !== 'SUBMITTED') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Báo cáo hoàn ứng chưa được nhân viên gửi',
+            });
+        }
+
+        const timestamp = new Date().toISOString();
+
+        const updateQuery = `
+            UPDATE travel_expense_requests
+            SET 
+                settlement_status = 'HR_CONFIRMED',
+                hr_confirmed_at = $1,
+                hr_confirmed_by = $2,
+                status = 'PENDING_ACCOUNTANT',
+                updated_at = $1
+            WHERE id = $3
+            RETURNING *
+        `;
+
+        const updateResult = await client.query(updateQuery, [
+            timestamp,
+            confirmedBy || null,
+            id
+        ]);
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Đã xác nhận báo cáo hoàn ứng thành công',
+            data: mapRowToResponse(updateResult.rows[0]),
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error confirming settlement:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi xác nhận báo cáo hoàn ứng: ' + error.message,
+        });
+    } finally {
+        client.release();
+    }
+});
+
+// POST /api/travel-expenses/:id/accountant/check - Kế toán kiểm tra và quyết toán
+router.post('/:id/accountant/check', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const { checkedBy, notes } = req.body;
+
+        await client.query('BEGIN');
+
+        const requestResult = await client.query(
+            'SELECT * FROM travel_expense_requests WHERE id = $1 FOR UPDATE',
+            [id]
+        );
+
+        if (!requestResult.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy yêu cầu chi phí công tác',
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Only allow checking if HR has confirmed settlement
+        if (request.settlement_status !== 'HR_CONFIRMED') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Báo cáo hoàn ứng chưa được HR xác nhận. Vui lòng đợi HR xác nhận trước.',
+            });
+        }
+
+        // Check if already checked
+        if (request.accountant_checked_at) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Yêu cầu đã được kế toán kiểm tra. Không thể kiểm tra lại.',
+            });
+        }
+
+        if (!request.actual_expense) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Yêu cầu chưa có chi phí thực tế. Vui lòng đợi nhân viên gửi báo cáo hoàn ứng.',
+            });
+        }
+
+        if (!request.actual_advance_amount) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Yêu cầu chưa có số tiền tạm ứng. Không thể quyết toán.',
+            });
+        }
+
+        const actualExpense = Number(request.actual_expense);
+        const advanceAmount = Number(request.actual_advance_amount); // Số tiền đã tạm ứng (thay cho ngân sách)
+        const timestamp = new Date().toISOString();
+
+        // Logic 2 trường hợp - Đối chiếu với số tiền tạm ứng
+        let reimbursementAmount = 0;
+        let exceedsBudget = false;
+        let excessAmount = 0;
+        let refundAmount = 0;
+        let newStatus = '';
+
+        if (actualExpense <= advanceAmount) {
+            // Trường hợp 1: Chi phí Thực tế <= Số tiền Tạm ứng
+            // → Hoàn ứng tối đa bằng Chi phí Thực tế
+            reimbursementAmount = actualExpense;
+            exceedsBudget = false;
+            excessAmount = 0;
+            refundAmount = actualExpense < advanceAmount ? advanceAmount - actualExpense : 0; // Nhân viên cần hoàn trả nếu chi phí < tạm ứng
+            newStatus = 'SETTLED'; // Hoàn tất quyết toán
+        } else {
+            // Trường hợp 2: Chi phí Thực tế > Số tiền Tạm ứng
+            // → Từ chối phần vượt, chuyển sang Bước 6.1 (PENDING_EXCEPTION_APPROVAL)
+            reimbursementAmount = advanceAmount; // Chỉ hoàn ứng bằng số tiền tạm ứng
+            exceedsBudget = true;
+            excessAmount = actualExpense - advanceAmount;
+            refundAmount = 0;
+            newStatus = 'PENDING_EXCEPTION_APPROVAL'; // Chờ phê duyệt ngoại lệ
+        }
+
+        // Update accountant fields
+        const updateQuery = `
+            UPDATE travel_expense_requests
+            SET 
+                accountant_checked_at = $1,
+                accountant_checked_by = $2,
+                accountant_notes = $3,
+                reimbursement_amount = $4,
+                exceeds_budget = $5,
+                excess_amount = $6,
+                status = $7,
+                updated_at = $1
+            WHERE id = $8
+            RETURNING *
+        `;
+
+        const updateResult = await client.query(updateQuery, [
+            timestamp,
+            checkedBy || null,
+            notes || null,
+            reimbursementAmount,
+            exceedsBudget,
+            excessAmount > 0 ? excessAmount : null,
+            newStatus,
+            id
+        ]);
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: exceedsBudget
+                ? `Đã kiểm tra và quyết toán. Chi phí thực tế vượt số tiền tạm ứng ${excessAmount.toLocaleString('vi-VN')} VND. Chuyển sang phê duyệt ngoại lệ.`
+                : refundAmount > 0
+                    ? `Đã kiểm tra và quyết toán thành công. Nhân viên cần hoàn trả ${refundAmount.toLocaleString('vi-VN')} VND.`
+                    : 'Đã kiểm tra và quyết toán thành công. Hoàn ứng tối đa bằng chi phí thực tế.',
+            data: mapRowToResponse(updateResult.rows[0]),
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error checking accountant:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi kiểm tra và quyết toán: ' + error.message,
         });
     } finally {
         client.release();

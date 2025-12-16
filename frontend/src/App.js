@@ -8,21 +8,28 @@ import RequestsManagementModal from './components/RequestsManagement/RequestsMan
 import LeaveRequest from './components/LeaveRequest/LeaveRequest';
 import ResignRequest from './components/ResignRequest/ResignRequest';
 import LeaveApprovals from './components/LeaveApprovals/LeaveApprovals';
-import InterviewApprovals from './components/InterviewApprovals/InterviewApprovals';
+import RequestManagement from './components/RequestManagement/RequestManagement';
 import ProbationList from './components/ProbationList/ProbationList';
+import RecruitmentManagement from './components/RecruitmentManagement/RecruitmentManagement';
+import InterviewApprovals from './components/InterviewApprovals/InterviewApprovals';
 import OvertimeRequest from './components/OvertimeRequest/OvertimeRequest';
 import AttendanceRequest from './components/AttendanceRequest/AttendanceRequest';
 import RequestHistory from './components/RequestHistory/RequestHistory';
-import CandidateForm from './components/CandidateForm/CandidateForm';
-import CandidateManagement from './components/CandidateManagement/CandidateManagement';
 import TravelExpense from './components/TravelExpense/TravelExpense';
 import TravelExpenseManagement from './components/TravelExpense/TravelExpenseManagement';
+import TravelExpenseAdvanceProcessing from './components/TravelExpense/TravelExpenseAdvanceProcessing';
 import TravelExpenseApproval from './components/TravelExpenseApproval/TravelExpenseApproval';
+import TravelExpenseSettlement from './components/TravelExpense/TravelExpenseSettlement';
+import TravelExpenseAccountant from './components/TravelExpense/TravelExpenseAccountant';
+import CustomerEntertainmentExpenseRequest from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseRequest';
+import CustomerEntertainmentExpenseApproval from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseApproval';
+import CustomerEntertainmentExpenseAccountant from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseAccountant';
+import CustomerEntertainmentExpenseCEO from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseCEO';
+import CustomerEntertainmentExpensePayment from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpensePayment';
 import Login from './components/Login/Login';
 import ToastContainer from './components/Common/ToastContainer';
 import ConfirmModal from './components/Common/ConfirmModal';
 import IntroOverlay from './components/Common/IntroOverlay';
-import FloatingNotificationBell from './components/Common/FloatingNotificationBell';
 import { employeesAPI } from './services/api';
 import './App.css';
 
@@ -40,6 +47,7 @@ function App() {
   const [isRequestsModalOpen, setIsRequestsModalOpen] = useState(false);
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
   const [equipmentModalEmployee, setEquipmentModalEmployee] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Toast management
   const showToast = (message, type = 'info', duration = 3000) => {
@@ -207,6 +215,37 @@ function App() {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
+  // Helper function to check if user is Lê Thanh Tùng
+  const isLeThanhTung = (user) => {
+    if (!user) return false;
+
+    const removeVietnameseAccents = (str) => {
+      if (!str) return '';
+      return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D');
+    };
+
+    const userName = (user.hoTen || user.username || '').trim();
+    const normalizedUserName = userName.toLowerCase().replace(/\s+/g, ' ');
+    const normalizedUserNameNoAccents = removeVietnameseAccents(normalizedUserName);
+
+    return (
+      normalizedUserName === 'lê thanh tùng' ||
+      normalizedUserName === 'le thanh tung' ||
+      normalizedUserNameNoAccents === 'le thanh tung' ||
+      normalizedUserName.includes('lê thanh tùng') ||
+      normalizedUserName.includes('le thanh tung') ||
+      normalizedUserNameNoAccents.includes('le thanh tung') ||
+      (normalizedUserName.includes('lê thanh') && normalizedUserName.includes('tùng')) ||
+      (normalizedUserNameNoAccents.includes('le thanh') && normalizedUserNameNoAccents.includes('tung')) ||
+      (normalizedUserName.includes('thanh tùng') && normalizedUserName.includes('lê')) ||
+      (normalizedUserNameNoAccents.includes('thanh tung') && normalizedUserNameNoAccents.includes('le'))
+    );
+  };
+
   const renderView = () => {
     // Employee view - giao diện riêng cho nhân viên
     if (currentUser?.role === 'EMPLOYEE') {
@@ -230,13 +269,6 @@ function App() {
             <LeaveApprovals
               currentUser={currentUser}
               showToast={showToast}
-              showConfirm={showConfirm}
-            />
-          );
-        case 'interview-approvals':
-          return (
-            <InterviewApprovals
-              currentUser={currentUser}
               showConfirm={showConfirm}
             />
           );
@@ -267,6 +299,14 @@ function App() {
               currentUser={currentUser}
             />
           );
+        case 'interview-approvals':
+          return (
+            <InterviewApprovals
+              currentUser={currentUser}
+              showToast={showToast}
+              showConfirm={showConfirm}
+            />
+          );
         case 'travel-expense':
           return (
             <TravelExpense
@@ -278,6 +318,71 @@ function App() {
         case 'travel-expense-approval':
           return (
             <TravelExpenseApproval
+              currentUser={currentUser}
+              showToast={showToast}
+              showConfirm={showConfirm}
+            />
+          );
+        case 'travel-expense-settlement':
+          return (
+            <TravelExpenseSettlement
+              currentUser={currentUser}
+              showToast={showToast}
+            />
+          );
+        case 'travel-expense-accountant':
+          return (
+            <TravelExpenseAccountant
+              currentUser={currentUser}
+              showToast={showToast}
+            />
+          );
+        case 'customer-entertainment-expense-request':
+          return (
+            <CustomerEntertainmentExpenseRequest
+              currentUser={currentUser}
+              showToast={showToast}
+              showConfirm={showConfirm}
+            />
+          );
+        case 'customer-entertainment-expense-approval':
+          return (
+            <CustomerEntertainmentExpenseApproval
+              currentUser={currentUser}
+              showToast={showToast}
+              showConfirm={showConfirm}
+            />
+          );
+        case 'customer-entertainment-expense-accountant':
+          return (
+            <CustomerEntertainmentExpenseAccountant
+              currentUser={currentUser}
+              showToast={showToast}
+              showConfirm={showConfirm}
+            />
+          );
+        case 'customer-entertainment-expense-ceo':
+          // Chỉ Lê Thanh Tùng mới được phép truy cập module này
+          if (!isLeThanhTung(currentUser)) {
+            showToast('Bạn không có quyền truy cập module này. Chỉ Tổng Giám đốc Lê Thanh Tùng mới được phép.', 'error');
+            setCurrentView('dashboard');
+            return (
+              <EmployeeDashboard
+                currentUser={currentUser}
+                showToast={showToast}
+              />
+            );
+          }
+          return (
+            <CustomerEntertainmentExpenseCEO
+              currentUser={currentUser}
+              showToast={showToast}
+              showConfirm={showConfirm}
+            />
+          );
+        case 'customer-entertainment-expense-payment':
+          return (
+            <CustomerEntertainmentExpensePayment
               currentUser={currentUser}
               showToast={showToast}
               showConfirm={showConfirm}
@@ -304,10 +409,11 @@ function App() {
             showConfirm={showConfirm}
           />
         );
-      case 'interview-approvals':
+      case 'request-management':
         return (
-          <InterviewApprovals
+          <RequestManagement
             currentUser={currentUser}
+            showToast={showToast}
             showConfirm={showConfirm}
           />
         );
@@ -318,18 +424,96 @@ function App() {
             showToast={showToast}
           />
         );
-      case 'candidate-management':
+      case 'recruitment-management':
         return (
-          <CandidateManagement
+          <RecruitmentManagement
             currentUser={currentUser}
             showToast={showToast}
             showConfirm={showConfirm}
-            onNavigate={handleNavigate}
+          />
+        );
+      case 'interview-approvals':
+        return (
+          <InterviewApprovals
+            currentUser={currentUser}
+            showToast={showToast}
+            showConfirm={showConfirm}
+          />
+        );
+      case 'travel-expense-advance-processing':
+        return (
+          <TravelExpenseAdvanceProcessing
+            currentUser={currentUser}
+            showToast={showToast}
+            showConfirm={showConfirm}
           />
         );
       case 'travel-expense-management':
         return (
           <TravelExpenseManagement
+            currentUser={currentUser}
+            showToast={showToast}
+            showConfirm={showConfirm}
+          />
+        );
+      case 'travel-expense-accountant':
+        return (
+          <TravelExpenseAccountant
+            currentUser={currentUser}
+            showToast={showToast}
+          />
+        );
+      case 'customer-entertainment-expense-request':
+        return (
+          <CustomerEntertainmentExpenseRequest
+            currentUser={currentUser}
+            showToast={showToast}
+            showConfirm={showConfirm}
+          />
+        );
+      case 'customer-entertainment-expense-approval':
+        return (
+          <CustomerEntertainmentExpenseApproval
+            currentUser={currentUser}
+            showToast={showToast}
+            showConfirm={showConfirm}
+          />
+        );
+      case 'customer-entertainment-expense-accountant':
+        return (
+          <CustomerEntertainmentExpenseAccountant
+            currentUser={currentUser}
+            showToast={showToast}
+            showConfirm={showConfirm}
+          />
+        );
+      case 'customer-entertainment-expense-ceo':
+        // Chỉ Lê Thanh Tùng mới được phép truy cập module này
+        if (!isLeThanhTung(currentUser)) {
+          showToast('Bạn không có quyền truy cập module này. Chỉ Tổng Giám đốc Lê Thanh Tùng mới được phép.', 'error');
+          setCurrentView('dashboard');
+          return (
+            <Dashboard
+              onAddEmployee={handleAddEmployee}
+              employees={employees}
+              onRefreshEmployees={fetchEmployees}
+              currentUser={currentUser}
+              showConfirm={showConfirm}
+              onUpdateEquipment={handleUpdateEquipment}
+              onOpenRequestsModal={() => setIsRequestsModalOpen(true)}
+            />
+          );
+        }
+        return (
+          <CustomerEntertainmentExpenseCEO
+            currentUser={currentUser}
+            showToast={showToast}
+            showConfirm={showConfirm}
+          />
+        );
+      case 'customer-entertainment-expense-payment':
+        return (
+          <CustomerEntertainmentExpensePayment
             currentUser={currentUser}
             showToast={showToast}
             showConfirm={showConfirm}
@@ -356,11 +540,32 @@ function App() {
       {showIntroOverlay && <IntroOverlay user={introUser || currentUser} />}
       <Sidebar
         currentView={currentView}
-        onNavigate={handleNavigate}
+        onNavigate={(view) => {
+          handleNavigate(view);
+          setIsSidebarOpen(false); // Close sidebar on mobile after navigation
+        }}
         onAddEmployee={handleAddEmployee}
         currentUser={currentUser}
         onLogout={handleLogout}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
+      {/* Mobile Hamburger Menu Button */}
+      <button
+        className="mobile-menu-toggle"
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        aria-label="Toggle menu"
+      >
+        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {isSidebarOpen ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+          )}
+        </svg>
+      </button>
+      {/* Mobile Sidebar Backdrop */}
+      {isSidebarOpen && <div className="sidebar-backdrop" onClick={() => setIsSidebarOpen(false)} />}
       <main
         className={`main-content ${currentUser?.role === 'EMPLOYEE' ? 'main-content--employee' : ''}`}
         style={{ position: 'relative' }}
@@ -392,13 +597,6 @@ function App() {
         notesInput={confirmModal.notesInput}
       />
 
-      {/* Floating Notification Bell for HR */}
-      {currentUser?.role === 'HR' && (
-        <FloatingNotificationBell
-          currentUser={currentUser}
-          showToast={showToast}
-        />
-      )}
 
       {/* Requests Management Modal */}
       <RequestsManagementModal

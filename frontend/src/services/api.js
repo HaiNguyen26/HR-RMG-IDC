@@ -9,7 +9,35 @@ const api = axios.create({
   },
 });
 
-// Add response interceptor to suppress 404 errors for employee lookups
+// Add request interceptor to include user ID in headers
+api.interceptors.request.use(
+  (config) => {
+    // Get user from localStorage
+    try {
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        const userData = JSON.parse(savedUser);
+        // Add user ID to headers if available
+        if (userData?.id) {
+          config.headers['user-id'] = userData.id;
+        } else if (userData?.employeeId) {
+          config.headers['user-id'] = userData.employeeId;
+        } else if (userData?.employee_id) {
+          config.headers['user-id'] = userData.employee_id;
+        }
+      }
+    } catch (error) {
+      // Ignore errors when parsing user data
+      console.warn('Error parsing user data for headers:', error);
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor to suppress 404 errors for employee lookups and handle connection errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -19,6 +47,12 @@ api.interceptors.response.use(
       // The calling code will handle it gracefully
       return Promise.reject(error);
     }
+    
+    // Log connection errors for debugging
+    if (error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED') {
+      console.warn('⚠️ Backend server không khả dụng. Đảm bảo backend đang chạy tại http://localhost:3000');
+    }
+    
     // For other errors, let them propagate normally
     return Promise.reject(error);
   }
@@ -142,65 +176,173 @@ export const attendanceAdjustmentsAPI = {
   remove: (id, data) => api.delete(`/attendance-adjustments/${id}`, { data }),
 };
 
+// Candidates API
+export const candidatesAPI = {
+  getAll: (params) => api.get('/candidates', { params }),
+  getById: (id) => api.get(`/candidates/${id}`),
+  create: (data) => {
+    const formData = new FormData();
+    
+    // Append all form fields (skip files, append later)
+    Object.keys(data).forEach(key => {
+      if (key === 'anhDaiDien' || key === 'cvDinhKem') {
+        // skip here, handled below
+        return;
+      } else if (key === 'workExperiences' || key === 'trainingProcesses' || key === 'foreignLanguages') {
+        // Convert arrays to JSON strings
+        formData.append(key, JSON.stringify(data[key]));
+      } else if (key === 'diaChiThuongTru' || key === 'diaChiLienLac') {
+        // Convert address objects to JSON strings
+        formData.append(key === 'diaChiThuongTru' ? 'diaChiTamTru' : 'diaChiLienLac', JSON.stringify(data[key]));
+      } else {
+        formData.append(key, data[key] || '');
+      }
+    });
+    
+    // Append files
+    if (data.anhDaiDien) {
+      formData.append('anhDaiDien', data.anhDaiDien);
+    }
+    if (data.cvDinhKem) {
+      formData.append('cvDinhKem', data.cvDinhKem);
+    }
+    
+    return api.post('/candidates', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  update: (id, data) => {
+    const formData = new FormData();
+    
+    // Similar to create (skip files, append later)
+    Object.keys(data).forEach(key => {
+        if (key === 'anhDaiDien' || key === 'cvDinhKem') {
+          // Skip files, will be appended separately
+          return;
+        } else if (key === 'workExperiences' || key === 'trainingProcesses' || key === 'foreignLanguages') {
+          formData.append(key, JSON.stringify(data[key]));
+        } else if (key === 'diaChiThuongTru' || key === 'diaChiLienLac') {
+          formData.append(key === 'diaChiThuongTru' ? 'diaChiTamTru' : 'diaChiLienLac', JSON.stringify(data[key]));
+        } else {
+          formData.append(key, data[key] || '');
+        }
+      });
+    
+    // Append files only if they are File objects
+    if (data.anhDaiDien && data.anhDaiDien instanceof File) {
+      console.log('[candidatesAPI.update] Appending anhDaiDien file:', data.anhDaiDien.name);
+      formData.append('anhDaiDien', data.anhDaiDien);
+    }
+    if (data.cvDinhKem && data.cvDinhKem instanceof File) {
+      console.log('[candidatesAPI.update] Appending cvDinhKem file:', data.cvDinhKem.name);
+      formData.append('cvDinhKem', data.cvDinhKem);
+    }
+    
+    // Log FormData contents for debugging
+    console.log('[candidatesAPI.update] FormData keys:', Array.from(formData.keys()));
+    console.log('[candidatesAPI.update] Has cvDinhKem:', formData.has('cvDinhKem'));
+    
+    return api.put(`/candidates/${id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  delete: (id) => api.delete(`/candidates/${id}`),
+};
+
 export const travelExpensesAPI = {
   create: (data) => api.post('/travel-expenses', data),
   getAll: (params) => api.get('/travel-expenses', { params }),
   getById: (id) => api.get(`/travel-expenses/${id}`),
   decide: (id, data) => api.post(`/travel-expenses/${id}/decision`, data),
   approveBudget: (id, data) => api.post(`/travel-expenses/${id}/budget`, data),
+  submitSettlement: (id, data) => {
+    const formData = new FormData();
+    formData.append('actualExpense', data.actualExpense);
+    if (data.notes) formData.append('notes', data.notes);
+    if (data.attachments && data.attachments.length > 0) {
+      data.attachments.forEach((file) => {
+        formData.append('attachments', file);
+      });
+    }
+    return api.post(`/travel-expenses/${id}/settlement`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  getAttachments: (id) => api.get(`/travel-expenses/${id}/attachments`),
+  confirmSettlement: (id, data) => api.post(`/travel-expenses/${id}/settlement/confirm`, data),
+  accountantCheck: (id, data) => api.post(`/travel-expenses/${id}/accountant/check`, data),
+  processAdvance: (id, data) => api.post(`/travel-expenses/${id}/advance/process`, data),
+  confirmAdvanceTransfer: (id, data) => api.post(`/travel-expenses/${id}/advance`, data),
+};
+
+// Customer Entertainment Expenses API
+export const customerEntertainmentExpensesAPI = {
+  create: (data) => {
+    const formData = new FormData();
+    formData.append('employeeId', data.employeeId);
+    formData.append('branchDirectorId', data.branchDirectorId);
+    formData.append('branchDirectorName', data.branchDirectorName);
+    formData.append('branch', data.branch);
+    formData.append('startDate', data.startDate);
+    formData.append('endDate', data.endDate);
+    formData.append('advanceAmount', data.advanceAmount || 0);
+    formData.append('expenseItems', JSON.stringify(data.expenseItems));
+
+    // Add files
+    if (data.files && data.files.length > 0) {
+      data.files.forEach((file) => {
+        formData.append('files', file);
+      });
+    }
+
+    return api.post('/customer-entertainment-expenses', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  getAll: (params) => api.get('/customer-entertainment-expenses', { params }),
+  getById: (id) => api.get(`/customer-entertainment-expenses/${id}`),
+  approve: (id, data) => api.put(`/customer-entertainment-expenses/${id}/approve`, data),
+  reject: (id, data) => api.put(`/customer-entertainment-expenses/${id}/reject`, data),
+  requestCorrection: (id, data) => api.put(`/customer-entertainment-expenses/${id}/request-correction`, data),
+  accountantProcess: (id, data) => api.put(`/customer-entertainment-expenses/${id}/accountant-process`, data),
+  ceoApprove: (id, data) => api.put(`/customer-entertainment-expenses/${id}/ceo-approve`, data),
+  ceoReject: (id, data) => api.put(`/customer-entertainment-expenses/${id}/ceo-reject`, data),
+  processPayment: (id, data) => api.put(`/customer-entertainment-expenses/${id}/payment`, data),
 };
 
 // Candidates API
-export const candidatesAPI = {
-  getAll: (params) => api.get('/candidates', { params }),
-  create: (formData) => api.post('/candidates', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    }
-  }),
-  update: (id, formData) => api.put(`/candidates/${id}`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    }
-  }),
-  updateStatus: (id, data) => api.put(`/candidates/${id}/status`, data),
-  updateNotes: (id, data) => api.put(`/candidates/${id}/notes`, data),
-  delete: (id) => api.delete(`/candidates/${id}`),
-  getManagers: () => api.get('/candidates/managers'),
-  createInterviewRequest: (candidateId, data) => api.post(`/candidates/${candidateId}/interview-request`, data),
-  getInterviewRequests: (params) => api.get('/candidates/interview-requests', { params }),
-  updateInterviewRequestStatus: (id, data) => api.put(`/candidates/interview-requests/${id}/status`, data),
-  submitInterviewEvaluation: (id, data) => api.put(`/candidates/interview-requests/${id}/evaluation`, data),
-  generateJobOfferPDF: (id, params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    const url = `/candidates/${id}/job-offer-pdf${queryString ? `?${queryString}` : ''}`;
-    return api.get(url, { responseType: 'blob' });
-  },
-  generateJobOfferPDFFromForm: (data) => {
-    return api.post('/candidates/generate-job-offer-pdf', data, { responseType: 'blob' });
-  },
-  getProbationCandidates: () => api.get('/candidates/probation'),
-  evaluateProbation: (id, data) => api.put(`/candidates/${id}/probation-evaluation`, data),
-  // Recruitment Requests API
-  createRecruitmentRequest: (data) => api.post('/candidates/recruitment-requests', data),
-  getAllRecruitmentRequests: (params) => api.get('/candidates/recruitment-requests', { params }),
-  getMyRecruitmentRequests: () => api.get('/candidates/recruitment-requests/my-requests'),
-  getRecruitmentRequestById: (id) => api.get(`/candidates/recruitment-requests/${id}`),
-  updateRecruitmentRequestStatus: (id, data) => api.put(`/candidates/recruitment-requests/${id}/status`, data),
-  deleteRecruitmentRequest: (id) => api.delete(`/candidates/recruitment-requests/${id}`),
-  // Candidate metadata API
-  getDepartments: () => api.get('/candidates/departments'),
-  getPositions: () => api.get('/candidates/positions'),
-  // Get CV file URL
-  getCVUrl: (candidateId) => `${API_URL}/candidates/cv/${candidateId}`,
-  // Export template Excel
-  exportTemplate: () => api.get('/candidates/export-template', { responseType: 'blob' }),
-  // Bulk import from Excel
-  bulkImport: (formData) => api.post('/candidates/bulk-import', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    }
-  }),
+
+// Recruitment Requests API
+export const recruitmentRequestsAPI = {
+  getAll: (params) => api.get('/recruitment-requests', { params }),
+  getById: (id) => api.get(`/recruitment-requests/${id}`),
+  create: (data) => api.post('/recruitment-requests', data),
+  approve: (id) => api.put(`/recruitment-requests/${id}/approve`),
+  reject: (id, data) => api.put(`/recruitment-requests/${id}/reject`, data),
+};
+
+// Interview Requests API
+export const interviewRequestsAPI = {
+  getAll: (params) => api.get('/interview-requests', { params }),
+  create: (data) => api.post('/interview-requests', data),
+  approve: (id, data) => api.put(`/interview-requests/${id}/approve`, data),
+  reject: (id, data) => api.put(`/interview-requests/${id}/reject`, data),
+};
+
+export const interviewEvaluationsAPI = {
+  getAll: (params) => api.get('/interview-evaluations', { params }),
+  getById: (id) => api.get(`/interview-evaluations/${id}`),
+  create: (data) => api.post('/interview-evaluations', data),
+  update: (id, data) => api.put(`/interview-evaluations/${id}`, data),
+  checkAndUpdateStatus: (candidateId) => api.post(`/interview-evaluations/check-and-update-status/${candidateId}`),
 };
 
 // Notification system removed

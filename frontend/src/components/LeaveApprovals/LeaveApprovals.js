@@ -28,6 +28,18 @@ const LEAVE_TYPE_LABELS = {
 
 const MODULE_OPTIONS = [
     {
+        key: 'all',
+        label: 'Tất cả đơn',
+        header: {
+            teamLead: 'Tất cả đơn từ',
+            hr: 'Quản lý đơn từ'
+        },
+        description: {
+            teamLead: 'Xem tất cả các đơn từ của nhân viên.',
+            hr: 'Xem và theo dõi tất cả các đơn xin phép, đơn tăng ca, đơn bổ sung chấm công.'
+        }
+    },
+    {
         key: 'leave',
         label: 'Đơn xin nghỉ',
         header: {
@@ -102,7 +114,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [managerResolved, setManagerResolved] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
-    
+
     // Statistics for badge counts - overall (tính từ requests hiện tại)
     const statistics = useMemo(() => {
         const pending = requests.filter(r => r.status === 'PENDING').length;
@@ -255,7 +267,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const baseViewerMode = useMemo(() => deriveViewerMode(currentUser), [currentUser]);
     const viewerMode = managerResolved ? (managerOverride ?? baseViewerMode) : null;
     const isTeamLead = viewerMode === 'teamLead';
-    const isHr = viewerMode === 'hr';
+    // LeaveApprovals chỉ dành cho Quản lý (teamLead), không dành cho HR
 
     // Fetch statistics for all modules (after viewerMode is defined)
     useEffect(() => {
@@ -269,18 +281,18 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 }
 
                 // Fetch tất cả các status cho mỗi module để tính tổng
-                const statuses = isTeamLead 
-                    ? ['PENDING', 'APPROVED', 'REJECTED'] 
+                const statuses = isTeamLead
+                    ? ['PENDING', 'APPROVED', 'REJECTED']
                     : ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'];
 
                 // Fetch cho từng module với tất cả các status
-                const leavePromises = statuses.map(status => 
+                const leavePromises = statuses.map(status =>
                     leaveRequestsAPI.getAll({ ...params, status })
                 );
-                const overtimePromises = statuses.map(status => 
+                const overtimePromises = statuses.map(status =>
                     overtimeRequestsAPI.getAll({ ...params, status })
                 );
-                const attendancePromises = statuses.map(status => 
+                const attendancePromises = statuses.map(status =>
                     attendanceAdjustmentsAPI.getAll({ ...params, status })
                 );
 
@@ -295,7 +307,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                     let pending = 0;
                     let total = 0;
                     results.forEach((result, index) => {
-                        const count = result.data?.success && Array.isArray(result.data.data) 
+                        const count = result.data?.success && Array.isArray(result.data.data)
                             ? result.data.data.length : 0;
                         total += count;
                         // Kết quả đầu tiên là PENDING (index 0)
@@ -310,7 +322,13 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 const overtimeStats = calculateStats(overtimeResults);
                 const attendanceStats = calculateStats(attendanceResults);
 
+                const allStats = {
+                    pending: leaveStats.pending + overtimeStats.pending + attendanceStats.pending,
+                    total: leaveStats.total + overtimeStats.total + attendanceStats.total
+                };
+
                 setModuleStatistics({
+                    all: allStats,
                     leave: leaveStats,
                     overtime: overtimeStats,
                     attendance: attendanceStats
@@ -368,6 +386,9 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
         const fetchModuleStatusStatistics = async () => {
             if (!viewerMode || !currentUser?.id || !activeModule) return;
 
+            // Skip if activeModule is 'all' (statistics are already calculated in fetchModuleStatistics)
+            if (activeModule === 'all') return;
+
             try {
                 const params = {};
                 if (isTeamLead) {
@@ -378,16 +399,16 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 if (!api) return;
 
                 // Fetch tất cả các status
-                const statuses = isTeamLead 
-                    ? ['PENDING', 'APPROVED', 'REJECTED'] 
+                const statuses = isTeamLead
+                    ? ['PENDING', 'APPROVED', 'REJECTED']
                     : ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'];
-                
-                const promises = statuses.map(status => 
+
+                const promises = statuses.map(status =>
                     api.getAll({ ...params, status })
                 );
 
                 const results = await Promise.all(promises);
-                
+
                 const stats = {
                     pending: 0,
                     approved: 0,
@@ -397,9 +418,9 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
 
                 results.forEach((result, index) => {
                     const status = statuses[index];
-                    const count = result.data?.success && Array.isArray(result.data.data) 
+                    const count = result.data?.success && Array.isArray(result.data.data)
                         ? result.data.data.length : 0;
-                    
+
                     if (status === 'PENDING') stats.pending = count;
                     else if (status === 'APPROVED') stats.approved = count;
                     else if (status === 'REJECTED') stats.rejected = count;
@@ -442,7 +463,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             }
 
             const statusToUse = statusOverride !== null ? statusOverride : selectedStatus;
-            
+
             // Xử lý trường hợp "Tất cả" - gửi tất cả các status có thể
             if (statusToUse === 'ALL') {
                 // TeamLead chỉ xem PENDING, APPROVED, REJECTED (không có CANCELLED)
@@ -460,15 +481,41 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             }
 
             console.log('[LeaveApprovals] Fetching with params:', params);
-            const response = await moduleApiMap[activeModule].getAll(params);
-            console.log('[LeaveApprovals] Response:', {
-                success: response.data.success,
-                dataCount: response.data.data?.length || 0
-            });
 
-            if (response.data.success) {
-                setRequests(response.data.data || []);
-                setStats({ total: response.data.data?.length || 0, overdueCount: 0 });
+            // Nếu activeModule là 'all', fetch tất cả các loại đơn
+            if (activeModule === 'all') {
+                const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
+                    leaveRequestsAPI.getAll(params),
+                    overtimeRequestsAPI.getAll(params),
+                    attendanceAdjustmentsAPI.getAll(params)
+                ]);
+
+                const allRequests = [
+                    ...(leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: 'leave' })) : []),
+                    ...(overtimeResponse.data.success ? (overtimeResponse.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
+                    ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : [])
+                ];
+
+                // Sắp xếp theo thời gian tạo mới nhất
+                allRequests.sort((a, b) => {
+                    const dateA = new Date(a.created_at || a.createdAt || 0);
+                    const dateB = new Date(b.created_at || b.createdAt || 0);
+                    return dateB - dateA;
+                });
+
+                setRequests(allRequests);
+                setStats({ total: allRequests.length, overdueCount: 0 });
+            } else {
+                const response = await moduleApiMap[activeModule].getAll(params);
+                console.log('[LeaveApprovals] Response:', {
+                    success: response.data.success,
+                    dataCount: response.data.data?.length || 0
+                });
+
+                if (response.data.success) {
+                    setRequests(response.data.data || []);
+                    setStats({ total: response.data.data?.length || 0, overdueCount: 0 });
+                }
             }
         } catch (error) {
             console.error('Error fetching approvals:', error);
@@ -655,7 +702,9 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     );
 
     const renderCardHeader = (request) => {
-        if (activeModule === 'leave') {
+        const requestType = request.requestType || activeModule;
+
+        if (requestType === 'leave' || activeModule === 'leave') {
             return (
                 <>
                     <h3>{getRequestTypeLabel(request.request_type)}</h3>
@@ -669,7 +718,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             );
         }
 
-        if (activeModule === 'overtime') {
+        if (requestType === 'overtime' || activeModule === 'overtime') {
             return (
                 <>
                     <h3>Đơn tăng ca</h3>
@@ -686,7 +735,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             <>
                 <h3>Đơn bổ sung chấm công</h3>
                 <p className="leave-approvals-period">
-                    {formatDateDisplay(request.adjustment_date)} •{' '}
+                    {formatDateDisplay(request.adjustment_date || request.request_date)} •{' '}
                     {request.check_type === 'CHECK_OUT' ? '-' : request.check_in_time?.slice(0, 5) || '-'}
                     {' → '}
                     {request.check_type === 'CHECK_IN' ? '-' : request.check_out_time?.slice(0, 5) || '-'}
@@ -762,62 +811,93 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
         return getStatusLabel(value);
     };
 
-    const renderDecisionTrace = (request) => (
-        <div className="leave-approvals-modal-section">
-            <h3 className="leave-approvals-modal-section-title">
-                <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                </svg>
-                Quy trình phê duyệt
-            </h3>
-            <div className="leave-approvals-steps">
-                <div className={`step ${request.status !== 'PENDING' ? 'completed' : ''}`}>
-                    <div className="step-icon">
-                        {request.status !== 'PENDING' ? (
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                        ) : (
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        )}
+    const renderDecisionTrace = (request) => {
+        // Xác định bước hiện tại của đơn
+        const getCurrentStep = () => {
+            if (request.status === 'PENDING') {
+                return 1; // Đang ở bước chờ quản lý duyệt
+            } else if (['APPROVED', 'REJECTED'].includes(request.status)) {
+                return 2; // Đã hoàn thành bước quản lý duyệt
+            }
+            return 0;
+        };
+
+        const currentStep = getCurrentStep();
+
+        return (
+            <div className="leave-approvals-modal-section">
+                <h3 className="leave-approvals-modal-section-title">
+                    <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                    </svg>
+                    Timeline đơn từ
+                </h3>
+                <div className="leave-approvals-timeline">
+                    {/* Bước 1: Nhân viên gửi đơn */}
+                    <div className={`timeline-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'current' : ''}`}>
+                        <div className="timeline-step-connector"></div>
+                        <div className="timeline-step-icon">
+                            {currentStep >= 1 ? (
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            ) : (
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            )}
+                        </div>
+                        <div className="timeline-step-content">
+                            <div className="timeline-step-title">Nhân viên gửi đơn</div>
+                            <div className="timeline-step-date">{formatDateDisplay(request.created_at, true)}</div>
+                            {currentStep === 1 && (
+                                <div className="timeline-step-badge current-badge">Bước hiện tại</div>
+                            )}
+                        </div>
                     </div>
-                    <div className="step-content">
-                        <span className="step-title">Nhân viên gửi đơn</span>
-                        <p className="step-date">{formatDateDisplay(request.created_at, true)}</p>
-                    </div>
-                </div>
-                <div className={`step ${['APPROVED', 'REJECTED'].includes(request.status) ? 'completed' : ''}`}>
-                    <div className="step-icon">
-                        {['APPROVED', 'REJECTED'].includes(request.status) ? (
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                        ) : (
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        )}
-                    </div>
-                    <div className="step-content">
-                        <span className="step-title">Quản lý trực tiếp</span>
-                        <p className="step-date">
-                            {request.status === 'PENDING'
-                                ? 'Chờ duyệt'
-                                : (
-                                    <>
-                                        {mapDecisionLabel(request.team_lead_action, request.status)}
-                                        {request.team_lead_action_at && ` - ${formatDateDisplay(request.team_lead_action_at, true)}`}
-                                    </>
-                                )
-                            }
-                        </p>
+
+                    {/* Bước 2: Quản lý trực tiếp */}
+                    <div className={`timeline-step ${currentStep >= 2 ? 'completed' : ''} ${currentStep === 2 ? 'current' : ''}`}>
+                        <div className="timeline-step-connector"></div>
+                        <div className="timeline-step-icon">
+                            {currentStep >= 2 ? (
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            ) : (
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            )}
+                        </div>
+                        <div className="timeline-step-content">
+                            <div className="timeline-step-title">Quản lý trực tiếp</div>
+                            <div className="timeline-step-date">
+                                {request.status === 'PENDING'
+                                    ? 'Chờ duyệt'
+                                    : (
+                                        <>
+                                            {mapDecisionLabel(request.team_lead_action, request.status)}
+                                            {request.team_lead_action_at && ` - ${formatDateDisplay(request.team_lead_action_at, true)}`}
+                                        </>
+                                    )
+                                }
+                            </div>
+                            {currentStep === 2 && (
+                                <div className="timeline-step-badge current-badge">Bước hiện tại</div>
+                            )}
+                            {currentStep >= 2 && request.status === 'APPROVED' && (
+                                <div className="timeline-step-badge success-badge">Đã duyệt</div>
+                            )}
+                            {currentStep >= 2 && request.status === 'REJECTED' && (
+                                <div className="timeline-step-badge error-badge">Đã từ chối</div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     const renderActionButtons = (request) => (
         <div className="leave-approvals-actions-row">
@@ -839,11 +919,6 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                     </button>
                 </>
             )}
-            {isHr && request.status === 'REJECTED' && (
-                <button type="button" className="btn-delete" onClick={() => handleDelete(request)}>
-                    Xóa đơn
-                </button>
-            )}
         </div>
     );
 
@@ -858,9 +933,11 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                         </svg>
                     </div>
                     <div>
-                        <h1 className="leave-approvals-title">Duyệt đơn nghỉ</h1>
+                        <h1 className="leave-approvals-title">
+                            {MODULE_OPTIONS.find(m => m.key === activeModule)?.header?.[isTeamLead ? 'teamLead' : 'hr'] || 'Duyệt đơn nghỉ'}
+                        </h1>
                         <p className="leave-approvals-subtitle">
-                            Xem và phê duyệt các đơn xin nghỉ phép, nghỉ việc từ nhân viên trong bộ phận của bạn.
+                            {MODULE_OPTIONS.find(m => m.key === activeModule)?.description?.[isTeamLead ? 'teamLead' : 'hr'] || 'Xem và phê duyệt các đơn từ nhân viên.'}
                         </p>
                     </div>
                 </div>
@@ -875,7 +952,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                             const totalCount = moduleStatistics[module.key]?.total || 0;
                             const pendingCount = moduleStatistics[module.key]?.pending || 0;
                             const hasPending = pendingCount > 0;
-                            
+
                             return (
                                 <button
                                     key={module.key}
@@ -894,45 +971,45 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 </div>
 
                 {/* Status Filter Bar - Lọc theo Trạng thái Xử lý */}
-                <div className="leave-approvals-status-filter-bar">
-                    <div className="status-filter-group">
-                        {statusFilters.map((filter) => {
-                            let count = 0;
-                            if (filter.key === 'PENDING') {
-                                count = moduleStatusStatistics.pending;
-                            } else if (filter.key === 'APPROVED') {
-                                count = moduleStatusStatistics.approved;
-                            } else if (filter.key === 'REJECTED') {
-                                count = moduleStatusStatistics.rejected;
-                            } else if (filter.key === 'CANCELLED') {
-                                count = moduleStatusStatistics.cancelled;
-                            } else if (filter.key === 'ALL') {
-                                // Tính tổng tất cả các status
-                                count = moduleStatusStatistics.pending + 
-                                        moduleStatusStatistics.approved + 
-                                        moduleStatusStatistics.rejected + 
+                {isTeamLead && (
+                    <div className="leave-approvals-status-filter-bar">
+                        <div className="status-filter-group">
+                            {statusFilters.map((filter) => {
+                                let count = 0;
+                                if (filter.key === 'PENDING') {
+                                    count = moduleStatusStatistics.pending;
+                                } else if (filter.key === 'APPROVED') {
+                                    count = moduleStatusStatistics.approved;
+                                } else if (filter.key === 'REJECTED') {
+                                    count = moduleStatusStatistics.rejected;
+                                } else if (filter.key === 'CANCELLED') {
+                                    count = moduleStatusStatistics.cancelled;
+                                } else if (filter.key === 'ALL') {
+                                    // Tính tổng tất cả các status
+                                    count = moduleStatusStatistics.pending +
+                                        moduleStatusStatistics.approved +
+                                        moduleStatusStatistics.rejected +
                                         moduleStatusStatistics.cancelled;
-                            }
-                            const hasPending = filter.key === 'PENDING' && moduleStatusStatistics.pending > 0;
-                            
-                            return (
-                                <button
-                                    key={filter.key}
-                                    type="button"
-                                    className={`status-filter-chip ${filter.key.toLowerCase()} ${selectedStatus === filter.key ? 'active' : ''} ${hasPending ? 'has-pending' : ''}`}
-                                    onClick={() => setSelectedStatus(filter.key)}
-                                >
-                                    <span className="status-filter-label">{filter.label}</span>
-                                    <span className={`leave-filter-tab-badge ${hasPending ? 'pulsing' : ''}`}>
-                                        {count}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
+                                }
+                                const hasPending = filter.key === 'PENDING' && moduleStatusStatistics.pending > 0;
 
-                    {/* Xóa nút Gửi cảnh báo đơn quá hạn vì không còn trong quy trình mới */}
-                </div>
+                                return (
+                                    <button
+                                        key={filter.key}
+                                        type="button"
+                                        className={`status-filter-chip ${filter.key.toLowerCase()} ${selectedStatus === filter.key ? 'active' : ''} ${hasPending ? 'has-pending' : ''}`}
+                                        onClick={() => setSelectedStatus(filter.key)}
+                                    >
+                                        <span className="status-filter-label">{filter.label}</span>
+                                        <span className={`leave-filter-tab-badge ${hasPending ? 'pulsing' : ''}`}>
+                                            {count}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Leave Request Table */}
                 <div className="leave-approvals-table-container">
@@ -953,6 +1030,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                             <thead>
                                 <tr>
                                     <th>Mã đơn</th>
+                                    {activeModule === 'all' && <th>Loại đơn</th>}
                                     <th>Tên nhân viên</th>
                                     {activeModule === 'leave' && (
                                         <>
@@ -973,6 +1051,12 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                             <th>Ngày bổ sung</th>
                                             <th>Loại bổ sung</th>
                                             <th>Giờ vào/ra</th>
+                                        </>
+                                    )}
+                                    {activeModule === 'all' && (
+                                        <>
+                                            <th>Thông tin đơn</th>
+                                            <th>Ngày/Thời gian</th>
                                         </>
                                     )}
                                     <th className="text-center">Trạng thái</th>
@@ -998,8 +1082,8 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                     }
 
                                     return (
-                                        <tr 
-                                            key={request.id} 
+                                        <tr
+                                            key={request.id}
                                             className="leave-request-row"
                                             onClick={() => {
                                                 setSelectedRequest(request);
@@ -1010,6 +1094,15 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                             <td className="leave-request-id-cell">
                                                 <span className="leave-request-id">ĐN{String(request.id).padStart(6, '0')}</span>
                                             </td>
+                                            {activeModule === 'all' && (
+                                                <td className="leave-request-type-cell">
+                                                    <span className={`request-type-badge ${request.requestType || 'leave'}`}>
+                                                        {request.requestType === 'leave' ? 'Đơn xin nghỉ' :
+                                                            request.requestType === 'overtime' ? 'Đơn tăng ca' :
+                                                                request.requestType === 'attendance' ? 'Đơn bổ sung công' : 'Đơn xin nghỉ'}
+                                                    </span>
+                                                </td>
+                                            )}
                                             <td className="leave-request-employee-cell">
                                                 <div className="leave-request-employee-info">
                                                     <strong>{request.employee_name || 'N/A'}</strong>
@@ -1018,6 +1111,80 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                     )}
                                                 </div>
                                             </td>
+                                            {activeModule === 'all' && (
+                                                <>
+                                                    <td className="leave-request-type-cell">
+                                                        {request.requestType === 'leave' && (
+                                                            <span className="leave-request-type">{getRequestTypeLabel(request.request_type) || 'N/A'}</span>
+                                                        )}
+                                                        {request.requestType === 'overtime' && (
+                                                            <span className="leave-request-type">Tăng ca</span>
+                                                        )}
+                                                        {request.requestType === 'attendance' && (
+                                                            <span className="leave-request-type">
+                                                                {(() => {
+                                                                    const notes = request.notes || '';
+                                                                    const attendanceType = request.attendance_type ||
+                                                                        (notes.includes('ATTENDANCE_TYPE:')
+                                                                            ? notes.split('ATTENDANCE_TYPE:')[1]?.split('\n')[0]?.trim()
+                                                                            : null);
+                                                                    if (attendanceType === 'FORGOT_CHECK' || attendanceType === '1') {
+                                                                        return 'Quên Chấm Công';
+                                                                    } else if (attendanceType === 'CONSTRUCTION_SITE' || attendanceType === '2') {
+                                                                        return 'Đi Công Trình';
+                                                                    } else if (attendanceType === 'OUTSIDE_WORK' || attendanceType === '3') {
+                                                                        return 'Làm việc bên ngoài';
+                                                                    }
+                                                                    return 'Quên Chấm Công';
+                                                                })()}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="leave-request-dates-cell">
+                                                        <div className="leave-request-dates-info">
+                                                            {request.requestType === 'leave' && (
+                                                                <>
+                                                                    <span>{formatDateDisplay(request.start_date)}</span>
+                                                                    {request.end_date && (
+                                                                        <>
+                                                                            <span className="date-separator"> → </span>
+                                                                            <span>{formatDateDisplay(request.end_date)}</span>
+                                                                        </>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                            {request.requestType === 'overtime' && (
+                                                                <>
+                                                                    <span>{formatDateDisplay(request.request_date)}</span>
+                                                                    {request.start_time && request.end_time && (
+                                                                        <>
+                                                                            <span className="date-separator"> • </span>
+                                                                            <span>{request.start_time.slice(0, 5)} → {request.end_time.slice(0, 5)}</span>
+                                                                        </>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                            {request.requestType === 'attendance' && (
+                                                                <>
+                                                                    <span>{formatDateDisplay(request.adjustment_date || request.request_date)}</span>
+                                                                    {request.check_in_time && (
+                                                                        <>
+                                                                            <span className="date-separator"> • </span>
+                                                                            <span>Vào: {request.check_in_time.slice(0, 5)}</span>
+                                                                        </>
+                                                                    )}
+                                                                    {request.check_out_time && (
+                                                                        <>
+                                                                            <span className="date-separator"> / </span>
+                                                                            <span>Ra: {request.check_out_time.slice(0, 5)}</span>
+                                                                        </>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </>
+                                            )}
                                             {activeModule === 'leave' && (
                                                 <>
                                                     <td className="leave-request-type-cell">
@@ -1039,7 +1206,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                     </td>
                                                 </>
                                             )}
-                                            {activeModule === 'overtime' && (
+                                            {((activeModule === 'overtime') || (activeModule === 'all' && selectedRequest?.requestType === 'overtime')) && (
                                                 <>
                                                     <td className="leave-request-dates-cell">
                                                         <div className="leave-request-dates-info">
@@ -1072,11 +1239,11 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                             {(() => {
                                                                 // Kiểm tra attendance_type từ notes hoặc trực tiếp
                                                                 const notes = request.notes || '';
-                                                                const attendanceType = request.attendance_type || 
-                                                                    (notes.includes('ATTENDANCE_TYPE:') 
+                                                                const attendanceType = request.attendance_type ||
+                                                                    (notes.includes('ATTENDANCE_TYPE:')
                                                                         ? notes.split('ATTENDANCE_TYPE:')[1]?.split('\n')[0]?.trim()
                                                                         : null);
-                                                                
+
                                                                 // Nếu có attendance_type rõ ràng
                                                                 if (attendanceType === 'FORGOT_CHECK' || attendanceType === '1') {
                                                                     return 'Quên Chấm Công';
@@ -1085,14 +1252,14 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                                 } else if (attendanceType === 'OUTSIDE_WORK' || attendanceType === '3') {
                                                                     return 'Làm việc bên ngoài';
                                                                 }
-                                                                
+
                                                                 // Suy luận từ dữ liệu: nếu có location trong notes thì là Đi Công Trình hoặc Làm việc bên ngoài
                                                                 const hasLocation = notes.includes('LOCATION:');
                                                                 if (hasLocation) {
                                                                     // Có thể là Đi Công Trình hoặc Làm việc bên ngoài, mặc định Đi Công Trình
                                                                     return 'Đi Công Trình';
                                                                 }
-                                                                
+
                                                                 // Nếu không có thông tin gì, mặc định là Quên Chấm Công (loại phổ biến nhất)
                                                                 return 'Quên Chấm Công';
                                                             })()}
@@ -1145,17 +1312,6 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                             </svg>
                                                         </button>
                                                     </div>
-                                                ) : isHr && request.status === 'REJECTED' ? (
-                                                    <button
-                                                        type="button"
-                                                        className="btn-fast-delete"
-                                                        onClick={() => handleDelete(request)}
-                                                        title="Xóa đơn đã từ chối"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                        </svg>
-                                                    </button>
                                                 ) : (
                                                     <span className="no-action">-</span>
                                                 )}
@@ -1311,7 +1467,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                             )}
 
                             {/* Module-specific details */}
-                            {activeModule === 'leave' && (
+                            {((activeModule === 'leave') || (activeModule === 'all' && selectedRequest?.requestType === 'leave')) && (
                                 <div className="leave-approvals-modal-section">
                                     <h3 className="leave-approvals-modal-section-title">
                                         <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1383,72 +1539,85 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                 </div>
                             )}
 
-                            {activeModule === 'overtime' && (
-                                <div className="leave-approvals-modal-section">
-                                    <h3 className="leave-approvals-modal-section-title">
-                                        <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg>
-                                        Chi tiết tăng ca
-                                    </h3>
-                                    <div className="leave-approvals-modal-info-grid">
-                                        <div className="leave-approvals-modal-info-item">
-                                            <span className="info-label">
-                                                <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                                </svg>
-                                                Ngày tăng ca
-                                            </span>
-                                            <span className="info-value">{formatDateDisplay(selectedRequest.request_date)}</span>
+                            {((activeModule === 'overtime') || (activeModule === 'all' && selectedRequest.requestType === 'overtime')) && (
+                                <>
+                                    {/* Warning for late request */}
+                                    {selectedRequest.is_late_request && (
+                                        <div className="leave-approvals-modal-warning">
+                                            <svg className="warning-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                            </svg>
+                                            <div className="warning-content">
+                                                <strong>Cảnh báo vi phạm:</strong> Nhân viên đã nộp đơn tăng ca sau thời gian thực tế. Đơn tăng ca phải được nộp trước khi bắt đầu làm việc.
+                                            </div>
                                         </div>
-                                        <div className="leave-approvals-modal-info-item">
-                                            <span className="info-label">
-                                                <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                                </svg>
-                                                Giờ bắt đầu
-                                            </span>
-                                            <span className="info-value">{selectedRequest.start_time?.slice(0, 5) || '-'}</span>
-                                        </div>
-                                        <div className="leave-approvals-modal-info-item">
-                                            <span className="info-label">
-                                                <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                                </svg>
-                                                Giờ kết thúc
-                                            </span>
-                                            <span className="info-value">{selectedRequest.end_time?.slice(0, 5) || '-'}</span>
-                                        </div>
-                                        {selectedRequest.duration && (
+                                    )}
+                                    <div className="leave-approvals-modal-section">
+                                        <h3 className="leave-approvals-modal-section-title">
+                                            <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            Chi tiết tăng ca
+                                        </h3>
+                                        <div className="leave-approvals-modal-info-grid">
                                             <div className="leave-approvals-modal-info-item">
                                                 <span className="info-label">
                                                     <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                                     </svg>
-                                                    Thời lượng
+                                                    Ngày tăng ca
                                                 </span>
-                                                <span className="info-value info-value-highlight">{selectedRequest.duration}</span>
+                                                <span className="info-value">{formatDateDisplay(selectedRequest.request_date)}</span>
                                             </div>
-                                        )}
+                                            <div className="leave-approvals-modal-info-item">
+                                                <span className="info-label">
+                                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                    </svg>
+                                                    Giờ bắt đầu
+                                                </span>
+                                                <span className="info-value">{selectedRequest.start_time?.slice(0, 5) || '-'}</span>
+                                            </div>
+                                            <div className="leave-approvals-modal-info-item">
+                                                <span className="info-label">
+                                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                    </svg>
+                                                    Giờ kết thúc
+                                                </span>
+                                                <span className="info-value">{selectedRequest.end_time?.slice(0, 5) || '-'}</span>
+                                            </div>
+                                            {selectedRequest.duration && (
+                                                <div className="leave-approvals-modal-info-item">
+                                                    <span className="info-label">
+                                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                                        </svg>
+                                                        Thời lượng
+                                                    </span>
+                                                    <span className="info-value info-value-highlight">{selectedRequest.duration}</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                </>
                             )}
 
-                            {activeModule === 'attendance' && (() => {
+                            {((activeModule === 'attendance') || (activeModule === 'all' && selectedRequest?.requestType === 'attendance')) && (() => {
                                 // Parse attendance_type và location từ notes
                                 const notes = selectedRequest.notes || '';
-                                const attendanceType = selectedRequest.attendance_type || 
-                                    (notes.includes('ATTENDANCE_TYPE:') 
+                                const attendanceType = selectedRequest.attendance_type ||
+                                    (notes.includes('ATTENDANCE_TYPE:')
                                         ? notes.split('ATTENDANCE_TYPE:')[1]?.split('\n')[0]?.trim()
                                         : null);
-                                const location = notes.includes('LOCATION:') 
+                                const location = notes.includes('LOCATION:')
                                     ? notes.split('LOCATION:')[1]?.split('\n')[0]?.trim()
                                     : null;
-                                
+
                                 const adjustmentDate = selectedRequest.adjustment_date || selectedRequest.request_date;
                                 const checkInTime = selectedRequest.check_in_time;
                                 const checkOutTime = selectedRequest.check_out_time;
-                                
+
                                 return (
                                     <div className="leave-approvals-modal-section">
                                         <h3 className="leave-approvals-modal-section-title">
@@ -1475,18 +1644,18 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                         } else if (attendanceType === 'OUTSIDE_WORK' || attendanceType === '3') {
                                                             return 'Làm việc bên ngoài';
                                                         }
-                                                        
+
                                                         // Suy luận từ dữ liệu: nếu có location trong notes thì là Đi Công Trình hoặc Làm việc bên ngoài
                                                         if (location) {
                                                             return 'Đi Công Trình';
                                                         }
-                                                        
+
                                                         // Nếu không có thông tin gì, mặc định là Quên Chấm Công
                                                         return 'Quên Chấm Công';
                                                     })()}
                                                 </span>
                                             </div>
-                                            
+
                                             <div className="leave-approvals-modal-info-item">
                                                 <span className="info-label">
                                                     <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1496,7 +1665,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                 </span>
                                                 <span className="info-value">{formatDateDisplay(adjustmentDate)}</span>
                                             </div>
-                                            
+
                                             {/* Quên Chấm Công: Hiển thị Giờ vào và Giờ ra */}
                                             {(attendanceType === 'FORGOT_CHECK' || attendanceType === '1' || (!attendanceType && checkInTime && checkOutTime)) && (
                                                 <>
@@ -1524,7 +1693,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                     )}
                                                 </>
                                             )}
-                                            
+
                                             {/* Đi Công Trình hoặc Làm việc bên ngoài: Hiển thị Địa điểm, Giờ bắt đầu, Giờ kết thúc */}
                                             {(attendanceType === 'CONSTRUCTION_SITE' || attendanceType === '2' || attendanceType === 'OUTSIDE_WORK' || attendanceType === '3') && (
                                                 <>

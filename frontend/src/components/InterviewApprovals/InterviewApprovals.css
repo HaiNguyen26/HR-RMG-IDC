@@ -1,48 +1,44 @@
 /* Interview Approvals - Gradient Calm Integrity Theme */
 
-/* I. CẤU TRÚC NỀN & VỎ ỨNG DỤNG (SHELL & GLASS CARD) */
-/* Nền BODY: Nền sáng, mềm mại (Light Mode) với Gradient Calm Integrity - xanh dương/xanh lá nhạt tạo cảm giác yên bình */
+/* I. MÀU NỀN CHỦ ĐẠO: Very Subtle Gradient (Gradient Rất Nhạt) - Calm Integrity */
 /* Container */
 .interview-approvals-container {
     width: 100%;
     height: 100vh;
     padding: 1.5rem;
     box-sizing: border-box;
-    /* Gradient Calm Integrity: Nền nhẹ nhàng từ xanh dương nhạt sang xanh lá nhạt */
-    background: linear-gradient(135deg, #e0f2fe 0%, #ffffff 50%, #ecfdf5 100%);
-    overflow: hidden;
+    /* Calm Integrity Gradient: Sky Blue 50 → White (60%) → Indigo 50 */
+    background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 60%, #f5f6ff 100%);
+    /* Optional: Ambient Blur - Làm mờ môi trường để tăng chiều sâu */
+    backdrop-filter: blur(1px);
+    overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
+    gap: 1.5rem;
     position: relative;
 }
 
-/* Custom Scrollbar - Tối ưu cho nền gradient Calm Integrity */
+/* Custom Scrollbar cho module */
 .interview-approvals-container::-webkit-scrollbar {
-    width: 8px;
+    width: 10px;
 }
 
 .interview-approvals-container::-webkit-scrollbar-track {
-    background: rgba(224, 242, 254, 0.3);
-    /* Sky blue nhạt với transparency */
-    border-radius: 4px;
+    background: rgba(240, 249, 255, 0.3);
     backdrop-filter: blur(5px);
+    border-radius: 10px;
 }
 
 .interview-approvals-container::-webkit-scrollbar-thumb {
     background: rgba(14, 165, 233, 0.4);
-    /* Sky blue với transparency */
-    border-radius: 4px;
     border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    transition: background 0.2s ease;
 }
 
 .interview-approvals-container::-webkit-scrollbar-thumb:hover {
     background: rgba(14, 165, 233, 0.6);
-}
-
-/* Allow scrolling for list view */
-.interview-approvals-container:has(.interview-approvals-list) {
-    overflow-y: auto;
-    overflow-x: hidden;
 }
 
 /* Ensure no scrolling on main container */
@@ -50,44 +46,39 @@
     box-sizing: border-box;
 }
 
-/* Màu Chủ Đạo: Gradient Calm Integrity - Gradient xanh dương/xanh lá nhạt tạo cảm giác yên bình và chuyên nghiệp */
+/* II. HEADER VỚI GRADIENT CALM INTEGRITY */
 /* Header Section */
 .interview-approvals-header {
-    margin-bottom: 1.5rem;
+    margin-bottom: 0;
     flex-shrink: 0;
-    padding-bottom: 0;
 }
 
-/* Header Background: Gradient Calm Integrity đậm hơn Nền Ngoại vi - Sky Blue 100 → Emerald 50 → Indigo 100 */
+/* Header Background: Gradient Calm Integrity (from-sky-50 to-emerald-50) */
 .interview-approvals-header-content {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1.25rem;
-    /* Calm Integrity Gradient đậm hơn: Sky Blue 100 → Emerald 50 → Indigo 100 */
-    /* (Nền Ngoại vi: Sky Blue 50 → White → Emerald 50) */
-    background: linear-gradient(135deg, #dbeafe 0%, #ecfdf5 50%, #e0e7ff 100%);
+    gap: 1.5rem;
+    /* Gradient Calm Integrity: from-sky-50 to-emerald-50 */
+    background: linear-gradient(to right, #e0f2fe, #ecfdf5);
     padding: 1.25rem 1.75rem;
-    border-radius: 1rem;
-    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.08);
+    border-radius: 0.875rem;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.1);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .interview-approvals-header-content:hover {
-    box-shadow: 0 6px 16px rgba(14, 165, 233, 0.12);
+    box-shadow: 0 6px 16px rgba(14, 165, 233, 0.15);
 }
 
-/* Icon Banner Block - Light Glass Block */
+/* Icon Module Lớn - Nền Trắng/Glass Effect */
 .interview-approvals-icon-wrapper {
-    width: 4rem;
-    height: 4rem;
-    background: rgba(255, 255, 255, 0.9);
-    /* bg-white/90 */
+    width: 4.5rem;
+    height: 4.5rem;
+    background: rgba(255, 255, 255, 0.95);
     padding: 1rem;
-    border-radius: 0.75rem;
-    /* rounded-xl */
+    border-radius: 1rem;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    /* shadow-md */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -102,528 +93,441 @@
 
 /* Icon - Xanh Dương Sáng */
 .interview-approvals-icon {
-    width: 2rem;
-    height: 2rem;
+    width: 2.25rem;
+    height: 2.25rem;
     color: #3b82f6;
-    /* text-blue-500 hoặc #3b82f6 */
     stroke-width: 2;
 }
 
-/* Tiêu đề - Xám Đậm */
+/* Tiêu đề - Đen Đậm */
 .interview-approvals-title {
-    font-size: 1.5rem;
-    /* text-2xl */
+    font-size: 1.75rem;
     font-weight: 700;
-    /* font-bold */
-    color: #000000;
-    /* Màu đen */
+    color: #1f2937;
     margin: 0 0 0.375rem 0;
     line-height: 1.2;
-    text-transform: uppercase;
+    letter-spacing: -0.02em;
 }
 
-/* Mô tả - Màu đen */
+/* Mô tả - Xám Đậm */
 .interview-approvals-subtitle {
-    font-size: 0.875rem;
-    /* text-sm */
-    color: #000000;
-    /* Màu đen */
+    font-size: 0.9375rem;
+    color: #4b5563;
     margin: 0;
     line-height: 1.5;
 }
 
-/* Separator Line */
-.interview-approvals-separator {
-    width: 100%;
-    height: 1px;
-    background: linear-gradient(to right, transparent, #e5e7eb 20%, #e5e7eb 80%, transparent);
-    margin: 1.5rem 0;
-    border: none;
-    flex-shrink: 0;
-}
-
-.interview-approvals-separator--thick {
-    height: 2px;
-    background: linear-gradient(to right, transparent, #d1d5db 20%, #d1d5db 80%, transparent);
-}
-
-.interview-approvals-separator--subtle {
-    height: 1px;
-    background: linear-gradient(to right, transparent, #f3f4f6 20%, #f3f4f6 80%, transparent);
-}
-
-/* ============================================
-   STATISTICS CARDS SECTION
-   ============================================ */
-
-/* Statistics Cards Container */
-.interview-approvals-statistics {
+/* Nút chính: Yêu cầu Tuyển dụng */
+.interview-approvals-recruitment-btn {
     display: flex;
-    gap: 1.25rem;
-    margin-bottom: 2rem;
-    flex-shrink: 0;
-    flex-wrap: nowrap;
-}
-
-/* Statistics Card - Base Styles */
-.interview-stat-card {
-    background: #ffffff;
-    border-radius: 1rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
-    padding: 1.5rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-    flex: 1 1 0;
-    min-width: 0;
-}
-
-.interview-stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
-}
-
-.interview-stat-card-content {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.interview-stat-card-label {
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.interview-stat-card-value {
-    font-size: 2rem;
-    font-weight: 700;
-    line-height: 1.2;
-}
-
-/* Chờ duyệt - Nền Vàng/Cam Pastel, chữ Xám Đậm */
-.interview-stat-card--pending {
-    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(253, 224, 71, 0.1));
-}
-
-.interview-stat-card--pending .interview-stat-card-label {
-    color: #374151;
-}
-
-.interview-stat-card--pending .interview-stat-card-value {
-    color: #1f2937;
-}
-
-/* Chờ đánh giá - Nền Tím Pastel, chữ Tím Đậm */
-.interview-stat-card--pending-evaluation {
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(167, 139, 250, 0.1));
-}
-
-.interview-stat-card--pending-evaluation .interview-stat-card-label {
-    color: #6b21a8;
-}
-
-.interview-stat-card--pending-evaluation .interview-stat-card-value {
-    color: #7e22ce;
-}
-
-/* Đã duyệt - Nền Xanh Lá Tươi Sáng Pastel, chữ Xanh Lá Đậm */
-.interview-stat-card--approved {
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(74, 222, 128, 0.1));
-}
-
-.interview-stat-card--approved .interview-stat-card-label {
-    color: #15803d;
-}
-
-.interview-stat-card--approved .interview-stat-card-value {
-    color: #166534;
-}
-
-/* Đã từ chối - Nền Đỏ Pastel Rất Nhạt, chữ Đỏ Đậm */
-.interview-stat-card--rejected {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(248, 113, 113, 0.08));
-}
-
-.interview-stat-card--rejected .interview-stat-card-label {
-    color: #991b1b;
-}
-
-.interview-stat-card--rejected .interview-stat-card-value {
-    color: #7f1d1d;
-}
-
-/* Tổng cộng - Nền Electric Blue Pastel, chữ Electric Blue Đậm */
-.interview-stat-card--total {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(96, 165, 250, 0.1));
-}
-
-.interview-stat-card--total .interview-stat-card-label {
-    color: #1e40af;
-}
-
-.interview-stat-card--total .interview-stat-card-value {
-    color: #1e3a8a;
-}
-
-/* ============================================
-   STATUS FILTER MINI-TABS SECTION
-   ============================================ */
-
-/* Filter Tabs Container */
-.interview-approvals-filter-tabs {
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 2rem;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-}
-
-/* Filter Tab - Base Styles */
-.interview-filter-tab {
+    align-items: center;
+    gap: 0.5rem;
     padding: 0.75rem 1.5rem;
+    border-radius: 9999px;
+    /* rounded-full - Bo tròn hoàn toàn */
     border: none;
-    border-radius: 0.75rem;
-    background: #ffffff;
-    color: #6b7280;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    outline: none;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
-    white-space: nowrap;
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-/* Badge for count */
-.interview-filter-tab-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.5rem;
-    height: 1.5rem;
-    padding: 0 0.375rem;
-    background: #ef4444;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    /* Gradient Xanh Lam/Ngọc Bích */
     color: #ffffff;
-    font-size: 0.75rem;
-    font-weight: 700;
-    border-radius: 0.75rem;
-    line-height: 1;
-}
-
-/* Animation for pending tabs */
-.interview-filter-tab.has-pending {
-    animation: pulse-glow 2s ease-in-out infinite;
-}
-
-@keyframes pulse-glow {
-
-    0%,
-    100% {
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
-    }
-
-    50% {
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 4px rgba(239, 68, 68, 0.2);
-    }
-}
-
-.interview-filter-tab.has-pending.active {
-    animation: pulse-glow-active 2s ease-in-out infinite;
-}
-
-@keyframes pulse-glow-active {
-
-    0%,
-    100% {
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2), 0 1px 4px rgba(59, 130, 246, 0.15);
-    }
-
-    50% {
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2), 0 1px 4px rgba(59, 130, 246, 0.15), 0 0 0 4px rgba(239, 68, 68, 0.3);
-    }
-}
-
-/* Hover Effect - Lift và Soft Shadow rõ hơn */
-.interview-filter-tab:hover:not(.active) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
-    background: #f9fafb;
-    color: #374151;
-}
-
-/* Active State - Nền Electric Blue Pastel, chữ Electric Blue Đậm */
-.interview-filter-tab.active {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(96, 165, 250, 0.1));
-    color: #1e40af;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2), 0 1px 4px rgba(59, 130, 246, 0.15);
-    font-weight: 700;
-}
-
-.interview-filter-tab.active:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25), 0 2px 6px rgba(59, 130, 246, 0.2);
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(96, 165, 250, 0.15));
-}
-
-/* Focus State */
-.interview-filter-tab:focus-visible {
-    outline: 2px solid #3b82f6;
-    outline-offset: 2px;
-}
-
-/* ============================================
-   REQUESTS LIST VIEW SECTION
-   ============================================ */
-
-/* List Container */
-.interview-approvals-list {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    background: #ffffff;
-    border-radius: 1rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
-    padding: 1.5rem;
-}
-
-/* Custom Scrollbar */
-.interview-approvals-list::-webkit-scrollbar {
-    width: 6px;
-}
-
-.interview-approvals-list::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 3px;
-}
-
-.interview-approvals-list::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 3px;
-}
-
-.interview-approvals-list::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-}
-
-/* Loading State */
-.interview-approvals-loading {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    padding: 3rem 1rem;
-    color: #6b7280;
-}
-
-.interview-approvals-spinner {
-    width: 2rem;
-    height: 2rem;
-    border: 3px solid rgba(59, 130, 246, 0.1);
-    border-top-color: #3b82f6;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-/* Empty State */
-.interview-approvals-empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    padding: 3rem 1rem;
-    color: #9ca3af;
-    text-align: center;
-}
-
-.interview-approvals-empty svg {
-    width: 3rem;
-    height: 3rem;
-    opacity: 0.5;
-}
-
-.interview-approvals-empty p {
-    margin: 0;
-    font-size: 0.95rem;
-}
-
-/* List Content */
-.interview-approvals-list-content {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-/* Request Card */
-.interview-request-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.25rem 1.5rem;
-    background: #ffffff;
-    border: 1px solid #f3f4f6;
-    border-radius: 0.75rem;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-}
-
-/* Hover Effect - Soft Glow Electric Blue Nhạt */
-.interview-request-card:hover {
-    background: #ffffff;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1), 0 4px 12px rgba(59, 130, 246, 0.15), 0 2px 6px rgba(59, 130, 246, 0.1);
-    transform: translateY(-1px);
-}
-
-/* Card Content */
-.interview-request-card-content {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    flex: 1;
-}
-
-/* Vị trí Ứng tuyển - Electric Blue Đậm (nổi bật nhất) */
-.interview-request-position {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: #1e40af;
-    line-height: 1.4;
-}
-
-/* Phòng ban - Xám Trung tính */
-.interview-request-department {
-    font-size: 0.9375rem;
-    font-weight: 500;
-    color: #6b7280;
-    line-height: 1.4;
-}
-
-/* Ngày gửi - Xám Nhạt */
-.interview-request-date {
-    font-size: 0.875rem;
-    font-weight: 400;
-    color: #9ca3af;
-    line-height: 1.4;
-}
-
-/* Action Buttons Container */
-.interview-request-actions {
-    flex-shrink: 0;
-    margin-left: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-/* View Details Button */
-.interview-request-view-details-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1rem;
-    background: #0096FF;
-    color: #ffffff;
-    border: none;
-    border-radius: 0.5rem;
     font-size: 0.875rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 150, 255, 0.2);
+    /* Transition: Đảm bảo mọi thay đổi diễn ra mượt mà */
+    outline: none;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4), 0 2px 6px rgba(59, 130, 246, 0.3);
+    /* Hiệu ứng nhấn (shadow) nổi bật */
+    flex-shrink: 0;
 }
 
-.interview-request-view-details-btn:hover {
-    background: #0077CC;
+.interview-approvals-recruitment-btn:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5), 0 4px 8px rgba(59, 130, 246, 0.4);
+    /* Tăng shadow khi hover */
+}
+
+.interview-approvals-recruitment-btn:active {
+    transform: scale(0.95) translateY(0);
+    /* Hiệu ứng Nhấn: Co lại 5% khi nhấn */
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4), 0 1px 4px rgba(59, 130, 246, 0.3);
+}
+
+.interview-approvals-recruitment-btn svg {
+    width: 1.125rem;
+    height: 1.125rem;
+    flex-shrink: 0;
+}
+
+/* ============================================
+   MAIN CONTAINER: CANDIDATE LIST
+   ============================================ */
+
+/* Main Card - Thẻ trắng lớn, nằm trung tâm, có shadow mềm (modern-card) */
+.interview-approvals-main-card {
+    background: #ffffff;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+    /* Soft Shadow: box-shadow nhẹ với độ trong suốt thấp */
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    flex: 1;
+    min-height: 0;
+    transition: all 0.2s ease;
+    /* Transition: Đảm bảo mọi thay đổi diễn ra mượt mà */
+}
+
+/* Pill Filters Container */
+.interview-approvals-filters {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+/* Pill Filter Button - Base Styles */
+.interview-approvals-filter-pill {
+    padding: 0.625rem 1.25rem;
+    border-radius: 9999px;
+    /* rounded-full */
+    border: none;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    /* Transition: Đảm bảo mọi thay đổi diễn ra mượt mà */
+    outline: none;
+    color: #6b7280;
+    background: #f3f4f6;
+    /* Nền xám nhạt khi không active */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.interview-approvals-filter-pill:hover:not(.active) {
+    background: #e5e7eb;
+    color: #374151;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 150, 255, 0.3);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.interview-request-view-details-btn svg {
+/* Active State - Nút "Tất cả" với Gradient Xanh Lam Chính và inset shadow */
+.interview-approvals-filter-pill.filter-all.active {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    /* Gradient Xanh Lam Chính */
+    color: #ffffff;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(59, 130, 246, 0.3);
+    /* Inset shadow + outer shadow */
+}
+
+/* Active State - Các nút trạng thái khác giữ gradient màu trạng thái */
+.interview-approvals-filter-pill.active:not(.filter-all) {
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.interview-approvals-filter-pill:active {
+    transform: scale(0.95);
+    /* Hiệu ứng Nhấn: Co lại 5% khi nhấn */
+}
+
+/* Table Wrapper */
+.interview-approvals-table-wrapper {
+    overflow-x: auto;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+}
+
+/* Custom Scrollbar for Table */
+.interview-approvals-table-wrapper::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.interview-approvals-table-wrapper::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.interview-approvals-table-wrapper::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.interview-approvals-table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Table */
+.interview-approvals-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+    table-layout: auto;
+    min-width: 100%;
+    border-spacing: 0;
+    transition: all 0.15s ease;
+}
+
+/* Table Header - Nền màu Xanh Lam nhạt (#e8f3ff) */
+.interview-approvals-table thead {
+    background: #e8f3ff;
+    /* Nền Header Bảng: Xanh Lam nhạt */
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.interview-approvals-table thead tr {
+    background: #e8f3ff;
+}
+
+.interview-approvals-table th {
+    padding: 0.875rem 1rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 700;
+    /* Chữ in đậm */
+    color: #1e40af;
+    /* Màu Xanh Lam/Ngọc Bích đậm */
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    border: none;
+    border-bottom: 2px solid #bfdbfe;
+}
+
+/* Table Body */
+.interview-approvals-table tbody {
+    background: #ffffff;
+}
+
+.interview-approvals-table tbody tr {
+    border-bottom: 1px solid #e5e7eb;
+    background: #ffffff;
+    /* Nền Hàng Lẻ: Màu trắng tinh khiết */
+    transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+/* Zebra Striping: Nền Hàng Chẵn */
+.interview-approvals-table tbody tr.even-row-bg {
+    background: #f7f9fc;
+    /* Nền Hàng Chẵn: Màu trắng xám cực kỳ nhẹ */
+}
+
+/* Table Row Hover Effect */
+.interview-approvals-table tbody tr:hover {
+    background: #e0e7ff !important;
+    /* Hiệu ứng Hover: Đổi màu nền (#e0e7ff) */
+    transform: translateY(-1px);
+    /* Hiệu ứng Hover: Nhấc lên nhẹ (translateY(-1px)) */
+}
+
+.interview-approvals-table td {
+    padding: 1rem;
+    text-align: left;
+    font-size: 0.875rem;
+    color: #1e293b;
+    vertical-align: middle;
+}
+
+/* Status Badge */
+.interview-approvals-status-badge {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.interview-approvals-status-badge.status-ready {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.interview-approvals-status-badge.status-approved {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.interview-approvals-status-badge.status-rejected {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Action Buttons Container */
+.interview-approvals-action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Action Button - Base Styles */
+.interview-approvals-action-btn {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    /* rounded-full */
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    /* Transition: Đảm bảo mọi thay đổi diễn ra mượt mà */
+    outline: none;
+}
+
+.interview-approvals-action-btn svg {
     width: 1rem;
     height: 1rem;
 }
 
-/* Status Badge Container */
-.interview-request-status {
-    flex-shrink: 0;
-    margin-left: 1rem;
+/* Approve Button - Xanh Lá */
+.interview-approvals-action-btn--approve {
+    background: #22c55e;
+    /* Xanh Lá */
+    color: #ffffff;
+    box-shadow: 0 2px 4px rgba(34, 197, 94, 0.2);
 }
 
-/* Status Badge - Base */
-.interview-request-status-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.5rem 1rem;
-    border-radius: 0.5rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    white-space: nowrap;
+.interview-approvals-action-btn--approve:hover {
+    background: #16a34a;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(34, 197, 94, 0.3);
 }
 
-/* Status Badge - Chờ duyệt (Vàng/Cam Pastel) */
-.interview-request-status-badge--pending {
-    background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(253, 224, 71, 0.15));
-    color: #92400e;
-    border: 1px solid rgba(251, 191, 36, 0.3);
+.interview-approvals-action-btn--approve:active {
+    transform: scale(0.95);
+    /* Hiệu ứng Nhấn: Co lại 5% khi nhấn */
 }
 
-/* Status Badge - Đã duyệt */
-.interview-request-status-badge--approved {
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(74, 222, 128, 0.15));
-    color: #15803d;
-    border: 1px solid rgba(34, 197, 94, 0.3);
+/* Reject Button - Đỏ */
+.interview-approvals-action-btn--reject {
+    background: #ef4444;
+    /* Đỏ */
+    color: #ffffff;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
 }
 
-/* Status Badge - Đã từ chối */
-.interview-request-status-badge--rejected {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(248, 113, 113, 0.1));
-    color: #991b1b;
-    border: 1px solid rgba(239, 68, 68, 0.25);
+.interview-approvals-action-btn--reject:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
 }
 
-/* Status Badge - Chờ đánh giá tiêu chí */
-.interview-request-status-badge--pending-evaluation {
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.1));
-    color: #92400e;
-    border: 1px solid rgba(245, 158, 11, 0.25);
+.interview-approvals-action-btn--reject:active {
+    transform: scale(0.95);
+    /* Hiệu ứng Nhấn: Co lại 5% khi nhấn */
 }
 
 /* ============================================
-   DETAIL MODAL SECTION
+   SECONDARY CONTAINER: REQUEST HISTORY
    ============================================ */
 
-/* Modal Overlay - Fluent Zoom In/Fade In */
-.interview-detail-modal-overlay {
+/* History Card - Thẻ trắng nhỏ hơn, nằm dưới bảng ứng viên */
+.interview-approvals-history-card {
+    background: #ffffff;
+    border-radius: 1rem;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+    /* Soft Shadow: box-shadow nhẹ với độ trong suốt thấp */
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+}
+
+/* History Title */
+.interview-approvals-history-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+/* History List */
+.interview-approvals-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* History Item */
+.interview-approvals-history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: #f9fafb;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.interview-approvals-history-item:hover {
+    background: #f3f4f6;
+}
+
+.interview-approvals-history-label {
+    font-size: 0.875rem;
+    color: #374151;
+    font-weight: 500;
+}
+
+/* History Badge */
+.interview-approvals-history-badge {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.interview-approvals-history-badge.badge-pending-hr {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.interview-approvals-history-badge.badge-approved {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.interview-approvals-history-badge.badge-in-progress {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+/* ============================================
+   MODAL: RECRUITMENT REQUEST
+   ============================================ */
+
+/* Modal Overlay - Nền tối mờ với hiệu ứng làm mờ nhẹ */
+.interview-approvals-modal-overlay {
     position: fixed;
     inset: 0;
     z-index: 10000;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(15, 23, 42, 0.5);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(17, 24, 39, 0.7);
+    /* bg-gray-900 bg-opacity-70 */
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    /* backdrop-blur-sm */
     padding: 1rem;
     animation: interviewModalOverlayFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden;
 }
 
 @keyframes interviewModalOverlayFadeIn {
@@ -632,27 +536,30 @@
         backdrop-filter: blur(0px);
         -webkit-backdrop-filter: blur(0px);
     }
-
     to {
         opacity: 1;
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
     }
+
 }
 
-/* Modal Container - Nền Trắng Sáng với Soft Shadow rõ ràng */
-.interview-detail-modal-container {
+/* Modal Container - Kích thước lớn, căn giữa, có cuộn dọc */
+.interview-approvals-modal-container {
     background: #ffffff;
-    border-radius: 1.5rem;
-    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.3),
-        0 10px 30px rgba(0, 0, 0, 0.2),
-        0 0 0 1px rgba(255, 255, 255, 0.1);
-    width: min(1000px, 95vw);
+    /* Nền Form: bg-white - Tạo độ tương phản cao với backdrop tối */
+    border-radius: 1rem;
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 60rem;
+    /* max-w-4xl */
     max-height: 90vh;
+    /* max-h-[90vh] */
+    overflow-y: auto;
+    /* overflow-y-auto */
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
-    color: #0f172a;
-    overflow: hidden;
     position: relative;
     animation: interviewModalZoomInFade 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     transform-origin: center center;
@@ -663,31 +570,57 @@
         opacity: 0;
         transform: scale(0.9) translateY(20px);
     }
-
     to {
         opacity: 1;
         transform: scale(1) translateY(0);
     }
 }
 
+/* Custom Scrollbar for Modal */
+.interview-approvals-modal-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.interview-approvals-modal-container::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.interview-approvals-modal-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.interview-approvals-modal-container::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
 /* Modal Header */
-.interview-detail-modal-header {
+.interview-approvals-modal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 1.5rem 2rem;
-    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+    border-bottom: 1px solid #e5e7eb;
     flex-shrink: 0;
+    background: #ffffff;
 }
 
-.interview-detail-modal-title {
-    font-size: 1.5rem;
+/* Modal Title - Tiêu đề lớn với màu Teal-600 làm điểm nhấn */
+.interview-approvals-modal-title {
+    font-size: 1.875rem;
+    /* text-3xl */
     font-weight: 700;
-    color: #1f2937;
+    /* font-bold */
+    color: #0d9488;
+    /* Teal-600 - Điểm nhấn chính */
     margin: 0;
+    line-height: 1.2;
 }
 
-.interview-detail-modal-close {
+/* Modal Close Button */
+.interview-approvals-modal-close {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -702,1258 +635,191 @@
     padding: 0;
 }
 
-/* Evaluation Modal Header - Redesigned */
-.interview-evaluation-modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.75rem 2rem;
-    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
-    flex-shrink: 0;
-    background: #ffffff;
-}
-
-.interview-evaluation-modal-title {
-    font-size: 1.75rem;
-    font-weight: 800;
-    color: #1f2937;
-    margin: 0;
-    letter-spacing: -0.025em;
-    line-height: 1.2;
-}
-
-.interview-evaluation-modal-close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border: none;
-    background: transparent;
-    color: #9ca3af;
-    cursor: pointer;
-    border-radius: 0.5rem;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    padding: 0;
-}
-
-.interview-evaluation-modal-close:hover {
-    color: #ef4444;
-    background: rgba(239, 68, 68, 0.1);
-}
-
-.interview-evaluation-modal-close:active {
-    transform: scale(0.95);
-}
-
-.interview-evaluation-modal-close svg {
-    width: 1.5rem;
-    height: 1.5rem;
-}
-
-.interview-detail-modal-close:hover {
+.interview-approvals-modal-close:hover {
     background: #f3f4f6;
     color: #1f2937;
 }
 
-.interview-detail-modal-close svg {
-    width: 1.5rem;
-    height: 1.5rem;
+.interview-approvals-modal-close svg {
+    width: 1.25rem;
+    height: 1.25rem;
 }
 
-/* ============================================
-   EVALUATION MODAL CONTENT SECTION
-   ============================================ */
-
-/* Evaluation Modal Content */
-.interview-evaluation-modal-content {
+/* Modal Body */
+.interview-approvals-modal-body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 1.5rem 2rem;
+    padding: 2rem;
+}
+
+/* Form */
+.interview-approvals-recruitment-form {
     display: flex;
     flex-direction: column;
     gap: 2rem;
 }
 
-/* Evaluation Section */
-.interview-evaluation-section {
+/* Fieldset - Form được chia thành các fieldset với viền và nền màu Xanh Lam nhẹ */
+.interview-approvals-fieldset {
+    border: 2px solid #bfdbfe;
+    /* Viền Xanh Lam nhẹ */
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.5rem;
+    position: relative;
 }
 
-.interview-evaluation-section-title {
+/* PHẦN I - Nền rất nhạt (bg-teal-50/50) */
+.interview-approvals-fieldset-part1 {
+    background: rgba(240, 253, 250, 0.5);
+    /* bg-teal-50/50 - Nền rất nhạt */
+    border-color: #5eead4;
+    /* Viền Teal nhẹ */
+}
+
+/* PHẦN II - Nền trắng */
+.interview-approvals-fieldset-part2 {
+    background: #ffffff;
+    /* bg-white */
+    border-color: #bfdbfe;
+    /* Viền Xanh Lam nhẹ */
+}
+
+/* Legend - Tiêu đề nhóm với nền trắng, bo tròn, shadow nhẹ */
+.interview-approvals-legend {
     font-size: 1.125rem;
     font-weight: 700;
-    color: #1d4ed8;
-    margin: 0;
-    padding-bottom: 0.75rem;
-    border-bottom: 2px solid rgba(29, 78, 216, 0.2);
-}
-
-/* 2.1. Evaluation Table */
-.interview-evaluation-table-wrapper {
-    overflow-x: auto;
-    border-radius: 0.75rem;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.interview-evaluation-table {
-    width: 100%;
-    border-collapse: collapse;
+    color: #0d9488;
+    /* Teal-600 - Điểm nhấn chính */
+    padding: 0.5rem 1rem;
     background: #ffffff;
-}
-
-.interview-evaluation-table thead {
-    background: #eff6ff;
-    /* bg-blue-50 */
-}
-
-.interview-evaluation-table thead th {
-    padding: 1rem;
-    text-align: left;
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: #1e40af;
-    /* text-blue-700 */
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 2px solid #dbeafe;
-}
-
-.interview-evaluation-table thead th:first-child {
-    border-top-left-radius: 0.75rem;
-}
-
-.interview-evaluation-table thead th:last-child {
-    border-top-right-radius: 0.75rem;
-}
-
-.interview-evaluation-table tbody tr {
-    border-bottom: 1px solid #e5e7eb;
-    transition: background-color 0.2s ease;
-}
-
-.interview-evaluation-table tbody tr:nth-child(even) {
-    background: #ffffff;
-}
-
-.interview-evaluation-table tbody tr:nth-child(odd) {
-    background: #f9fafb;
-}
-
-.interview-evaluation-table tbody tr:hover {
-    background: #eff6ff;
-    /* hover:bg-blue-50 */
-}
-
-.interview-evaluation-table tbody tr:last-child {
-    border-bottom: none;
-}
-
-.interview-evaluation-table td {
-    padding: 1rem;
-    vertical-align: middle;
-}
-
-.interview-evaluation-criterion-name {
-    font-weight: 600;
-    color: #1f2937;
-    min-width: 180px;
-}
-
-.interview-evaluation-score-cell {
-    width: 120px;
-}
-
-.interview-evaluation-score-input {
-    width: 100%;
-    padding: 0.625rem 0.75rem;
-    border: 1px solid #d1d5db;
+    /* Nền trắng */
     border-radius: 0.5rem;
-    background: #ffffff;
-    font-size: 0.9375rem;
-    font-weight: 600;
-    color: #1f2937;
-    text-align: center;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    outline: none;
+    /* Bo tròn */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+    /* Shadow nhẹ */
+    margin-left: 0;
+    margin-bottom: 0;
+    float: none;
+    width: auto;
 }
 
-.interview-evaluation-score-input:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+/* Form Grid - Layout 2 cột cho desktop */
+.interview-approvals-form-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    /* Mobile: 1 cột */
+    gap: 1.5rem;
 }
 
-.interview-evaluation-score-input::placeholder {
-    color: #9ca3af;
-    font-weight: 400;
+@media (min-width: 768px) {
+    .interview-approvals-form-grid {
+        grid-template-columns: repeat(2, 1fr);
+        /* Desktop: 2 cột */
+    }
 }
 
-.interview-evaluation-comment-cell {
-    min-width: 300px;
-}
-
-.interview-evaluation-comment-input {
-    width: 100%;
-    padding: 0.625rem 0.75rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
-    background: #ffffff;
-    font-size: 0.875rem;
-    color: #1f2937;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    outline: none;
-}
-
-.interview-evaluation-comment-input:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.interview-evaluation-comment-input::placeholder {
-    color: #9ca3af;
-}
-
-/* 2.2. Comments Form */
-.interview-evaluation-comments {
+/* Form Column */
+.interview-approvals-form-column {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
 }
 
-.interview-evaluation-form-group {
+/* Form Group Full Width */
+.interview-approvals-form-group-full {
+    grid-column: 1 / -1;
+    /* Span full width */
+}
+
+/* Form Group */
+.interview-approvals-form-group {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
 }
 
-.interview-evaluation-form-label {
+/* Form Label */
+.interview-approvals-form-label {
     font-size: 0.875rem;
     font-weight: 600;
     color: #374151;
     margin: 0;
 }
 
-.interview-evaluation-textarea {
-    width: 100%;
-    padding: 0.75rem 1rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
-    background: #ffffff;
-    font-size: 0.875rem;
-    color: #1f2937;
-    font-family: inherit;
-    line-height: 1.5;
-    resize: vertical;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    outline: none;
-}
-
-.interview-evaluation-textarea:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.interview-evaluation-textarea::placeholder {
-    color: #9ca3af;
-}
-
-/* 2.3. Conclusion Radio Buttons */
-.interview-evaluation-conclusion {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.interview-evaluation-radio-label {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.875rem 1.25rem;
-    border: 2px solid #e5e7eb;
-    border-radius: 0.75rem;
-    background: #ffffff;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.interview-evaluation-radio-label:hover {
-    border-color: #d1d5db;
-    background: #f9fafb;
-}
-
-.interview-evaluation-radio-label.selected {
-    border-color: #3b82f6;
-    background: rgba(59, 130, 246, 0.05);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.interview-evaluation-radio {
-    width: 1.25rem;
-    height: 1.25rem;
-    cursor: pointer;
-    accent-color: #3b82f6;
-}
-
-.interview-evaluation-radio-text {
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0;
-}
-
-.interview-evaluation-radio-text--pass {
-    color: #15803d;
-    /* text-green-700 */
-}
-
-.interview-evaluation-radio-text--fail {
-    color: #b91c1c;
-    /* text-red-700 */
-}
-
-.interview-evaluation-radio-text--hold {
-    color: #1e40af;
-    /* text-blue-700 */
-}
-
-.interview-evaluation-radio-label.selected .interview-evaluation-radio-text--pass {
-    color: #166534;
-}
-
-.interview-evaluation-radio-label.selected .interview-evaluation-radio-text--fail {
-    color: #991b1b;
-}
-
-.interview-evaluation-radio-label.selected .interview-evaluation-radio-text--hold {
-    color: #1e3a8a;
-}
-
-/* ============================================
-   EVALUATION MODAL FOOTER SECTION
-   ============================================ */
-
-/* Footer (Chân Modal) */
-.interview-evaluation-modal-footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    padding: 1.5rem 2rem;
-    border-top: 1px solid rgba(226, 232, 240, 0.8);
-    background: #f9fafb;
-    /* bg-gray-50 */
-    flex-shrink: 0;
-    position: relative;
-    z-index: 10;
-}
-
-/* Footer Button Base */
-.interview-evaluation-footer-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.875rem 1.5rem;
-    border-radius: 0.75rem;
-    font-size: 0.9375rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    outline: none;
-    border: none;
-}
-
-.interview-evaluation-footer-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    pointer-events: none;
-}
-
-.interview-evaluation-footer-btn svg {
-    width: 1.25rem;
-    height: 1.25rem;
-}
-
-/* Cancel Button: Nền trắng, viền xám */
-.interview-evaluation-footer-btn--cancel {
-    background: #ffffff;
-    color: #374151;
-    border: 1px solid #d1d5db;
-    /* border-gray-300 */
-}
-
-.interview-evaluation-footer-btn--cancel:hover:not(:disabled) {
-    background: #f9fafb;
-    border-color: #9ca3af;
-}
-
-.interview-evaluation-footer-btn--cancel:active:not(:disabled) {
-    transform: scale(0.98);
-}
-
-/* Submit Button: Primary Button - Màu xanh dương đậm */
-.interview-evaluation-footer-btn--submit {
-    background: #2563eb;
-    /* bg-blue-600 */
-    color: #ffffff;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3), 0 2px 4px rgba(37, 99, 235, 0.2);
-    position: relative;
-    z-index: 10;
-}
-
-.interview-evaluation-footer-btn--submit:hover:not(:disabled) {
-    background: #1d4ed8;
-    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4), 0 4px 8px rgba(37, 99, 235, 0.3);
-    transform: translateY(-1px);
-}
-
-.interview-evaluation-footer-btn--submit:active:not(:disabled) {
-    transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3), 0 1px 4px rgba(37, 99, 235, 0.2);
-}
-
-.interview-evaluation-footer-btn--submit:focus {
-    outline: 2px solid #3b82f6;
-    outline-offset: 2px;
-}
-
-/* Readonly Notice */
-.interview-evaluation-readonly-notice {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.875rem 1.25rem;
-    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-    border: 2px solid #10b981;
-    border-radius: 0.75rem;
-    color: #059669;
-    font-size: 0.9375rem;
-    font-weight: 600;
-    flex: 1;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
-}
-
-.interview-evaluation-readonly-notice svg {
-    width: 1.5rem;
-    height: 1.5rem;
-    flex-shrink: 0;
-}
-
-/* Disabled Inputs Styling */
-.interview-evaluation-score-input:disabled,
-.interview-evaluation-comment-input:disabled,
-.interview-evaluation-textarea:disabled {
-    background: #f9fafb;
-    color: #6b7280;
-    cursor: not-allowed;
-    opacity: 0.8;
-}
-
-.interview-evaluation-radio:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-}
-
-.interview-evaluation-radio-label:has(.interview-evaluation-radio:disabled) {
-    cursor: not-allowed;
-    opacity: 0.8;
-}
-
-/* Modal Content */
-.interview-detail-modal-content {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 1.5rem 2rem;
-}
-
-/* Custom Scrollbar for Modal Content */
-.interview-detail-modal-content::-webkit-scrollbar {
-    width: 6px;
-}
-
-.interview-detail-modal-content::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 3px;
-}
-
-.interview-detail-modal-content::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 3px;
-}
-
-.interview-detail-modal-content::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-}
-
-/* Detail Section */
-.interview-detail-section {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-}
-
-/* Detail Field */
-.interview-detail-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.interview-detail-label {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.interview-detail-required {
+.interview-approvals-form-label .required {
     color: #ef4444;
+    margin-left: 0.25rem;
 }
 
-.interview-detail-value {
-    font-size: 1rem;
-    font-weight: 500;
-    color: #1f2937;
-    line-height: 1.4;
-    padding: 0.375rem 0;
-}
-
-.interview-detail-value--highlight {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: #1e40af;
-}
-
-.interview-detail-value--candidate-name {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #1e40af;
-    letter-spacing: -0.2px;
-    padding: 0.75rem 1rem;
-    margin: 0.25rem 0;
-    border-radius: 0.75rem;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(30, 64, 175, 0.08) 100%);
-    border: 2px solid rgba(59, 130, 246, 0.2);
-    display: inline-block;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.interview-detail-value--candidate-name:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    border-color: rgba(59, 130, 246, 0.3);
-}
-
-/* Textarea - Focus Glow Electric Blue */
-.interview-detail-textarea {
+/* Form Input - Góc bo tròn lớn và padding rộng rãi */
+.interview-approvals-form-input,
+.interview-approvals-form-select,
+.interview-approvals-form-textarea {
     width: 100%;
     padding: 0.75rem 1rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    background: #ffffff;
-    font-size: 0.9375rem;
-    color: #1f2937;
-    font-family: inherit;
-    line-height: 1.5;
-    resize: vertical;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    outline: none;
-    box-shadow: none;
-}
-
-.interview-detail-textarea:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15), 0 0 0 1px #3b82f6, 0 0 12px rgba(59, 130, 246, 0.12);
-}
-
-.interview-detail-textarea::placeholder {
-    color: #9ca3af;
-}
-
-/* Action Bar */
-.interview-detail-modal-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    padding: 1.5rem 2rem;
-    border-top: 1px solid rgba(226, 232, 240, 0.8);
-    flex-shrink: 0;
-}
-
-/* Action Button - Base */
-.interview-detail-action-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 0.75rem;
-    font-size: 0.9375rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    outline: none;
-    white-space: nowrap;
-}
-
-.interview-detail-action-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.interview-detail-action-btn svg {
-    width: 1.25rem;
-    height: 1.25rem;
-}
-
-/* CV Button */
-.interview-detail-action-btn--cv {
-    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 50%, #6d28d9 100%);
-    color: #ffffff;
-    border: none;
-    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.interview-detail-action-btn--cv:hover:not(:disabled) {
-    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 50%, #5b21b6 100%);
-    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
-    transform: translateY(-1px);
-}
-
-.interview-detail-action-btn--cv svg {
-    width: 1.125rem;
-    height: 1.125rem;
-}
-
-/* Preview Button */
-.interview-detail-action-btn--preview {
-    background: #0096FF;
-    color: #ffffff;
-    border: none;
-    box-shadow: 0 2px 8px rgba(0, 150, 255, 0.2);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.interview-detail-action-btn--preview:hover:not(:disabled) {
-    background: #0077CC;
-    box-shadow: 0 4px 12px rgba(0, 150, 255, 0.3);
-    transform: translateY(-1px);
-}
-
-.interview-detail-action-btn--preview svg {
-    width: 1.125rem;
-    height: 1.125rem;
-}
-
-/* Cancel Button */
-.interview-detail-action-btn--cancel {
-    background: #ffffff;
-    color: #6b7280;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-.interview-detail-action-btn--cancel:hover:not(:disabled) {
-    background: #f9fafb;
-    color: #374151;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-}
-
-/* Reject Button - Nền Đỏ Pastel Rất Nhạt, chữ Đỏ Đậm */
-.interview-detail-action-btn--reject {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(248, 113, 113, 0.08));
-    color: #991b1b;
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.15);
-}
-
-.interview-detail-action-btn--reject:hover:not(:disabled) {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(248, 113, 113, 0.12));
-    color: #7f1d1d;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
-    transform: translateY(-1px);
-}
-
-/* Approve Button - Nền Xanh Lá Tươi Sáng (Vibrant Green) */
-.interview-detail-action-btn--approve {
-    background: linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%);
-    color: #ffffff;
-    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35), 0 2px 8px rgba(34, 197, 94, 0.25);
-}
-
-.interview-detail-action-btn--approve:hover:not(:disabled) {
-    background: linear-gradient(135deg, #16a34a 0%, #15803d 50%, #166534 100%);
-    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.45), 0 4px 12px rgba(34, 197, 94, 0.35);
-    transform: translateY(-2px);
-}
-
-.interview-detail-action-btn--approve:active:not(:disabled) {
-    transform: translateY(0);
-}
-
-/* ============================================
-   CANDIDATE PREVIEW MODAL
-   ============================================ */
-
-/* Preview Modal Box */
-.candidate-preview-modal-box {
-    background: #ffffff;
-    border-radius: 1.25rem;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
-    width: 1200px;
-    max-width: 95vw;
-    height: auto;
-    max-height: 98vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    animation: modalZoomInFade 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    position: relative;
-    box-sizing: border-box;
-}
-
-@keyframes modalZoomInFade {
-    from {
-        transform: scale(0.9) translateY(20px);
-        opacity: 0;
-    }
-
-    to {
-        transform: scale(1) translateY(0);
-        opacity: 1;
-    }
-}
-
-.candidate-preview-content-wrapper {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    flex: 1;
-    min-height: 0;
-}
-
-.candidate-preview-content {
-    padding: 1.5rem 2rem;
-    overflow-y: auto;
-    overflow-x: hidden;
-    flex: 1;
-    min-height: 0;
-}
-
-.candidate-preview-section {
-    margin-bottom: 2rem;
-    page-break-inside: avoid;
-}
-
-.candidate-preview-section:last-child {
-    margin-bottom: 0;
-}
-
-.candidate-preview-section-title {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin: 0 0 1rem 0;
-    padding: 0.75rem;
-    background: #f8fafc;
-    border-bottom: 2px solid #0096FF;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.candidate-preview-section-subtitle {
-    font-size: 0.875rem;
-    font-weight: 400;
-    color: #64748b;
-    font-style: italic;
-}
-
-.candidate-preview-table {
-    margin-bottom: 1rem;
-    width: 100%;
-}
-
-.candidate-preview-info-table,
-.candidate-preview-data-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-}
-
-.candidate-preview-info-table td,
-.candidate-preview-data-table td,
-.candidate-preview-data-table th {
-    padding: 0.625rem 0.75rem;
-    border: 1px solid #e2e8f0;
-    text-align: left;
-    font-size: 0.875rem;
-    vertical-align: middle;
-}
-
-.candidate-preview-info-table .candidate-preview-label {
-    font-weight: 700;
-    color: #1e293b;
-    background: #f8fafc;
-    width: auto;
-    white-space: nowrap;
-}
-
-.candidate-preview-info-table .candidate-preview-sub-label {
-    font-weight: 600;
-    color: #475569;
-    font-style: italic;
-    background: #f8fafc;
-    padding-left: 1rem;
-}
-
-.candidate-preview-info-table .candidate-preview-value {
-    color: #0096FF;
-    font-style: italic;
-    font-weight: 300;
-    background: #ffffff;
-}
-
-.candidate-preview-data-table th {
-    font-weight: 700;
-    color: #1e293b;
-    background: #f8fafc;
-    text-align: center;
-}
-
-.candidate-preview-data-table td {
-    color: #0096FF;
-    font-style: italic;
-    font-weight: 300;
-    background: #ffffff;
-    text-align: center;
-}
-
-.candidate-preview-data-table tbody tr:nth-child(even) {
-    background: #f8fafc;
-}
-
-.candidate-preview-data-table tbody tr:hover {
-    background: #f1f5f9;
-}
-
-.candidate-preview-actions {
-    padding: 1rem 2rem;
-    border-top: 1px solid rgba(226, 232, 240, 0.8);
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    flex-shrink: 0;
-    background: #ffffff;
-}
-
-/* Modal Header */
-.candidate-modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.5rem 2rem;
-    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
-    flex-shrink: 0;
-    background: #ffffff;
-}
-
-.candidate-modal-title {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin: 0;
-}
-
-.candidate-modal-title-icon {
-    width: 1.5rem;
-    height: 1.5rem;
-    color: #0096FF;
-}
-
-.candidate-modal-close {
-    width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: transparent;
-    color: #64748b;
-    cursor: pointer;
-    border-radius: 0.5rem;
-    transition: all 0.2s ease;
-}
-
-.candidate-modal-close:hover {
-    background: #f1f5f9;
-    color: #1e293b;
-}
-
-.candidate-modal-close svg {
-    width: 1.25rem;
-    height: 1.25rem;
-}
-
-/* ============================================
-   RECRUITMENT REQUEST MODAL - FORM YÊU CẦU TUYỂN DỤNG
-   ============================================ */
-
-/* Button in Header */
-.interview-approvals-recruitment-request-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.875rem 1.5rem;
-    border: none;
-    border-radius: 0.75rem;
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
-    color: #ffffff;
-    font-size: 0.95rem;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3), 0 2px 6px rgba(59, 130, 246, 0.2);
-    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    outline: none;
-    flex-shrink: 0;
-}
-
-.interview-approvals-recruitment-request-btn:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4), 0 4px 12px rgba(59, 130, 246, 0.3);
-    background: linear-gradient(135deg, #2563eb, #1d4ed8);
-}
-
-.interview-approvals-recruitment-request-btn svg {
-    width: 1.25rem;
-    height: 1.25rem;
-}
-
-/* Modal Overlay */
-.interview-approvals-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 2rem;
-    overflow-y: auto;
-}
-
-/* Modal Box */
-.recruitment-request-modal-box {
-    background: #ffffff;
-    border-radius: 1rem;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    width: 100%;
-    max-width: 900px;
-    max-height: 90vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-/* Modal Header */
-.recruitment-request-modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.5rem 2rem;
-    border-bottom: 1px solid #e5e7eb;
-    background: linear-gradient(135deg, #dbeafe 0%, #ecfdf5 50%, #e0e7ff 100%);
-    flex-shrink: 0;
-}
-
-.recruitment-request-modal-title {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #1f2937;
-    margin: 0;
-}
-
-.recruitment-request-modal-close-btn {
-    width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: transparent;
-    color: #6b7280;
-    cursor: pointer;
-    border-radius: 0.5rem;
-    transition: all 0.2s ease;
-}
-
-.recruitment-request-modal-close-btn:hover {
-    background: rgba(255, 255, 255, 0.5);
-    color: #1f2937;
-}
-
-.recruitment-request-modal-close-btn svg {
-    width: 1.25rem;
-    height: 1.25rem;
-}
-
-/* Modal Form */
-.recruitment-request-modal-form {
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    max-height: calc(90vh - 120px);
-    /* Trừ đi chiều cao header và actions */
-    padding: 0;
-}
-
-/* Section */
-.recruitment-request-section {
-    padding: 1.5rem 2rem;
-    border-bottom: 2px solid #e5e7eb;
-    background: #ffffff;
-}
-
-.recruitment-request-section:last-of-type {
-    border-bottom: none;
-}
-
-.recruitment-request-section:nth-child(odd) {
-    background: #fafafa;
-}
-
-.recruitment-request-section-header {
-    margin-bottom: 1.25rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 2px solid #e5e7eb;
-}
-
-.recruitment-request-section-title {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: #0f766e;
-    margin: 0 0 0.5rem 0;
-    text-transform: uppercase;
-}
-
-.recruitment-request-section-divider {
-    height: 2px;
-    background: linear-gradient(to right, #14b8a6, transparent);
-    border-radius: 1px;
-}
-
-/* Form Content */
-.recruitment-request-form-content {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-/* Form Field with Border */
-.recruitment-request-form-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 1rem;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    transition: all 0.2s ease;
-}
-
-.recruitment-request-form-field:hover {
-    border-color: #d1d5db;
-    background: #ffffff;
-}
-
-.recruitment-request-form-field:focus-within {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    background: #ffffff;
-}
-
-/* Form Row - 2 Columns */
-.recruitment-request-form-row {
-    display: flex;
-    gap: 1rem;
-}
-
-.recruitment-request-form-row-2cols {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1rem;
-}
-
-/* Form Field - Removed duplicate, defined above */
-
-.recruitment-request-form-label {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #1f2937;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin-bottom: 0.25rem;
-}
-
-.required {
-    color: #ef4444;
-}
-
-/* Form Input */
-.recruitment-request-form-input {
-    padding: 0.625rem 0.875rem;
+    /* Padding rộng rãi */
     border: 1px solid #d1d5db;
-    border-radius: 0.375rem;
+    border-radius: 0.75rem;
+    /* rounded-xl - 12px - Góc bo tròn lớn */
     font-size: 0.875rem;
     color: #1f2937;
     background: #ffffff;
     transition: all 0.2s ease;
+    /* Transition: Đảm bảo mọi thay đổi diễn ra mượt mà */
     outline: none;
-    width: 100%;
-    box-sizing: border-box;
+    font-family: inherit;
 }
 
-.recruitment-request-form-input:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+.interview-approvals-form-input:focus,
+.interview-approvals-form-select:focus,
+.interview-approvals-form-textarea:focus {
+    border-color: #06b6d4;
+    /* Cyan-500 - Input Focus */
+    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1), 0 2px 4px rgba(6, 182, 212, 0.1);
+    /* Hiệu ứng shadow khi focus */
 }
 
-.recruitment-request-form-input.error {
-    border-color: #ef4444;
-}
-
-.recruitment-request-form-input.error:focus {
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-}
-
-.recruitment-request-form-input:disabled {
-    background: #f3f4f6;
+.interview-approvals-form-input::placeholder,
+.interview-approvals-form-textarea::placeholder {
     color: #9ca3af;
-    cursor: not-allowed;
 }
 
 /* Form Select */
-.recruitment-request-form-select {
-    padding: 0.625rem 0.875rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
-    color: #1f2937;
-    background: #ffffff;
-    width: 100%;
+.interview-approvals-form-select {
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 0.5rem center;
-    background-size: 1.5em 1.5em;
+    background-position: right 0.75rem center;
+    background-size: 1.25em 1.25em;
     padding-right: 2.5rem;
     cursor: pointer;
-    transition: all 0.2s ease;
 }
 
-.recruitment-request-form-select:hover:not(:disabled) {
+.interview-approvals-form-select:hover {
     border-color: #9ca3af;
 }
 
-.recruitment-request-form-select:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.recruitment-request-form-select.error {
-    border-color: #ef4444;
-}
-
-.recruitment-request-form-select.error:focus {
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-}
-
-.recruitment-request-form-select:disabled {
-    background-color: #f3f4f6;
-    color: #9ca3af;
-    cursor: not-allowed;
-    opacity: 0.6;
-}
-
-.recruitment-request-form-input-inline {
-    flex: 1;
-    margin-left: 0.5rem;
-}
-
 /* Form Textarea */
-.recruitment-request-form-textarea {
-    padding: 0.75rem 1rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    color: #1f2937;
-    background: #ffffff;
-    transition: all 0.2s ease;
-    outline: none;
+.interview-approvals-form-textarea {
     resize: vertical;
-    font-family: inherit;
-}
-
-.recruitment-request-form-textarea:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-/* Note */
-.recruitment-request-note {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    background: #f0f9ff;
-    border: 1px solid #bfdbfe;
-    border-left: 3px solid #3b82f6;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    color: #374151;
+    min-height: 80px;
     line-height: 1.5;
-    margin: 0.5rem 0;
 }
 
-.recruitment-request-note span {
-    flex: 1;
-}
-
-/* Checkbox Group */
-.recruitment-request-checkbox-group {
+/* Radio Group */
+.interview-approvals-radio-group {
     display: flex;
-    gap: 1.25rem;
-    flex-wrap: wrap;
-    padding: 0.5rem 0;
+    flex-direction: column;
+    gap: 0.75rem;
 }
 
-.recruitment-request-checkbox-label {
+.interview-approvals-radio-label {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -1963,218 +829,219 @@
     user-select: none;
 }
 
-.recruitment-request-checkbox-label input[type="checkbox"],
-.recruitment-request-checkbox-label input[type="radio"] {
-    width: 1.125rem;
-    height: 1.125rem;
+.interview-approvals-radio-label input[type="radio"] {
+    width: 1rem;
+    height: 1rem;
     cursor: pointer;
-    accent-color: #3b82f6;
+    accent-color: #06b6d4;
+    /* Cyan-500 */
 }
 
-.recruitment-request-checkbox-label-with-input {
+.interview-approvals-radio-label span {
+    flex: 1;
+}
+
+/* Modal Footer */
+.interview-approvals-modal-footer {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.recruitment-request-checkbox-label-with-input span {
-    white-space: nowrap;
-}
-
-/* Lý do tuyển Group */
-.recruitment-request-lydo-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    padding: 0.5rem 0;
-}
-
-/* Error Text */
-.recruitment-request-error-text {
-    font-size: 0.75rem;
-    color: #ef4444;
-    margin-top: 0.25rem;
-}
-
-/* Modal Actions */
-.recruitment-request-modal-actions {
-    display: flex;
     justify-content: flex-end;
     gap: 1rem;
     padding: 1.5rem 2rem;
     border-top: 1px solid #e5e7eb;
-    background: #f9fafb;
+    background: #ffffff;
     flex-shrink: 0;
 }
 
-.recruitment-request-modal-btn {
+/* Modal Button - Base Styles */
+.interview-approvals-modal-btn {
     padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 0.625rem;
+    border-radius: 0.5rem;
     font-size: 0.875rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    outline: none;
-}
-
-.recruitment-request-modal-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.recruitment-request-modal-btn-secondary {
-    background: #ffffff;
-    color: #374151;
-    border: 1px solid #d1d5db;
-}
-
-.recruitment-request-modal-btn-secondary:hover:not(:disabled) {
-    background: #f9fafb;
-    border-color: #9ca3af;
-}
-
-.recruitment-request-modal-btn-primary {
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
-    color: #ffffff;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-    position: relative;
-    z-index: 10;
-}
-
-.recruitment-request-modal-btn-primary:hover:not(:disabled) {
-    background: linear-gradient(135deg, #2563eb, #1d4ed8);
-    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
-    transform: translateY(-1px);
-}
-
-.recruitment-request-modal-btn-primary:active:not(:disabled) {
-    transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-}
-
-.recruitment-request-modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-    padding: 1.5rem 2rem;
-    border-top: 1px solid #e5e7eb;
-    background: #f9fafb;
-    flex-shrink: 0;
-    position: relative;
-    z-index: 10;
-}
-
-/* Skills Table */
-.recruitment-request-skills-table {
-    display: table;
-    width: 100%;
-    border-collapse: collapse;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.375rem;
-    overflow: hidden;
-    background: #ffffff;
-    margin: 0;
-    table-layout: auto;
-}
-
-.recruitment-request-skills-row {
-    display: table-row;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-.recruitment-request-skills-row:last-child {
-    border-bottom: none;
-}
-
-.recruitment-request-skills-label {
-    display: table-cell;
-    padding: 0.75rem 0.75rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #1f2937;
-    background: #f9fafb;
-    vertical-align: middle;
-    border-right: 1px solid #e5e7eb;
-    white-space: nowrap;
-    width: auto;
-    min-width: fit-content;
-}
-
-.recruitment-request-skills-note {
-    font-weight: 400;
-    font-style: italic;
-    color: #6b7280;
-    margin-left: 0.25rem;
-}
-
-.recruitment-request-skills-input {
-    display: table-cell;
-    padding: 0.625rem 0.875rem;
+    /* Transition: Đảm bảo mọi thay đổi diễn ra mượt mà */
     border: none;
-    border-radius: 0;
-    width: 100%;
-    vertical-align: middle;
-}
-
-.recruitment-request-skills-input:focus {
     outline: none;
-    background: #f0f9ff;
 }
 
-/* Remove padding from field when it contains skills table */
-.recruitment-request-form-field:has(.recruitment-request-skills-table) {
-    padding: 0 !important;
-    margin: 0 !important;
-    background: transparent !important;
-    border: none !important;
-    width: 100%;
-    max-width: 100%;
+/* Cancel Button - Trung tính */
+.interview-approvals-modal-btn--cancel {
+    background: #f3f4f6;
+    color: #374151;
 }
 
-.recruitment-request-form-field:has(.recruitment-request-skills-table):hover {
-    background: transparent !important;
-    border: none !important;
+.interview-approvals-modal-btn--cancel:hover {
+    background: #e5e7eb;
+    color: #1f2937;
 }
 
-.recruitment-request-form-field:has(.recruitment-request-skills-table):focus-within {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
+.interview-approvals-modal-btn--cancel:active {
+    transform: scale(0.95);
+    /* Hiệu ứng Nhấn: Co lại 5% khi nhấn */
 }
 
-/* Ensure table takes full width */
-.recruitment-request-form-field:has(.recruitment-request-skills-table) .recruitment-request-skills-table {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box;
-    margin: 0 !important;
+/* Submit Button - CTA Gradient Teal -> Cyan */
+.interview-approvals-modal-btn--submit {
+    background: linear-gradient(135deg, #10b981, #06b6d4);
+    /* Gradient Teal -> Cyan */
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3), 0 2px 6px rgba(6, 182, 212, 0.2);
 }
 
-/* Remove gap from form content when it contains skills table field */
-.recruitment-request-form-content:has(.recruitment-request-form-field:has(.recruitment-request-skills-table)) {
+.interview-approvals-modal-btn--submit:hover {
+    background: linear-gradient(135deg, #059669, #0891b2);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4), 0 4px 8px rgba(6, 182, 212, 0.3);
+}
+
+.interview-approvals-modal-btn--submit:active {
+    transform: scale(0.95);
+    /* Hiệu ứng Nhấn: Co lại 5% khi nhấn */
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3), 0 1px 4px rgba(6, 182, 212, 0.2);
+}
+
+/* Preview Button */
+.interview-approvals-modal-btn--preview {
+    background: #f3f4f6;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.interview-approvals-modal-btn--preview:hover {
+    background: #e5e7eb;
+    color: #1f2937;
+}
+
+.interview-approvals-modal-btn--preview:active {
+    transform: scale(0.95);
+    /* Hiệu ứng Nhấn: Co lại 5% khi nhấn */
+}
+
+.interview-approvals-modal-btn--preview svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ============================================
+   PREVIEW MODAL
+   ============================================ */
+
+/* Preview Modal Container */
+.interview-approvals-preview-modal {
+    max-width: 56rem;
+    /* Slightly smaller than form modal */
+}
+
+/* Preview Section */
+.interview-approvals-preview-section {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: #f9fafb;
+    border-radius: 0.75rem;
+    border: 1px solid #e5e7eb;
+}
+
+.interview-approvals-preview-section:last-child {
+    margin-bottom: 0;
+}
+
+/* Preview Section Title */
+.interview-approvals-preview-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #0d9488;
+    /* Teal-600 */
+    margin: 0 0 1.5rem 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #5eead4;
+}
+
+/* Preview Grid - 2 columns layout */
+.interview-approvals-preview-grid {
+    display: grid;
+    grid-template-columns: 1fr;
     gap: 1rem;
 }
 
-/* Ensure input reaches the edge */
-.recruitment-request-skills-input {
-    display: table-cell;
-    padding: 0.625rem 0.875rem;
-    padding-right: 0.875rem !important;
-    border: none !important;
-    border-radius: 0;
-    width: 100%;
-    vertical-align: middle;
-    box-sizing: border-box;
-    margin: 0;
+@media (min-width: 768px) {
+    .interview-approvals-preview-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
-/* Remove right border radius from last cell in each row */
-.recruitment-request-skills-row .recruitment-request-skills-input:last-child {
-    border-radius: 0 0.375rem 0.375rem 0;
+/* Preview Item */
+.interview-approvals-preview-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
 }
 
-.recruitment-request-skills-row:last-child .recruitment-request-skills-input:last-child {
-    border-radius: 0 0.375rem 0 0;
+.interview-approvals-preview-item-full {
+    grid-column: 1 / -1;
+    /* Span full width */
+}
+
+/* Preview Label */
+.interview-approvals-preview-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Preview Value */
+.interview-approvals-preview-value {
+    font-size: 0.875rem;
+    color: #1f2937;
+    line-height: 1.5;
+    padding: 0.5rem 0.75rem;
+    background: #ffffff;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+    min-height: 2.5rem;
+    display: flex;
+    align-items: center;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Preview Radio Group */
+.interview-approvals-preview-radio-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0.75rem;
+    background: #ffffff;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+    min-height: 2.5rem;
+}
+
+/* Preview Checkbox - Dấu tích hoặc ô vuông trống */
+.interview-approvals-preview-checkbox {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #06b6d4;
+    /* Cyan-500 */
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.interview-approvals-preview-checkbox.checked {
+    color: #10b981;
+    /* Teal-500 - Màu xanh lá cho dấu tích */
+}
+
+}
 }

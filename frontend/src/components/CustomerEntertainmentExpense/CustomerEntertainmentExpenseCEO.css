@@ -1,0 +1,661 @@
+/* Customer Entertainment Expense CEO Module */
+
+.customer-entertainment-expense-ceo-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #e0f2fe 0%, #ffffff 50%, #ecfdf5 100%);
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    box-sizing: border-box;
+}
+
+.customer-entertainment-expense-ceo-content {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Header */
+.customer-entertainment-expense-ceo-header {
+    width: 100%;
+    flex-shrink: 0;
+}
+
+.customer-entertainment-expense-ceo-header-content {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background: linear-gradient(to right, #e0f2fe, #ecfdf5);
+    padding: 1.25rem 1.75rem;
+    border-radius: 0.875rem;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.customer-entertainment-expense-ceo-header-content:hover {
+    box-shadow: 0 6px 16px rgba(14, 165, 233, 0.15);
+}
+
+.customer-entertainment-expense-ceo-icon-wrapper {
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 0.75rem;
+    background: rgba(239, 246, 255, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.customer-entertainment-expense-ceo-icon-wrapper:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.22), 0 3px 8px rgba(59, 130, 246, 0.15), 0 1px 4px rgba(59, 130, 246, 0.1);
+}
+
+.customer-entertainment-expense-ceo-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    color: #3b82f6;
+    stroke-width: 2;
+}
+
+.customer-entertainment-expense-ceo-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.customer-entertainment-expense-ceo-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #000000;
+    margin: 0;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.customer-entertainment-expense-ceo-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    color: #4a5568;
+}
+
+.customer-entertainment-expense-ceo-role {
+    font-weight: 600;
+    color: #1e40af;
+}
+
+.customer-entertainment-expense-ceo-separator {
+    color: #cbd5e0;
+}
+
+.customer-entertainment-expense-ceo-report-id {
+    color: #718096;
+}
+
+/* Summary Section */
+.customer-entertainment-expense-ceo-summary-section {
+    background: #ffffff;
+    border-radius: 0.875rem;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    padding: 1rem 1.25rem;
+}
+
+.customer-entertainment-expense-ceo-section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a202c;
+    margin: 0 0 0.75rem 0;
+}
+
+.customer-entertainment-expense-ceo-summary-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.customer-entertainment-expense-ceo-summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.customer-entertainment-expense-ceo-summary-item:last-child {
+    border-bottom: none;
+}
+
+.customer-entertainment-expense-ceo-summary-item.highlight {
+    background: #f0fdf4;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 2px solid #16a34a;
+    margin-top: 0.5rem;
+}
+
+.customer-entertainment-expense-ceo-summary-label {
+    font-size: 0.875rem;
+    color: #4a5568;
+    font-weight: 500;
+}
+
+.customer-entertainment-expense-ceo-summary-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a202c;
+}
+
+.customer-entertainment-expense-ceo-summary-value.red {
+    color: #dc2626;
+}
+
+.customer-entertainment-expense-ceo-summary-value.green {
+    color: #16a34a;
+}
+
+.customer-entertainment-expense-ceo-summary-footer {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e2e8f0;
+    font-size: 0.875rem;
+    color: #718096;
+}
+
+/* Details Section */
+.customer-entertainment-expense-ceo-details-section {
+    background: #ffffff;
+    border-radius: 0.875rem;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    padding: 1.5rem;
+}
+
+.customer-entertainment-expense-ceo-table-container {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 560px;
+    /* Chiều cao cố định để hiển thị 7-8 phiếu (mỗi phiếu ~70px) */
+    display: flex;
+    flex-direction: column;
+}
+
+.customer-entertainment-expense-ceo-table-wrapper {
+    overflow-y: auto;
+    overflow-x: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.customer-entertainment-expense-ceo-table-wrapper::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.customer-entertainment-expense-ceo-table-wrapper::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.customer-entertainment-expense-ceo-table-wrapper::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.customer-entertainment-expense-ceo-table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.customer-entertainment-expense-ceo-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.customer-entertainment-expense-ceo-table thead {
+    background: #f7fafc;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.customer-entertainment-expense-ceo-table th {
+    padding: 1rem;
+    text-align: left;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1a202c;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.customer-entertainment-expense-ceo-table td {
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+    color: #4a5568;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.customer-entertainment-expense-ceo-table tbody tr:hover {
+    background: #f7fafc;
+}
+
+.customer-entertainment-expense-ceo-code {
+    font-weight: 600;
+    color: #1e40af;
+}
+
+.customer-entertainment-expense-ceo-amount {
+    font-weight: 600;
+    text-align: right;
+}
+
+.customer-entertainment-expense-ceo-note {
+    font-size: 0.8125rem;
+    color: #718096;
+    max-width: 300px;
+}
+
+.customer-entertainment-expense-ceo-status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.625rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.customer-entertainment-expense-ceo-status-badge.ok {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.customer-entertainment-expense-ceo-status-badge.attention {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+/* Notes Section */
+.customer-entertainment-expense-ceo-notes-section {
+    background: #ffffff;
+    border-radius: 0.875rem;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    padding: 1.5rem;
+}
+
+.customer-entertainment-expense-ceo-notes-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1a202c;
+    margin-bottom: 0.75rem;
+}
+
+.customer-entertainment-expense-ceo-notes-textarea {
+    width: 100%;
+    padding: 0.875rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    resize: vertical;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.customer-entertainment-expense-ceo-notes-textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Actions */
+.customer-entertainment-expense-ceo-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.customer-entertainment-expense-ceo-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.875rem 2rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.customer-entertainment-expense-ceo-btn.approve {
+    background: #16a34a;
+    color: #ffffff;
+}
+
+.customer-entertainment-expense-ceo-btn.approve:hover:not(:disabled) {
+    background: #15803d;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(22, 163, 74, 0.3);
+}
+
+.customer-entertainment-expense-ceo-btn.reject {
+    background: #dc2626;
+    color: #ffffff;
+}
+
+.customer-entertainment-expense-ceo-btn.reject:hover:not(:disabled) {
+    background: #b91c1c;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
+}
+
+.customer-entertainment-expense-ceo-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.customer-entertainment-expense-ceo-btn-icon {
+    font-size: 1.125rem;
+}
+
+.customer-entertainment-expense-ceo-empty,
+.customer-entertainment-expense-ceo-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    gap: 1rem;
+    color: #718096;
+    font-size: 0.875rem;
+}
+
+.customer-entertainment-expense-ceo-loading .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e2e8f0;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Custom Scrollbar */
+.customer-entertainment-expense-ceo-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.customer-entertainment-expense-ceo-container::-webkit-scrollbar-track {
+    background: rgba(224, 242, 254, 0.3);
+    border-radius: 4px;
+}
+
+.customer-entertainment-expense-ceo-container::-webkit-scrollbar-thumb {
+    background: rgba(20, 184, 166, 0.4);
+    border-radius: 4px;
+}
+
+.customer-entertainment-expense-ceo-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(20, 184, 166, 0.6);
+}
+
+/* View Detail Button */
+.customer-entertainment-expense-ceo-view-detail-btn {
+    padding: 0.375rem 0.75rem;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: #ffffff;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.customer-entertainment-expense-ceo-view-detail-btn:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+}
+
+/* Detail Modal */
+.customer-entertainment-expense-ceo-detail-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.customer-entertainment-expense-ceo-detail-modal {
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    width: 100%;
+    max-width: 1000px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.customer-entertainment-expense-ceo-detail-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid #e5e7eb;
+    background: linear-gradient(135deg, #dbeafe, #ecfdf5);
+    flex-shrink: 0;
+}
+
+.customer-entertainment-expense-ceo-detail-modal-header h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+.customer-entertainment-expense-ceo-detail-modal-close {
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    cursor: pointer;
+    border-radius: 0.5rem;
+    font-size: 1.5rem;
+    line-height: 1;
+    transition: all 0.2s;
+}
+
+.customer-entertainment-expense-ceo-detail-modal-close:hover {
+    background: rgba(255, 255, 255, 0.5);
+    color: #1f2937;
+}
+
+.customer-entertainment-expense-ceo-detail-modal-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem 2rem;
+}
+
+.customer-entertainment-expense-ceo-detail-section {
+    margin-bottom: 2rem;
+}
+
+.customer-entertainment-expense-ceo-detail-section h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f766e;
+    margin: 0 0 1rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #14b8a6;
+}
+
+.customer-entertainment-expense-ceo-detail-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.customer-entertainment-expense-ceo-detail-row {
+    display: flex;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: #f9fafb;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+}
+
+.customer-entertainment-expense-ceo-detail-label {
+    font-weight: 600;
+    color: #374151;
+    min-width: 150px;
+    flex-shrink: 0;
+}
+
+.customer-entertainment-expense-ceo-detail-value {
+    color: #1f2937;
+    flex: 1;
+}
+
+.customer-entertainment-expense-ceo-detail-table-wrapper {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 400px;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+}
+
+.customer-entertainment-expense-ceo-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.customer-entertainment-expense-ceo-detail-table thead {
+    background: #f7fafc;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.customer-entertainment-expense-ceo-detail-table th {
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    color: #1a202c;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.customer-entertainment-expense-ceo-detail-table td {
+    padding: 0.75rem;
+    color: #4a5568;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.customer-entertainment-expense-ceo-detail-table tbody tr:hover {
+    background: #f7fafc;
+}
+
+.customer-entertainment-expense-ceo-detail-amount {
+    font-weight: 600;
+    text-align: right;
+    color: #1e40af;
+}
+
+.customer-entertainment-expense-ceo-detail-files {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.customer-entertainment-expense-ceo-detail-file-link {
+    color: #3b82f6;
+    text-decoration: none;
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.5rem;
+    background: #eff6ff;
+    border-radius: 0.25rem;
+    transition: all 0.2s;
+    display: inline-block;
+}
+
+.customer-entertainment-expense-ceo-detail-file-link:hover {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.customer-entertainment-expense-ceo-detail-modal-footer {
+    padding: 1.5rem 2rem;
+    border-top: 1px solid #e5e7eb;
+    background: #f9fafb;
+    display: flex;
+    justify-content: flex-end;
+    flex-shrink: 0;
+}
+
+.customer-entertainment-expense-ceo-detail-modal-close-btn {
+    padding: 0.75rem 1.5rem;
+    background: #6b7280;
+    color: #ffffff;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.customer-entertainment-expense-ceo-detail-modal-close-btn:hover {
+    background: #4b5563;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(107, 114, 128, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .customer-entertainment-expense-ceo-table-container {
+        overflow-x: auto;
+    }
+
+    .customer-entertainment-expense-ceo-actions {
+        flex-direction: column;
+    }
+
+    .customer-entertainment-expense-ceo-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}

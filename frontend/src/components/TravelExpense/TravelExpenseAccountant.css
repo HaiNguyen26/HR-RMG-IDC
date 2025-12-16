@@ -1,0 +1,819 @@
+/* Travel Expense Accountant - Gradient Calm Integrity Theme (giống CandidateManagement) */
+
+/* I. CẤU TRÚC NỀN & VỎ ỨNG DỤNG (SHELL & GLASS CARD) */
+/* Nền BODY: Nền sáng, mềm mại (Light Mode) với Gradient Calm Integrity - xanh dương/xanh lá nhạt tạo cảm giác yên bình */
+.travel-expense-accountant {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 2rem;
+    /* Nền chung của ứng dụng - Gray-50 */
+    background: #f9fafb;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    position: relative;
+}
+
+/* Custom Scrollbar - Tối ưu cho nền gradient Calm Integrity */
+.travel-expense-accountant::-webkit-scrollbar {
+    width: 8px;
+}
+
+.travel-expense-accountant::-webkit-scrollbar-track {
+    background: rgba(224, 242, 254, 0.3);
+    /* Sky blue nhạt với transparency */
+    border-radius: 4px;
+    backdrop-filter: blur(5px);
+}
+
+.travel-expense-accountant::-webkit-scrollbar-thumb {
+    background: rgba(14, 165, 233, 0.4);
+    /* Sky blue với transparency */
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.travel-expense-accountant::-webkit-scrollbar-thumb:hover {
+    background: rgba(14, 165, 233, 0.6);
+}
+
+/* Header */
+.travel-expense-accountant-header {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Màu Chủ Đạo: Gradient Calm Integrity - Gradient xanh dương/xanh lá nhạt tạo cảm giác yên bình và chuyên nghiệp */
+.travel-expense-accountant-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    /* Gradient Calm Integrity: from-sky-50 to-emerald-50 - Từ xanh dương nhạt sang xanh lá nhạt, tạo cảm giác yên bình và đáng tin cậy */
+    background: linear-gradient(to right, #e0f2fe, #ecfdf5);
+    padding: 1.25rem 1.75rem;
+    border-radius: 0.875rem;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.travel-expense-accountant-header-top:hover {
+    box-shadow: 0 6px 16px rgba(14, 165, 233, 0.15);
+}
+
+.travel-expense-accountant-header-content {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex: 1;
+}
+
+.travel-expense-accountant-icon-wrapper {
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 1.125rem;
+    /* Nền Electric Blue Pastel - Giữ nguyên màu riêng của module */
+    background: linear-gradient(135deg,
+            rgba(147, 197, 253, 0.35) 0%,
+            rgba(191, 219, 254, 0.25) 50%,
+            rgba(219, 234, 254, 0.2) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow:
+        0 4px 12px rgba(59, 130, 246, 0.18),
+        0 2px 6px rgba(59, 130, 246, 0.12),
+        0 1px 3px rgba(59, 130, 246, 0.08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+.travel-expense-accountant-icon-wrapper:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        0 6px 16px rgba(59, 130, 246, 0.22),
+        0 3px 8px rgba(59, 130, 246, 0.15),
+        0 1px 4px rgba(59, 130, 246, 0.1);
+}
+
+.travel-expense-accountant-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    /* Accent Main - Indigo-700 */
+    color: #4338ca;
+    stroke-width: 2;
+}
+
+/* Tiêu đề chính - Text Dark */
+.travel-expense-accountant-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    /* Text Dark - Gray-800/900 */
+    margin: 0 0 0.375rem 0;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+/* Mô tả - Text Muted */
+.travel-expense-accountant-subtitle {
+    font-size: 0.875rem;
+    color: #6b7280;
+    /* Text Muted - Gray-500 */
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Main Container - Master-Detail View */
+.travel-expense-accountant-main-container {
+    width: 100%;
+    height: calc(90vh - 6rem);
+    min-height: 700px;
+    padding: 0;
+    /* Glass Card */
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 1.5rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+/* Bố cục chính: Grid 2 cột - 33% và 67% */
+.travel-expense-accountant-main-layout {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: 33% 67%;
+    gap: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    flex: 1;
+    min-height: 0;
+}
+
+/* IV. CỘT 1: MASTER - DANH SÁCH YÊU CẦU (33%) */
+.travel-expense-accountant-list-column {
+    height: 100%;
+    overflow: hidden;
+    border-right: 1px solid rgba(226, 232, 240, 0.6);
+    box-sizing: border-box;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Nền Cột: Trắng tinh - #ffffff */
+.travel-expense-accountant-list-container {
+    width: 100%;
+    height: 100%;
+    background: #ffffff;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    box-sizing: border-box;
+    overflow: hidden;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Tiêu đề danh sách - Accent Main */
+.travel-expense-accountant-list-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #4338ca;
+    /* Accent Main - Indigo-700 */
+    margin: 0 0 0.5rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e5e7eb;
+    /* Border - Gray-200 */
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+
+/* Thanh Công Cụ: Search */
+.travel-expense-accountant-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0;
+    margin-top: 0;
+    flex-shrink: 0;
+}
+
+.travel-expense-accountant-search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.travel-expense-accountant-search-icon {
+    position: absolute;
+    left: 0.75rem;
+    width: 1rem;
+    height: 1rem;
+    color: #6b7280;
+    /* Text Muted - Gray-500 */
+    pointer-events: none;
+    z-index: 1;
+}
+
+.travel-expense-accountant-search-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    padding-left: 2.5rem;
+    border: 1px solid #d1d5db;
+    /* Input Border - Gray-300 */
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    transition: all 0.2s;
+    box-sizing: border-box;
+}
+
+.travel-expense-accountant-search-input:focus {
+    outline: none;
+    border-color: #4338ca;
+    /* Accent Main */
+    box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.15);
+}
+
+/* Danh sách items - có thể cuộn */
+.travel-expense-accountant-list-items {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+    padding-top: 0.5rem;
+}
+
+/* Custom Scrollbar cho danh sách */
+.travel-expense-accountant-list-items::-webkit-scrollbar {
+    width: 8px;
+}
+
+.travel-expense-accountant-list-items::-webkit-scrollbar-track {
+    background: rgba(240, 249, 255, 0.3);
+    border-radius: 4px;
+}
+
+.travel-expense-accountant-list-items::-webkit-scrollbar-thumb {
+    background: rgba(14, 165, 233, 0.4);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.travel-expense-accountant-list-items::-webkit-scrollbar-thumb:hover {
+    background: rgba(14, 165, 233, 0.6);
+}
+
+/* Item trong danh sách */
+.travel-expense-accountant-list-item {
+    padding: 1rem;
+    border: 1px solid #e5e7eb;
+    /* Card Border - Gray-200 */
+    border-left: 3px solid transparent;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    background: #ffffff;
+    /* Card Background */
+    position: relative;
+}
+
+.travel-expense-accountant-list-item:hover {
+    border-color: #4338ca;
+    /* Accent Main */
+    background: #f9fafb;
+    /* Background - Gray-50 */
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.travel-expense-accountant-list-item.active {
+    border-left-color: #4338ca;
+    /* Accent Main */
+    border-color: #e0e7ff;
+    /* Selected Border - Indigo-100 */
+    background: #ffffff;
+    /* Card Background */
+    box-shadow: 0 0 0 3px rgba(224, 231, 255, 0.5);
+}
+
+.travel-expense-accountant-item-left {
+    flex: 1;
+}
+
+.travel-expense-accountant-item-right {
+    text-align: right;
+    display: flex;
+    align-items: flex-start;
+}
+
+.travel-expense-accountant-request-code {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #4f46e5;
+    /* Accent Light - Indigo-600 */
+    margin-bottom: 0.25rem;
+}
+
+.travel-expense-accountant-employee-name {
+    font-size: 0.875rem;
+    color: #1f2937;
+    /* Text Dark - Gray-800/900 */
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.travel-expense-accountant-purpose {
+    font-size: 0.875rem;
+    color: #6b7280;
+    /* Text Muted - Gray-500 */
+    font-weight: 400;
+    margin-bottom: 0.25rem;
+}
+
+.travel-expense-accountant-actual-expense {
+    font-size: 0.875rem;
+    color: #dc2626;
+    /* Red-600 - Chi phí thực tế */
+    font-weight: 700;
+    margin-top: 0.25rem;
+}
+
+.travel-expense-accountant-loading,
+.travel-expense-accountant-empty {
+    text-align: center;
+    padding: 2rem;
+    color: #6b7280;
+    /* Text Muted - Gray-500 */
+    font-size: 0.875rem;
+}
+
+/* V. CỘT 2: DETAIL - FORM KIỂM TRA & QUYẾT TOÁN (67%) */
+.travel-expense-accountant-detail-column {
+    height: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Nền Cột: Trắng tinh - #ffffff */
+.travel-expense-accountant-detail-container {
+    width: 100%;
+    height: 100%;
+    background: #ffffff;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+}
+
+.travel-expense-accountant-form {
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+    /* Tăng khoảng cách giữa các section */
+}
+
+/* Report Header */
+.travel-expense-accountant-report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.travel-expense-accountant-report-header-left {
+    flex: 1;
+}
+
+.travel-expense-accountant-report-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.travel-expense-accountant-report-title-code {
+    color: #4338ca;
+    /* Accent Main - Indigo-700 */
+}
+
+.travel-expense-accountant-report-title-text {
+    color: #1f2937;
+    /* Text Dark - Gray-800/900 */
+}
+
+.travel-expense-accountant-report-header-right {
+    display: flex;
+    align-items: center;
+}
+
+.travel-expense-accountant-status-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    /* Pill shape */
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.travel-expense-accountant-status-badge.status-pending-accountant {
+    background: #e0f2fe;
+    /* Sky-100 */
+    color: #0284c7;
+    /* Sky-600 */
+}
+
+.travel-expense-accountant-empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #6b7280;
+    /* Text Muted - Gray-500 */
+    font-size: 1rem;
+    text-align: center;
+}
+
+/* Status Tags */
+.travel-expense-accountant-status-tag {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+/* Chờ HR Xác nhận (SUBMITTED) - Amber */
+.travel-expense-accountant-status-tag.status-submitted {
+    background: #fef3c7;
+    /* Amber-100 */
+    color: #d97706;
+    /* Amber-600 */
+}
+
+/* Chờ Kế Toán Duyệt (HR_CONFIRMED/PENDING_ACCOUNTANT) - Sky */
+.travel-expense-accountant-status-tag.status-pending-accountant {
+    background: #e0f2fe;
+    /* Sky-100 */
+    color: #0284c7;
+    /* Sky-600 */
+}
+
+/* Đã Hoàn Tất (ACCOUNTANT_DONE/SETTLED) - Green */
+.travel-expense-accountant-status-tag.status-completed {
+    background: #d1fae5;
+    /* Green-100 */
+    color: #059669;
+    /* Green-600 */
+}
+
+/* Section I: Thông tin Đề nghị */
+.travel-expense-accountant-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.travel-expense-accountant-section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #4338ca;
+    /* Accent Main - Indigo-700 */
+    margin: -1.5rem 0 0 0;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid #4338ca;
+}
+
+.travel-expense-accountant-section-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Section I có màu Indigo-50 và không có viền */
+.travel-expense-accountant-section-summary-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: #eef2ff;
+    /* Indigo-50 - Header Info BG */
+    border: none;
+    /* Không có viền */
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Info Grid (Section I) */
+.travel-expense-accountant-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.travel-expense-accountant-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.travel-expense-accountant-info-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+    /* Text Muted - Gray-500 */
+    font-weight: 600;
+}
+
+.travel-expense-accountant-info-value {
+    font-size: 0.875rem;
+    color: #1f2937;
+    /* Text Dark - Gray-800/900 */
+    font-weight: 700;
+    /* Bold cho giá trị */
+}
+
+/* Section II: Summary Cards */
+.travel-expense-accountant-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.travel-expense-accountant-summary-card {
+    background: #ffffff;
+    /* Card Background */
+    border: 1px solid #e5e7eb;
+    /* Card Border - Gray-200 */
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.travel-expense-accountant-summary-card-label {
+    font-size: 0.875rem;
+    color: #1f2937;
+    /* Text Dark - Gray-800/900 */
+    font-weight: 600;
+}
+
+.travel-expense-accountant-summary-card-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.travel-expense-accountant-summary-card-value.advance {
+    color: #2563eb;
+    /* Blue-600 - Quyết toán đủ */
+}
+
+.travel-expense-accountant-summary-card-value.actual {
+    color: #dc2626;
+    /* Red-600 - Chi phí thực tế */
+}
+
+.travel-expense-accountant-summary-card-value.balance.refund {
+    color: #dc2626;
+    /* Red-600 - Hoàn lại tiền (âm) */
+}
+
+.travel-expense-accountant-summary-card-value.balance.supplement {
+    color: #16a34a;
+    /* Green-600 - Bổ sung tiền (dương) */
+}
+
+.travel-expense-accountant-summary-card-value.balance.balanced {
+    color: #2563eb;
+    /* Blue-600 - Quyết toán đủ (bằng 0) */
+}
+
+/* Expense List Card */
+.travel-expense-accountant-expense-list-card {
+    background: #ffffff;
+    /* Card Background */
+    border: 1px solid #e5e7eb;
+    /* Card Border - Gray-200 */
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.travel-expense-accountant-expense-list-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1f2937;
+    /* Text Dark - Gray-800/900 */
+    margin-bottom: 1rem;
+}
+
+.travel-expense-accountant-expense-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.travel-expense-accountant-expense-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #e5e7eb;
+    /* Card Border - Gray-200 */
+}
+
+.travel-expense-accountant-expense-item:last-child {
+    border-bottom: 1px solid #e5e7eb;
+    /* Giữ dấu gạch cho mục cuối cùng */
+}
+
+.travel-expense-accountant-expense-description {
+    font-size: 0.875rem;
+    color: #1f2937;
+    /* Text Dark - Gray-800/900 */
+    flex: 1;
+}
+
+.travel-expense-accountant-expense-amount {
+    font-size: 0.875rem;
+    color: #1f2937;
+    /* Text Dark - Gray-800/900 */
+    font-weight: 600;
+}
+
+/* Section III: Employee Note Card */
+.travel-expense-accountant-employee-note-card {
+    background: #f9fafb;
+    /* Background - Gray-50 */
+    border: 1px solid #e5e7eb;
+    /* Card Border - Gray-200 */
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.travel-expense-accountant-employee-note-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1f2937;
+    /* Text Dark - Gray-800/900 */
+    margin-bottom: 0.75rem;
+}
+
+.travel-expense-accountant-employee-note-content {
+    background: #ffffff;
+    /* Card Background */
+    border-radius: 0.5rem;
+    padding: 1rem;
+    font-size: 0.875rem;
+    color: #1f2937;
+    /* Text Dark - Gray-800/900 */
+    font-style: italic;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+/* Processing Department Actions Card */
+.travel-expense-accountant-actions-card {
+    background: #eef2ff;
+    /* Indigo-50 - Header Info BG */
+    border: 1px solid #e5e7eb;
+    /* Card Border - Gray-200 */
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.travel-expense-accountant-actions-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #4338ca;
+    /* Accent Main - Indigo-700 */
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+}
+
+.travel-expense-accountant-form-group {
+    margin-bottom: 1.5rem;
+}
+
+.travel-expense-accountant-form-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    /* Input Border - Gray-300 */
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    resize: vertical;
+    transition: all 0.2s;
+    box-sizing: border-box;
+    background: #ffffff;
+    /* Card Background */
+}
+
+.travel-expense-accountant-form-textarea:focus {
+    outline: none;
+    border-color: #4338ca;
+    /* Accent Main */
+    border-width: 1px;
+    box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.15);
+}
+
+.travel-expense-accountant-form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-start;
+}
+
+.travel-expense-accountant-approve-btn {
+    padding: 0.75rem 1.5rem;
+    background: #16a34a;
+    /* Green-600 - Bổ sung tiền */
+    color: #ffffff;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.travel-expense-accountant-approve-btn:hover:not(:disabled) {
+    background: #15803d;
+    /* Darker green */
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(22, 163, 74, 0.3);
+}
+
+.travel-expense-accountant-approve-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.travel-expense-accountant-reject-btn {
+    padding: 0.75rem 1.5rem;
+    background: #dc2626;
+    /* Red-600 - Hoàn lại tiền */
+    color: #ffffff;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.travel-expense-accountant-reject-btn:hover:not(:disabled) {
+    background: #b91c1c;
+    /* Darker red */
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(220, 38, 38, 0.3);
+}
+
+.travel-expense-accountant-reject-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
