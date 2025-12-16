@@ -1,8 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { authAPI } from '../../services/api';
 import './Login.css';
 
+// ============================================================
+// CẤU HÌNH TRẠNG THÁI APP
+// ============================================================
+// IS_APP_ENABLED: 
+//   - false: Hiển thị trang "Coming Soon" (mặc định cho production)
+//   - true: Hiển thị form đăng nhập bình thường
+// 
+// Để phát triển local khi IS_APP_ENABLED = false:
+//   - Thêm ?dev=true vào URL: http://localhost:3000/?dev=true
+//   - Hoặc set localStorage: localStorage.setItem('dev_mode', 'true')
+//   - Sau đó refresh trang
+// ============================================================
+const IS_APP_ENABLED = false;
+
+// Ngày ra mắt hiển thị trên trang "Coming Soon"
+const LAUNCH_DATE = '20/12/2025';
+
 const Login = ({ onLoginSuccess }) => {
+  // Tất cả hooks phải được gọi ở top level, không được gọi có điều kiện
+  const [isDevMode, setIsDevMode] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -10,6 +29,80 @@ const Login = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Kiểm tra dev mode từ URL hoặc localStorage
+  // Chỉ cho phép dev mode trên localhost để đảm bảo an toàn
+  useEffect(() => {
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1' ||
+                        window.location.hostname === '';
+    
+    // Chỉ cho phép dev mode khi đang chạy trên localhost
+    if (isLocalhost) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const devParam = urlParams.get('dev');
+      const localStorageDev = localStorage.getItem('dev_mode');
+      
+      if (devParam === 'true' || localStorageDev === 'true') {
+        setIsDevMode(true);
+        localStorage.setItem('dev_mode', 'true');
+      }
+    } else {
+      // Trên server production, luôn tắt dev mode để đảm bảo an toàn
+      setIsDevMode(false);
+      localStorage.removeItem('dev_mode');
+    }
+  }, []);
+
+  // Nếu app chưa được kích hoạt và không phải dev mode, hiển thị Coming Soon
+  if (!IS_APP_ENABLED && !isDevMode) {
+    return (
+      <div className="login-container">
+        <div className="coming-soon-card">
+          <div className="coming-soon-content">
+            {/* Logo Section */}
+            <div className="login-logo-section">
+              <div className="login-logo-container">
+                <img
+                  src={process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL}/LogoRMG.png` : '/LogoRMG.png'}
+                  alt="RMG Logo"
+                  className="login-logo"
+                />
+              </div>
+              <h1 className="login-title">HR Management System</h1>
+              <p className="login-subtitle">Hệ thống quản lý nhân sự</p>
+            </div>
+
+            {/* Coming Soon Message */}
+            <div className="coming-soon-message">
+              <div className="coming-soon-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+              </div>
+              <h2 className="coming-soon-title">Coming Soon</h2>
+              <p className="coming-soon-date">{LAUNCH_DATE}</p>
+              <p className="coming-soon-description">
+                Hệ thống đang trong giai đoạn phát triển và sẽ sớm ra mắt.
+                <br />
+                Vui lòng quay lại sau!
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="login-footer">
+              <p className="login-footer-text">
+                © 2025 All rights reserved
+                <br />
+                by <strong>Hải Nguyễn</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleChange = (e) => {
     const { name, value } = e.target;
