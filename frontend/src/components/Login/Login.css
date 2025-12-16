@@ -565,6 +565,18 @@
   text-align: center;
 }
 
+/* Điều chỉnh kích thước chữ trong Coming Soon card */
+.coming-soon-content .login-title {
+  font-size: 1.75rem;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.coming-soon-content .login-subtitle {
+  font-size: 1rem;
+  white-space: normal;
+}
+
 .coming-soon-message {
   margin-top: 2rem;
   margin-bottom: 1rem;
@@ -638,6 +650,14 @@
     padding: 2rem 1.5rem;
   }
 
+  .coming-soon-content .login-title {
+    font-size: 1.5rem;
+  }
+
+  .coming-soon-content .login-subtitle {
+    font-size: 0.9375rem;
+  }
+
   .coming-soon-icon {
     width: 60px;
     height: 60px;
@@ -660,6 +680,14 @@
 @media (max-width: 640px) {
   .coming-soon-content {
     padding: 1.5rem 1rem;
+  }
+
+  .coming-soon-content .login-title {
+    font-size: 1.25rem;
+  }
+
+  .coming-soon-content .login-subtitle {
+    font-size: 0.875rem;
   }
 
   .coming-soon-icon {
