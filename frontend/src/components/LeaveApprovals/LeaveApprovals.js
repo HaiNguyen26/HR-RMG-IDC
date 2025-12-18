@@ -116,6 +116,11 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
 
+    // Reset activeModule về 'leave' khi component mount
+    useEffect(() => {
+        setActiveModule('leave');
+    }, []);
+
     // Statistics for badge counts - overall (tính từ requests hiện tại)
     const statistics = useMemo(() => {
         const pending = requests.filter(r => r.status === 'PENDING').length;

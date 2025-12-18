@@ -494,9 +494,12 @@
 .request-management-table-container {
   flex: 1;
   min-height: 0;
-  max-height: 600px; /* Cố định chiều cao tối đa */
-  overflow-y: auto; /* Cho phép cuộn dọc */
-  overflow-x: auto; /* Cho phép cuộn ngang nếu cần */
+  max-height: 600px;
+  /* Cố định chiều cao tối đa */
+  overflow-y: auto;
+  /* Cho phép cuộn dọc */
+  overflow-x: auto;
+  /* Cho phép cuộn ngang nếu cần */
   border-radius: 0.75rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
@@ -556,7 +559,8 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-bottom: 2px solid #bfdbfe;
-  background: #e8f3ff; /* Đảm bảo background không trong suốt khi sticky */
+  background: #e8f3ff;
+  /* Đảm bảo background không trong suốt khi sticky */
 }
 
 .request-management-table tbody tr {
