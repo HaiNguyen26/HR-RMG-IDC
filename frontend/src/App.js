@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Sidebar from './components/Sidebar/Sidebar';
 import Dashboard from './components/Dashboard/Dashboard';
 import EmployeeDashboard from './components/EmployeeDashboard/EmployeeDashboard';
+import CEOProgressTracking from './components/CEOProgressTracking/CEOProgressTracking';
 import EmployeeForm from './components/EmployeeForm/EmployeeForm';
 import EquipmentAssignmentModal from './components/EquipmentAssignment/EquipmentAssignmentModal';
 import RequestsManagementModal from './components/RequestsManagement/RequestsManagementModal';
@@ -247,6 +248,17 @@ function App() {
   };
 
   const renderView = () => {
+    // CEO Progress Tracking - Đặc biệt cho Tổng giám đốc (bất kể role)
+    if (currentView === 'ceo-progress-tracking') {
+      return (
+        <CEOProgressTracking
+          currentUser={currentUser}
+          showToast={showToast}
+          showConfirm={showConfirm}
+        />
+      );
+    }
+
     // Employee view - giao diện riêng cho nhân viên
     if (currentUser?.role === 'EMPLOYEE') {
       switch (currentView) {

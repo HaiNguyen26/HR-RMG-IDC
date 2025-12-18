@@ -596,7 +596,6 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
                                                                     <th>Mục Đích Chi</th>
                                                                     <th>Số Tiền (VND)</th>
                                                                     <th>File Đính Kèm</th>
-                                                                    <th>Hành Động Duyệt</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
@@ -630,31 +629,6 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
                                                                                     Không có file
                                                                                 </span>
                                                                             )}
-                                                                        </td>
-                                                                        <td className="customer-entertainment-expense-approval-action-cell">
-                                                                            <div className="customer-entertainment-expense-approval-item-actions">
-                                                                                <button
-                                                                                    className="customer-entertainment-expense-approval-item-btn approve"
-                                                                                    onClick={() => {
-                                                                                        // TODO: Handle approve item
-                                                                                        console.log('Approve item:', item.id);
-                                                                                    }}
-                                                                                >
-                                                                                    DUYỆT
-                                                                                </button>
-                                                                                <button
-                                                                                    className="customer-entertainment-expense-approval-item-btn reject"
-                                                                                    onClick={() => {
-                                                                                        // TODO: Handle reject item
-                                                                                        console.log('Reject item:', item.id);
-                                                                                    }}
-                                                                                >
-                                                                                    TỪ CHỐI
-                                                                                </button>
-                                                                                <span className="customer-entertainment-expense-approval-item-status">
-                                                                                    Không rõ
-                                                                                </span>
-                                                                            </div>
                                                                         </td>
                                                                     </tr>
                                                                 ))}
@@ -750,7 +724,7 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
                                     {selectedItemFiles.files.map((file) => (
                                         <li key={file.id}>
                                             <a
-                                                href={file.url}
+                                                href={`${process.env.REACT_APP_API_URL || 'http://localhost:3000/api'}${file.url}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="customer-entertainment-expense-approval-file-modal-link"

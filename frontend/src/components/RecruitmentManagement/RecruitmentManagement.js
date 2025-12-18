@@ -285,15 +285,55 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                 const newManagerId = interviewRequest.manager_id?.toString() || '';
                 const newBranchDirectorId = interviewRequest.branch_director_id?.toString() || '';
 
+                // Determine indirect manager
+                let indirectManagerId = newBranchDirectorId;
+
+                // If branch director is the direct manager, find CEO as indirect manager
+                if (newManagerId === newBranchDirectorId) {
+                    // Debug: Log all managers to find CEO
+                    console.log('🔍 Finding CEO - All managers:', managers.map(m => ({
+                        id: m.id,
+                        name: m.ho_ten || m.hoTen,
+                        position: m.chuc_danh || m.chucDanh,
+                        positionLower: (m.chuc_danh || m.chucDanh || '').toLowerCase()
+                    })));
+
+                    // Find CEO in managers list (Lê Thanh Tùng or by position/code)
+                    const ceo = managers.find(m => {
+                        const name = (m.ho_ten || m.hoTen || '').toLowerCase();
+                        const position = (m.chuc_danh || m.chucDanh || '').toLowerCase();
+                        const code = (m.ma_nhan_vien || m.maNhanVien || '').toLowerCase();
+                        return name.includes('lê thanh tùng') ||
+                            name.includes('le thanh tung') ||
+                            code.includes('ceo') ||
+                            position.includes('tổng giám đốc') ||
+                            position.includes('tong giam doc') ||
+                            position.includes('ceo') ||
+                            position.includes('giám đốc điều hành');
+                    });
+
+                    if (ceo) {
+                        indirectManagerId = ceo.id?.toString() || '';
+                        console.log('✅ Branch Director is requester, setting CEO as indirect manager:', {
+                            id: ceo.id,
+                            name: ceo.ho_ten || ceo.hoTen,
+                            position: ceo.chuc_danh || ceo.chucDanh
+                        });
+                    } else {
+                        console.warn('⚠️ CEO not found in managers list!');
+                    }
+                }
+
                 // Only update if values are different
                 if (prev.baoCaoTrucTiep === newManagerId &&
-                    prev.baoCaoGianTiep === newBranchDirectorId) {
+                    prev.baoCaoGianTiep === indirectManagerId) {
                     return prev;
                 }
+
                 return {
                     ...prev,
                     baoCaoTrucTiep: newManagerId,
-                    baoCaoGianTiep: newBranchDirectorId,
+                    baoCaoGianTiep: indirectManagerId,
                 };
             });
         }

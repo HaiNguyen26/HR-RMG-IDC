@@ -52,7 +52,8 @@ router.post('/login', async (req, res) => {
         FROM employees
         WHERE (
           email = $1 OR
-          LOWER(TRIM(ho_ten)) = LOWER(TRIM($1))
+          LOWER(TRIM(ho_ten)) = LOWER(TRIM($1)) OR
+          LOWER(TRIM(ma_nhan_vien)) = LOWER(TRIM($1))
         ) AND trang_thai IN ('ACTIVE', 'PENDING')
       `;
 

@@ -105,7 +105,7 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
 
     const handleSelectAll = () => {
         if (!report || !report.requests) return;
-        
+
         if (selectedRequests.length === report.requests.length) {
             setSelectedRequests([]);
         } else {
@@ -115,7 +115,7 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
 
     const handleApprove = async () => {
         if (!report || !report.requests || report.requests.length === 0) return;
-        
+
         if (selectedRequests.length === 0) {
             showToast?.('Vui lòng chọn ít nhất một phiếu để duyệt', 'warning');
             return;
@@ -144,7 +144,7 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
 
                 // Chờ tất cả các request được duyệt
                 const results = await Promise.all(approvePromises);
-                
+
                 // Kiểm tra xem có request nào bị lỗi không
                 const failedRequests = results.filter(result => !result.data?.success);
                 if (failedRequests.length > 0) {
@@ -152,7 +152,7 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
                 } else {
                     showToast?.('Đã duyệt chi thành công!', 'success');
                     setSelectedRequests([]);
-                    
+
                     // Refresh danh sách để loại bỏ các requests đã được duyệt
                     const refreshResponse = await customerEntertainmentExpensesAPI.getAll({
                         status: 'ACCOUNTANT_PROCESSED'
@@ -247,7 +247,7 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
 
                 // Chờ tất cả các request được từ chối
                 const results = await Promise.all(rejectPromises);
-                
+
                 // Kiểm tra xem có request nào bị lỗi không
                 const failedRequests = results.filter(result => !result.data?.success);
                 if (failedRequests.length > 0) {
@@ -257,7 +257,7 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
                     setRejectionNotes('');
                     setSelectedRequests([]);
                     setIsRejectModalOpen(false);
-                    
+
                     // Refresh danh sách
                     const refreshResponse = await customerEntertainmentExpensesAPI.getAll({
                         status: 'ACCOUNTANT_PROCESSED'
@@ -633,7 +633,7 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
                                                                 {item.files.map((file, fileIndex) => (
                                                                     <a
                                                                         key={file.id || fileIndex}
-                                                                        href={file.url}
+                                                                        href={`${process.env.REACT_APP_API_URL || 'http://localhost:3000/api'}${file.url}`}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
                                                                         className="customer-entertainment-expense-ceo-detail-file-link"

@@ -138,7 +138,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [isHrRecruitmentModalOpen, setIsHrRecruitmentModalOpen] = useState(false);
     const [hrRecruitmentRequests, setHrRecruitmentRequests] = useState([]);
     const [pendingRecruitmentCount, setPendingRecruitmentCount] = useState(0);
-    
+
     // Evaluation modal state
     const [showEvaluationModal, setShowEvaluationModal] = useState(false);
     const [selectedEvaluationRequest, setSelectedEvaluationRequest] = useState(null);
@@ -295,23 +295,23 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
         const fetchInterviewRequestCounts = async () => {
             // Allow fetch for branch directors, managers, team leads, and employees
             if (!['EMPLOYEE', 'MANAGER', 'TEAM_LEAD', 'BRANCH_DIRECTOR'].includes(currentUser?.role) && !isBranchDirector) return;
-            
+
             try {
                 const params = {
                     managerId: currentUser?.id,
                     branchDirectorId: currentUser?.id
                 };
-                
+
                 // Fetch tất cả requests để đếm
                 const response = await interviewRequestsAPI.getAll(params);
                 const allRequests = response.data?.data || [];
-                
+
                 // Lọc và đếm "Chờ duyệt phỏng vấn"
-                const pendingRequests = allRequests.filter(req => 
+                const pendingRequests = allRequests.filter(req =>
                     req.status === 'PENDING_INTERVIEW' || req.status === 'WAITING_FOR_OTHER_APPROVAL'
                 );
                 setInterviewRequestsCount(pendingRequests.length);
-                
+
                 // Lọc và đếm "Sẵn sàng PV" - loại bỏ các ứng viên đã ON_PROBATION
                 const readyRequests = allRequests.filter(req => {
                     if (req.status !== 'READY_FOR_INTERVIEW') return false;
@@ -332,23 +332,23 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
         const fetchInterviewRequestsDetails = async () => {
             // Allow fetch for branch directors, managers, team leads, and employees
             if (!['EMPLOYEE', 'MANAGER', 'TEAM_LEAD', 'BRANCH_DIRECTOR'].includes(currentUser?.role) && !isBranchDirector) return;
-            
+
             try {
                 const params = {
                     managerId: currentUser?.id,
                     branchDirectorId: currentUser?.id
                 };
-                
+
                 // Fetch "Chờ duyệt phỏng vấn" - PENDING_INTERVIEW hoặc WAITING_FOR_OTHER_APPROVAL
                 if (selectedFilter === 'interview') {
                     const response = await interviewRequestsAPI.getAll(params);
                     const allRequests = response.data?.data || [];
-                    const pendingRequests = allRequests.filter(req => 
+                    const pendingRequests = allRequests.filter(req =>
                         req.status === 'PENDING_INTERVIEW' || req.status === 'WAITING_FOR_OTHER_APPROVAL'
                     );
                     setInterviewRequests(pendingRequests);
                 }
-                
+
                 // Fetch "Sẵn sàng PV" - READY_FOR_INTERVIEW (loại bỏ các ứng viên đã ON_PROBATION)
                 if (selectedFilter === 'ready') {
                     const readyParams = { ...params, status: 'READY_FOR_INTERVIEW' };
@@ -365,7 +365,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 console.error('Error fetching interview requests details:', error);
             }
         };
-        
+
         // Chỉ fetch details khi filter là 'interview' hoặc 'ready'
         if (selectedFilter === 'interview' || selectedFilter === 'ready') {
             fetchInterviewRequestsDetails();
@@ -413,21 +413,70 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                     }));
                 }
 
-                // Tự động điền người quản lý gián tiếp = giám đốc chi nhánh
+                // Tự động điền người quản lý gián tiếp
                 if (currentUser?.chiNhanh || currentUser?.chi_nhanh) {
                     const userBranch = currentUser.chiNhanh || currentUser.chi_nhanh;
-                    // Tìm giám đốc chi nhánh từ danh sách employees
-                    const branchDirectors = ['Châu Quang Hải', 'Nguyễn Ngọc Luyễn', 'Nguyễn Văn Khải'];
-                    const branchDirector = employeesData.find(emp =>
-                        branchDirectors.includes(emp.ho_ten) &&
-                        (emp.chi_nhanh === userBranch || emp.chiNhanh === userBranch)
-                    );
+                    const currentUserPosition = (currentUser.chucDanh || currentUser.chuc_danh || '').toLowerCase();
 
-                    if (branchDirector) {
-                        setRecruitmentForm(prev => ({
-                            ...prev,
-                            nguoiQuanLyGianTiep: branchDirector.ho_ten || branchDirector.hoTen
-                        }));
+                    // Check if current user is a branch director (by position or hardcoded names)
+                    const branchDirectorKeywords = ['giám đốc chi nhánh', 'giam doc chi nhanh', 'branch director'];
+                    const branchDirectorNames = ['Châu Quang Hải', 'Nguyễn Ngọc Luyễn', 'Nguyễn Văn Khải'];
+                    const currentUserName = currentUser.hoTen || currentUser.ho_ten || '';
+                    const currentUserCode = currentUser.maNhanVien || currentUser.ma_nhan_vien || '';
+
+                    const isCurrentUserBranchDirector =
+                        branchDirectorKeywords.some(keyword => currentUserPosition.includes(keyword)) ||
+                        branchDirectorNames.includes(currentUserName);
+
+                    if (isCurrentUserBranchDirector) {
+                        // If current user is branch director, set CEO as indirect manager
+                        const ceo = employeesData.find(emp => {
+                            const name = (emp.ho_ten || emp.hoTen || '').toLowerCase();
+                            const position = (emp.chuc_danh || emp.chucDanh || '').toLowerCase();
+                            const code = (emp.ma_nhan_vien || emp.maNhanVien || '').toLowerCase();
+                            return name.includes('lê thanh tùng') ||
+                                name.includes('le thanh tung') ||
+                                code.includes('ceo') ||
+                                position.includes('tổng giám đốc') ||
+                                position.includes('tong giam doc') ||
+                                position.includes('ceo') ||
+                                position.includes('giám đốc điều hành');
+                        });
+
+                        if (ceo) {
+                            console.log('✅ Current user is Branch Director, setting CEO as indirect manager:', {
+                                currentUser: currentUserName,
+                                currentUserCode: currentUserCode,
+                                ceo: ceo.ho_ten || ceo.hoTen,
+                                ceoCode: ceo.ma_nhan_vien || ceo.maNhanVien
+                            });
+                            setRecruitmentForm(prev => ({
+                                ...prev,
+                                nguoiQuanLyGianTiep: ceo.ho_ten || ceo.hoTen
+                            }));
+                        } else {
+                            console.warn('⚠️ CEO not found in employees list!');
+                        }
+                    } else {
+                        // If current user is NOT branch director, find their branch director
+                        const branchDirector = employeesData.find(emp => {
+                            const empName = emp.ho_ten || emp.hoTen || '';
+                            const empPosition = (emp.chuc_danh || emp.chucDanh || '').toLowerCase();
+                            const empBranch = emp.chi_nhanh || emp.chiNhanh;
+
+                            const isBranchDirector =
+                                branchDirectorNames.includes(empName) ||
+                                branchDirectorKeywords.some(keyword => empPosition.includes(keyword));
+
+                            return isBranchDirector && empBranch === userBranch;
+                        });
+
+                        if (branchDirector) {
+                            setRecruitmentForm(prev => ({
+                                ...prev,
+                                nguoiQuanLyGianTiep: branchDirector.ho_ten || branchDirector.hoTen
+                            }));
+                        }
                     }
                 }
             } catch (error) {
@@ -481,12 +530,12 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 const updatedResponse = await interviewRequestsAPI.getAll(params);
                 const allRequests = updatedResponse.data?.data || [];
                 // Lọc chỉ lấy PENDING_INTERVIEW và WAITING_FOR_OTHER_APPROVAL
-                const pendingRequests = allRequests.filter(req => 
+                const pendingRequests = allRequests.filter(req =>
                     req.status === 'PENDING_INTERVIEW' || req.status === 'WAITING_FOR_OTHER_APPROVAL'
                 );
                 setInterviewRequests(pendingRequests);
                 setInterviewRequestsCount(pendingRequests.length);
-                
+
                 // Refresh ready list nếu có - loại bỏ các ứng viên đã ON_PROBATION
                 const readyRequests = allRequests.filter(req => {
                     if (req.status !== 'READY_FOR_INTERVIEW') return false;
@@ -495,7 +544,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 });
                 setReadyInterviewRequests(readyRequests);
                 setReadyInterviewRequestsCount(readyRequests.length);
-                
+
                 setShowInterviewRequestDetail(false);
                 setSelectedInterviewRequest(null);
             }
@@ -537,12 +586,12 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 const updatedResponse = await interviewRequestsAPI.getAll(params);
                 const allRequests = updatedResponse.data?.data || [];
                 // Lọc chỉ lấy PENDING_INTERVIEW và WAITING_FOR_OTHER_APPROVAL
-                const pendingRequests = allRequests.filter(req => 
+                const pendingRequests = allRequests.filter(req =>
                     req.status === 'PENDING_INTERVIEW' || req.status === 'WAITING_FOR_OTHER_APPROVAL'
                 );
                 setInterviewRequests(pendingRequests);
                 setInterviewRequestsCount(pendingRequests.length);
-                
+
                 // Cập nhật ready count - loại bỏ các ứng viên đã ON_PROBATION
                 const readyRequests = allRequests.filter(req => {
                     if (req.status !== 'READY_FOR_INTERVIEW') return false;
@@ -573,31 +622,31 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
             const allEvalsResponse = await interviewEvaluationsAPI.getAll({
                 interviewRequestId: request.id
             });
-            
+
             // Load current user's evaluation
             const evalResponse = await interviewEvaluationsAPI.getAll({
                 interviewRequestId: request.id,
                 evaluatorId: currentUser?.id
             });
-            
+
             // Check if current user has evaluated
             const currentUserEval = evalResponse.data.success && evalResponse.data.data && evalResponse.data.data.length > 0
                 ? evalResponse.data.data[0]
                 : null;
             setCurrentUserHasEvaluated(!!currentUserEval);
-            
+
             // Check if both manager and branch director have evaluated
-            const allEvals = allEvalsResponse.data.success && allEvalsResponse.data.data 
-                ? allEvalsResponse.data.data 
+            const allEvals = allEvalsResponse.data.success && allEvalsResponse.data.data
+                ? allEvalsResponse.data.data
                 : [];
             const managerEval = allEvals.find(e => e.evaluator_id === request.manager_id);
             const branchDirectorEval = allEvals.find(e => e.evaluator_id === request.branch_director_id);
             const bothHaveEvaluated = !!(managerEval && branchDirectorEval);
             setBothEvaluated(bothHaveEvaluated);
-            
+
             // Set readonly if current user has evaluated OR both have evaluated
             setIsEvaluationReadOnly(!!currentUserEval || bothHaveEvaluated);
-            
+
             const formatDateTime = (dateValue) => {
                 if (!dateValue) return '';
                 try {
@@ -613,7 +662,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
             const getUserName = () => {
                 return currentUser?.ho_ten || currentUser?.hoTen || currentUser?.name || '';
             };
-            
+
             if (currentUserEval) {
                 setEvaluationForm({
                     tenUngVien: currentUserEval.ten_ung_vien || request.candidate_name || '',
@@ -743,7 +792,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
             }
             return;
         }
-        
+
         // Validate required fields
         if (!evaluationForm.ketLuan) {
             if (showToast) {
@@ -751,27 +800,27 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
             }
             return;
         }
-        
+
         try {
             setSavingEvaluation(true);
-            
+
             // Check if evaluation exists
             const checkResponse = await interviewEvaluationsAPI.getAll({
                 interviewRequestId: selectedEvaluationRequest.id,
                 evaluatorId: currentUser.id
             });
-            
+
             const existingEval = checkResponse.data.success && checkResponse.data.data && checkResponse.data.data.length > 0
                 ? checkResponse.data.data[0]
                 : null;
-            
+
             const evaluationData = {
                 interviewRequestId: selectedEvaluationRequest.id,
                 candidateId: selectedEvaluationRequest.candidate_id,
                 evaluatorId: currentUser.id,
                 ...evaluationForm
             };
-            
+
             let response;
             if (existingEval) {
                 // Update existing evaluation
@@ -780,7 +829,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 // Create new evaluation
                 response = await interviewEvaluationsAPI.create(evaluationData);
             }
-            
+
             if (response.data.success) {
                 if (showToast) {
                     showToast('Đã lưu đánh giá phỏng vấn thành công', 'success');
@@ -802,9 +851,9 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 });
                 setReadyInterviewRequests(readyRequests);
                 setReadyInterviewRequestsCount(readyRequests.length);
-                
+
                 // Cập nhật interview count
-                const pendingRequests = allRequests.filter(req => 
+                const pendingRequests = allRequests.filter(req =>
                     req.status === 'PENDING_INTERVIEW' || req.status === 'WAITING_FOR_OTHER_APPROVAL'
                 );
                 setInterviewRequestsCount(pendingRequests.length);
@@ -1008,26 +1057,32 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 }
 
                 // Fetch interview requests với status filter
-                const response = await interviewRequestsAPI.getAll({ 
+                const response = await interviewRequestsAPI.getAll({
                     ...params,
-                    status: statusFilter || undefined 
+                    status: statusFilter || undefined
                 });
-                
+
                 if (response.data?.success) {
                     const requestsData = response.data.data || [];
-                    
+
                     // Map interview requests data để có format phù hợp với table
-                    const mappedCandidates = requestsData.map(request => ({
-                        id: request.candidate_id || request.candidateId || request.id,
-                        requestId: request.id,
-                        name: request.candidate_name || request.candidateName || '-',
-                        position: request.vi_tri_ung_tuyen || request.viTriUngTuyen || request.chuc_danh_can_tuyen || '-',
-                        department: request.phong_ban || request.phongBan || request.phong_ban_bo_phan || '-',
-                        date: request.created_at || request.createdAt || request.interview_time || '-',
-                        status: request.status || 'PENDING_INTERVIEW',
-                        interviewRequest: request
-                    }));
-                    
+                    const mappedCandidates = requestsData
+                        .filter(request => {
+                            // Loại bỏ các ứng viên đang trong quá trình thử việc
+                            const candidateStatus = request.candidate_status;
+                            return candidateStatus !== 'ON_PROBATION';
+                        })
+                        .map(request => ({
+                            id: request.candidate_id || request.candidateId || request.id,
+                            requestId: request.id,
+                            name: request.candidate_name || request.candidateName || '-',
+                            position: request.vi_tri_ung_tuyen || request.viTriUngTuyen || request.chuc_danh_can_tuyen || '-',
+                            department: request.phong_ban || request.phongBan || request.phong_ban_bo_phan || '-',
+                            date: request.created_at || request.createdAt || request.interview_time || '-',
+                            status: request.status || 'PENDING_INTERVIEW',
+                            interviewRequest: request
+                        }));
+
                     setCandidates(mappedCandidates);
                 } else {
                     setCandidates([]);
@@ -1144,11 +1199,11 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                 <td>
                                     {req.status === 'WAITING_FOR_OTHER_APPROVAL' ? (
                                         <span className="interview-approvals-status-badge waiting">
-                                            {req.manager_approved && !req.branch_director_approved 
+                                            {req.manager_approved && !req.branch_director_approved
                                                 ? `Đang chờ giám đốc chi nhánh${req.branch_director_name ? ` - ${req.branch_director_name}` : ''}`
                                                 : !req.manager_approved && req.branch_director_approved
-                                                ? `Đang chờ quản lý trực tiếp${req.manager_name ? ` - ${req.manager_name}` : ''}`
-                                                : 'Đang chờ người kia duyệt phỏng vấn'}
+                                                    ? `Đang chờ quản lý trực tiếp${req.manager_name ? ` - ${req.manager_name}` : ''}`
+                                                    : 'Đang chờ người kia duyệt phỏng vấn'}
                                         </span>
                                     ) : (
                                         <span className="interview-approvals-status-badge pending">Chờ duyệt phỏng vấn</span>
@@ -1371,17 +1426,6 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 </div>
             </div>
 
-            {/* Secondary Container: Request History */}
-            <div className="interview-approvals-history-card">
-                <h3 className="interview-approvals-history-title">Lịch sử Yêu cầu</h3>
-                <div className="interview-approvals-history-list">
-                    {/* Request history - sẽ được fetch từ API */}
-                    <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                        Chưa có lịch sử yêu cầu nào
-                    </div>
-                </div>
-            </div>
-
             {/* Recruitment Request Modal */}
             {isRecruitmentModalOpen && (
                 <div className="interview-approvals-modal-overlay" onClick={() => setIsRecruitmentModalOpen(false)}>
@@ -1527,14 +1571,17 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                 <label className="interview-approvals-form-label">
                                                     Loại lao động <span className="required">*</span>
                                                 </label>
-                                                <select
-                                                    className="interview-approvals-form-select"
+                                                <CustomDropdown
+                                                    id="loaiLaoDong"
+                                                    name="loaiLaoDong"
                                                     value={recruitmentForm.loaiLaoDong}
                                                     onChange={(e) => setRecruitmentForm({ ...recruitmentForm, loaiLaoDong: e.target.value })}
-                                                >
-                                                    <option value="toan_thoi_gian">Toàn thời gian (Full-time)</option>
-                                                    <option value="thoi_vu">Thời vụ</option>
-                                                </select>
+                                                    options={[
+                                                        { value: 'toan_thoi_gian', label: 'Toàn thời gian (Full-time)' },
+                                                        { value: 'thoi_vu', label: 'Thời vụ' }
+                                                    ]}
+                                                    placeholder="Chọn loại lao động"
+                                                />
                                             </div>
 
                                             <div className="interview-approvals-form-group">
@@ -1602,15 +1649,18 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                         <div className="interview-approvals-form-column">
                                             <div className="interview-approvals-form-group">
                                                 <label className="interview-approvals-form-label">Giới tính</label>
-                                                <select
-                                                    className="interview-approvals-form-select"
+                                                <CustomDropdown
+                                                    id="gioiTinh"
+                                                    name="gioiTinh"
                                                     value={recruitmentForm.gioiTinh}
                                                     onChange={(e) => setRecruitmentForm({ ...recruitmentForm, gioiTinh: e.target.value })}
-                                                >
-                                                    <option value="bat_ky">Bất kỳ</option>
-                                                    <option value="nam">Nam</option>
-                                                    <option value="nu">Nữ</option>
-                                                </select>
+                                                    options={[
+                                                        { value: 'bat_ky', label: 'Bất kỳ' },
+                                                        { value: 'nam', label: 'Nam' },
+                                                        { value: 'nu', label: 'Nữ' }
+                                                    ]}
+                                                    placeholder="Chọn giới tính"
+                                                />
                                             </div>
 
                                             <div className="interview-approvals-form-group">
@@ -2315,16 +2365,15 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                         <h3 className="interview-approvals-detail-header-title">
                                             {selectedInterviewRequest.candidate_name || '---'}
                                         </h3>
-                                        <span className={`interview-approvals-detail-status-badge ${
-                                            selectedInterviewRequest.status === 'WAITING_FOR_OTHER_APPROVAL' ? 'status-waiting' : 
+                                        <span className={`interview-approvals-detail-status-badge ${selectedInterviewRequest.status === 'WAITING_FOR_OTHER_APPROVAL' ? 'status-waiting' :
                                             selectedInterviewRequest.status === 'READY_FOR_INTERVIEW' ? 'status-ready' : 'status-pending'
-                                        }`}>
+                                            }`}>
                                             {selectedInterviewRequest.status === 'WAITING_FOR_OTHER_APPROVAL' ? (
-                                                selectedInterviewRequest.manager_approved && !selectedInterviewRequest.branch_director_approved 
+                                                selectedInterviewRequest.manager_approved && !selectedInterviewRequest.branch_director_approved
                                                     ? `Đang chờ giám đốc chi nhánh${selectedInterviewRequest.branch_director_name ? ` - ${selectedInterviewRequest.branch_director_name}` : ''}`
                                                     : !selectedInterviewRequest.manager_approved && selectedInterviewRequest.branch_director_approved
-                                                    ? `Đang chờ quản lý trực tiếp${selectedInterviewRequest.manager_name ? ` - ${selectedInterviewRequest.manager_name}` : ''}`
-                                                    : 'Đang chờ người kia duyệt phỏng vấn'
+                                                        ? `Đang chờ quản lý trực tiếp${selectedInterviewRequest.manager_name ? ` - ${selectedInterviewRequest.manager_name}` : ''}`
+                                                        : 'Đang chờ người kia duyệt phỏng vấn'
                                             ) : selectedInterviewRequest.status === 'READY_FOR_INTERVIEW' ? (
                                                 'Sẵn sàng phỏng vấn'
                                             ) : (
@@ -2632,83 +2681,83 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                             </div>
 
                             {/* Section 3: Chi Tiết Yêu Cầu */}
-                            {(recruitmentForm.trinhDoHocVanYeuCau || recruitmentForm.chiTietKinhNghiem || recruitmentForm.kienThucChuyenMonKhac || 
-                              recruitmentForm.yeuCauNgoaiNgu || recruitmentForm.yeuCauViTinhKyNangKhac || recruitmentForm.kyNangGiaoTiep || 
-                              recruitmentForm.thaiDoLamViec || recruitmentForm.kyNangQuanLy || recruitmentForm.yeuCauChiTietCongViec || 
-                              recruitmentForm.lyDoKhacGhiChu) && (
-                                <div className="preview-section">
-                                    <div className="preview-section-header">
-                                        <h3 className="preview-section-title">
-                                            <svg className="preview-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                            </svg>
-                                            Chi Tiết Yêu Cầu
-                                        </h3>
+                            {(recruitmentForm.trinhDoHocVanYeuCau || recruitmentForm.chiTietKinhNghiem || recruitmentForm.kienThucChuyenMonKhac ||
+                                recruitmentForm.yeuCauNgoaiNgu || recruitmentForm.yeuCauViTinhKyNangKhac || recruitmentForm.kyNangGiaoTiep ||
+                                recruitmentForm.thaiDoLamViec || recruitmentForm.kyNangQuanLy || recruitmentForm.yeuCauChiTietCongViec ||
+                                recruitmentForm.lyDoKhacGhiChu) && (
+                                    <div className="preview-section">
+                                        <div className="preview-section-header">
+                                            <h3 className="preview-section-title">
+                                                <svg className="preview-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                </svg>
+                                                Chi Tiết Yêu Cầu
+                                            </h3>
+                                        </div>
+                                        <div className="preview-text-cards">
+                                            {recruitmentForm.trinhDoHocVanYeuCau && (
+                                                <div className="preview-text-card">
+                                                    <span className="preview-label">Trình độ học vấn</span>
+                                                    <span className="preview-value">{recruitmentForm.trinhDoHocVanYeuCau}</span>
+                                                </div>
+                                            )}
+                                            {recruitmentForm.kinhNghiemChuyenMon === 'co_yeu_cau' && recruitmentForm.chiTietKinhNghiem && (
+                                                <div className="preview-text-card">
+                                                    <span className="preview-label">Chi tiết kinh nghiệm</span>
+                                                    <span className="preview-value">{recruitmentForm.chiTietKinhNghiem}</span>
+                                                </div>
+                                            )}
+                                            {recruitmentForm.kienThucChuyenMonKhac && (
+                                                <div className="preview-text-card">
+                                                    <span className="preview-label">Kiến thức chuyên môn</span>
+                                                    <span className="preview-value">{recruitmentForm.kienThucChuyenMonKhac}</span>
+                                                </div>
+                                            )}
+                                            {recruitmentForm.yeuCauNgoaiNgu && (
+                                                <div className="preview-text-card">
+                                                    <span className="preview-label">Yêu cầu ngoại ngữ</span>
+                                                    <span className="preview-value">{recruitmentForm.yeuCauNgoaiNgu}</span>
+                                                </div>
+                                            )}
+                                            {recruitmentForm.yeuCauViTinhKyNangKhac && (
+                                                <div className="preview-text-card">
+                                                    <span className="preview-label">Vi tính / Kỹ năng</span>
+                                                    <span className="preview-value">{recruitmentForm.yeuCauViTinhKyNangKhac}</span>
+                                                </div>
+                                            )}
+                                            {recruitmentForm.kyNangGiaoTiep && (
+                                                <div className="preview-text-card">
+                                                    <span className="preview-label">Kỹ năng giao tiếp</span>
+                                                    <span className="preview-value">{recruitmentForm.kyNangGiaoTiep}</span>
+                                                </div>
+                                            )}
+                                            {recruitmentForm.thaiDoLamViec && (
+                                                <div className="preview-text-card">
+                                                    <span className="preview-label">Thái độ làm việc</span>
+                                                    <span className="preview-value">{recruitmentForm.thaiDoLamViec}</span>
+                                                </div>
+                                            )}
+                                            {recruitmentForm.kyNangQuanLy && (
+                                                <div className="preview-text-card">
+                                                    <span className="preview-label">Kỹ năng quản lý</span>
+                                                    <span className="preview-value">{recruitmentForm.kyNangQuanLy}</span>
+                                                </div>
+                                            )}
+                                            {recruitmentForm.yeuCauChiTietCongViec && (
+                                                <div className="preview-text-card">
+                                                    <span className="preview-label">Yêu cầu chi tiết công việc</span>
+                                                    <span className="preview-value">{recruitmentForm.yeuCauChiTietCongViec}</span>
+                                                </div>
+                                            )}
+                                            {recruitmentForm.lyDoKhacGhiChu && (
+                                                <div className="preview-text-card">
+                                                    <span className="preview-label">Ghi chú</span>
+                                                    <span className="preview-value">{recruitmentForm.lyDoKhacGhiChu}</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="preview-text-cards">
-                                        {recruitmentForm.trinhDoHocVanYeuCau && (
-                                            <div className="preview-text-card">
-                                                <span className="preview-label">Trình độ học vấn</span>
-                                                <span className="preview-value">{recruitmentForm.trinhDoHocVanYeuCau}</span>
-                                            </div>
-                                        )}
-                                        {recruitmentForm.kinhNghiemChuyenMon === 'co_yeu_cau' && recruitmentForm.chiTietKinhNghiem && (
-                                            <div className="preview-text-card">
-                                                <span className="preview-label">Chi tiết kinh nghiệm</span>
-                                                <span className="preview-value">{recruitmentForm.chiTietKinhNghiem}</span>
-                                            </div>
-                                        )}
-                                        {recruitmentForm.kienThucChuyenMonKhac && (
-                                            <div className="preview-text-card">
-                                                <span className="preview-label">Kiến thức chuyên môn</span>
-                                                <span className="preview-value">{recruitmentForm.kienThucChuyenMonKhac}</span>
-                                            </div>
-                                        )}
-                                        {recruitmentForm.yeuCauNgoaiNgu && (
-                                            <div className="preview-text-card">
-                                                <span className="preview-label">Yêu cầu ngoại ngữ</span>
-                                                <span className="preview-value">{recruitmentForm.yeuCauNgoaiNgu}</span>
-                                            </div>
-                                        )}
-                                        {recruitmentForm.yeuCauViTinhKyNangKhac && (
-                                            <div className="preview-text-card">
-                                                <span className="preview-label">Vi tính / Kỹ năng</span>
-                                                <span className="preview-value">{recruitmentForm.yeuCauViTinhKyNangKhac}</span>
-                                            </div>
-                                        )}
-                                        {recruitmentForm.kyNangGiaoTiep && (
-                                            <div className="preview-text-card">
-                                                <span className="preview-label">Kỹ năng giao tiếp</span>
-                                                <span className="preview-value">{recruitmentForm.kyNangGiaoTiep}</span>
-                                            </div>
-                                        )}
-                                        {recruitmentForm.thaiDoLamViec && (
-                                            <div className="preview-text-card">
-                                                <span className="preview-label">Thái độ làm việc</span>
-                                                <span className="preview-value">{recruitmentForm.thaiDoLamViec}</span>
-                                            </div>
-                                        )}
-                                        {recruitmentForm.kyNangQuanLy && (
-                                            <div className="preview-text-card">
-                                                <span className="preview-label">Kỹ năng quản lý</span>
-                                                <span className="preview-value">{recruitmentForm.kyNangQuanLy}</span>
-                                            </div>
-                                        )}
-                                        {recruitmentForm.yeuCauChiTietCongViec && (
-                                            <div className="preview-text-card">
-                                                <span className="preview-label">Yêu cầu chi tiết công việc</span>
-                                                <span className="preview-value">{recruitmentForm.yeuCauChiTietCongViec}</span>
-                                            </div>
-                                        )}
-                                        {recruitmentForm.lyDoKhacGhiChu && (
-                                            <div className="preview-text-card">
-                                                <span className="preview-label">Ghi chú</span>
-                                                <span className="preview-value">{recruitmentForm.lyDoKhacGhiChu}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+                                )}
                         </div>
 
                         {/* Footer */}
@@ -3366,10 +3415,10 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                         </div>
                         <div className="interview-evaluation-modal-footer">
                             {bothEvaluated && (
-                                <div className="interview-evaluation-status-message" style={{ 
-                                    padding: '0.75rem 1rem', 
-                                    background: '#10b981', 
-                                    color: 'white', 
+                                <div className="interview-evaluation-status-message" style={{
+                                    padding: '0.75rem 1rem',
+                                    background: '#10b981',
+                                    color: 'white',
                                     borderRadius: '0.5rem',
                                     marginBottom: '1rem',
                                     textAlign: 'center'
@@ -3378,10 +3427,10 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                 </div>
                             )}
                             {currentUserHasEvaluated && !bothEvaluated && (
-                                <div className="interview-evaluation-status-message" style={{ 
-                                    padding: '0.75rem 1rem', 
-                                    background: '#f59e0b', 
-                                    color: 'white', 
+                                <div className="interview-evaluation-status-message" style={{
+                                    padding: '0.75rem 1rem',
+                                    background: '#f59e0b',
+                                    color: 'white',
                                     borderRadius: '0.5rem',
                                     marginBottom: '1rem',
                                     textAlign: 'center'

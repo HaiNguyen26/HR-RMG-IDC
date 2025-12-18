@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { employeesAPI, leaveRequestsAPI, overtimeRequestsAPI, attendanceAdjustmentsAPI, recruitmentRequestsAPI } from '../../services/api';
+import { employeesAPI, leaveRequestsAPI, overtimeRequestsAPI, attendanceAdjustmentsAPI, recruitmentRequestsAPI, customerEntertainmentExpensesAPI } from '../../services/api';
 import './Sidebar.css';
 
 const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout, isOpen = false, onClose }) => {
@@ -10,6 +10,8 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
     const [hasInterviewAccess, setHasInterviewAccess] = useState(false);
     const [pendingRecruitmentCount, setPendingRecruitmentCount] = useState(0);
     const [isBranchDirectorForRecruitment, setIsBranchDirectorForRecruitment] = useState(false);
+    const [pendingExpenseApprovalCount, setPendingExpenseApprovalCount] = useState(0);
+    const [pendingExpenseCeoCount, setPendingExpenseCeoCount] = useState(0);
 
     useEffect(() => {
         let isMounted = true;
@@ -290,6 +292,122 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
         const interval = setInterval(fetchPendingCount, 30000);
         return () => clearInterval(interval);
     }, [isBranchDirectorForRecruitment, currentUser?.id]);
+
+    // Fetch pending entertainment expense approvals for branch directors
+    useEffect(() => {
+        if (!currentUser?.id) {
+            setPendingExpenseApprovalCount(0);
+            return;
+        }
+
+        // Check if user is allowed branch director (will be calculated below)
+        const currentUserName = (currentUser?.hoTen || currentUser?.username || '').trim();
+        const normalizedCurrentName = currentUserName.toLowerCase();
+
+        const removeAccents = (str) => {
+            if (!str) return '';
+            return str
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/đ/g, 'd')
+                .replace(/Đ/g, 'D');
+        };
+
+        const normalizedCurrentNameNoAccents = removeAccents(normalizedCurrentName);
+
+        const allowedBranchDirectors = [
+            'châu quang hải',
+            'chau quang hai',
+            'nguyễn ngọc luyễn',
+            'nguyen ngoc luyen',
+            'nguyễn văn khải',
+            'nguyen van khai'
+        ];
+
+        const isAllowedBD = allowedBranchDirectors.some(name =>
+            normalizedCurrentName.includes(name) ||
+            normalizedCurrentNameNoAccents.includes(removeAccents(name))
+        );
+
+        if (!isAllowedBD) {
+            setPendingExpenseApprovalCount(0);
+            return;
+        }
+
+        const fetchPendingExpenseCount = async () => {
+            try {
+                const response = await customerEntertainmentExpensesAPI.getAll({
+                    branchDirectorId: currentUser.id,
+                    status: 'PENDING_BRANCH_DIRECTOR'
+                });
+                const count = response.data?.data?.length || 0;
+                setPendingExpenseApprovalCount(count);
+            } catch (error) {
+                console.error('Error fetching pending expense approval count:', error);
+                setPendingExpenseApprovalCount(0);
+            }
+        };
+
+        fetchPendingExpenseCount();
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchPendingExpenseCount, 30000);
+        return () => clearInterval(interval);
+    }, [currentUser?.id, currentUser?.hoTen, currentUser?.username]);
+
+    // Fetch pending entertainment expense for CEO (Lê Thanh Tùng)
+    useEffect(() => {
+        if (!currentUser?.id) {
+            setPendingExpenseCeoCount(0);
+            return;
+        }
+
+        const userName = (currentUser.hoTen || currentUser.username || '').trim();
+        const normalizedUserName = userName.toLowerCase().replace(/\s+/g, ' ');
+
+        const removeAccents = (str) => {
+            if (!str) return '';
+            return str
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/đ/g, 'd')
+                .replace(/Đ/g, 'D');
+        };
+
+        const normalizedUserNameNoAccents = removeAccents(normalizedUserName);
+
+        const allowedCeoNames = [
+            'lê thanh tùng',
+            'le thanh tung'
+        ];
+
+        const isLeThanhTung = allowedCeoNames.some(name =>
+            normalizedUserName.includes(name) ||
+            normalizedUserNameNoAccents.includes(removeAccents(name))
+        );
+
+        if (!isLeThanhTung) {
+            setPendingExpenseCeoCount(0);
+            return;
+        }
+
+        const fetchPendingExpenseCeoCount = async () => {
+            try {
+                const response = await customerEntertainmentExpensesAPI.getAll({
+                    status: 'APPROVED_BY_BRANCH_DIRECTOR'
+                });
+                const count = response.data?.data?.length || 0;
+                setPendingExpenseCeoCount(count);
+            } catch (error) {
+                console.error('Error fetching pending expense CEO count:', error);
+                setPendingExpenseCeoCount(0);
+            }
+        };
+
+        fetchPendingExpenseCeoCount();
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchPendingExpenseCeoCount, 30000);
+        return () => clearInterval(interval);
+    }, [currentUser?.id, currentUser?.hoTen, currentUser?.username]);
 
     const isEmployee = currentUser?.role === 'EMPLOYEE';
     const chucDanh = (currentUser?.chucDanh || '').trim().replace(/^["']+|["']+$/g, '');
@@ -681,6 +799,11 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                                     </svg>
                                                 </span>
                                                 <span className="nav-label">Duyệt Chi phí Tiếp khách</span>
+                                                {pendingExpenseApprovalCount > 0 && (
+                                                    <span className="nav-badge nav-badge-pulse">
+                                                        {pendingExpenseApprovalCount}
+                                                    </span>
+                                                )}
                                             </button>
                                         </li>
                                     )}
@@ -715,19 +838,46 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
 
                                         return isLeThanhTung;
                                     })() && (
-                                            <li>
-                                                <button
-                                                    onClick={() => onNavigate('customer-entertainment-expense-ceo')}
-                                                    className={`nav-item nav-item-approval ${currentView === 'customer-entertainment-expense-ceo' ? 'active' : ''}`}
-                                                >
-                                                    <span className="nav-icon-wrapper">
-                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                                                        </svg>
-                                                    </span>
-                                                    <span className="nav-label">Phê Duyệt Cuối Cùng Chi Phí</span>
-                                                </button>
-                                            </li>
+                                            <>
+                                                {/* CEO Progress Tracking - Menu đặc biệt */}
+                                                <li>
+                                                    <button
+                                                        onClick={() => onNavigate('ceo-progress-tracking')}
+                                                        className={`nav-item nav-item-ceo-special ${currentView === 'ceo-progress-tracking' ? 'active' : ''}`}
+                                                    >
+                                                        <span className="nav-icon-wrapper">
+                                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                            </svg>
+                                                        </span>
+                                                        <span className="nav-label">
+                                                            <svg className="nav-label-crown" fill="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '6px' }}>
+                                                                <path d="M12 2L9 12h6l-3-10zm0 20c-3.87 0-7-3.13-7-7h14c0 3.87-3.13 7-7 7z" />
+                                                            </svg>
+                                                            Theo dõi Tiến độ
+                                                        </span>
+                                                    </button>
+                                                </li>
+
+                                                <li>
+                                                    <button
+                                                        onClick={() => onNavigate('customer-entertainment-expense-ceo')}
+                                                        className={`nav-item nav-item-approval ${currentView === 'customer-entertainment-expense-ceo' ? 'active' : ''}`}
+                                                    >
+                                                        <span className="nav-icon-wrapper">
+                                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                                                            </svg>
+                                                        </span>
+                                                        <span className="nav-label">Phê Duyệt Cuối Cùng Chi Phí</span>
+                                                        {pendingExpenseCeoCount > 0 && (
+                                                            <span className="nav-badge nav-badge-pulse">
+                                                                {pendingExpenseCeoCount}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                </li>
+                                            </>
                                         )}
                                 </>
                             )}
@@ -808,7 +958,25 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
             </nav>
 
             {/* User Account Section */}
-            <div className="sidebar-logout">
+            <div className="sidebar-user-section">
+                {/* User Info Card */}
+                <div className="sidebar-user-info">
+                    <div className="sidebar-user-avatar">
+                        <svg fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                        </svg>
+                    </div>
+                    <div className="sidebar-user-details">
+                        <div className="sidebar-user-name">
+                            {currentUser?.hoTen || currentUser?.ho_ten || 'User'}
+                        </div>
+                        <div className="sidebar-user-department">
+                            {currentUser?.phongBan || currentUser?.phong_ban || 'N/A'}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Logout Button */}
                 <button onClick={onLogout} className="sidebar-logout-btn">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"

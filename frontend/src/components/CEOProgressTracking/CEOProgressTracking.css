@@ -1,0 +1,836 @@
+/* ============================================
+   CEO PROGRESS TRACKING - REDESIGNED
+   Gold Theme - Simple & Functional
+   ============================================ */
+
+/* Container - Chiếm đủ 100% main-content */
+.ceo-tracking-container {
+    padding: 2rem;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fffbeb 100%);
+    animation: fadeIn 0.4s ease;
+    min-height: 100%;
+    /* Chiếm đủ main-content */
+    display: flex;
+    flex-direction: column;
+    /* Để timeline có thể flex */
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================================
+   HEADER
+   ============================================ */
+.ceo-tracking-header {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    border-radius: 1rem;
+    padding: 1.5rem 2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-shrink: 0;
+    /* Không co lại */
+}
+
+.ceo-tracking-header-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.ceo-tracking-header-icon {
+    width: 3rem;
+    height: 3rem;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ceo-tracking-header-icon svg {
+    width: 1.75rem;
+    height: 1.75rem;
+    color: #ffffff;
+}
+
+.ceo-tracking-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0;
+}
+
+.ceo-tracking-subtitle {
+    font-size: 0.9375rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0.25rem 0 0 0;
+}
+
+.ceo-tracking-refresh-btn {
+    padding: 0.625rem 1.25rem;
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+}
+
+.ceo-tracking-refresh-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.ceo-tracking-refresh-btn svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ============================================
+   STATISTICS CARDS
+   ============================================ */
+.ceo-tracking-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-shrink: 0;
+    /* Không co lại */
+}
+
+.ceo-tracking-stat-card {
+    background: #ffffff;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    display: flex;
+    gap: 0.875rem;
+    transition: all 0.2s;
+}
+
+.ceo-tracking-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.ceo-tracking-stat-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ceo-tracking-stat-card.leave .ceo-tracking-stat-icon {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.ceo-tracking-stat-card.expense .ceo-tracking-stat-icon {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.ceo-tracking-stat-card.recruitment .ceo-tracking-stat-icon {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.ceo-tracking-stat-icon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.ceo-tracking-stat-content h3 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin: 0 0 0.5rem 0;
+}
+
+.ceo-tracking-stat-total {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f59e0b;
+    margin-bottom: 0.5rem;
+}
+
+.ceo-tracking-stat-breakdown {
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.ceo-tracking-stat-breakdown span {
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.ceo-tracking-stat-breakdown .pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.ceo-tracking-stat-breakdown .approved {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.ceo-tracking-stat-breakdown .rejected {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* ============================================
+   FILTERS
+   ============================================ */
+.ceo-tracking-filters {
+    background: #ffffff;
+    border-radius: 0.75rem;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    /* Không co lại */
+}
+
+.ceo-tracking-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.ceo-tracking-filter-group label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.ceo-tracking-filter-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.ceo-tracking-filter-buttons button {
+    padding: 0.5rem 1rem;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #6b7280;
+    border-radius: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ceo-tracking-filter-buttons button:hover {
+    border-color: #f59e0b;
+    color: #f59e0b;
+}
+
+.ceo-tracking-filter-buttons button.active {
+    background: #f59e0b;
+    color: #ffffff;
+    border-color: #f59e0b;
+}
+
+/* ============================================
+   TIMELINE - Fit vừa đủ 100% trang
+   ============================================ */
+.ceo-tracking-timeline-container {
+    background: #ffffff;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    margin-bottom: 0;
+    /* Bỏ margin để fit chính xác */
+    flex: 1;
+    /* Chiếm không gian còn lại */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Container không scroll */
+    min-height: 0;
+    /* Important cho flexbox */
+}
+
+/* Custom scrollbar cho timeline */
+.ceo-tracking-timeline::-webkit-scrollbar {
+    width: 8px;
+}
+
+.ceo-tracking-timeline::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 4px;
+}
+
+.ceo-tracking-timeline::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #fbbf24, #f59e0b);
+    border-radius: 4px;
+}
+
+.ceo-tracking-timeline::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #f59e0b, #d97706);
+}
+
+.ceo-tracking-timeline-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 1rem 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #fef3c7;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    /* Không co lại */
+}
+
+.ceo-tracking-timeline-title svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: #f59e0b;
+}
+
+.ceo-tracking-timeline {
+    position: relative;
+    padding-left: 2.5rem;
+    flex: 1;
+    /* Chiếm không gian còn lại */
+    overflow-y: auto;
+    /* Scroll riêng cho timeline */
+    overflow-x: hidden;
+    min-height: 0;
+    /* Important cho flexbox */
+}
+
+.ceo-tracking-timeline::before {
+    content: '';
+    position: absolute;
+    left: 1rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, #fbbf24, #f59e0b, #d97706);
+}
+
+.ceo-tracking-timeline-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.ceo-tracking-timeline-item:last-child {
+    margin-bottom: 0;
+}
+
+.ceo-tracking-timeline-marker {
+    position: absolute;
+    left: -2rem;
+    top: 0.375rem;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.ceo-tracking-timeline-item.leave .ceo-tracking-timeline-marker {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.ceo-tracking-timeline-item.expense .ceo-tracking-timeline-marker {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.ceo-tracking-timeline-item.recruitment .ceo-tracking-timeline-marker {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.ceo-tracking-timeline-marker svg {
+    width: 1rem;
+    height: 1rem;
+    color: #ffffff;
+}
+
+.ceo-tracking-timeline-content {
+    background: #f9fafb;
+    border-radius: 0.5rem;
+    padding: 0.875rem;
+    /* Compact padding */
+    border-left: 3px solid #e5e7eb;
+    transition: all 0.2s;
+    cursor: pointer;
+    /* Clickable */
+}
+
+.ceo-tracking-timeline-item.leave .ceo-tracking-timeline-content {
+    border-left-color: #3b82f6;
+}
+
+.ceo-tracking-timeline-item.expense .ceo-tracking-timeline-content {
+    border-left-color: #f59e0b;
+}
+
+.ceo-tracking-timeline-item.recruitment .ceo-tracking-timeline-content {
+    border-left-color: #10b981;
+}
+
+.ceo-tracking-timeline-content:hover {
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateX(2px);
+    /* Slight movement on hover */
+}
+
+.ceo-tracking-timeline-content:active {
+    transform: translateX(1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.ceo-tracking-timeline-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    gap: 0.75rem;
+}
+
+.ceo-tracking-timeline-header h3 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+}
+
+.ceo-tracking-timeline-description {
+    font-size: 0.8125rem;
+    color: #6b7280;
+    margin: 0;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    /* Chỉ hiện 1 dòng */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ceo-tracking-timeline-meta {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.ceo-tracking-timeline-meta span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+.ceo-tracking-timeline-meta svg {
+    width: 0.75rem;
+    height: 0.75rem;
+}
+
+/* ============================================
+   STATUS BADGES
+   ============================================ */
+.ceo-tracking-status-badge {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.ceo-tracking-status-badge.pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.ceo-tracking-status-badge.processing {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.ceo-tracking-status-badge.approved {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.ceo-tracking-status-badge.rejected {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.ceo-tracking-status-badge.default {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+/* ============================================
+   LOADING & EMPTY
+   ============================================ */
+.ceo-tracking-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 50vh;
+    gap: 1rem;
+}
+
+.ceo-tracking-spinner {
+    width: 3rem;
+    height: 3rem;
+    border: 3px solid rgba(245, 158, 11, 0.2);
+    border-top-color: #f59e0b;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.ceo-tracking-loading p {
+    font-size: 1rem;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.ceo-tracking-empty {
+    text-align: center;
+    padding: 3rem 2rem;
+}
+
+.ceo-tracking-empty svg {
+    width: 4rem;
+    height: 4rem;
+    color: #d1d5db;
+    margin-bottom: 1rem;
+}
+
+.ceo-tracking-empty p {
+    font-size: 1rem;
+    color: #9ca3af;
+}
+
+/* ============================================
+   MODAL CHI TIẾT
+   ============================================ */
+.ceo-tracking-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+}
+
+.ceo-tracking-modal {
+    background: #ffffff;
+    border-radius: 1rem;
+    width: 90%;
+    max-width: 700px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.ceo-tracking-modal-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 2px solid #f3f4f6;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    background: #ffffff;
+    z-index: 10;
+}
+
+.ceo-tracking-modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.ceo-tracking-modal-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.ceo-tracking-modal-type-badge.leave {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.ceo-tracking-modal-type-badge.expense {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.ceo-tracking-modal-type-badge.recruitment {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.ceo-tracking-modal-type-badge svg {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+
+.ceo-tracking-modal-close {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    border: none;
+    background: #f3f4f6;
+    color: #6b7280;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.ceo-tracking-modal-close:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.ceo-tracking-modal-close svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.ceo-tracking-modal-body {
+    padding: 2rem;
+}
+
+.ceo-tracking-modal-section {
+    margin-bottom: 2rem;
+}
+
+.ceo-tracking-modal-section:last-child {
+    margin-bottom: 0;
+}
+
+.ceo-tracking-modal-section-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    margin: 0 0 1rem 0;
+}
+
+.ceo-tracking-modal-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.ceo-tracking-modal-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.ceo-tracking-modal-info-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #9ca3af;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.ceo-tracking-modal-info-label svg {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+
+.ceo-tracking-modal-info-value {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: #1f2937;
+}
+
+.ceo-tracking-modal-description {
+    background: #f9fafb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    border-left: 3px solid #e5e7eb;
+}
+
+.ceo-tracking-modal-description p {
+    font-size: 0.9375rem;
+    color: #6b7280;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* Modal scrollbar */
+.ceo-tracking-modal::-webkit-scrollbar {
+    width: 8px;
+}
+
+.ceo-tracking-modal::-webkit-scrollbar-track {
+    background: #f3f4f6;
+}
+
+.ceo-tracking-modal::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.ceo-tracking-modal::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 1024px) {
+    .ceo-tracking-stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ceo-tracking-filters {
+        flex-direction: column;
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .ceo-tracking-container {
+        padding: 1rem;
+    }
+
+    .ceo-tracking-header {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 1.25rem;
+    }
+
+    .ceo-tracking-title {
+        font-size: 1.5rem;
+    }
+
+    .ceo-tracking-timeline {
+        padding-left: 2rem;
+    }
+
+    .ceo-tracking-timeline::before {
+        left: 0.75rem;
+    }
+
+    .ceo-tracking-timeline-marker {
+        left: -1.625rem;
+        width: 1.75rem;
+        height: 1.75rem;
+    }
+
+    /* Modal responsive */
+    .ceo-tracking-modal {
+        width: 95%;
+        max-height: 90vh;
+    }
+
+    .ceo-tracking-modal-header {
+        padding: 1rem 1.25rem;
+    }
+
+    .ceo-tracking-modal-title {
+        font-size: 1.125rem;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .ceo-tracking-modal-body {
+        padding: 1.25rem;
+    }
+
+    .ceo-tracking-modal-info-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -56,6 +56,7 @@ body {
   background: #fafbfc;
   border-left: 1px solid rgba(209, 213, 219, 0.5);
   padding: 0;
+  position: relative;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -100,13 +101,26 @@ body {
   background: transparent;
 }
 
-/* Firefox và IE/Edge */
-html,
-body,
-.main-content,
-.main-content--employee {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+/* Custom Scrollbar cho Main Content */
+.main-content::-webkit-scrollbar,
+.main-content--employee::-webkit-scrollbar {
+  width: 8px;
+}
+
+.main-content::-webkit-scrollbar-track,
+.main-content--employee::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.main-content::-webkit-scrollbar-thumb,
+.main-content--employee::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.main-content::-webkit-scrollbar-thumb:hover,
+.main-content--employee::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .surface-card {
