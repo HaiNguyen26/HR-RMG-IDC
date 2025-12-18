@@ -749,5 +749,82 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// POST /api/candidates/:id/start-probation - Bắt đầu thử việc
+router.post('/:id/start-probation', async (req, res) => {
+    const client = await pool.connect();
+    
+    try {
+        await client.query('BEGIN');
+        
+        const { id } = req.params;
+        const { startDate, recruitmentInfo } = req.body;
+        
+        if (!startDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vui lòng cung cấp ngày bắt đầu thử việc'
+            });
+        }
+        
+        // Kiểm tra ứng viên có tồn tại không
+        const checkCandidate = await client.query('SELECT id, trang_thai FROM candidates WHERE id = $1', [id]);
+        if (checkCandidate.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy ứng viên'
+            });
+        }
+        
+        // Update candidate status và ngày bắt đầu thử việc
+        // Thử update với probation_start_date trước
+        try {
+            const updateQuery = `
+                UPDATE candidates 
+                SET trang_thai = $1, probation_start_date = $2, updated_at = NOW()
+                WHERE id = $3
+            `;
+            await client.query(updateQuery, ['ON_PROBATION', startDate, id]);
+        } catch (err) {
+            // Nếu cột không tồn tại, chỉ update status
+            if (err.message.includes('column "probation_start_date" does not exist')) {
+                console.warn('Column probation_start_date does not exist, updating status only');
+                const fallbackQuery = `
+                    UPDATE candidates 
+                    SET trang_thai = $1, updated_at = NOW()
+                    WHERE id = $2
+                `;
+                await client.query(fallbackQuery, ['ON_PROBATION', id]);
+            } else {
+                console.error('Error updating candidate:', err);
+                throw err;
+            }
+        }
+        
+        // Lưu thông tin recruitment info vào bảng riêng nếu có (có thể tạo bảng sau)
+        // Hiện tại chỉ update status và ngày bắt đầu
+        
+        await client.query('COMMIT');
+        
+        res.json({
+            success: true,
+            message: 'Bắt đầu thử việc thành công',
+            data: {
+                candidateId: id,
+                startDate: startDate,
+                status: 'ON_PROBATION'
+            }
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error starting probation:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi bắt đầu thử việc: ' + error.message
+        });
+    } finally {
+        client.release();
+    }
+});
+
 module.exports = router;
 

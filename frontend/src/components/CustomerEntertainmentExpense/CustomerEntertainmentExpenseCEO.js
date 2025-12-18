@@ -6,9 +6,11 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
     const [loading, setLoading] = useState(false);
     const [report, setReport] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [rejectionNotes, setRejectionNotes] = useState('');
     const [selectedRequestDetail, setSelectedRequestDetail] = useState(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [selectedRequests, setSelectedRequests] = useState([]);
+    const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+    const [rejectionNotes, setRejectionNotes] = useState('');
 
     // Fetch report from API
     useEffect(() => {
@@ -91,12 +93,40 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
         return `${hours}:${minutes}, ${day}/${month}/${year}`;
     };
 
+    const handleSelectRequest = (requestId) => {
+        setSelectedRequests(prev => {
+            if (prev.includes(requestId)) {
+                return prev.filter(id => id !== requestId);
+            } else {
+                return [...prev, requestId];
+            }
+        });
+    };
+
+    const handleSelectAll = () => {
+        if (!report || !report.requests) return;
+        
+        if (selectedRequests.length === report.requests.length) {
+            setSelectedRequests([]);
+        } else {
+            setSelectedRequests(report.requests.map(req => req.id));
+        }
+    };
+
     const handleApprove = async () => {
-        if (!report) return;
+        if (!report || !report.requests || report.requests.length === 0) return;
+        
+        if (selectedRequests.length === 0) {
+            showToast?.('Vui lòng chọn ít nhất một phiếu để duyệt', 'warning');
+            return;
+        }
+
+        const selectedRequestsData = report.requests.filter(req => selectedRequests.includes(req.id));
+        const totalSupplement = selectedRequestsData.reduce((sum, req) => sum + req.supplementAmount, 0);
 
         const confirmed = await showConfirm?.({
             title: 'Xác nhận duyệt chi',
-            message: `Bạn có chắc chắn muốn duyệt chi ${formatCurrency(report.totals.totalSupplement)} cho ${report.totals.totalRequests} phiếu chi?`,
+            message: `Bạn có chắc chắn muốn duyệt chi ${formatCurrency(totalSupplement)} cho ${selectedRequests.length} phiếu chi đã chọn?`,
             confirmText: 'Duyệt chi',
             cancelText: 'Hủy'
         });
@@ -104,10 +134,74 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
         if (confirmed) {
             setIsProcessing(true);
             try {
-                // TODO: API call để duyệt báo cáo
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                showToast?.('Đã duyệt chi thành công!', 'success');
+                // Duyệt chỉ các request được chọn
+                const approvePromises = selectedRequestsData.map(request => {
+                    return customerEntertainmentExpensesAPI.ceoApprove(request.id, {
+                        ceoId: currentUser?.id || null,
+                        ceoNotes: `Đã duyệt chi bởi ${currentUser?.hoTen || currentUser?.username || 'CEO'}`
+                    });
+                });
+
+                // Chờ tất cả các request được duyệt
+                const results = await Promise.all(approvePromises);
+                
+                // Kiểm tra xem có request nào bị lỗi không
+                const failedRequests = results.filter(result => !result.data?.success);
+                if (failedRequests.length > 0) {
+                    showToast?.(`Có ${failedRequests.length} phiếu duyệt không thành công`, 'error');
+                } else {
+                    showToast?.('Đã duyệt chi thành công!', 'success');
+                    setSelectedRequests([]);
+                    
+                    // Refresh danh sách để loại bỏ các requests đã được duyệt
+                    const refreshResponse = await customerEntertainmentExpensesAPI.getAll({
+                        status: 'ACCOUNTANT_PROCESSED'
+                    });
+
+                    if (refreshResponse.data && refreshResponse.data.success) {
+                        const apiRequests = refreshResponse.data.data || [];
+                        const mappedRequests = apiRequests.map(request => {
+                            const totalAmount = (request.expenseItems || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                            const advanceAmount = parseFloat(request.advance_amount) || 0;
+                            const supplementAmount = totalAmount - advanceAmount;
+
+                            return {
+                                id: request.id,
+                                requestNumber: request.request_number,
+                                requester: `${request.requester_name || ''} (${request.requester_department || ''})`,
+                                requestedAmount: totalAmount,
+                                advanceAmount: advanceAmount,
+                                supplementAmount: supplementAmount,
+                                accountantNote: request.accountant_notes || '',
+                                status: request.status,
+                                fullRequest: request
+                            };
+                        });
+
+                        const totals = {
+                            totalRequests: mappedRequests.length,
+                            totalRequested: mappedRequests.reduce((sum, req) => sum + req.requestedAmount, 0),
+                            totalAdvance: mappedRequests.reduce((sum, req) => sum + req.advanceAmount, 0),
+                            totalSupplement: mappedRequests.reduce((sum, req) => sum + req.supplementAmount, 0)
+                        };
+
+                        const reportData = {
+                            id: 'REPORT-' + new Date().toISOString().split('T')[0],
+                            createdAt: new Date().toISOString(),
+                            createdBy: currentUser?.hoTen || currentUser?.username || '',
+                            createdByRole: currentUser?.chucDanh || '',
+                            requests: mappedRequests,
+                            totals: totals
+                        };
+
+                        setReport(reportData);
+                    } else {
+                        // Nếu không còn request nào, set report về null
+                        setReport(null);
+                    }
+                }
             } catch (error) {
+                console.error('Error approving requests:', error);
                 showToast?.('Lỗi khi duyệt chi: ' + (error.message || 'Unknown error'), 'error');
             } finally {
                 setIsProcessing(false);
@@ -115,17 +209,27 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
         }
     };
 
+    const handleRejectClick = () => {
+        if (selectedRequests.length === 0) {
+            showToast?.('Vui lòng chọn ít nhất một phiếu để từ chối', 'warning');
+            return;
+        }
+        setIsRejectModalOpen(true);
+    };
+
     const handleReject = async () => {
-        if (!report) return;
+        if (!report || !report.requests || report.requests.length === 0) return;
 
         if (!rejectionNotes.trim()) {
-            showToast?.('Vui lòng nhập lý do từ chối hoặc yêu cầu kiểm tra lại', 'warning');
+            showToast?.('Vui lòng nhập lý do từ chối', 'warning');
             return;
         }
 
+        const selectedRequestsData = report.requests.filter(req => selectedRequests.includes(req.id));
+
         const confirmed = await showConfirm?.({
             title: 'Xác nhận từ chối',
-            message: 'Bạn có chắc chắn muốn từ chối báo cáo này?',
+            message: `Bạn có chắc chắn muốn từ chối ${selectedRequests.length} phiếu chi đã chọn?`,
             confirmText: 'Từ chối',
             cancelText: 'Hủy'
         });
@@ -133,11 +237,76 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
         if (confirmed) {
             setIsProcessing(true);
             try {
-                // TODO: API call để từ chối báo cáo
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                showToast?.('Đã từ chối báo cáo thành công!', 'success');
-                setRejectionNotes('');
+                // Từ chối chỉ các request được chọn
+                const rejectPromises = selectedRequestsData.map(request => {
+                    return customerEntertainmentExpensesAPI.ceoReject(request.id, {
+                        ceoId: currentUser?.id || null,
+                        ceoNotes: rejectionNotes.trim()
+                    });
+                });
+
+                // Chờ tất cả các request được từ chối
+                const results = await Promise.all(rejectPromises);
+                
+                // Kiểm tra xem có request nào bị lỗi không
+                const failedRequests = results.filter(result => !result.data?.success);
+                if (failedRequests.length > 0) {
+                    showToast?.(`Có ${failedRequests.length} phiếu từ chối không thành công`, 'error');
+                } else {
+                    showToast?.('Đã từ chối báo cáo thành công!', 'success');
+                    setRejectionNotes('');
+                    setSelectedRequests([]);
+                    setIsRejectModalOpen(false);
+                    
+                    // Refresh danh sách
+                    const refreshResponse = await customerEntertainmentExpensesAPI.getAll({
+                        status: 'ACCOUNTANT_PROCESSED'
+                    });
+
+                    if (refreshResponse.data && refreshResponse.data.success) {
+                        const apiRequests = refreshResponse.data.data || [];
+                        const mappedRequests = apiRequests.map(request => {
+                            const totalAmount = (request.expenseItems || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                            const advanceAmount = parseFloat(request.advance_amount) || 0;
+                            const supplementAmount = totalAmount - advanceAmount;
+
+                            return {
+                                id: request.id,
+                                requestNumber: request.request_number,
+                                requester: `${request.requester_name || ''} (${request.requester_department || ''})`,
+                                requestedAmount: totalAmount,
+                                advanceAmount: advanceAmount,
+                                supplementAmount: supplementAmount,
+                                accountantNote: request.accountant_notes || '',
+                                status: request.status,
+                                fullRequest: request
+                            };
+                        });
+
+                        const totals = {
+                            totalRequests: mappedRequests.length,
+                            totalRequested: mappedRequests.reduce((sum, req) => sum + req.requestedAmount, 0),
+                            totalAdvance: mappedRequests.reduce((sum, req) => sum + req.advanceAmount, 0),
+                            totalSupplement: mappedRequests.reduce((sum, req) => sum + req.supplementAmount, 0)
+                        };
+
+                        const reportData = {
+                            id: 'REPORT-' + new Date().toISOString().split('T')[0],
+                            createdAt: new Date().toISOString(),
+                            createdBy: currentUser?.hoTen || currentUser?.username || '',
+                            createdByRole: currentUser?.chucDanh || '',
+                            requests: mappedRequests,
+                            totals: totals
+                        };
+
+                        setReport(reportData);
+                    } else {
+                        // Nếu không còn request nào, set report về null
+                        setReport(null);
+                    }
+                }
             } catch (error) {
+                console.error('Error rejecting requests:', error);
                 showToast?.('Lỗi khi từ chối: ' + (error.message || 'Unknown error'), 'error');
             } finally {
                 setIsProcessing(false);
@@ -252,6 +421,14 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
                         <table className="customer-entertainment-expense-ceo-table">
                             <thead>
                                 <tr>
+                                    <th style={{ width: '50px' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={report.requests.length > 0 && selectedRequests.length === report.requests.length}
+                                            onChange={handleSelectAll}
+                                            style={{ cursor: 'pointer' }}
+                                        />
+                                    </th>
                                     <th>Mã YC</th>
                                     <th>Người Yêu Cầu</th>
                                     <th>Nội Dung Chính</th>
@@ -265,6 +442,14 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
                             <tbody>
                                 {report.requests.map(request => (
                                     <tr key={request.id}>
+                                        <td>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedRequests.includes(request.id)}
+                                                onChange={() => handleSelectRequest(request.id)}
+                                                style={{ cursor: 'pointer' }}
+                                            />
+                                        </td>
                                         <td className="customer-entertainment-expense-ceo-code">{request.requestNumber}</td>
                                         <td>{request.requester}</td>
                                         <td>{request.purpose || '-'}</td>
@@ -291,40 +476,90 @@ const CustomerEntertainmentExpenseCEO = ({ currentUser, showToast, showConfirm }
                     </div>
                 </div>
 
-                {/* Rejection Notes */}
-                <div className="customer-entertainment-expense-ceo-notes-section">
-                    <label className="customer-entertainment-expense-ceo-notes-label">
-                        Ghi chú (Nếu từ chối hoặc yêu cầu kiểm tra lại):
-                    </label>
-                    <textarea
-                        className="customer-entertainment-expense-ceo-notes-textarea"
-                        value={rejectionNotes}
-                        onChange={(e) => setRejectionNotes(e.target.value)}
-                        placeholder="Nhập lý do từ chối hoặc yêu cầu kiểm tra lại..."
-                        rows="4"
-                    />
-                </div>
-
                 {/* Action Buttons */}
                 <div className="customer-entertainment-expense-ceo-actions">
-                    <button
-                        className="customer-entertainment-expense-ceo-btn approve"
-                        onClick={handleApprove}
-                        disabled={isProcessing}
-                    >
-                        <span className="customer-entertainment-expense-ceo-btn-icon">✓</span>
-                        DUYỆT CHI ({formatCurrency(report.totals.totalSupplement)})
-                    </button>
-                    <button
-                        className="customer-entertainment-expense-ceo-btn reject"
-                        onClick={handleReject}
-                        disabled={isProcessing}
-                    >
-                        <span className="customer-entertainment-expense-ceo-btn-icon">✕</span>
-                        TỪ CHỐI / YÊU CẦU KIỂM TRA LẠI
-                    </button>
+                    <div className="customer-entertainment-expense-ceo-selected-info">
+                        Đã chọn: <strong>{selectedRequests.length}</strong> / {report.requests.length} phiếu
+                    </div>
+                    <div className="customer-entertainment-expense-ceo-buttons">
+                        <button
+                            className="customer-entertainment-expense-ceo-btn approve"
+                            onClick={handleApprove}
+                            disabled={isProcessing || selectedRequests.length === 0}
+                        >
+                            <span className="customer-entertainment-expense-ceo-btn-icon">✓</span>
+                            DUYỆT CHI ({selectedRequests.length > 0 ? formatCurrency(report.requests.filter(r => selectedRequests.includes(r.id)).reduce((sum, r) => sum + r.supplementAmount, 0)) : formatCurrency(0)})
+                        </button>
+                        <button
+                            className="customer-entertainment-expense-ceo-btn reject"
+                            onClick={handleRejectClick}
+                            disabled={isProcessing || selectedRequests.length === 0}
+                        >
+                            <span className="customer-entertainment-expense-ceo-btn-icon">✕</span>
+                            TỪ CHỐI / YÊU CẦU KIỂM TRA LẠI
+                        </button>
+                    </div>
                 </div>
             </div>
+
+            {/* Reject Modal */}
+            {isRejectModalOpen && (
+                <div className="customer-entertainment-expense-ceo-reject-modal-overlay" onClick={() => {
+                    setIsRejectModalOpen(false);
+                    setRejectionNotes('');
+                }}>
+                    <div className="customer-entertainment-expense-ceo-reject-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="customer-entertainment-expense-ceo-reject-modal-header">
+                            <h2>Từ chối / Yêu cầu kiểm tra lại</h2>
+                            <button
+                                className="customer-entertainment-expense-ceo-reject-modal-close"
+                                onClick={() => {
+                                    setIsRejectModalOpen(false);
+                                    setRejectionNotes('');
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="customer-entertainment-expense-ceo-reject-modal-body">
+                            <div className="customer-entertainment-expense-ceo-reject-modal-info">
+                                Bạn đang từ chối <strong>{selectedRequests.length}</strong> phiếu chi đã chọn.
+                            </div>
+                            <div className="customer-entertainment-expense-ceo-reject-modal-form-group">
+                                <label className="customer-entertainment-expense-ceo-reject-modal-label">
+                                    Lý do từ chối <span style={{ color: '#dc2626' }}>*</span>
+                                </label>
+                                <textarea
+                                    className="customer-entertainment-expense-ceo-reject-modal-textarea"
+                                    value={rejectionNotes}
+                                    onChange={(e) => setRejectionNotes(e.target.value)}
+                                    placeholder="Nhập lý do từ chối hoặc yêu cầu kiểm tra lại..."
+                                    rows="6"
+                                />
+                            </div>
+                        </div>
+                        <div className="customer-entertainment-expense-ceo-reject-modal-footer">
+                            <button
+                                className="customer-entertainment-expense-ceo-reject-modal-btn cancel"
+                                onClick={() => {
+                                    setIsRejectModalOpen(false);
+                                    setRejectionNotes('');
+                                }}
+                                disabled={isProcessing}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                className="customer-entertainment-expense-ceo-reject-modal-btn submit"
+                                onClick={handleReject}
+                                disabled={isProcessing || !rejectionNotes.trim()}
+                            >
+                                {isProcessing ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Detail Modal */}
             {isDetailModalOpen && selectedRequestDetail && (

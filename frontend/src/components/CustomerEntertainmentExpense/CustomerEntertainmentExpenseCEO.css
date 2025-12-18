@@ -325,6 +325,26 @@
 /* Actions */
 .customer-entertainment-expense-ceo-actions {
     display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.customer-entertainment-expense-ceo-selected-info {
+    text-align: center;
+    font-size: 0.875rem;
+    color: #475569;
+    padding: 0.75rem;
+    background: rgba(239, 246, 255, 0.5);
+    border-radius: 0.5rem;
+}
+
+.customer-entertainment-expense-ceo-selected-info strong {
+    color: #2563eb;
+    font-weight: 700;
+}
+
+.customer-entertainment-expense-ceo-buttons {
+    display: flex;
     gap: 1rem;
     justify-content: center;
 }
@@ -644,18 +664,184 @@
     box-shadow: 0 2px 6px rgba(107, 114, 128, 0.3);
 }
 
+/* Reject Modal */
+.customer-entertainment-expense-ceo-reject-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+    padding: 1rem;
+}
+
+.customer-entertainment-expense-ceo-reject-modal {
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid #e5e7eb;
+    background: linear-gradient(135deg, #fee2e2, #fef2f2);
+    flex-shrink: 0;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #991b1b;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-close {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    color: #64748b;
+    cursor: pointer;
+    padding: 0;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-close:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #1e293b;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-body {
+    padding: 2rem;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-info {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: rgba(254, 226, 226, 0.5);
+    border-radius: 0.5rem;
+    color: #991b1b;
+    font-size: 0.875rem;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-textarea {
+    width: 100%;
+    padding: 0.875rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    color: #1e293b;
+    resize: vertical;
+    min-height: 120px;
+    transition: all 0.2s;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-textarea:focus {
+    outline: none;
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.customer-entertainment-expense-ceo-reject-modal-footer {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding: 1.5rem 2rem;
+    border-top: 1px solid #e5e7eb;
+    flex-shrink: 0;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-btn.cancel {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-btn.cancel:hover:not(:disabled) {
+    background: #e5e7eb;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-btn.submit {
+    background: #dc2626;
+    color: #ffffff;
+}
+
+.customer-entertainment-expense-ceo-reject-modal-btn.submit:hover:not(:disabled) {
+    background: #b91c1c;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
+}
+
+.customer-entertainment-expense-ceo-reject-modal-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
     .customer-entertainment-expense-ceo-table-container {
         overflow-x: auto;
     }
 
-    .customer-entertainment-expense-ceo-actions {
+    .customer-entertainment-expense-ceo-buttons {
         flex-direction: column;
     }
 
     .customer-entertainment-expense-ceo-btn {
         width: 100%;
         justify-content: center;
+    }
+
+    .customer-entertainment-expense-ceo-reject-modal {
+        max-width: 95%;
+    }
+
+    .customer-entertainment-expense-ceo-reject-modal-footer {
+        flex-direction: column-reverse;
+    }
+
+    .customer-entertainment-expense-ceo-reject-modal-btn {
+        width: 100%;
     }
 }

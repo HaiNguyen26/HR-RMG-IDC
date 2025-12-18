@@ -14,7 +14,7 @@ import './Login.css';
 //   - Hoặc set localStorage: localStorage.setItem('dev_mode', 'true')
 //   - Sau đó refresh trang
 // ============================================================
-const IS_APP_ENABLED = false;
+const IS_APP_ENABLED = true;
 
 // Ngày ra mắt hiển thị trên trang "Coming Soon"
 const LAUNCH_DATE = '20/12/2025';

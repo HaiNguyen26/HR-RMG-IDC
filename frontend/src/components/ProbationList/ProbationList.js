@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { employeesAPI } from '../../services/api';
+import { employeesAPI, candidatesAPI, interviewRequestsAPI } from '../../services/api';
 import './ProbationList.css';
 
 const ProbationList = ({ currentUser, showToast }) => {
@@ -15,6 +15,8 @@ const ProbationList = ({ currentUser, showToast }) => {
     const [submitting, setSubmitting] = useState(false);
     const [isManager, setIsManager] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [showProbationStatusModal, setShowProbationStatusModal] = useState(false);
+    const [selectedProbationCandidate, setSelectedProbationCandidate] = useState(null);
 
     // Update currentTime every second for countdown timer
     useEffect(() => {
@@ -26,13 +28,25 @@ const ProbationList = ({ currentUser, showToast }) => {
     }, []);
 
     useEffect(() => {
-        fetchCandidates();
         checkManagerAccess();
     }, [currentUser]);
+
+    useEffect(() => {
+        // HR hoặc Manager có thể xem danh sách thử việc
+        if (isManager || currentUser?.role === 'HR') {
+            fetchCandidates();
+        }
+    }, [isManager, currentUser]);
 
     const checkManagerAccess = async () => {
         if (!currentUser?.id) {
             setIsManager(false);
+            return;
+        }
+
+        // HR có thể xem tất cả ứng viên thử việc
+        if (currentUser?.role === 'HR') {
+            setIsManager(true);
             return;
         }
 
@@ -55,6 +69,7 @@ const ProbationList = ({ currentUser, showToast }) => {
 
             const normalizedCurrentName = normalizeText(currentUserName);
 
+            // Kiểm tra quản lý trực tiếp
             const isDirectManager = employees.some((emp) => {
                 if (!emp.quan_ly_truc_tiep) return false;
                 const managerName = (emp.quan_ly_truc_tiep || '').trim();
@@ -62,7 +77,15 @@ const ProbationList = ({ currentUser, showToast }) => {
                 return normalizedManagerName === normalizedCurrentName;
             });
 
-            setIsManager(isDirectManager);
+            // Kiểm tra giám đốc chi nhánh
+            const isBranchDirector = employees.some((emp) => {
+                if (!emp.quan_ly_gian_tiep) return false;
+                const directorName = (emp.quan_ly_gian_tiep || '').trim();
+                const normalizedDirectorName = normalizeText(directorName);
+                return normalizedDirectorName === normalizedCurrentName;
+            });
+
+            setIsManager(isDirectManager || isBranchDirector);
         } catch (error) {
             console.error('Error checking manager access:', error);
             setIsManager(false);
@@ -72,13 +95,109 @@ const ProbationList = ({ currentUser, showToast }) => {
     const fetchCandidates = async () => {
         setLoading(true);
         try {
-            // Module tuyển dụng đã bị xóa
-            setCandidates([]);
+            // Fetch all probation candidates
+            const candidatesResponse = await candidatesAPI.getAll({ status: 'ON_PROBATION' });
+            if (!candidatesResponse.data?.success) {
+                setCandidates([]);
+                setLoading(false);
+                return;
+            }
+
+            const allCandidates = candidatesResponse.data.data || [];
+            console.log(`[ProbationList] Found ${allCandidates.length} candidates with ON_PROBATION status`);
+
+            // Get current user info
+            const currentUserName = (currentUser.hoTen || currentUser.username || '').trim();
+            console.log(`[ProbationList] Current user name: "${currentUserName}"`);
+            
+            const normalizeText = (text) => {
+                if (!text) return '';
+                return text
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/đ/g, 'd')
+                    .replace(/Đ/g, 'd')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            };
+            const normalizedCurrentName = normalizeText(currentUserName);
+
+            // Fetch employees to get manager IDs
+            const employeesResponse = await employeesAPI.getAll();
+            const employees = employeesResponse.data?.data || [];
+            console.log(`[ProbationList] Found ${employees.length} employees`);
+            
+            // Find current user's employee ID
+            const currentEmployee = employees.find(emp => {
+                const empName = normalizeText(emp.ho_ten || emp.hoTen || '');
+                return empName === normalizedCurrentName;
+            });
+
+            if (!currentEmployee) {
+                console.warn(`[ProbationList] Current user "${currentUserName}" not found in employees list`);
+                // For debugging: show all candidates if employee not found
+                setCandidates(allCandidates);
+                setLoading(false);
+                return;
+            }
+
+            console.log(`[ProbationList] Current employee ID: ${currentEmployee.id}`);
+
+            // Fetch interview requests to get manager and branch director info
+            const interviewRequestsResponse = await interviewRequestsAPI.getAll();
+            const interviewRequests = interviewRequestsResponse.data?.data || [];
+            console.log(`[ProbationList] Found ${interviewRequests.length} interview requests`);
+
+            // HR có thể xem tất cả ứng viên thử việc
+            if (currentUser?.role === 'HR') {
+                setCandidates(allCandidates);
+                setLoading(false);
+                return;
+            }
+
+            // Filter candidates based on manager access
+            const filteredCandidates = allCandidates.filter(candidate => {
+                // Find interview request for this candidate
+                const candidateId = candidate.id || candidate.candidateId;
+                const interviewRequest = interviewRequests.find(ir => {
+                    const irCandidateId = ir.candidate_id || ir.candidateId;
+                    return irCandidateId === candidateId;
+                });
+
+                if (!interviewRequest) {
+                    console.log(`[ProbationList] No interview request found for candidate ${candidateId}`);
+                    return false;
+                }
+
+                // Get manager and branch director IDs from interview request
+                const managerId = interviewRequest.manager_id || interviewRequest.managerId;
+                const branchDirectorId = interviewRequest.branch_director_id || interviewRequest.branchDirectorId;
+                const currentEmployeeId = currentEmployee.id;
+
+                // Check if current user is the direct manager
+                const isDirectManager = managerId === currentEmployeeId;
+
+                // Check if current user is the branch director
+                const isBranchDirector = branchDirectorId === currentEmployeeId;
+
+                const hasAccess = isDirectManager || isBranchDirector;
+                
+                if (!hasAccess) {
+                    console.log(`[ProbationList] Candidate ${candidateId} filtered out - Manager: ${managerId}, Director: ${branchDirectorId}, Current: ${currentEmployeeId}`);
+                }
+
+                return hasAccess;
+            });
+
+            console.log(`[ProbationList] Found ${filteredCandidates.length} candidates out of ${allCandidates.length} total probation candidates`);
+            setCandidates(filteredCandidates);
         } catch (error) {
             console.error('Error fetching probation candidates:', error);
             if (showToast) {
-                showToast('Module tuyển dụng đã bị xóa', 'error');
+                showToast('Lỗi khi tải danh sách ứng viên thử việc', 'error');
             }
+            setCandidates([]);
         } finally {
             setLoading(false);
         }
@@ -94,42 +213,71 @@ const ProbationList = ({ currentUser, showToast }) => {
         });
     };
 
-    const calculateDaysSinceJobOffer = (jobOfferDate) => {
-        if (!jobOfferDate) return null;
-        const offerDate = new Date(jobOfferDate);
-        if (isNaN(offerDate.getTime())) return null;
+    const calculateProbationCountdown = (probationStartDate) => {
+        if (!probationStartDate) return null;
+        const startDate = new Date(probationStartDate);
+        if (isNaN(startDate.getTime())) return null;
 
-        // Đặt thời gian về 00:00:00 của ngày xuất thư để tính chính xác
-        const offerDateStart = new Date(offerDate);
-        offerDateStart.setHours(0, 0, 0, 0);
+        // Đặt thời gian về 00:00:00 của ngày bắt đầu thử việc
+        const startDateStart = new Date(startDate);
+        startDateStart.setHours(0, 0, 0, 0);
 
-        // Tính thời gian còn lại đến ngày đánh giá (45 ngày sau)
-        const targetDate = new Date(offerDateStart);
-        targetDate.setDate(targetDate.getDate() + 45);
-        targetDate.setHours(23, 59, 59, 999);
+        const now = new Date(currentTime);
+        now.setHours(0, 0, 0, 0);
 
-        const diffTime = targetDate.getTime() - currentTime.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        // Nếu ngày bắt đầu thử việc còn xa (chưa đến)
+        if (startDateStart.getTime() > now.getTime()) {
+            // Đếm ngược đến ngày bắt đầu
+            const diffTime = startDateStart.getTime() - currentTime.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            
+            return {
+                daysUntilStart: diffDays,
+                daysSince: 0,
+                daysRemaining: 45,
+                totalSeconds: Math.max(0, Math.floor(diffTime / 1000)),
+                hasStarted: false,
+                canEvaluate: false
+            };
+        } else {
+            // Đã bắt đầu thử việc, đếm 45 ngày từ ngày bắt đầu
+            const daysSince = Math.floor((currentTime.getTime() - startDateStart.getTime()) / (1000 * 60 * 60 * 24));
+            const endDate = new Date(startDateStart);
+            endDate.setDate(endDate.getDate() + 45);
+            endDate.setHours(23, 59, 59, 999);
 
-        return {
-            daysSince: Math.floor((currentTime.getTime() - offerDateStart.getTime()) / (1000 * 60 * 60 * 24)),
-            daysRemaining: diffDays,
-            totalSeconds: Math.max(0, Math.floor(diffTime / 1000)),
-            canEvaluate: diffDays <= 0
-        };
+            const diffTime = endDate.getTime() - currentTime.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            return {
+                daysUntilStart: 0,
+                daysSince: daysSince,
+                daysRemaining: Math.max(0, diffDays),
+                totalSeconds: Math.max(0, Math.floor(diffTime / 1000)),
+                hasStarted: true,
+                canEvaluate: diffDays <= 0
+            };
+        }
     };
 
-    const canEvaluate = (jobOfferDate) => {
-        const result = calculateDaysSinceJobOffer(jobOfferDate);
+    const canEvaluate = (probationStartDate) => {
+        const result = calculateProbationCountdown(probationStartDate);
         return result !== null && result.canEvaluate;
     };
 
     const handleEvaluateClick = (candidate) => {
-        if (!canEvaluate(candidate.job_offer_sent_date)) {
-            const countdownData = calculateDaysSinceJobOffer(candidate.job_offer_sent_date);
-            const remainingDays = countdownData?.daysRemaining || 0;
-            if (showToast) {
-                showToast(`Chưa đủ 45 ngày kể từ ngày xuất thư tuyển dụng. Còn ${remainingDays} ngày nữa.`, 'warning');
+        if (!canEvaluate(candidate.probation_start_date)) {
+            const countdownData = calculateProbationCountdown(candidate.probation_start_date);
+            if (!countdownData?.hasStarted) {
+                const daysUntil = countdownData?.daysUntilStart || 0;
+                if (showToast) {
+                    showToast(`Chưa đến ngày bắt đầu thử việc. Còn ${daysUntil} ngày nữa.`, 'warning');
+                }
+            } else {
+                const remainingDays = countdownData?.daysRemaining || 0;
+                if (showToast) {
+                    showToast(`Chưa đủ 45 ngày kể từ ngày bắt đầu thử việc. Còn ${remainingDays} ngày nữa.`, 'warning');
+                }
             }
             return;
         }
@@ -257,16 +405,17 @@ const ProbationList = ({ currentUser, showToast }) => {
                                     <th>Họ tên</th>
                                     <th>Vị trí</th>
                                     <th>Phòng ban</th>
-                                    <th>Ngày xuất thư</th>
+                                    <th>Ngày bắt đầu thử việc</th>
                                     <th>Số ngày</th>
                                     <th>Trạng thái</th>
                                     {isManager && <th>Hành động</th>}
+                                    {currentUser?.role === 'HR' && <th>Chi tiết</th>}
                                 </tr>
                             </thead>
                             <tbody>
                                 {candidates.map((candidate, index) => {
-                                    const countdownData = calculateDaysSinceJobOffer(candidate.job_offer_sent_date);
-                                    const canEval = canEvaluate(candidate.job_offer_sent_date);
+                                    const countdownData = calculateProbationCountdown(candidate.probation_start_date);
+                                    const canEval = canEvaluate(candidate.probation_start_date);
 
                                     // Tính toán thời gian còn lại chính xác đến giây
                                     let formattedTime = '00:00:00';
@@ -278,24 +427,42 @@ const ProbationList = ({ currentUser, showToast }) => {
                                     }
 
                                     return (
-                                        <tr key={candidate.id}>
+                                        <tr 
+                                            key={candidate.id}
+                                            onClick={(e) => {
+                                                // Chỉ mở modal khi là HR và không click vào button
+                                                if (currentUser?.role === 'HR' && !e.target.closest('button')) {
+                                                    setSelectedProbationCandidate(candidate);
+                                                    setShowProbationStatusModal(true);
+                                                }
+                                            }}
+                                            style={{ 
+                                                cursor: currentUser?.role === 'HR' ? 'pointer' : 'default' 
+                                            }}
+                                        >
                                             <td>{index + 1}</td>
                                             <td className="probation-candidate-name">
                                                 <strong>{candidate.ho_ten || candidate.hoTen || '-'}</strong>
                                             </td>
                                             <td>{getViTriLabel(candidate.vi_tri_ung_tuyen || candidate.viTriUngTuyen || '-')}</td>
                                             <td>{getPhongBanLabel(candidate.phong_ban || candidate.phongBan || '-')}</td>
-                                            <td>{formatDate(candidate.job_offer_sent_date)}</td>
+                                            <td>{formatDate(candidate.probation_start_date)}</td>
                                             <td>
                                                 {countdownData !== null ? (
                                                     <div className="probation-countdown-cell">
-                                                        <div className={canEval ? 'probation-days-ready' : 'probation-days-waiting'}>
-                                                            {countdownData.daysSince} ngày
-                                                            {!canEval && countdownData.daysRemaining !== null && countdownData.daysRemaining > 0 && (
-                                                                <span className="probation-remaining-days"> (Còn {countdownData.daysRemaining} ngày)</span>
-                                                            )}
-                                                        </div>
-                                                        {!canEval && countdownData.daysRemaining > 0 && (
+                                                        {!countdownData.hasStarted ? (
+                                                            <div className="probation-days-waiting">
+                                                                Chưa bắt đầu (Còn {countdownData.daysUntilStart} ngày)
+                                                            </div>
+                                                        ) : (
+                                                            <div className={canEval ? 'probation-days-ready' : 'probation-days-waiting'}>
+                                                                {countdownData.daysSince} ngày
+                                                                {!canEval && countdownData.daysRemaining !== null && countdownData.daysRemaining > 0 && (
+                                                                    <span className="probation-remaining-days"> (Còn {countdownData.daysRemaining} ngày)</span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        {countdownData.totalSeconds > 0 && (
                                                             <div className="probation-digital-countdown">
                                                                 <div className="probation-digital-time">
                                                                     {formattedTime.split('').map((char, idx) => (
@@ -318,7 +485,7 @@ const ProbationList = ({ currentUser, showToast }) => {
                                             </td>
                                             <td>
                                                 <span className="probation-status-badge probation-status-badge--active">
-                                                    Đang thử việc
+                                                    {countdownData?.hasStarted ? 'Đang thử việc' : 'Đang chờ thử việc'}
                                                 </span>
                                             </td>
                                             {isManager && (
@@ -327,9 +494,23 @@ const ProbationList = ({ currentUser, showToast }) => {
                                                         className={`probation-evaluate-btn ${canEval ? 'probation-evaluate-btn--ready' : 'probation-evaluate-btn--disabled'}`}
                                                         onClick={() => handleEvaluateClick(candidate)}
                                                         disabled={!canEval}
-                                                        title={canEval ? 'Đánh giá quá trình thử việc' : `Chưa đủ 45 ngày. Còn ${countdownData?.daysRemaining || 0} ngày nữa`}
+                                                        title={canEval ? 'Đánh giá quá trình thử việc' : countdownData?.hasStarted ? `Chưa đủ 45 ngày. Còn ${countdownData?.daysRemaining || 0} ngày nữa` : `Chưa đến ngày bắt đầu. Còn ${countdownData?.daysUntilStart || 0} ngày nữa`}
                                                     >
-                                                        {canEval ? 'Đánh giá' : `Còn ${countdownData?.daysRemaining || 0} ngày`}
+                                                        {canEval ? 'Đánh giá' : countdownData?.hasStarted ? `Còn ${countdownData?.daysRemaining || 0} ngày` : `Còn ${countdownData?.daysUntilStart || 0} ngày`}
+                                                    </button>
+                                                </td>
+                                            )}
+                                            {currentUser?.role === 'HR' && (
+                                                <td>
+                                                    <button
+                                                        className="probation-evaluate-btn probation-evaluate-btn--ready"
+                                                        onClick={() => {
+                                                            setSelectedProbationCandidate(candidate);
+                                                            setShowProbationStatusModal(true);
+                                                        }}
+                                                        title="Xem trạng thái thử việc"
+                                                    >
+                                                        Xem chi tiết
                                                     </button>
                                                 </td>
                                             )}
@@ -442,6 +623,146 @@ const ProbationList = ({ currentUser, showToast }) => {
                             >
                                 {submitting ? 'Đang xử lý...' : 'Xác nhận'}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Probation Status Modal for HR */}
+            {showProbationStatusModal && selectedProbationCandidate && (
+                <div className="probation-status-modal-overlay" onClick={() => setShowProbationStatusModal(false)}>
+                    <div className="probation-status-modal-container" onClick={(e) => e.stopPropagation()}>
+                        <div className="probation-status-modal-header">
+                            <div className="probation-status-modal-header-content">
+                                <svg className="probation-status-modal-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <div>
+                                    <h2 className="probation-status-modal-title">Trạng Thái Thử Việc (45 Ngày)</h2>
+                                    <p className="probation-status-modal-subtitle">
+                                        Ứng viên: <strong>{selectedProbationCandidate.ho_ten || selectedProbationCandidate.hoTen}</strong>
+                                    </p>
+                                </div>
+                            </div>
+                            <button className="probation-status-modal-close" onClick={() => setShowProbationStatusModal(false)}>
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="probation-status-modal-body">
+                            {(() => {
+                                const countdownData = calculateProbationCountdown(selectedProbationCandidate.probation_start_date);
+                                const startDate = selectedProbationCandidate.probation_start_date 
+                                    ? new Date(selectedProbationCandidate.probation_start_date)
+                                    : null;
+                                const formattedStartDate = startDate 
+                                    ? startDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                    : '-';
+
+                                if (!countdownData) {
+                                    return <div>Không có thông tin về thời gian thử việc</div>;
+                                }
+
+                                // Tính toán countdown chi tiết
+                                let days = 0, hours = 0, minutes = 0, seconds = 0;
+                                if (countdownData.totalSeconds > 0) {
+                                    days = Math.floor(countdownData.totalSeconds / (24 * 3600));
+                                    const remainingSeconds = countdownData.totalSeconds % (24 * 3600);
+                                    hours = Math.floor(remainingSeconds / 3600);
+                                    const remainingMinutes = remainingSeconds % 3600;
+                                    minutes = Math.floor(remainingMinutes / 60);
+                                    seconds = remainingMinutes % 60;
+                                }
+
+                                // Tính phần trăm tiến độ
+                                const progressPercent = countdownData.hasStarted 
+                                    ? Math.min(100, Math.max(0, (countdownData.daysSince / 45) * 100))
+                                    : 0;
+
+                                return (
+                                    <div className="probation-status-content">
+                                        <div className="probation-status-card">
+                                            {!countdownData.hasStarted ? (
+                                                <>
+                                                    <div className="probation-status-left">
+                                                        <div className="probation-status-label">Ngày bắt đầu sau:</div>
+                                                        <div className="probation-status-countdown">
+                                                            <div className="probation-status-countdown-digits">
+                                                                <span className="probation-status-digit">{String(days).padStart(2, '0')}</span>
+                                                                <span className="probation-status-separator">:</span>
+                                                                <span className="probation-status-digit">{String(hours).padStart(2, '0')}</span>
+                                                                <span className="probation-status-separator">:</span>
+                                                                <span className="probation-status-digit">{String(minutes).padStart(2, '0')}</span>
+                                                                <span className="probation-status-separator">:</span>
+                                                                <span className="probation-status-digit">{String(seconds).padStart(2, '0')}</span>
+                                                            </div>
+                                                            <div className="probation-status-labels">
+                                                                <span>NGÀY</span>
+                                                                <span>GIỜ</span>
+                                                                <span>PHÚT</span>
+                                                                <span>GIÂY</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="probation-status-right">
+                                                        <div className="probation-status-title">Chờ Bắt Đầu</div>
+                                                        <div className="probation-status-date">Bắt đầu vào {formattedStartDate}.</div>
+                                                        <div className="probation-status-progress-wrapper">
+                                                            <div className="probation-status-progress-bar">
+                                                                <div className="probation-status-progress-fill" style={{ width: '0%' }}></div>
+                                                            </div>
+                                                            <div className="probation-status-progress-labels">
+                                                                <span>0 Ngày</span>
+                                                                <span>0%</span>
+                                                                <span>45 Ngày</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="probation-status-left">
+                                                        <div className="probation-status-label">Thời gian còn lại:</div>
+                                                        <div className="probation-status-countdown">
+                                                            <div className="probation-status-countdown-digits">
+                                                                <span className="probation-status-digit">{String(days).padStart(2, '0')}</span>
+                                                                <span className="probation-status-separator">:</span>
+                                                                <span className="probation-status-digit">{String(hours).padStart(2, '0')}</span>
+                                                                <span className="probation-status-separator">:</span>
+                                                                <span className="probation-status-digit">{String(minutes).padStart(2, '0')}</span>
+                                                                <span className="probation-status-separator">:</span>
+                                                                <span className="probation-status-digit">{String(seconds).padStart(2, '0')}</span>
+                                                            </div>
+                                                            <div className="probation-status-labels">
+                                                                <span>NGÀY</span>
+                                                                <span>GIỜ</span>
+                                                                <span>PHÚT</span>
+                                                                <span>GIÂY</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="probation-status-right">
+                                                        <div className="probation-status-title">Đang Thử Việc</div>
+                                                        <div className="probation-status-date">Bắt đầu vào {formattedStartDate}.</div>
+                                                        <div className="probation-status-progress-wrapper">
+                                                            <div className="probation-status-progress-bar">
+                                                                <div className="probation-status-progress-fill" style={{ width: `${progressPercent}%` }}></div>
+                                                            </div>
+                                                            <div className="probation-status-progress-labels">
+                                                                <span>{countdownData.daysSince} Ngày</span>
+                                                                <span>{Math.round(progressPercent)}%</span>
+                                                                <span>45 Ngày</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>

@@ -1,62 +1,115 @@
+/* Customer Entertainment Expense Payment - Thiết kế lại với Calm Gradient */
+
+/* I. MÀU NỀN CHỦ ĐẠO: Very Subtle Gradient (Gradient Rất Nhạt) - Calm Integrity */
 .customer-entertainment-expense-payment {
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 1.5rem;
+    padding: 2rem;
+    box-sizing: border-box;
+    /* Calm Integrity Gradient: Sky Blue 50 → White (60%) → Indigo 50 */
+    background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 60%, #f5f6ff 100%);
+    /* Optional: Ambient Blur - Làm mờ môi trường để tăng chiều sâu */
+    backdrop-filter: blur(1px);
     display: flex;
     flex-direction: column;
-    height: 100%;
-    overflow: hidden;
+    gap: 1.5rem;
+    position: relative;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
+/* Custom Scrollbar cho module */
+.customer-entertainment-expense-payment::-webkit-scrollbar {
+    width: 8px;
+}
+
+.customer-entertainment-expense-payment::-webkit-scrollbar-track {
+    background: rgba(240, 249, 255, 0.3);
+    backdrop-filter: blur(5px);
+    border-radius: 4px;
+}
+
+.customer-entertainment-expense-payment::-webkit-scrollbar-thumb {
+    background: rgba(14, 165, 233, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.customer-entertainment-expense-payment::-webkit-scrollbar-thumb:hover {
+    background: rgba(14, 165, 233, 0.6);
+}
+
+/* II. HEADER VỚI GRADIENT CALM INTEGRITY */
 .customer-entertainment-expense-payment-header {
-    background: white;
-    border-radius: 0.75rem;
-    padding: 2rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 0;
+    flex-shrink: 0;
 }
 
 .customer-entertainment-expense-payment-header-content {
     display: flex;
     align-items: center;
     gap: 1.5rem;
+    /* Gradient Calm Integrity: from-sky-50 to-emerald-50 */
+    background: linear-gradient(to right, #e0f2fe, #ecfdf5);
+    padding: 1.25rem 1.75rem;
+    border-radius: 0.875rem;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.customer-entertainment-expense-payment-header-content:hover {
+    box-shadow: 0 6px 16px rgba(14, 165, 233, 0.15);
 }
 
 .customer-entertainment-expense-payment-header-icon {
-    width: 4rem;
-    height: 4rem;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    width: 4.5rem;
+    height: 4.5rem;
     border-radius: 0.75rem;
+    background: rgba(239, 246, 255, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
     flex-shrink: 0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+.customer-entertainment-expense-payment-header-icon:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.22), 0 3px 8px rgba(59, 130, 246, 0.15), 0 1px 4px rgba(59, 130, 246, 0.1);
 }
 
 .customer-entertainment-expense-payment-header-icon svg {
-    width: 2rem;
-    height: 2rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    color: #3b82f6;
+    stroke-width: 2;
 }
 
 .customer-entertainment-expense-payment-header-text h1 {
-    font-size: 1.875rem;
+    font-size: 1.5rem;
     font-weight: 700;
-    color: #1e3a8a;
-    margin: 0 0 0.5rem 0;
+    color: #1e293b;
+    margin: 0;
+    line-height: 1.2;
 }
 
 .customer-entertainment-expense-payment-header-text p {
-    font-size: 1rem;
-    color: #3b82f6;
-    margin: 0;
+    font-size: 0.875rem;
+    color: #64748b;
+    margin: 0.25rem 0 0 0;
+    line-height: 1.4;
 }
 
+/* III. CONTENT AREA */
 .customer-entertainment-expense-payment-content {
     background: white;
-    border-radius: 0.75rem;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     padding: 1.5rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -70,27 +123,33 @@
     justify-content: space-between;
     align-items: center;
     padding: 1.25rem;
-    background: #f7fafc;
-    border-radius: 0.5rem;
-    border-top: 3px solid #3b82f6;
+    background: linear-gradient(to right, #f8fafc, #f1f5f9);
+    border-radius: 0.75rem;
+    border: 1px solid rgba(226, 232, 240, 0.6);
     margin-bottom: 1.5rem;
+    flex-shrink: 0;
 }
 
 .customer-entertainment-expense-payment-summary {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
 }
 
 .summary-label {
     font-weight: 600;
-    color: #4a5568;
+    color: #475569;
+    font-size: 0.875rem;
 }
 
 .summary-value {
     font-weight: 700;
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     color: #3b82f6;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .customer-entertainment-expense-payment-filter {
@@ -101,22 +160,24 @@
 
 .customer-entertainment-expense-payment-filter label {
     font-weight: 500;
-    color: #4a5568;
+    color: #475569;
+    font-size: 0.875rem;
 }
 
 .status-filter-select {
     padding: 0.5rem 2.5rem 0.5rem 1rem;
     border: 1px solid #cbd5e0;
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
     font-size: 0.875rem;
-    color: #4a5568;
+    color: #475569;
     background: white;
     cursor: pointer;
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234a5568'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.5rem center;
     background-size: 1.25rem;
+    transition: all 0.2s;
 }
 
 .status-filter-select:focus {
@@ -125,14 +186,16 @@
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
+.status-filter-select:hover {
+    border-color: #94a3b8;
+}
+
 /* Table Styles */
 .customer-entertainment-expense-payment-table-container {
     overflow-x: auto;
     overflow-y: auto;
     flex: 1;
     min-height: 0;
-    max-height: calc(100vh - 320px);
-    /* Chiều cao cố định, trừ đi header, summary, filters (đã giảm do summary cards nhỏ hơn) */
     display: flex;
     flex-direction: column;
 }
@@ -142,129 +205,359 @@
     overflow-x: auto;
     flex: 1;
     min-height: 0;
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    overflow: hidden;
 }
 
 .customer-entertainment-expense-payment-table-wrapper::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
 }
 
 .customer-entertainment-expense-payment-table-wrapper::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 4px;
+    background: rgba(241, 245, 249, 0.6);
+    border-radius: 10px;
+    margin: 8px;
 }
 
 .customer-entertainment-expense-payment-table-wrapper::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 4px;
+    background: linear-gradient(135deg, 
+        rgba(148, 163, 184, 0.6) 0%,
+        rgba(100, 116, 139, 0.5) 100%);
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.3s ease;
 }
 
 .customer-entertainment-expense-payment-table-wrapper::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: linear-gradient(135deg, 
+        rgba(59, 130, 246, 0.7) 0%,
+        rgba(37, 99, 235, 0.6) 100%);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .customer-entertainment-expense-payment-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.875rem;
+    background: #ffffff;
 }
 
 .customer-entertainment-expense-payment-table thead {
-    background: #e0e7ff;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: linear-gradient(to right, #e0f2fe, #ecfdf5);
+    border-bottom: 2px solid rgba(14, 165, 233, 0.2);
 }
 
 .customer-entertainment-expense-payment-table th {
     padding: 1rem;
     text-align: left;
-    font-weight: 600;
-    color: #1e3a8a;
-    border-bottom: 2px solid #c7d2fe;
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* Cột số tiền - căn phải */
+.customer-entertainment-expense-payment-table th:nth-child(4) {
+    text-align: right;
+}
+
+.customer-entertainment-expense-payment-table th:first-child {
+    padding-left: 1.5rem;
+}
+
+.customer-entertainment-expense-payment-table th:last-child {
+    padding-right: 1.5rem;
+}
+
+.customer-entertainment-expense-payment-table tbody tr {
+    background: #ffffff;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+}
+
+.customer-entertainment-expense-payment-table tbody tr:hover {
+    background: rgba(239, 246, 255, 0.5);
+}
+
+.customer-entertainment-expense-payment-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.customer-entertainment-expense-payment-table tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 1rem;
+}
+
+.customer-entertainment-expense-payment-table tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 1rem;
 }
 
 .customer-entertainment-expense-payment-table td {
     padding: 1rem;
-    border-bottom: 1px solid #e5e7eb;
-    color: #4a5568;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.4);
+    color: #334155;
+    text-align: left;
+    vertical-align: middle;
 }
 
-.customer-entertainment-expense-payment-table tbody tr:hover {
-    background: #f9fafb;
+/* Cột số tiền - căn phải */
+.customer-entertainment-expense-payment-table td:nth-child(4) {
+    text-align: right;
+}
+
+.customer-entertainment-expense-payment-table td:first-child {
+    padding-left: 1.5rem;
+}
+
+.customer-entertainment-expense-payment-table td:last-child {
+    padding-right: 1.5rem;
 }
 
 .report-code {
-    font-weight: 600;
-    color: #1e3a8a;
+    font-weight: 700;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-size: 0.9375rem;
+    letter-spacing: 0.02em;
+    transition: all 0.2s ease;
+}
+
+.customer-entertainment-expense-payment-table tbody tr:hover .report-code {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .report-content {
     max-width: 300px;
     word-wrap: break-word;
+    color: #475569;
+    line-height: 1.5;
+    transition: color 0.2s ease;
+}
+
+.customer-entertainment-expense-payment-table tbody tr:hover .report-content {
+    color: #334155;
 }
 
 .approval-date {
-    color: #6b7280;
+    color: #64748b;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.customer-entertainment-expense-payment-table tbody tr:hover .approval-date {
+    color: #475569;
 }
 
 .amount-cell {
-    text-align: right;
+    text-align: right !important;
 }
 
 .amount-value {
-    font-weight: 600;
-    color: #dc2626;
+    font-weight: 700;
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-size: 0.9375rem;
+    letter-spacing: 0.02em;
+    transition: all 0.2s ease;
+}
+
+.customer-entertainment-expense-payment-table tbody tr:hover .amount-value {
+    background: linear-gradient(135deg, #b91c1c, #991b1b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 /* Status Badge */
 .status-badge {
     display: inline-block;
-    padding: 0.375rem 0.75rem;
-    border-radius: 9999px;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid;
+    margin: 0;
+    vertical-align: middle;
+    line-height: 1.2;
+}
+
+.status-badge::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent 100%);
+    transition: left 0.5s ease;
+}
+
+.status-badge:hover::before {
+    left: 100%;
 }
 
 .status-pending {
-    background: #fef3c7;
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
     color: #92400e;
+    border-color: #fbbf24;
+}
+
+.status-pending:hover {
+    background: linear-gradient(135deg, #fde68a, #fcd34d);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(251, 191, 36, 0.25);
 }
 
 .status-paid {
-    background: #d1fae5;
+    background: linear-gradient(135deg, #d1fae5, #a7f3d0);
     color: #065f46;
+    border-color: #10b981;
+}
+
+.status-paid:hover {
+    background: linear-gradient(135deg, #a7f3d0, #6ee7b7);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.25);
 }
 
 .status-reimbursed {
-    background: #dbeafe;
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
     color: #1e40af;
+    border-color: #3b82f6;
+}
+
+.status-reimbursed:hover {
+    background: linear-gradient(135deg, #bfdbfe, #93c5fd);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.25);
 }
 
 .status-default {
-    background: #f3f4f6;
+    background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
     color: #4b5563;
+    border-color: #9ca3af;
+}
+
+.status-default:hover {
+    background: linear-gradient(135deg, #e5e7eb, #d1d5db);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(156, 163, 175, 0.25);
 }
 
 /* Payment Button */
 .payment-button {
     padding: 0.5rem 1.25rem;
-    background: #3b82f6;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
     color: white;
     border: none;
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
     font-weight: 600;
     font-size: 0.875rem;
     cursor: pointer;
-    transition: all 0.2s;
+    margin: 0;
+    display: inline-block;
+    vertical-align: middle;
+    line-height: 1.2;
+}
+
+.payment-button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
 }
 
 .payment-button:hover {
-    background: #2563eb;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45),
+                0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+.payment-button:hover::before {
+    width: 300px;
+    height: 300px;
 }
 
 .payment-button:active {
     transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.payment-button:disabled {
+    background: linear-gradient(135deg, #9ca3af, #6b7280);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 2px 4px rgba(156, 163, 175, 0.2);
+}
+
+.payment-button:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+}
+
+.payment-button:active {
+    transform: translateY(0);
+}
+
+.payment-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Action Cell - Đảm bảo không có khoảng trống */
+.action-cell {
+    text-align: left;
+    padding: 1rem !important;
+    vertical-align: middle !important;
+}
+
+.action-cell > * {
+    margin: 0;
+    vertical-align: middle;
+}
+
+.payment-completed-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+    color: #065f46;
+    border: 1px solid #10b981;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    margin: 0;
+    vertical-align: middle;
+    line-height: 1.2;
 }
 
 /* Loading and Empty States */
@@ -272,11 +565,13 @@
 .empty-cell {
     text-align: center;
     padding: 3rem;
-    color: #6b7280;
+    color: #64748b;
+    font-size: 0.875rem;
 }
 
 .loading-spinner {
     display: inline-block;
+    color: #3b82f6;
 }
 
 /* Payment Modal */
@@ -286,78 +581,106 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     padding: 1rem;
+    animation: fadeInOverlay 0.3s ease-out;
+}
+
+@keyframes fadeInOverlay {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 .payment-modal {
     background: white;
-    border-radius: 0.75rem;
+    border-radius: 1rem;
     width: 100%;
     max-width: 500px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+    animation: slideInModal 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes slideInModal {
+    from {
+        transform: translateY(-20px) scale(0.95);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
 }
 
 .payment-modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.5rem;
-    border-bottom: 1px solid #e5e7eb;
+    padding: 1.5rem 2rem;
+    background: linear-gradient(to right, #e0f2fe, #ecfdf5);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+    border-radius: 1rem 1rem 0 0;
 }
 
 .payment-modal-header h2 {
     margin: 0;
     font-size: 1.25rem;
-    font-weight: 600;
-    color: #1e3a8a;
+    font-weight: 700;
+    color: #1e293b;
 }
 
 .payment-modal-close {
-    background: none;
+    background: transparent;
     border: none;
     font-size: 1.5rem;
-    color: #6b7280;
+    color: #64748b;
     cursor: pointer;
-    padding: 0;
+    padding: 0.5rem;
     width: 2rem;
     height: 2rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
     transition: all 0.2s;
 }
 
 .payment-modal-close:hover {
-    background: #f3f4f6;
-    color: #1f2937;
+    background: rgba(0, 0, 0, 0.05);
+    color: #1e293b;
 }
 
 .payment-modal-content {
-    padding: 1.5rem;
+    padding: 2rem;
 }
 
 .payment-modal-info {
-    background: #f7fafc;
-    padding: 1rem;
-    border-radius: 0.5rem;
+    background: linear-gradient(to right, #f8fafc, #f1f5f9);
+    padding: 1.25rem;
+    border-radius: 0.75rem;
     margin-bottom: 1.5rem;
+    border: 1px solid rgba(226, 232, 240, 0.6);
 }
 
 .payment-modal-info p {
     margin: 0.5rem 0;
-    color: #4a5568;
+    color: #475569;
+    font-size: 0.875rem;
 }
 
 .payment-modal-info strong {
-    color: #1e3a8a;
+    color: #1e293b;
+    font-weight: 600;
 }
 
 .payment-modal-form {
@@ -373,8 +696,8 @@
 }
 
 .form-group label {
-    font-weight: 500;
-    color: #4a5568;
+    font-weight: 600;
+    color: #374151;
     font-size: 0.875rem;
 }
 
@@ -385,12 +708,13 @@
 .form-group select,
 .form-group input,
 .form-group textarea {
-    padding: 0.625rem;
+    padding: 0.75rem;
     border: 1px solid #cbd5e0;
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
     font-size: 0.875rem;
-    color: #4a5568;
+    color: #475569;
     transition: all 0.2s;
+    background: white;
 }
 
 .form-group select:focus,
@@ -410,14 +734,14 @@
     display: flex;
     justify-content: flex-end;
     gap: 0.75rem;
-    padding: 1.5rem;
-    border-top: 1px solid #e5e7eb;
+    padding: 1.5rem 2rem;
+    border-top: 1px solid #e2e8f0;
 }
 
 .payment-modal-cancel,
 .payment-modal-submit {
-    padding: 0.625rem 1.25rem;
-    border-radius: 0.375rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
     font-weight: 600;
     font-size: 0.875rem;
     cursor: pointer;
@@ -427,7 +751,7 @@
 
 .payment-modal-cancel {
     background: #f3f4f6;
-    color: #4a5568;
+    color: #374151;
 }
 
 .payment-modal-cancel:hover {
@@ -435,46 +759,63 @@
 }
 
 .payment-modal-submit {
-    background: #3b82f6;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
     color: white;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
 }
 
 .payment-modal-submit:hover {
-    background: #2563eb;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
 }
 
-/* Custom Scrollbar */
-.customer-entertainment-expense-payment-table-container::-webkit-scrollbar {
-    height: 8px;
-}
-
-.customer-entertainment-expense-payment-table-container::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 4px;
-}
-
-.customer-entertainment-expense-payment-table-container::-webkit-scrollbar-thumb {
-    background: #cbd5e0;
-    border-radius: 4px;
-}
-
-.customer-entertainment-expense-payment-table-container::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-}
-
+/* Custom Scrollbar for Modal */
 .payment-modal::-webkit-scrollbar {
     width: 8px;
 }
 
 .payment-modal::-webkit-scrollbar-track {
-    background: #f1f5f9;
-}
-
-.payment-modal::-webkit-scrollbar-thumb {
-    background: #cbd5e0;
+    background: rgba(241, 245, 249, 0.5);
     border-radius: 4px;
 }
 
+.payment-modal::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.5);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
 .payment-modal::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: rgba(148, 163, 184, 0.7);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .customer-entertainment-expense-payment {
+        padding: 1rem;
+    }
+
+    .customer-entertainment-expense-payment-summary-filter {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .customer-entertainment-expense-payment-filter {
+        width: 100%;
+    }
+
+    .status-filter-select {
+        width: 100%;
+    }
+
+    .customer-entertainment-expense-payment-table {
+        font-size: 0.75rem;
+    }
+
+    .customer-entertainment-expense-payment-table th,
+    .customer-entertainment-expense-payment-table td {
+        padding: 0.75rem 0.5rem;
+    }
 }

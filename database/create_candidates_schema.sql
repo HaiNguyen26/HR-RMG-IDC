@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS candidates (
         'PENDING_INTERVIEW',      -- Chờ phỏng vấn
         'PENDING_MANAGER',        -- Đang chờ quản lý phỏng vấn
         'PASSED',                 -- Đã đậu
-        'FAILED'                  -- Đã rớt
+        'FAILED',                 -- Đã rớt
+        'ON_PROBATION'            -- Đang thử việc
     )),
     
     -- Metadata

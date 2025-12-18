@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import html2pdf from 'html2pdf.js';
 import { employeesAPI, candidatesAPI, recruitmentRequestsAPI, interviewRequestsAPI, interviewEvaluationsAPI } from '../../services/api';
 import './RecruitmentManagement.css';
 
@@ -36,7 +37,10 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
     const [evaluationSummaryData, setEvaluationSummaryData] = useState(null);
     const [showSendRecruitmentInfoModal, setShowSendRecruitmentInfoModal] = useState(false);
     const [statusUpdateChecked, setStatusUpdateChecked] = useState(false);
-    
+    const [showProbationStatusModal, setShowProbationStatusModal] = useState(false);
+    const [selectedProbationCandidate, setSelectedProbationCandidate] = useState(null);
+    const [currentTime, setCurrentTime] = useState(new Date());
+
     // Send Recruitment Info Form State
     const [recruitmentInfoForm, setRecruitmentInfoForm] = useState({
         chucDanh: '',
@@ -64,6 +68,8 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
     const [ranks, setRanks] = useState([]);
     const [showRecruitmentInfoPreview, setShowRecruitmentInfoPreview] = useState(false);
     const [recruitmentRequestForForm, setRecruitmentRequestForForm] = useState(null);
+    const [showStartProbationModal, setShowStartProbationModal] = useState(false);
+    const [probationStartDate, setProbationStartDate] = useState('');
 
     // Form data state
     const [formData, setFormData] = useState({
@@ -257,30 +263,98 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
             fetchManagers();
             fetchDropdownData();
             fetchRanks();
-            
-            // Load data from interview timeline if available
-            if (interviewTimelineData && interviewTimelineData.interviewRequest && viewingCandidate) {
-                const interviewRequest = interviewTimelineData.interviewRequest;
-                
-                // Get manager and branch director names
-                const manager = managers.find(m => m.id === interviewRequest.manager_id);
-                const branchDirector = managers.find(m => m.id === interviewRequest.branch_director_id);
-                
-                // Get recruitment request to get lyDoTuyen
-                // We need to fetch recruitment request by ID from interview request
-                if (interviewRequest.recruitment_request_id) {
-                    fetchRecruitmentRequestForForm(interviewRequest.recruitment_request_id);
-                }
-                
-                // Update form with readonly data
-                setRecruitmentInfoForm(prev => ({
-                    ...prev,
-                    baoCaoTrucTiep: interviewRequest.manager_id?.toString() || '',
-                    baoCaoGianTiep: interviewRequest.branch_director_id?.toString() || '',
-                }));
-            }
         }
-    }, [showSendRecruitmentInfoModal, interviewTimelineData, managers]);
+    }, [showSendRecruitmentInfoModal]);
+
+    // Load data from interview timeline when modal opens and data is available
+    useEffect(() => {
+        if (showSendRecruitmentInfoModal && interviewTimelineData && interviewTimelineData.interviewRequest && viewingCandidate && managers.length > 0) {
+            const interviewRequest = interviewTimelineData.interviewRequest;
+
+            // Get manager and branch director names
+            const manager = managers.find(m => m.id === interviewRequest.manager_id);
+            const branchDirector = managers.find(m => m.id === interviewRequest.branch_director_id);
+
+            // Get recruitment request to get lyDoTuyen (only fetch once)
+            if (interviewRequest.recruitment_request_id && !recruitmentRequestForForm) {
+                fetchRecruitmentRequestForForm(interviewRequest.recruitment_request_id);
+            }
+
+            // Update form with readonly data (only if not already set)
+            setRecruitmentInfoForm(prev => {
+                const newManagerId = interviewRequest.manager_id?.toString() || '';
+                const newBranchDirectorId = interviewRequest.branch_director_id?.toString() || '';
+
+                // Only update if values are different
+                if (prev.baoCaoTrucTiep === newManagerId &&
+                    prev.baoCaoGianTiep === newBranchDirectorId) {
+                    return prev;
+                }
+                return {
+                    ...prev,
+                    baoCaoTrucTiep: newManagerId,
+                    baoCaoGianTiep: newBranchDirectorId,
+                };
+            });
+        }
+    }, [showSendRecruitmentInfoModal, interviewTimelineData?.interviewRequest?.id, viewingCandidate?.id, managers.length]);
+
+    // Update currentTime every second for countdown timer
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    // Calculate probation countdown
+    const calculateProbationCountdown = (probationStartDate) => {
+        if (!probationStartDate) return null;
+        const startDate = new Date(probationStartDate);
+        if (isNaN(startDate.getTime())) return null;
+
+        // Đặt thời gian về 00:00:00 của ngày bắt đầu thử việc
+        const startDateStart = new Date(startDate);
+        startDateStart.setHours(0, 0, 0, 0);
+
+        const now = new Date(currentTime);
+        now.setHours(0, 0, 0, 0);
+
+        // Nếu ngày bắt đầu thử việc còn xa (chưa đến)
+        if (startDateStart.getTime() > now.getTime()) {
+            // Đếm ngược đến ngày bắt đầu
+            const diffTime = startDateStart.getTime() - currentTime.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            return {
+                daysUntilStart: diffDays,
+                daysSince: 0,
+                daysRemaining: 45,
+                totalSeconds: Math.max(0, Math.floor(diffTime / 1000)),
+                hasStarted: false,
+                canEvaluate: false
+            };
+        } else {
+            // Đã bắt đầu thử việc, đếm 45 ngày từ ngày bắt đầu
+            const daysSince = Math.floor((currentTime.getTime() - startDateStart.getTime()) / (1000 * 60 * 60 * 24));
+            const endDate = new Date(startDateStart);
+            endDate.setDate(endDate.getDate() + 45);
+            endDate.setHours(23, 59, 59, 999);
+
+            const diffTime = endDate.getTime() - currentTime.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            return {
+                daysUntilStart: 0,
+                daysSince: daysSince,
+                daysRemaining: Math.max(0, diffDays),
+                totalSeconds: Math.max(0, Math.floor(diffTime / 1000)),
+                hasStarted: true,
+                canEvaluate: diffDays <= 0
+            };
+        }
+    };
 
     // Fetch managers for recruitment info form
     const fetchManagers = async () => {
@@ -313,7 +387,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
             if (response.data?.success && response.data.data) {
                 const request = response.data.data;
                 setRecruitmentRequestForForm(request);
-                
+
                 // Map lyDoTuyen to form value
                 let lyDoTuyenValue = '';
                 if (request.lyDoTuyen === 'thay_the') {
@@ -325,7 +399,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                 } else if (request.lyDoKhacGhiChu) {
                     lyDoTuyenValue = request.lyDoKhacGhiChu;
                 }
-                
+
                 setRecruitmentInfoForm(prev => ({
                     ...prev,
                     lyDoTuyenDung: lyDoTuyenValue
@@ -415,11 +489,20 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
             if (response.data.success && response.data.data) {
                 const candidate = response.data.data;
                 console.log('[handleViewCandidate] Candidate status:', candidate.trang_thai);
+
+                // Nếu ứng viên đang thử việc (ON_PROBATION), mở modal đếm thời gian thử việc
+                if (candidate.trang_thai === 'ON_PROBATION') {
+                    setSelectedProbationCandidate(candidate);
+                    setShowProbationStatusModal(true);
+                    setLoading(false);
+                    return;
+                }
+
                 setViewingCandidate(candidate);
                 setShowViewCandidateModal(true);
-                
+
                 // Cập nhật candidate trong list để đồng bộ status
-                setCandidates(prevCandidates => 
+                setCandidates(prevCandidates =>
                     prevCandidates.map(c => c.id === candidateId ? candidate : c)
                 );
 
@@ -455,7 +538,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
     const handleLoadInterviewTimeline = async (candidateId) => {
         try {
             setLoadingTimeline(true);
-            
+
             // Fetch interview request
             const interviewResponse = await interviewRequestsAPI.getAll({ candidateId });
             if (!interviewResponse.data?.success || !interviewResponse.data.data?.length) {
@@ -466,7 +549,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
             }
 
             const interviewRequest = interviewResponse.data.data[0];
-            
+
             // Fetch evaluations
             const evaluationsResponse = await interviewEvaluationsAPI.getAll({
                 interviewRequestId: interviewRequest.id
@@ -480,12 +563,24 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                 if (candidateResponse.data?.success && candidateResponse.data.data) {
                     candidateData = candidateResponse.data.data;
                     console.log('[handleLoadInterviewTimeline] Fetched candidate status:', candidateData.trang_thai);
+
+                    // Không cho phép reset status nếu candidate đã ON_PROBATION
+                    if (candidateData.trang_thai === 'ON_PROBATION') {
+                        if (showToast) {
+                            showToast('Ứng viên đã bắt đầu thử việc. Vui lòng sử dụng module "Danh sách thử việc" để theo dõi.', 'info');
+                        }
+                        setLoadingTimeline(false);
+                        return;
+                    }
+
                     // Cập nhật viewingCandidate để đồng bộ
                     setViewingCandidate(candidateData);
-                    // Cập nhật candidate trong list để đồng bộ status
-                    setCandidates(prevCandidates => 
-                        prevCandidates.map(c => c.id === candidateId ? candidateData : c)
-                    );
+                    // Cập nhật candidate trong list để đồng bộ status (chỉ nếu không phải ON_PROBATION)
+                    if (candidateData.trang_thai !== 'ON_PROBATION') {
+                        setCandidates(prevCandidates =>
+                            prevCandidates.map(c => c.id === candidateId ? candidateData : c)
+                        );
+                    }
                 }
             } catch (err) {
                 console.error('Error fetching updated candidate:', err);
@@ -516,10 +611,10 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
             return;
         }
 
-        const managerEval = interviewTimelineData.evaluations.find(e => 
+        const managerEval = interviewTimelineData.evaluations.find(e =>
             e.evaluator_id === interviewTimelineData.interviewRequest.manager_id
         );
-        const directorEval = interviewTimelineData.evaluations.find(e => 
+        const directorEval = interviewTimelineData.evaluations.find(e =>
             e.evaluator_id === interviewTimelineData.interviewRequest.branch_director_id
         );
 
@@ -554,7 +649,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                 // Lấy giá trị từ snake_case hoặc camelCase
                 const managerScore = managerEval[c.key] !== undefined ? managerEval[c.key] : (managerEval[c.camelKey] !== undefined ? managerEval[c.camelKey] : null);
                 const directorScore = directorEval[c.key] !== undefined ? directorEval[c.key] : (directorEval[c.camelKey] !== undefined ? directorEval[c.camelKey] : null);
-                
+
                 return {
                     ...c,
                     managerScore: managerScore !== null && managerScore !== undefined ? managerScore : null,
@@ -1283,6 +1378,295 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
         }
     };
 
+    // Generate PDF for recruitment offer letter
+    const handleExportPDF = () => {
+        try {
+            // Helper function to format currency
+            const formatCurrency = (value) => {
+                if (!value || value === '') return '……';
+                return parseInt(value).toLocaleString('vi-VN') + ' VNĐ';
+            };
+
+            // Get candidate name
+            const candidateName = viewingCandidate?.ho_ten || viewingCandidate?.hoTen || '';
+
+            // Get manager names
+            const directManager = managers.find(m => m.id === parseInt(recruitmentInfoForm.baoCaoTrucTiep));
+            const directManagerName = directManager ? (directManager.ho_ten || directManager.hoTen || '') : '';
+
+            const indirectManager = managers.find(m => m.id === parseInt(recruitmentInfoForm.baoCaoGianTiep));
+            const indirectManagerName = indirectManager ? (indirectManager.ho_ten || indirectManager.hoTen || '') : '';
+
+            const startDate = recruitmentInfoForm.ngayBatDauLamViec
+                ? new Date(recruitmentInfoForm.ngayBatDauLamViec).toLocaleDateString('vi-VN')
+                : '……';
+
+            // Escape HTML to prevent XSS
+            const escapeHtml = (text) => {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            };
+
+            const workItems = recruitmentInfoForm.congViecChinh || [];
+            const allLetters = 'abcdefghijklmnopqrstuvwxyz'.split('');
+            let workItemsHtml = '';
+            let letterIndex = 0;
+
+            // Chỉ hiển thị các công việc đã nhập
+            workItems.forEach((item) => {
+                if (item && item.trim() !== '') {
+                    workItemsHtml += `<p style="margin: 4px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">${allLetters[letterIndex]}. <span style="color: #ff0000;">${escapeHtml(item)}</span></p>`;
+                    letterIndex++;
+                }
+            });
+
+            // Mục cuối cùng luôn là "Những công việc khác..."
+            if (letterIndex > 0) {
+                workItemsHtml += `<p style="margin: 4px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">${allLetters[letterIndex]}. Những công việc khác theo sự phân công của cấp quản lý trực tiếp.</p>`;
+            } else {
+                // Nếu không có công việc nào, chỉ hiển thị mục e
+                workItemsHtml += `<p style="margin: 4px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">a. Những công việc khác theo sự phân công của cấp quản lý trực tiếp.</p>`;
+            }
+
+            const hoTroComTrua = recruitmentInfoForm.hoTroComTrua
+                ? formatCurrency(recruitmentInfoForm.hoTroComTrua)
+                : '30.000 VNĐ';
+
+            // Get logo path
+            const logoPath = `${window.location.origin}${process.env.PUBLIC_URL || ''}/RMG-logo.jpg`;
+
+            // Create HTML content with left alignment and proper formatting
+            const htmlContent = `
+                <style>
+                    @media print {
+                        p {
+                            orphans: 2;
+                            widows: 2;
+                            page-break-inside: avoid;
+                        }
+                        div {
+                            page-break-inside: avoid;
+                        }
+                    }
+                </style>
+                <div id="pdf-content-wrapper" style="font-family: 'Times New Roman', serif; padding: 3mm 5mm 10mm 5mm; line-height: 1.5; color: #000; background: #ffffff; text-align: left !important; max-width: 100%; direction: ltr; orphans: 2; widows: 2;">
+                    <div style="margin-bottom: 5px; margin-top: 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important;">
+                        <img src="${logoPath}" alt="RMG Logo" style="max-width: 200px; height: auto; margin-left: 0 !important; padding-left: 0 !important; display: block;" onerror="this.style.display='none';" />
+                    </div>
+                    <p style="font-weight: bold; font-size: 12pt; margin-bottom: 4px; margin-top: 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid; orphans: 2; widows: 2;">Kính gửi ${escapeHtml(candidateName)},</p>
+                    <p style="margin-bottom: 8px; margin-top: 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid; orphans: 2; widows: 2;">Công ty TNHH RMG Việt Nam trân trọng gửi đến Anh/ Chị thư mời làm việc cho vị trí công việc như sau:</p>
+                    
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>1. Chức danh</strong> : <span style="color: #ff0000;">${escapeHtml(recruitmentInfoForm.chucDanh || '…………………..')}</span></p>
+                    
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>2. Báo cáo trực tiếp cho</strong> : <span style="color: #ff0000;">${escapeHtml(directManagerName || '………………………….')}</span></p>
+                    
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>3. Báo cáo gián tiếp cho</strong> : <span style="color: #ff0000;">${escapeHtml(indirectManagerName || '………………………….')}</span></p>
+                    
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>4. Địa điểm làm việc</strong> : <span style="color: #ff0000;">${escapeHtml(recruitmentInfoForm.diaDiemLamViec || '…………………………')}</span></p>
+                    
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>5. Ngày bắt đầu làm việc</strong> : <span style="color: #ff0000;">${escapeHtml(startDate)}</span></p>
+                    
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>6. Thời gian thử việc</strong> : 60 ngày (kể từ ngày bắt đầu làm việc)</p>
+                    
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>7. Thời gian làm việc</strong> : 08:30 – 17:30 (Từ Thứ Hai đến Thứ Sáu)</p>
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 20px !important; page-break-inside: avoid;">08:00 – 12:00 (Thứ Bảy- Nếu cần)</p>
+                    
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>8. Công việc chính:</strong></p>
+                    ${workItemsHtml}
+                    
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>9. Mức lương gộp hàng tháng (gross)</strong></p>
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">a. Trong thời gian thử việc : <span style="color: #ff0000;">${formatCurrency(recruitmentInfoForm.luongThuViec)}/tháng.</span></p>
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">b. Sau thời gian thử việc : <span style="color: #ff0000;">${formatCurrency(recruitmentInfoForm.luongSauThuViec)}/tháng.</span></p>
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">Trong đó 80% là mức lương cơ bản và 20% là phụ cấp lương.</p>
+                    
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>10. Thuế thu nhập cá nhân và bảo hiểm bắt buộc:</strong> Hàng tháng nhân viên có nghĩa vụ nộp thuế thu nhập cá nhân theo Luật định. Nếu đạt yêu cầu qua thử việc và được ký Hợp đồng lao động, Anh/Chị có nghĩa vụ tham gia BHXH, BHYT, BH thất nghiệp được trích từ tiền lương theo Luật định.</p>
+                    
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>11. Chính sách phụ cấp</strong></p>
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">a. Hỗ trợ cơm trưa : 30.000 VNĐ/ngày làm việc</p>
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">b. Hỗ trợ đi lại : <span style="color: #ff0000;">${formatCurrency(recruitmentInfoForm.hoTroDiLai)}/ngày làm việc</span></p>
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">c. Phụ cấp tiền cơm : <span style="color: #ff0000;">${formatCurrency(recruitmentInfoForm.phuCapTienCom)}/ngày làm việc</span></p>
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">d. Phụ cấp điện thoại : <span style="color: #ff0000;">${formatCurrency(recruitmentInfoForm.phuCapDienThoai)}/tháng (thẻ điện thoại).</span></p>
+                    
+                    <p style="margin: 6px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>12. Bảo hiểm Tai nạn:</strong></p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">theo chính sách công ty</p>
+                    
+                    <p style="margin: 6px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>13. Chính sách tiền thưởng</strong></p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">a. Thưởng tháng lương thứ 13: theo chính sách công ty hiện hành.</p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">b. Thưởng theo đánh giá hoàn thành mục tiêu cuối năm và các khoản thưởng khác: theo chính sách công ty hiện hành.</p>
+                    
+                    <p style="margin: 6px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>14. Phương tiện</strong></p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">a. Phương tiện đi làm: tự túc</p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">b. Phương tiện đi công tác trong thời gian làm việc: theo chính sách công ty.</p>
+                    
+                    <p style="margin: 6px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>15. Số ngày nghỉ trong năm:</strong></p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">a. Nghỉ phép năm: 12 ngày trong một năm.</p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">Phép năm được tính từ ngày Anh/Chị bắt đầu làm việc tại công ty và chỉ được sử dụng sau thời hạn thử việc.</p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">b. Nghỉ lễ, nghỉ chế độ: áp dụng theo Luật lao động Việt Nam và Chính sách công ty.</p>
+                    
+                    <p style="margin: 6px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>16. Hình thức trả lương:</strong></p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">Lương và phụ cấp được trả bằng tiền đồng và được chuyển khoản vào tài khoản ngân hàng của Anh/Chị vào ngày 5 hàng tháng.</p>
+                    
+                    <p style="margin: 6px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>17. Phúc lợi:</strong></p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">Trong thời gian thử việc, Anh/Chị được hưởng các phúc lợi của công ty bao gồm trợ cấp ngày lễ (nếu có), sinh nhật, cưới hỏi, ốm đau, chia buồn; và các khoản phúc lợi khác áp dụng chung cho toàn thể nhân viên công ty tại thời điểm Anh/Chị đang làm việc (nếu có).</p>
+                    
+                    <p style="margin: 12px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>* QUI ĐỊNH:</strong></p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">→ Cam kết tuân thủ Nội Quy làm việc của Công ty làm kim chỉ nam cho mọi hành động.</p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">→ Không làm bất cứ điều gì gây ảnh hưởng xấu đến vị thế, danh tiếng và hình ảnh của RMG Việt Nam dưới mọi hình thức.</p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">→ Không được tiết lộ các thông tin liên quan đến tiền lương và phúc lợi cá nhân cho người khác không có thẩm quyền.</p>
+                    <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">→ Đảm bảo giấy phép hành nghề phải được sử dụng phục vụ cho công việc tại công ty RMG Việt Nam</p>
+                    
+                    <p style="margin: 12px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">Hết thời hạn thử việc, Công ty sẽ tiến hành đánh giá hiệu quả công việc của Anh/Chị và sẽ xem xét ký hợp đồng lao động.</p>
+                    
+                    <p style="margin: 8px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">Chào mừng Anh/Chị đến với Công ty TNHH RMG Việt Nam, chúc Anh/Chị thành công trong thời gian làm việc với Công ty.</p>
+                    
+                    <p style="margin: 12px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">Vui lòng ký xác nhận những điều kiện và điều khoản trong Thư Tuyển dụng và gởi lại phòng Hành chính Nhân sự một (01) bản.</p>
+                </div>
+            `;
+
+            // Create a container for the PDF content - hidden from the start
+            const container = document.createElement('div');
+            container.id = 'pdf-export-container';
+            container.style.position = 'fixed';
+            container.style.top = '-9999px';
+            container.style.left = '-9999px';
+            container.style.width = '794px';
+            container.style.height = 'auto';
+            container.style.zIndex = '-9999';
+            container.style.backgroundColor = 'transparent';
+            container.style.display = 'block';
+            container.style.overflow = 'visible';
+            container.style.visibility = 'hidden';
+
+            // Create the content element
+            const element = document.createElement('div');
+            element.id = 'pdf-export-content';
+            element.innerHTML = htmlContent;
+            element.style.width = '794px'; // A4 width in pixels (210mm)
+            element.style.backgroundColor = '#ffffff';
+            element.style.color = '#000000';
+            element.style.fontFamily = 'Times New Roman, serif';
+            element.style.fontSize = '11pt';
+            element.style.lineHeight = '1.5';
+            element.style.padding = '3mm 5mm 10mm 5mm';
+            element.style.boxSizing = 'border-box';
+            element.style.margin = '20px auto';
+            element.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+            element.style.textAlign = 'left';
+            element.style.direction = 'ltr';
+            element.style.setProperty('text-align', 'left', 'important');
+
+            container.appendChild(element);
+            document.body.appendChild(container);
+
+            // Force reflow
+            const height = element.offsetHeight;
+
+            // Wait for images to load before generating PDF
+            const images = element.querySelectorAll('img');
+            const imagePromises = Array.from(images).map(img => {
+                if (img.complete) {
+                    return Promise.resolve();
+                }
+                return new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = resolve; // Continue even if image fails to load
+                    // Timeout after 3 seconds
+                    setTimeout(resolve, 3000);
+                });
+            });
+
+            // Wait for element to be fully rendered and images to load
+            Promise.all(imagePromises).then(() => {
+                setTimeout(() => {
+                    // Generate PDF (container is already hidden)
+                    const opt = {
+                        margin: [5, 5, 5, 5],
+                        filename: `Thu_Moi_Lam_Viec_${candidateName.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: {
+                            scale: 2,
+                            useCORS: true,
+                            allowTaint: false,
+                            logging: false,
+                            letterRendering: true,
+                            backgroundColor: '#ffffff',
+                            removeContainer: false,
+                            onclone: (clonedDoc) => {
+                                // Ensure the cloned element is visible for rendering
+                                const clonedElement = clonedDoc.getElementById('pdf-export-content');
+                                if (clonedElement) {
+                                    clonedElement.style.visibility = 'visible';
+                                    clonedElement.style.display = 'block';
+                                    clonedElement.style.textAlign = 'left';
+                                    clonedElement.style.direction = 'ltr';
+                                    clonedElement.style.setProperty('text-align', 'left', 'important');
+                                }
+                                // Also update the wrapper
+                                const wrapper = clonedDoc.getElementById('pdf-content-wrapper');
+                                if (wrapper) {
+                                    wrapper.style.textAlign = 'left';
+                                    wrapper.style.direction = 'ltr';
+                                    wrapper.style.setProperty('text-align', 'left', 'important');
+                                    // Update all child elements
+                                    const allElements = wrapper.querySelectorAll('*');
+                                    allElements.forEach(el => {
+                                        if (el.style) {
+                                            el.style.textAlign = 'left';
+                                            el.style.setProperty('text-align', 'left', 'important');
+                                            // Add orphans and widows to prevent text cutting
+                                            if (el.tagName === 'P' || el.tagName === 'DIV') {
+                                                el.style.setProperty('orphans', '2', 'important');
+                                                el.style.setProperty('widows', '2', 'important');
+                                                el.style.setProperty('page-break-inside', 'avoid', 'important');
+                                            }
+                                        }
+                                    });
+                                    // Ensure logo images are loaded
+                                    const images = wrapper.querySelectorAll('img');
+                                    images.forEach(img => {
+                                        if (img.src && !img.complete) {
+                                            img.style.display = 'block';
+                                        }
+                                    });
+                                }
+                            }
+                        },
+                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                    };
+
+                    html2pdf().set(opt).from(element).save().then(() => {
+                        // Clean up
+                        const containerEl = document.getElementById('pdf-export-container');
+                        if (containerEl && document.body.contains(containerEl)) {
+                            document.body.removeChild(containerEl);
+                        }
+                        if (showToast) {
+                            showToast('Xuất PDF thành công!', 'success');
+                        }
+                    }).catch((error) => {
+                        // Clean up
+                        const containerEl = document.getElementById('pdf-export-container');
+                        if (containerEl && document.body.contains(containerEl)) {
+                            document.body.removeChild(containerEl);
+                        }
+                        console.error('Export PDF error:', error);
+                        console.error('Error stack:', error.stack);
+                        if (showToast) {
+                            showToast('Lỗi khi xuất PDF: ' + (error.message || 'Unknown error'), 'error');
+                        }
+                    });
+                }, 300);
+            });
+        } catch (error) {
+            console.error('Export PDF error:', error);
+            if (showToast) {
+                showToast('Lỗi khi xuất PDF', 'error');
+            }
+        }
+    };
+
     return (
         <div className="recruitment-management">
             {/* Header */}
@@ -1478,7 +1862,26 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                 ) : (
                                     candidates.map((candidate, index) => {
                                         // Map status từ database sang label
-                                        const getStatusLabel = (status) => {
+                                        const getStatusLabel = (status, candidate = null) => {
+                                            // Xử lý ON_PROBATION với 2 trạng thái con
+                                            if (status === 'ON_PROBATION') {
+                                                if (!candidate || !candidate.probation_start_date) {
+                                                    return 'Đang chờ thử việc';
+                                                }
+
+                                                const startDate = new Date(candidate.probation_start_date);
+                                                const today = new Date();
+                                                today.setHours(0, 0, 0, 0);
+                                                startDate.setHours(0, 0, 0, 0);
+
+                                                // Nếu chưa đến ngày bắt đầu
+                                                if (startDate > today) {
+                                                    return 'Đang chờ thử việc';
+                                                } else {
+                                                    return 'Đang thử việc';
+                                                }
+                                            }
+
                                             const statusMap = {
                                                 'NEW': 'Ứng viên mới',
                                                 'PENDING_INTERVIEW': 'Chờ phỏng vấn',
@@ -1501,7 +1904,8 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                 'WAITING_FOR_OTHER_APPROVAL': 'status-waiting',
                                                 'READY_FOR_INTERVIEW': 'status-ready',
                                                 'PASSED': 'status-passed',
-                                                'FAILED': 'status-failed'
+                                                'FAILED': 'status-failed',
+                                                'ON_PROBATION': 'status-probation'
                                             };
                                             return classMap[status] || '';
                                         };
@@ -1529,7 +1933,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                 <td>{formatDate(candidate.ngay_gui_cv) || formatDate(candidate.created_at) || '-'}</td>
                                                 <td>
                                                     <span className={`recruitment-status-badge ${getStatusClass(candidate.trang_thai)}`}>
-                                                        {getStatusLabel(candidate.trang_thai)}
+                                                        {getStatusLabel(candidate.trang_thai, candidate)}
                                                     </span>
                                                 </td>
                                             </tr>
@@ -2686,12 +3090,13 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                             <h2 className="recruitment-view-candidate-modal-title">Thông tin Ứng viên</h2>
                             <div className="recruitment-view-candidate-modal-header-actions">
                                 {currentUser?.role === 'HR' && (
-                                    hasInterviewRequest || 
-                                    viewingCandidate?.trang_thai === 'TRANSFERRED_TO_INTERVIEW' ||
-                                    viewingCandidate?.trang_thai === 'WAITING_FOR_OTHER_APPROVAL' ||
-                                    viewingCandidate?.trang_thai === 'READY_FOR_INTERVIEW' ||
-                                    viewingCandidate?.trang_thai === 'PASSED' ||
-                                    viewingCandidate?.trang_thai === 'FAILED' ? (
+                                    (hasInterviewRequest ||
+                                        viewingCandidate?.trang_thai === 'TRANSFERRED_TO_INTERVIEW' ||
+                                        viewingCandidate?.trang_thai === 'WAITING_FOR_OTHER_APPROVAL' ||
+                                        (viewingCandidate?.trang_thai === 'READY_FOR_INTERVIEW' ||
+                                            viewingCandidate?.trang_thai === 'PASSED' ||
+                                            viewingCandidate?.trang_thai === 'FAILED')) &&
+                                        viewingCandidate?.trang_thai !== 'ON_PROBATION' ? (
                                         <button
                                             type="button"
                                             className="recruitment-transfer-btn"
@@ -3448,7 +3853,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                 Ứng viên đã được chuyển sang phỏng vấn
                                             </p>
                                             <p className="timeline-step-date">
-                                                {interviewTimelineData.interviewRequest.created_at 
+                                                {interviewTimelineData.interviewRequest.created_at
                                                     ? new Date(interviewTimelineData.interviewRequest.created_at).toLocaleString('vi-VN')
                                                     : '---'}
                                             </p>
@@ -3476,7 +3881,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                 )}
                                             </h3>
                                             <p className="timeline-step-description">
-                                                {interviewTimelineData.interviewRequest.manager_approved 
+                                                {interviewTimelineData.interviewRequest.manager_approved
                                                     ? 'Đã được quản lý trực tiếp duyệt'
                                                     : 'Đang chờ quản lý trực tiếp duyệt'}
                                             </p>
@@ -3509,7 +3914,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                 )}
                                             </h3>
                                             <p className="timeline-step-description">
-                                                {interviewTimelineData.interviewRequest.branch_director_approved 
+                                                {interviewTimelineData.interviewRequest.branch_director_approved
                                                     ? 'Đã được giám đốc chi nhánh duyệt'
                                                     : 'Đang chờ giám đốc chi nhánh duyệt'}
                                             </p>
@@ -3545,7 +3950,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
 
                                     {/* Step 5: Đánh giá của Quản lý trực tiếp */}
                                     {(() => {
-                                        const managerEval = interviewTimelineData.evaluations?.find(e => 
+                                        const managerEval = interviewTimelineData.evaluations?.find(e =>
                                             e.evaluator_id === interviewTimelineData.interviewRequest.manager_id
                                         );
                                         return (
@@ -3581,8 +3986,8 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                     <span className={`conclusion-badge conclusion-badge-${managerEval.ket_luan.toLowerCase().replace('_', '-')}`}>
                                                                         {
                                                                             managerEval.ket_luan === 'DAT_YEU_CAU' ? '✓ Đạt yêu cầu' :
-                                                                            managerEval.ket_luan === 'KHONG_DAT_YEU_CAU' ? '✗ Không đạt yêu cầu' :
-                                                                            managerEval.ket_luan === 'LUU_HO_SO' ? '📄 Lưu hồ sơ' : managerEval.ket_luan
+                                                                                managerEval.ket_luan === 'KHONG_DAT_YEU_CAU' ? '✗ Không đạt yêu cầu' :
+                                                                                    managerEval.ket_luan === 'LUU_HO_SO' ? '📄 Lưu hồ sơ' : managerEval.ket_luan
                                                                         }
                                                                     </span>
                                                                 </div>
@@ -3600,7 +4005,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
 
                                     {/* Step 6: Đánh giá của Giám đốc chi nhánh */}
                                     {(() => {
-                                        const directorEval = interviewTimelineData.evaluations?.find(e => 
+                                        const directorEval = interviewTimelineData.evaluations?.find(e =>
                                             e.evaluator_id === interviewTimelineData.interviewRequest.branch_director_id
                                         );
                                         return (
@@ -3636,8 +4041,8 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                     <span className={`conclusion-badge conclusion-badge-${directorEval.ket_luan.toLowerCase().replace('_', '-')}`}>
                                                                         {
                                                                             directorEval.ket_luan === 'DAT_YEU_CAU' ? '✓ Đạt yêu cầu' :
-                                                                            directorEval.ket_luan === 'KHONG_DAT_YEU_CAU' ? '✗ Không đạt yêu cầu' :
-                                                                            directorEval.ket_luan === 'LUU_HO_SO' ? '📄 Lưu hồ sơ' : directorEval.ket_luan
+                                                                                directorEval.ket_luan === 'KHONG_DAT_YEU_CAU' ? '✗ Không đạt yêu cầu' :
+                                                                                    directorEval.ket_luan === 'LUU_HO_SO' ? '📄 Lưu hồ sơ' : directorEval.ket_luan
                                                                         }
                                                                     </span>
                                                                 </div>
@@ -3660,9 +4065,9 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                             const isPassed = finalStatus === 'PASSED';
                                             const isFailed = finalStatus === 'FAILED';
                                             const showResult = isPassed || isFailed;
-                                            
+
                                             if (!showResult) return null;
-                                            
+
                                             return (
                                                 <div className={`timeline-step timeline-step-completed ${isPassed ? 'timeline-step-success' : 'timeline-step-error'}`}>
                                                     <div className="timeline-step-icon">
@@ -3681,7 +4086,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                             {isPassed ? '🎉 Kết quả: Đậu' : '❌ Kết quả: Rớt'}
                                                         </h3>
                                                         <p className="timeline-step-description">
-                                                            {isPassed 
+                                                            {isPassed
                                                                 ? 'Ứng viên đã vượt qua vòng phỏng vấn và được tuyển dụng'
                                                                 : 'Ứng viên không đạt yêu cầu phỏng vấn'}
                                                         </p>
@@ -3700,37 +4105,26 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                         </div>
                         <div className="interview-timeline-modal-footer">
                             {(() => {
-                                const managerEval = interviewTimelineData.evaluations?.find(e => 
+                                const managerEval = interviewTimelineData.evaluations?.find(e =>
                                     e.evaluator_id === interviewTimelineData.interviewRequest.manager_id
                                 );
-                                const directorEval = interviewTimelineData.evaluations?.find(e => 
+                                const directorEval = interviewTimelineData.evaluations?.find(e =>
                                     e.evaluator_id === interviewTimelineData.interviewRequest.branch_director_id
                                 );
                                 const bothEvaluated = managerEval && directorEval;
-                                const bothPassed = bothEvaluated && 
-                                    managerEval.ket_luan === 'DAT_YEU_CAU' && 
+                                const bothPassed = bothEvaluated &&
+                                    managerEval.ket_luan === 'DAT_YEU_CAU' &&
                                     directorEval.ket_luan === 'DAT_YEU_CAU';
                                 const candidateStatus = interviewTimelineData.candidate?.trang_thai;
                                 const isPassed = candidateStatus === 'PASSED' || bothPassed;
-                                
-                                // Debug log
-                                console.log('[Timeline Modal] Debug:', {
-                                    candidateStatus,
-                                    bothEvaluated,
-                                    bothPassed,
-                                    managerEval: managerEval?.ket_luan,
-                                    directorEval: directorEval?.ket_luan,
-                                    isPassed,
-                                    statusUpdateChecked
-                                });
-                                
+
                                 // Nếu cả 2 đánh giá "Đạt yêu cầu" nhưng status chưa là PASSED, gọi API để update (chỉ 1 lần)
-                                if (bothPassed && candidateStatus !== 'PASSED' && interviewTimelineData.candidate?.id && !statusUpdateChecked) {
+                                // Không update nếu candidate đã ON_PROBATION
+                                if (bothPassed && candidateStatus !== 'PASSED' && candidateStatus !== 'ON_PROBATION' && interviewTimelineData.candidate?.id && !statusUpdateChecked) {
                                     setStatusUpdateChecked(true);
                                     interviewEvaluationsAPI.checkAndUpdateStatus(interviewTimelineData.candidate.id)
                                         .then(response => {
                                             if (response.data?.success) {
-                                                console.log('[Timeline Modal] Updated candidate status to PASSED');
                                                 // Refresh candidate data và timeline
                                                 setTimeout(() => {
                                                     handleLoadInterviewTimeline(interviewTimelineData.candidate.id);
@@ -3742,7 +4136,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                             setStatusUpdateChecked(false); // Reset để thử lại
                                         });
                                 }
-                                
+
                                 return (
                                     <>
                                         {bothEvaluated && (
@@ -3772,7 +4166,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                 setShowInterviewTimelineModal(false);
                                                 setInterviewTimelineData(null);
                                                 setStatusUpdateChecked(false); // Reset flag khi đóng modal
-                                                
+
                                                 // Refresh candidate data khi đóng timeline modal
                                                 if (viewingCandidate?.id) {
                                                     try {
@@ -3780,14 +4174,13 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                         const candidateResponse = await candidatesAPI.getById(viewingCandidate.id);
                                                         if (candidateResponse.data?.success && candidateResponse.data.data) {
                                                             const updatedCandidate = candidateResponse.data.data;
-                                                            console.log('[Timeline Modal Close] Updated candidate status:', updatedCandidate.trang_thai);
                                                             setViewingCandidate(updatedCandidate);
-                                                            
+
                                                             // Cập nhật candidate trong list để đồng bộ status ngay lập tức
-                                                            setCandidates(prevCandidates => 
+                                                            setCandidates(prevCandidates =>
                                                                 prevCandidates.map(c => c.id === updatedCandidate.id ? updatedCandidate : c)
                                                             );
-                                                            
+
                                                             // Refresh toàn bộ candidate list để đảm bảo đồng bộ
                                                             setTimeout(() => {
                                                                 fetchCandidates();
@@ -3888,8 +4281,8 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                         <span className={`conclusion-badge conclusion-badge-${evaluationSummaryData.managerConclusion?.toLowerCase().replace('_', '-')}`}>
                                             {
                                                 evaluationSummaryData.managerConclusion === 'DAT_YEU_CAU' ? '✓ Đạt yêu cầu' :
-                                                evaluationSummaryData.managerConclusion === 'KHONG_DAT_YEU_CAU' ? '✗ Không đạt yêu cầu' :
-                                                evaluationSummaryData.managerConclusion === 'LUU_HO_SO' ? '📄 Lưu hồ sơ' : evaluationSummaryData.managerConclusion
+                                                    evaluationSummaryData.managerConclusion === 'KHONG_DAT_YEU_CAU' ? '✗ Không đạt yêu cầu' :
+                                                        evaluationSummaryData.managerConclusion === 'LUU_HO_SO' ? '📄 Lưu hồ sơ' : evaluationSummaryData.managerConclusion
                                             }
                                         </span>
                                     </div>
@@ -3898,8 +4291,8 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                         <span className={`conclusion-badge conclusion-badge-${evaluationSummaryData.directorConclusion?.toLowerCase().replace('_', '-')}`}>
                                             {
                                                 evaluationSummaryData.directorConclusion === 'DAT_YEU_CAU' ? '✓ Đạt yêu cầu' :
-                                                evaluationSummaryData.directorConclusion === 'KHONG_DAT_YEU_CAU' ? '✗ Không đạt yêu cầu' :
-                                                evaluationSummaryData.directorConclusion === 'LUU_HO_SO' ? '📄 Lưu hồ sơ' : evaluationSummaryData.directorConclusion
+                                                    evaluationSummaryData.directorConclusion === 'KHONG_DAT_YEU_CAU' ? '✗ Không đạt yêu cầu' :
+                                                        evaluationSummaryData.directorConclusion === 'LUU_HO_SO' ? '📄 Lưu hồ sơ' : evaluationSummaryData.directorConclusion
                                             }
                                         </span>
                                     </div>
@@ -3966,7 +4359,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                         {/* Section 1: Thông Tin Vị Trí & Tổ Chức */}
                                         <div className="send-recruitment-info-section">
                                             <h3 className="send-recruitment-info-section-title">A. Thông Tin Vị Trí & Tổ Chức</h3>
-                                            
+
                                             {/* Hàng 1: Chức danh, Cấp Bậc */}
                                             <div className="send-recruitment-info-form-row">
                                                 <div className="send-recruitment-info-form-group">
@@ -3976,7 +4369,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     <select
                                                         className="send-recruitment-info-select"
                                                         value={recruitmentInfoForm.chucDanh}
-                                                        onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, chucDanh: e.target.value})}
+                                                        onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, chucDanh: e.target.value })}
                                                         required
                                                     >
                                                         <option value="">-- Chọn chức danh --</option>
@@ -3992,7 +4385,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     <select
                                                         className="send-recruitment-info-select"
                                                         value={recruitmentInfoForm.capBac}
-                                                        onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, capBac: e.target.value})}
+                                                        onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, capBac: e.target.value })}
                                                     >
                                                         <option value="">-- Chọn cấp bậc --</option>
                                                         {ranks.map((rank, index) => (
@@ -4008,36 +4401,37 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     <label className="send-recruitment-info-label">
                                                         Người báo cáo trực tiếp <span className="required">*</span>
                                                     </label>
-                                                    <select
-                                                        className="send-recruitment-info-select"
-                                                        value={recruitmentInfoForm.baoCaoTrucTiep}
-                                                        onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, baoCaoTrucTiep: e.target.value})}
-                                                        required
-                                                    >
-                                                        <option value="">-- Chọn người quản lý --</option>
-                                                        {managers.map((manager) => (
-                                                            <option key={manager.id} value={manager.id}>
-                                                                {manager.ho_ten || manager.hoTen} - {manager.chuc_danh || manager.chucDanh || ''}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                    <input
+                                                        type="text"
+                                                        className="send-recruitment-info-input"
+                                                        value={
+                                                            recruitmentInfoForm.baoCaoTrucTiep
+                                                                ? (() => {
+                                                                    const manager = managers.find(m => m.id === parseInt(recruitmentInfoForm.baoCaoTrucTiep));
+                                                                    return manager ? `${manager.ho_ten || manager.hoTen}${manager.chuc_danh || manager.chucDanh ? ` - ${manager.chuc_danh || manager.chucDanh}` : ''}` : '';
+                                                                })()
+                                                                : ''
+                                                        }
+                                                        readOnly
+                                                    />
                                                 </div>
                                                 <div className="send-recruitment-info-form-group">
                                                     <label className="send-recruitment-info-label">
                                                         Người báo cáo gián tiếp
                                                     </label>
-                                                    <select
-                                                        className="send-recruitment-info-select"
-                                                        value={recruitmentInfoForm.baoCaoGianTiep}
-                                                        onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, baoCaoGianTiep: e.target.value})}
-                                                    >
-                                                        <option value="">-- Chọn người quản lý --</option>
-                                                        {managers.map((manager) => (
-                                                            <option key={manager.id} value={manager.id}>
-                                                                {manager.ho_ten || manager.hoTen} - {manager.chuc_danh || manager.chucDanh || ''}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                    <input
+                                                        type="text"
+                                                        className="send-recruitment-info-input"
+                                                        value={
+                                                            recruitmentInfoForm.baoCaoGianTiep
+                                                                ? (() => {
+                                                                    const manager = managers.find(m => m.id === parseInt(recruitmentInfoForm.baoCaoGianTiep));
+                                                                    return manager ? `${manager.ho_ten || manager.hoTen}${manager.chuc_danh || manager.chucDanh ? ` - ${manager.chuc_danh || manager.chucDanh}` : ''}` : '';
+                                                                })()
+                                                                : ''
+                                                        }
+                                                        readOnly
+                                                    />
                                                 </div>
                                             </div>
 
@@ -4051,7 +4445,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                         type="text"
                                                         className="send-recruitment-info-input"
                                                         value={recruitmentInfoForm.diaDiemLamViec}
-                                                        onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, diaDiemLamViec: e.target.value})}
+                                                        onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, diaDiemLamViec: e.target.value })}
                                                         placeholder="Nhập địa điểm làm việc"
                                                         required
                                                     />
@@ -4064,7 +4458,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                         type="date"
                                                         className="send-recruitment-info-input"
                                                         value={recruitmentInfoForm.ngayBatDauLamViec}
-                                                        onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, ngayBatDauLamViec: e.target.value})}
+                                                        onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, ngayBatDauLamViec: e.target.value })}
                                                         required
                                                     />
                                                 </div>
@@ -4092,7 +4486,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                         type="text"
                                                         className="send-recruitment-info-input"
                                                         value={recruitmentInfoForm.thoiGianLamViec}
-                                                        onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, thoiGianLamViec: e.target.value})}
+                                                        onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, thoiGianLamViec: e.target.value })}
                                                         placeholder="08:00 – 12:00 (Thứ Bảy- Nếu cần)"
                                                     />
                                                 </div>
@@ -4107,7 +4501,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     <select
                                                         className="send-recruitment-info-select"
                                                         value={recruitmentInfoForm.lyDoTuyenDung}
-                                                        onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, lyDoTuyenDung: e.target.value})}
+                                                        onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, lyDoTuyenDung: e.target.value })}
                                                     >
                                                         <option value="">-- Chọn lý do --</option>
                                                         <option value="Mở rộng đội ngũ">Mở rộng đội ngũ</option>
@@ -4124,7 +4518,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                         type="number"
                                                         className="send-recruitment-info-input"
                                                         value={recruitmentInfoForm.soLuongCanTuyen}
-                                                        onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, soLuongCanTuyen: e.target.value})}
+                                                        onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, soLuongCanTuyen: e.target.value })}
                                                         placeholder="1"
                                                         min="1"
                                                     />
@@ -4135,7 +4529,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                         {/* Section 2: Công Việc Chính & Yêu Cầu */}
                                         <div className="send-recruitment-info-section">
                                             <h3 className="send-recruitment-info-section-title">B. Công Việc Chính & Yêu Cầu</h3>
-                                            
+
                                             {/* Công Việc Chính */}
                                             <div className="send-recruitment-info-form-group">
                                                 <label className="send-recruitment-info-label">
@@ -4153,7 +4547,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                             onChange={(e) => {
                                                                 const newCongViecChinh = [...recruitmentInfoForm.congViecChinh];
                                                                 newCongViecChinh[index] = e.target.value;
-                                                                setRecruitmentInfoForm({...recruitmentInfoForm, congViecChinh: newCongViecChinh});
+                                                                setRecruitmentInfoForm({ ...recruitmentInfoForm, congViecChinh: newCongViecChinh });
                                                             }}
                                                             placeholder={`Nhập công việc ${index + 1}`}
                                                         />
@@ -4163,7 +4557,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                 className="send-recruitment-info-remove-btn"
                                                                 onClick={() => {
                                                                     const newCongViecChinh = recruitmentInfoForm.congViecChinh.filter((_, i) => i !== index);
-                                                                    setRecruitmentInfoForm({...recruitmentInfoForm, congViecChinh: newCongViecChinh});
+                                                                    setRecruitmentInfoForm({ ...recruitmentInfoForm, congViecChinh: newCongViecChinh });
                                                                 }}
                                                             >
                                                                 Xóa
@@ -4194,7 +4588,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     <select
                                                         className="send-recruitment-info-select"
                                                         value={recruitmentInfoForm.kinhNghiem}
-                                                        onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, kinhNghiem: e.target.value})}
+                                                        onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, kinhNghiem: e.target.value })}
                                                     >
                                                         <option value="">-- Chọn kinh nghiệm --</option>
                                                         <option value="Không yêu cầu">Không yêu cầu</option>
@@ -4212,7 +4606,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     <select
                                                         className="send-recruitment-info-select"
                                                         value={recruitmentInfoForm.hocVanToiThieu}
-                                                        onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, hocVanToiThieu: e.target.value})}
+                                                        onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, hocVanToiThieu: e.target.value })}
                                                     >
                                                         <option value="">-- Chọn học vấn --</option>
                                                         <option value="Trung học phổ thông">Trung học phổ thông</option>
@@ -4234,7 +4628,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     type="text"
                                                     className="send-recruitment-info-input"
                                                     value={recruitmentInfoForm.kyNang}
-                                                    onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, kyNang: e.target.value})}
+                                                    onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, kyNang: e.target.value })}
                                                     placeholder="Nhập các kỹ năng yêu cầu (cách nhau bằng dấu phẩy)"
                                                 />
                                             </div>
@@ -4246,7 +4640,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                         {/* Section 3: Đề Xuất Ngân Sách & Phúc Lợi */}
                                         <div className="send-recruitment-info-section">
                                             <h3 className="send-recruitment-info-section-title">C. Đề Xuất Ngân Sách & Phúc Lợi</h3>
-                                            
+
                                             {/* Mức Lương Gộp */}
                                             <div className="send-recruitment-info-form-group">
                                                 <label className="send-recruitment-info-label">
@@ -4262,7 +4656,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                 type="number"
                                                                 className="send-recruitment-info-input"
                                                                 value={recruitmentInfoForm.luongThuViec}
-                                                                onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, luongThuViec: e.target.value})}
+                                                                onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, luongThuViec: e.target.value })}
                                                                 placeholder="0"
                                                                 min="0"
                                                             />
@@ -4286,7 +4680,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                 type="number"
                                                                 className="send-recruitment-info-input"
                                                                 value={recruitmentInfoForm.luongSauThuViec}
-                                                                onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, luongSauThuViec: e.target.value})}
+                                                                onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, luongSauThuViec: e.target.value })}
                                                                 placeholder="0"
                                                                 min="0"
                                                             />
@@ -4332,7 +4726,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                 type="number"
                                                                 className="send-recruitment-info-input"
                                                                 value={recruitmentInfoForm.hoTroComTrua}
-                                                                onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, hoTroComTrua: e.target.value})}
+                                                                onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, hoTroComTrua: e.target.value })}
                                                                 placeholder="0"
                                                                 min="0"
                                                             />
@@ -4356,7 +4750,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                 type="number"
                                                                 className="send-recruitment-info-input"
                                                                 value={recruitmentInfoForm.hoTroDiLai}
-                                                                onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, hoTroDiLai: e.target.value})}
+                                                                onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, hoTroDiLai: e.target.value })}
                                                                 placeholder="0"
                                                                 min="0"
                                                             />
@@ -4380,7 +4774,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                 type="number"
                                                                 className="send-recruitment-info-input"
                                                                 value={recruitmentInfoForm.phuCapTienCom}
-                                                                onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, phuCapTienCom: e.target.value})}
+                                                                onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, phuCapTienCom: e.target.value })}
                                                                 placeholder="0"
                                                                 min="0"
                                                             />
@@ -4404,7 +4798,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                 type="number"
                                                                 className="send-recruitment-info-input"
                                                                 value={recruitmentInfoForm.phuCapDienThoai}
-                                                                onChange={(e) => setRecruitmentInfoForm({...recruitmentInfoForm, phuCapDienThoai: e.target.value})}
+                                                                onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, phuCapDienThoai: e.target.value })}
                                                                 placeholder="0"
                                                                 min="0"
                                                             />
@@ -4429,26 +4823,31 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                         <div className="send-recruitment-info-modal-footer">
                             <button
                                 type="button"
-                                className="send-recruitment-info-modal-btn send-recruitment-info-modal-btn-preview"
-                                onClick={() => {
-                                    setShowRecruitmentInfoPreview(true);
-                                }}
+                                className="send-recruitment-info-modal-btn send-recruitment-info-modal-btn-export"
+                                onClick={handleExportPDF}
                             >
-                                Xem Trước Toàn Bộ Đề Xuất
+                                Xuất PDF
                             </button>
-                            <button
-                                type="button"
-                                className="send-recruitment-info-modal-btn send-recruitment-info-modal-btn-send"
-                                onClick={() => {
-                                    // TODO: Implement send logic
-                                    console.log('Send recruitment info:', recruitmentInfoForm);
-                                    if (showToast) {
-                                        showToast('Chức năng gửi thông tin tuyển dụng sẽ được phát triển', 'info');
-                                    }
-                                }}
-                            >
-                                Gửi Yêu Cầu & Đề Xuất
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.75rem', marginLeft: 'auto' }}>
+                                <button
+                                    type="button"
+                                    className="send-recruitment-info-modal-btn send-recruitment-info-modal-btn-preview"
+                                    onClick={() => {
+                                        setShowRecruitmentInfoPreview(true);
+                                    }}
+                                >
+                                    Xem Trước Toàn Bộ Đề Xuất
+                                </button>
+                                <button
+                                    type="button"
+                                    className="send-recruitment-info-modal-btn send-recruitment-info-modal-btn-send"
+                                    onClick={() => {
+                                        setShowStartProbationModal(true);
+                                    }}
+                                >
+                                    Bắt đầu thử việc
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -4487,7 +4886,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                     <div className="recruitment-info-preview-item">
                                         <label className="recruitment-info-preview-label">Người báo cáo trực tiếp:</label>
                                         <span className="recruitment-info-preview-value">
-                                            {recruitmentInfoForm.baoCaoTrucTiep 
+                                            {recruitmentInfoForm.baoCaoTrucTiep
                                                 ? managers.find(m => m.id === parseInt(recruitmentInfoForm.baoCaoTrucTiep))?.ho_ten || managers.find(m => m.id === parseInt(recruitmentInfoForm.baoCaoTrucTiep))?.hoTen || '---'
                                                 : '---'}
                                         </span>
@@ -4495,7 +4894,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                     <div className="recruitment-info-preview-item">
                                         <label className="recruitment-info-preview-label">Người báo cáo gián tiếp:</label>
                                         <span className="recruitment-info-preview-value">
-                                            {recruitmentInfoForm.baoCaoGianTiep 
+                                            {recruitmentInfoForm.baoCaoGianTiep
                                                 ? managers.find(m => m.id === parseInt(recruitmentInfoForm.baoCaoGianTiep))?.ho_ten || managers.find(m => m.id === parseInt(recruitmentInfoForm.baoCaoGianTiep))?.hoTen || '---'
                                                 : '---'}
                                         </span>
@@ -4530,7 +4929,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                             {/* Section B: Công Việc Chính & Yêu Cầu */}
                             <div className="recruitment-info-preview-section">
                                 <h3 className="recruitment-info-preview-section-title">B. Công Việc Chính & Yêu Cầu</h3>
-                                
+
                                 {/* Công Việc Chính */}
                                 <div className="recruitment-info-preview-item-full">
                                     <label className="recruitment-info-preview-label">Công Việc Chính:</label>
@@ -4567,7 +4966,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                             {/* Section C: Đề Xuất Ngân Sách & Phúc Lợi */}
                             <div className="recruitment-info-preview-section">
                                 <h3 className="recruitment-info-preview-section-title">C. Đề Xuất Ngân Sách & Phúc Lợi</h3>
-                                
+
                                 {/* Mức Lương Gộp */}
                                 <div className="recruitment-info-preview-item-full">
                                     <label className="recruitment-info-preview-label">Mức lương gộp hàng tháng (gross):</label>
@@ -4659,15 +5058,252 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                 className="recruitment-info-preview-modal-btn recruitment-info-preview-modal-btn-send"
                                 onClick={() => {
                                     setShowRecruitmentInfoPreview(false);
-                                    // Trigger send action
-                                    console.log('Send recruitment info:', recruitmentInfoForm);
-                                    if (showToast) {
-                                        showToast('Chức năng gửi thông tin tuyển dụng sẽ được phát triển', 'info');
+                                    setShowStartProbationModal(true);
+                                }}
+                            >
+                                Bắt đầu thử việc
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Start Probation Modal */}
+            {showStartProbationModal && (
+                <div className="start-probation-modal-overlay" onClick={() => setShowStartProbationModal(false)}>
+                    <div className="start-probation-modal-container" onClick={(e) => e.stopPropagation()}>
+                        <div className="start-probation-modal-header">
+                            <h2 className="start-probation-modal-title">Bắt đầu thử việc</h2>
+                            <button
+                                type="button"
+                                className="start-probation-modal-close"
+                                onClick={() => setShowStartProbationModal(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="start-probation-modal-body">
+                            <div className="start-probation-form-group">
+                                <label className="start-probation-label">
+                                    Chọn ngày bắt đầu thử việc <span className="required">*</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    className="start-probation-input"
+                                    value={probationStartDate}
+                                    onChange={(e) => setProbationStartDate(e.target.value)}
+                                    min={new Date().toISOString().split('T')[0]}
+                                    required
+                                />
+                                <p className="start-probation-note">
+                                    Thời gian thử việc: 45 ngày (kể từ ngày bắt đầu)
+                                </p>
+                            </div>
+                            {viewingCandidate && (
+                                <div className="start-probation-candidate-info">
+                                    <p><strong>Ứng viên:</strong> {viewingCandidate.ho_ten || viewingCandidate.hoTen}</p>
+                                    <p><strong>Vị trí:</strong> {recruitmentInfoForm.chucDanh || viewingCandidate.vi_tri_ung_tuyen || viewingCandidate.viTriUngTuyen || '---'}</p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="start-probation-modal-footer">
+                            <button
+                                type="button"
+                                className="start-probation-modal-btn start-probation-modal-btn-cancel"
+                                onClick={() => setShowStartProbationModal(false)}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type="button"
+                                className="start-probation-modal-btn start-probation-modal-btn-confirm"
+                                onClick={async () => {
+                                    if (!probationStartDate) {
+                                        if (showToast) {
+                                            showToast('Vui lòng chọn ngày bắt đầu thử việc', 'error');
+                                        }
+                                        return;
+                                    }
+
+                                    if (!viewingCandidate?.id) {
+                                        if (showToast) {
+                                            showToast('Không tìm thấy thông tin ứng viên', 'error');
+                                        }
+                                        return;
+                                    }
+
+                                    try {
+                                        // Call API to start probation
+                                        const response = await candidatesAPI.startProbation(viewingCandidate.id, {
+                                            startDate: probationStartDate,
+                                            recruitmentInfo: recruitmentInfoForm
+                                        });
+
+                                        if (response.data?.success) {
+                                            if (showToast) {
+                                                showToast('Bắt đầu thử việc thành công! Ứng viên đã được chuyển sang danh sách thử việc.', 'success');
+                                            }
+                                            setShowStartProbationModal(false);
+                                            setShowSendRecruitmentInfoModal(false);
+                                            setShowRecruitmentInfoPreview(false);
+                                            setProbationStartDate('');
+                                            // Refresh candidate list
+                                            fetchCandidates();
+                                        } else {
+                                            if (showToast) {
+                                                showToast(response.data?.message || 'Có lỗi xảy ra khi bắt đầu thử việc', 'error');
+                                            }
+                                        }
+                                    } catch (error) {
+                                        console.error('Error starting probation:', error);
+                                        if (showToast) {
+                                            showToast('Có lỗi xảy ra khi bắt đầu thử việc', 'error');
+                                        }
                                     }
                                 }}
                             >
-                                Gửi Yêu Cầu & Đề Xuất
+                                Xác nhận
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Probation Status Modal for HR */}
+            {showProbationStatusModal && selectedProbationCandidate && (
+                <div className="probation-status-modal-overlay" onClick={() => setShowProbationStatusModal(false)}>
+                    <div className="probation-status-modal-container" onClick={(e) => e.stopPropagation()}>
+                        <div className="probation-status-modal-header">
+                            <div className="probation-status-modal-header-content">
+                                <svg className="probation-status-modal-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <div>
+                                    <h2 className="probation-status-modal-title">Trạng Thái Thử Việc (45 Ngày)</h2>
+                                    <p className="probation-status-modal-subtitle">
+                                        Ứng viên: <strong>{selectedProbationCandidate.ho_ten || selectedProbationCandidate.hoTen}</strong>
+                                    </p>
+                                </div>
+                            </div>
+                            <button className="probation-status-modal-close" onClick={() => setShowProbationStatusModal(false)}>
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="probation-status-modal-body">
+                            {(() => {
+                                const countdownData = calculateProbationCountdown(selectedProbationCandidate.probation_start_date);
+                                const startDate = selectedProbationCandidate.probation_start_date
+                                    ? new Date(selectedProbationCandidate.probation_start_date)
+                                    : null;
+                                const formattedStartDate = startDate
+                                    ? startDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                    : '-';
+
+                                if (!countdownData) {
+                                    return <div>Không có thông tin về thời gian thử việc</div>;
+                                }
+
+                                // Tính toán countdown chi tiết
+                                let days = 0, hours = 0, minutes = 0, seconds = 0;
+                                if (countdownData.totalSeconds > 0) {
+                                    days = Math.floor(countdownData.totalSeconds / (24 * 3600));
+                                    const remainingSeconds = countdownData.totalSeconds % (24 * 3600);
+                                    hours = Math.floor(remainingSeconds / 3600);
+                                    const remainingMinutes = remainingSeconds % 3600;
+                                    minutes = Math.floor(remainingMinutes / 60);
+                                    seconds = remainingMinutes % 60;
+                                }
+
+                                // Tính phần trăm tiến độ
+                                const progressPercent = countdownData.hasStarted
+                                    ? Math.min(100, Math.max(0, (countdownData.daysSince / 45) * 100))
+                                    : 0;
+
+                                return (
+                                    <div className="probation-status-content">
+                                        <div className="probation-status-card">
+                                            {!countdownData.hasStarted ? (
+                                                <>
+                                                    <div className="probation-status-left">
+                                                        <div className="probation-status-label">Ngày bắt đầu sau:</div>
+                                                        <div className="probation-status-countdown">
+                                                            <div className="probation-status-countdown-digits">
+                                                                <span className="probation-status-digit">{String(days).padStart(2, '0')}</span>
+                                                                <span className="probation-status-separator">:</span>
+                                                                <span className="probation-status-digit">{String(hours).padStart(2, '0')}</span>
+                                                                <span className="probation-status-separator">:</span>
+                                                                <span className="probation-status-digit">{String(minutes).padStart(2, '0')}</span>
+                                                                <span className="probation-status-separator">:</span>
+                                                                <span className="probation-status-digit">{String(seconds).padStart(2, '0')}</span>
+                                                            </div>
+                                                            <div className="probation-status-labels">
+                                                                <span>NGÀY</span>
+                                                                <span>GIỜ</span>
+                                                                <span>PHÚT</span>
+                                                                <span>GIÂY</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="probation-status-right">
+                                                        <div className="probation-status-title">Chờ Bắt Đầu</div>
+                                                        <div className="probation-status-date">Bắt đầu vào {formattedStartDate}.</div>
+                                                        <div className="probation-status-progress-wrapper">
+                                                            <div className="probation-status-progress-bar">
+                                                                <div className="probation-status-progress-fill" style={{ width: '0%' }}></div>
+                                                            </div>
+                                                            <div className="probation-status-progress-labels">
+                                                                <span>0 Ngày</span>
+                                                                <span>0%</span>
+                                                                <span>45 Ngày</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="probation-status-left">
+                                                        <div className="probation-status-label">Thời gian còn lại:</div>
+                                                        <div className="probation-status-countdown">
+                                                            <div className="probation-status-countdown-digits">
+                                                                <span className="probation-status-digit">{String(days).padStart(2, '0')}</span>
+                                                                <span className="probation-status-separator">:</span>
+                                                                <span className="probation-status-digit">{String(hours).padStart(2, '0')}</span>
+                                                                <span className="probation-status-separator">:</span>
+                                                                <span className="probation-status-digit">{String(minutes).padStart(2, '0')}</span>
+                                                                <span className="probation-status-separator">:</span>
+                                                                <span className="probation-status-digit">{String(seconds).padStart(2, '0')}</span>
+                                                            </div>
+                                                            <div className="probation-status-labels">
+                                                                <span>NGÀY</span>
+                                                                <span>GIỜ</span>
+                                                                <span>PHÚT</span>
+                                                                <span>GIÂY</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="probation-status-right">
+                                                        <div className="probation-status-title">Đang Thử Việc</div>
+                                                        <div className="probation-status-date">Bắt đầu vào {formattedStartDate}.</div>
+                                                        <div className="probation-status-progress-wrapper">
+                                                            <div className="probation-status-progress-bar">
+                                                                <div className="probation-status-progress-fill" style={{ width: `${progressPercent}%` }}></div>
+                                                            </div>
+                                                            <div className="probation-status-progress-labels">
+                                                                <span>{countdownData.daysSince} Ngày</span>
+                                                                <span>{Math.round(progressPercent)}%</span>
+                                                                <span>45 Ngày</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>

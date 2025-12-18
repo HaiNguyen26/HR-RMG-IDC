@@ -312,8 +312,13 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 );
                 setInterviewRequestsCount(pendingRequests.length);
                 
-                // Lọc và đếm "Sẵn sàng PV"
-                const readyRequests = allRequests.filter(req => req.status === 'READY_FOR_INTERVIEW');
+                // Lọc và đếm "Sẵn sàng PV" - loại bỏ các ứng viên đã ON_PROBATION
+                const readyRequests = allRequests.filter(req => {
+                    if (req.status !== 'READY_FOR_INTERVIEW') return false;
+                    // Loại bỏ nếu candidate đã ON_PROBATION
+                    const candidateStatus = req.candidate_status;
+                    return candidateStatus !== 'ON_PROBATION';
+                });
                 setReadyInterviewRequestsCount(readyRequests.length);
             } catch (error) {
                 console.error('Error fetching interview request counts:', error);
@@ -344,11 +349,17 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                     setInterviewRequests(pendingRequests);
                 }
                 
-                // Fetch "Sẵn sàng PV" - READY_FOR_INTERVIEW
+                // Fetch "Sẵn sàng PV" - READY_FOR_INTERVIEW (loại bỏ các ứng viên đã ON_PROBATION)
                 if (selectedFilter === 'ready') {
                     const readyParams = { ...params, status: 'READY_FOR_INTERVIEW' };
                     const readyResponse = await interviewRequestsAPI.getAll(readyParams);
-                    setReadyInterviewRequests(readyResponse.data?.data || []);
+                    const allReadyRequests = readyResponse.data?.data || [];
+                    // Filter bỏ các ứng viên đã ON_PROBATION
+                    const filteredReadyRequests = allReadyRequests.filter(req => {
+                        const candidateStatus = req.candidate_status;
+                        return candidateStatus !== 'ON_PROBATION';
+                    });
+                    setReadyInterviewRequests(filteredReadyRequests);
                 }
             } catch (error) {
                 console.error('Error fetching interview requests details:', error);
@@ -476,8 +487,12 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 setInterviewRequests(pendingRequests);
                 setInterviewRequestsCount(pendingRequests.length);
                 
-                // Refresh ready list nếu có
-                const readyRequests = allRequests.filter(req => req.status === 'READY_FOR_INTERVIEW');
+                // Refresh ready list nếu có - loại bỏ các ứng viên đã ON_PROBATION
+                const readyRequests = allRequests.filter(req => {
+                    if (req.status !== 'READY_FOR_INTERVIEW') return false;
+                    const candidateStatus = req.candidate_status;
+                    return candidateStatus !== 'ON_PROBATION';
+                });
                 setReadyInterviewRequests(readyRequests);
                 setReadyInterviewRequestsCount(readyRequests.length);
                 
@@ -528,8 +543,12 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 setInterviewRequests(pendingRequests);
                 setInterviewRequestsCount(pendingRequests.length);
                 
-                // Cập nhật ready count
-                const readyRequests = allRequests.filter(req => req.status === 'READY_FOR_INTERVIEW');
+                // Cập nhật ready count - loại bỏ các ứng viên đã ON_PROBATION
+                const readyRequests = allRequests.filter(req => {
+                    if (req.status !== 'READY_FOR_INTERVIEW') return false;
+                    const candidateStatus = req.candidate_status;
+                    return candidateStatus !== 'ON_PROBATION';
+                });
                 setReadyInterviewRequestsCount(readyRequests.length);
                 setShowInterviewRequestDetail(false);
                 setSelectedInterviewRequest(null);
@@ -775,7 +794,12 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 };
                 const updatedResponse = await interviewRequestsAPI.getAll(params);
                 const allRequests = updatedResponse.data?.data || [];
-                const readyRequests = allRequests.filter(req => req.status === 'READY_FOR_INTERVIEW');
+                // Refresh ready list - loại bỏ các ứng viên đã ON_PROBATION
+                const readyRequests = allRequests.filter(req => {
+                    if (req.status !== 'READY_FOR_INTERVIEW') return false;
+                    const candidateStatus = req.candidate_status;
+                    return candidateStatus !== 'ON_PROBATION';
+                });
                 setReadyInterviewRequests(readyRequests);
                 setReadyInterviewRequestsCount(readyRequests.length);
                 
@@ -963,10 +987,65 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
         }
     };
 
-    // Filter candidates based on selected filter
-    const filteredCandidates = selectedFilter === 'all'
-        ? candidates
-        : candidates.filter(candidate => candidate.status === selectedFilter);
+    // Fetch interview requests based on selected filter (all, approved, rejected)
+    useEffect(() => {
+        const fetchInterviewRequestsForFilter = async () => {
+            if (selectedFilter !== 'all' && selectedFilter !== 'approved' && selectedFilter !== 'rejected') {
+                return; // Chỉ fetch khi filter là all, approved, hoặc rejected
+            }
+
+            try {
+                const params = {
+                    managerId: currentUser?.id,
+                    branchDirectorId: currentUser?.id
+                };
+
+                let statusFilter = null;
+                if (selectedFilter === 'approved') {
+                    statusFilter = 'APPROVED';
+                } else if (selectedFilter === 'rejected') {
+                    statusFilter = 'REJECTED';
+                }
+
+                // Fetch interview requests với status filter
+                const response = await interviewRequestsAPI.getAll({ 
+                    ...params,
+                    status: statusFilter || undefined 
+                });
+                
+                if (response.data?.success) {
+                    const requestsData = response.data.data || [];
+                    
+                    // Map interview requests data để có format phù hợp với table
+                    const mappedCandidates = requestsData.map(request => ({
+                        id: request.candidate_id || request.candidateId || request.id,
+                        requestId: request.id,
+                        name: request.candidate_name || request.candidateName || '-',
+                        position: request.vi_tri_ung_tuyen || request.viTriUngTuyen || request.chuc_danh_can_tuyen || '-',
+                        department: request.phong_ban || request.phongBan || request.phong_ban_bo_phan || '-',
+                        date: request.created_at || request.createdAt || request.interview_time || '-',
+                        status: request.status || 'PENDING_INTERVIEW',
+                        interviewRequest: request
+                    }));
+                    
+                    setCandidates(mappedCandidates);
+                } else {
+                    setCandidates([]);
+                }
+            } catch (error) {
+                console.error('Error fetching interview requests:', error);
+                setCandidates([]);
+            }
+        };
+
+        // Chỉ fetch khi user có quyền
+        if (['EMPLOYEE', 'MANAGER', 'TEAM_LEAD', 'BRANCH_DIRECTOR'].includes(currentUser?.role) || isBranchDirector) {
+            fetchInterviewRequestsForFilter();
+        }
+    }, [selectedFilter, currentUser, isBranchDirector]);
+
+    // Filter candidates based on selected filter (đã được filter từ API)
+    const filteredCandidates = candidates;
 
     const renderReadyInterviewRequestsTable = () => (
         <div className="interview-approvals-table-wrapper">
@@ -1220,50 +1299,71 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                 {filteredCandidates.length === 0 ? (
                                     <tr>
                                         <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                                            {candidates.length === 0 ? 'Chưa có ứng viên nào' : 'Không có ứng viên nào phù hợp với bộ lọc'}
+                                            {candidates.length === 0 ? 'Chưa có đơn nào' : 'Không có đơn nào phù hợp với bộ lọc'}
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredCandidates.map((candidate, index) => (
-                                        <tr key={candidate.id} className={index % 2 === 1 ? 'even-row-bg' : ''}>
-                                            <td>{index + 1}</td>
-                                            <td>{candidate.name}</td>
-                                            <td>{candidate.position}</td>
-                                            <td>{candidate.department}</td>
-                                            <td>{candidate.date}</td>
-                                            <td>
-                                                <span className={`interview-approvals-status-badge status-${candidate.status}`}>
-                                                    {candidate.status === 'ready' ? 'Sẵn sàng PV' :
-                                                        candidate.status === 'approved' ? 'Đã Duyệt' :
-                                                            candidate.status === 'rejected' ? 'Đã Từ chối' : candidate.status}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <div className="interview-approvals-action-buttons">
-                                                    <button
-                                                        type="button"
-                                                        className="interview-approvals-action-btn interview-approvals-action-btn--approve"
-                                                        onClick={() => handleApprove(candidate.id)}
-                                                        title="Duyệt"
-                                                    >
-                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                                                        </svg>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className="interview-approvals-action-btn interview-approvals-action-btn--reject"
-                                                        onClick={() => handleReject(candidate.id)}
-                                                        title="Từ chối"
-                                                    >
-                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
+                                    filteredCandidates.map((candidate, index) => {
+                                        const formatDate = (dateString) => {
+                                            if (!dateString) return '-';
+                                            try {
+                                                const date = new Date(dateString);
+                                                return date.toLocaleDateString('vi-VN', {
+                                                    day: '2-digit',
+                                                    month: '2-digit',
+                                                    year: 'numeric'
+                                                });
+                                            } catch (e) {
+                                                return dateString;
+                                            }
+                                        };
+
+                                        const getStatusLabel = (status) => {
+                                            if (status === 'APPROVED') return 'Đã Duyệt';
+                                            if (status === 'REJECTED') return 'Đã Từ chối';
+                                            if (status === 'READY_FOR_INTERVIEW') return 'Sẵn sàng PV';
+                                            if (status === 'PENDING_INTERVIEW') return 'Chờ duyệt PV';
+                                            if (status === 'WAITING_FOR_OTHER_APPROVAL') return 'Chờ duyệt PV';
+                                            if (status === 'PASSED') return 'Đã Duyệt';
+                                            if (status === 'FAILED') return 'Đã Từ chối';
+                                            return status || '-';
+                                        };
+
+                                        return (
+                                            <tr key={candidate.id || candidate.requestId} className={index % 2 === 1 ? 'even-row-bg' : ''}>
+                                                <td>{index + 1}</td>
+                                                <td>{candidate.name}</td>
+                                                <td>{candidate.position}</td>
+                                                <td>{candidate.department}</td>
+                                                <td>{formatDate(candidate.date)}</td>
+                                                <td>
+                                                    <span className={`interview-approvals-status-badge status-${candidate.status?.toLowerCase() || 'new'}`}>
+                                                        {getStatusLabel(candidate.status)}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div className="interview-approvals-action-buttons">
+                                                        {candidate.interviewRequest && (
+                                                            <button
+                                                                type="button"
+                                                                className="interview-approvals-action-btn interview-approvals-action-btn--approve"
+                                                                onClick={() => {
+                                                                    setSelectedInterviewRequest(candidate.interviewRequest);
+                                                                    setShowInterviewRequestDetail(true);
+                                                                }}
+                                                                title="Xem chi tiết"
+                                                            >
+                                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                                </svg>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>

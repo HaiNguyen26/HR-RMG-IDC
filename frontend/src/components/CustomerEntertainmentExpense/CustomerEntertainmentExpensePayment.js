@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { customerEntertainmentExpensesAPI } from '../../services/api';
 import './CustomerEntertainmentExpensePayment.css';
 
@@ -15,39 +15,84 @@ const CustomerEntertainmentExpensePayment = ({ currentUser, showToast, showConfi
         notes: ''
     });
 
+    // Helper function to map API requests to report format
+    const mapRequestsToReports = useCallback((apiRequests) => {
+        if (!apiRequests || apiRequests.length === 0) {
+            console.log('[Payment] No requests to map');
+            return [];
+        }
+
+        // Filter chỉ lấy các requests đã được CEO duyệt (APPROVED_CEO) hoặc đã thanh toán (PAID)
+        const filteredRequests = apiRequests.filter(request => {
+            const status = request.status || request.trang_thai;
+            const isApproved = status === 'APPROVED_CEO' || status === 'PAID';
+            if (!isApproved) {
+                console.log('[Payment] Filtered out request:', { id: request.id, status: status, request_number: request.request_number });
+            }
+            return isApproved;
+        });
+
+        console.log('[Payment] Filtered requests count:', filteredRequests.length, 'out of', apiRequests.length);
+
+        // Map API response to component format
+        return filteredRequests.map(request => {
+            const totalAmount = (request.expenseItems || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            const advanceAmount = parseFloat(request.advance_amount) || 0;
+            const additionalAmount = totalAmount - advanceAmount;
+
+            // Xác định status hiển thị
+            const requestStatus = request.status || request.trang_thai;
+            let displayStatus = 'PENDING_PAYMENT';
+            if (requestStatus === 'PAID') {
+                displayStatus = 'PAID';
+            } else if (requestStatus === 'APPROVED_CEO') {
+                displayStatus = 'PENDING_PAYMENT';
+            }
+
+            return {
+                id: request.id,
+                reportCode: request.request_number || `CP${String(request.id).padStart(6, '0')}`,
+                content: `Quyết toán Chi phí Tiếp khách - ${request.branch || ''} - ${request.requester_name || ''}`,
+                generalDirectorApprovalDate: request.ceo_decision_at || request.updated_at,
+                additionalAmount: additionalAmount,
+                status: displayStatus,
+                totalAmount: totalAmount,
+                advanceAmount: advanceAmount,
+                branch: request.branch,
+                requesterName: request.requester_name,
+                paymentMethod: request.payment_method,
+                paymentNotes: request.payment_notes,
+                paymentProcessedAt: request.payment_processed_at,
+                rawData: request // Lưu toàn bộ data để dùng sau
+            };
+        });
+    }, []);
+
     // Fetch reports from API
     useEffect(() => {
         const fetchReports = async () => {
             try {
                 setLoading(true);
 
-                // Fetch requests that have been approved by CEO and ready for payment
+                // Fetch tất cả requests, sau đó filter trong mapRequestsToReports
+                // Kế toán cần thấy các đơn đã được CEO duyệt (APPROVED_CEO) hoặc đã thanh toán (PAID)
                 const response = await customerEntertainmentExpensesAPI.getAll({
-                    status: 'APPROVED_CEO' // This status will be set when CEO approves
+                    // Không filter ở đây, để lấy tất cả và filter trong mapRequestsToReports
                 });
 
                 if (response.data && response.data.success) {
                     const apiRequests = response.data.data || [];
-
-                    // Map API response to component format
-                    const mappedReports = apiRequests.map(request => {
-                        const totalAmount = (request.expenseItems || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-                        const advanceAmount = parseFloat(request.advance_amount) || 0;
-                        const additionalAmount = totalAmount - advanceAmount;
-
-                        return {
-                            id: request.id,
-                            reportCode: request.request_number,
-                            content: `Quyết toán Chi phí Tiếp khách - ${request.branch} - ${request.requester_name || ''}`,
-                            generalDirectorApprovalDate: request.ceo_decision_at || request.updated_at,
-                            additionalAmount: additionalAmount,
-                            status: 'PENDING_PAYMENT'
-                        };
-                    });
-
+                    console.log('[Payment] Fetched requests:', apiRequests.length);
+                    console.log('[Payment] Request statuses:', apiRequests.map(r => ({ id: r.id, status: r.status, request_number: r.request_number })));
+                    
+                    const mappedReports = mapRequestsToReports(apiRequests);
+                    console.log('[Payment] Mapped reports:', mappedReports.length);
+                    console.log('[Payment] Mapped report statuses:', mappedReports.map(r => ({ id: r.id, status: r.status, reportCode: r.reportCode })));
+                    
                     setReports(mappedReports);
                     setFilteredReports(mappedReports);
                 } else {
+                    console.warn('[Payment] API response not successful:', response.data);
                     setReports([]);
                     setFilteredReports([]);
                 }
@@ -62,7 +107,7 @@ const CustomerEntertainmentExpensePayment = ({ currentUser, showToast, showConfi
         };
 
         fetchReports();
-    }, [showToast]);
+    }, [showToast, currentUser]);
 
     // Filter reports by status
     useEffect(() => {
@@ -106,7 +151,7 @@ const CustomerEntertainmentExpensePayment = ({ currentUser, showToast, showConfi
         setIsPaymentModalOpen(true);
     };
 
-    const handlePaymentSubmit = () => {
+    const handlePaymentSubmit = async () => {
         if (!paymentData.paymentMethod) {
             showToast('Vui lòng chọn phương thức thanh toán', 'error');
             return;
@@ -119,22 +164,53 @@ const CustomerEntertainmentExpensePayment = ({ currentUser, showToast, showConfi
 
         showConfirm({
             title: 'Xác nhận thanh toán',
-            message: `Bạn có chắc chắn muốn thanh toán cho báo cáo ${selectedReport.reportCode}?`,
-            onConfirm: () => {
-                // TODO: Call API to process payment
-                console.log('Processing payment:', {
-                    reportId: selectedReport.id,
-                    paymentData
-                });
+            message: `Bạn có chắc chắn muốn thanh toán cho báo cáo ${selectedReport.reportCode}?\n\nSố tiền: ${formatCurrency(selectedReport.additionalAmount)}`,
+            onConfirm: async () => {
+                try {
+                    setLoading(true);
+                    
+                    // Gọi API để thanh toán
+                    // Backend expects: paymentMethod, notes (hoặc bankAccount), paymentProcessedBy
+                    const paymentPayload = {
+                        paymentMethod: paymentData.paymentMethod,
+                        notes: paymentData.notes || (paymentData.paymentMethod === 'BANK_TRANSFER' ? `Số tài khoản: ${paymentData.bankAccount}` : ''),
+                        bankAccount: paymentData.paymentMethod === 'BANK_TRANSFER' ? paymentData.bankAccount : undefined,
+                        paymentProcessedBy: currentUser?.id || null
+                    };
 
-                showToast('Thanh toán thành công', 'success');
-                setIsPaymentModalOpen(false);
-                setSelectedReport(null);
-                setPaymentData({
-                    paymentMethod: 'BANK_TRANSFER',
-                    bankAccount: '',
-                    notes: ''
-                });
+                    const response = await customerEntertainmentExpensesAPI.processPayment(
+                        selectedReport.id,
+                        paymentPayload
+                    );
+
+                    if (response.data && response.data.success) {
+                        showToast('Thanh toán thành công', 'success');
+                        
+                        // Refresh danh sách
+                        const refreshResponse = await customerEntertainmentExpensesAPI.getAll();
+                        if (refreshResponse.data && refreshResponse.data.success) {
+                            const apiRequests = refreshResponse.data.data || [];
+                            const mappedReports = mapRequestsToReports(apiRequests);
+                            setReports(mappedReports);
+                            setFilteredReports(mappedReports);
+                        }
+
+                        setIsPaymentModalOpen(false);
+                        setSelectedReport(null);
+                        setPaymentData({
+                            paymentMethod: 'BANK_TRANSFER',
+                            bankAccount: '',
+                            notes: ''
+                        });
+                    } else {
+                        showToast(response.data?.message || 'Lỗi khi thanh toán', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error processing payment:', error);
+                    showToast(error.response?.data?.message || 'Lỗi khi thanh toán', 'error');
+                } finally {
+                    setLoading(false);
+                }
             }
         });
     };
@@ -226,14 +302,23 @@ const CustomerEntertainmentExpensePayment = ({ currentUser, showToast, showConfi
                                                         {statusBadge.text}
                                                     </span>
                                                 </td>
-                                                <td>
-                                                    {report.status === 'PENDING_PAYMENT' && (
+                                                <td className="action-cell">
+                                                    {report.status === 'PENDING_PAYMENT' ? (
                                                         <button
                                                             className="payment-button"
                                                             onClick={() => handlePaymentClick(report)}
+                                                            disabled={loading}
                                                         >
-                                                            Thanh Toán
+                                                            {loading ? 'Đang xử lý...' : 'Thanh Toán'}
                                                         </button>
+                                                    ) : report.status === 'PAID' ? (
+                                                        <span className="payment-completed-badge">
+                                                            Đã thanh toán
+                                                        </span>
+                                                    ) : (
+                                                        <span className="payment-completed-badge">
+                                                            -
+                                                        </span>
                                                     )}
                                                 </td>
                                             </tr>
@@ -263,7 +348,11 @@ const CustomerEntertainmentExpensePayment = ({ currentUser, showToast, showConfi
                             <div className="payment-modal-info">
                                 <p><strong>Mã BC:</strong> {selectedReport.reportCode}</p>
                                 <p><strong>Nội dung:</strong> {selectedReport.content}</p>
-                                <p><strong>Số tiền:</strong> {formatCurrency(selectedReport.additionalAmount)}</p>
+                                <p><strong>Người yêu cầu:</strong> {selectedReport.requesterName || '-'}</p>
+                                <p><strong>Chi nhánh:</strong> {selectedReport.branch || '-'}</p>
+                                <p><strong>Tổng chi phí:</strong> {formatCurrency(selectedReport.totalAmount || 0)}</p>
+                                <p><strong>Số tiền tạm ứng:</strong> {formatCurrency(selectedReport.advanceAmount || 0)}</p>
+                                <p><strong>Số tiền chi thêm:</strong> <span style={{ color: '#dc2626', fontWeight: '600' }}>{formatCurrency(selectedReport.additionalAmount)}</span></p>
                             </div>
                             <div className="payment-modal-form">
                                 <div className="form-group">

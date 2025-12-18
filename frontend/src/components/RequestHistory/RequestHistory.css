@@ -262,6 +262,12 @@
   border: 1px solid rgba(234, 179, 8, 0.25);
 }
 
+.request-type-tag--customer-entertainment {
+  background: rgba(16, 185, 129, 0.15); /* Xanh Lá Pastel */
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
 /* Thời gian: Chữ Xám Trung tính */
 .request-time-cell {
   color: #6b7280; /* Grey 500 - Xám Trung tính */
@@ -301,6 +307,12 @@
   background: #ffe4e6; /* bg-rose-100 - Đã Từ Chối */
   color: #991b1b; /* text-rose-800 */
   border-color: #fb7185; /* border-rose-400 */
+}
+
+.request-status-tag--correction {
+  background: #fed7aa; /* bg-orange-200 - Yêu cầu chỉnh sửa */
+  color: #9a3412; /* text-orange-800 */
+  border-color: #fb923c; /* border-orange-400 */
 }
 
 /* Chi tiết: Icon Mắt Electric Blue */
@@ -522,6 +534,18 @@
   color: #dc2626;
 }
 
+.request-timeline-item--correction .request-timeline-node {
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.2) 0%, rgba(254, 215, 170, 0.15) 100%);
+  border: 2px solid rgba(251, 146, 60, 0.4);
+  color: #ea580c;
+}
+
+.request-timeline-item--cancelled .request-timeline-node {
+  background: linear-gradient(135deg, rgba(107, 114, 128, 0.2) 0%, rgba(156, 163, 175, 0.15) 100%);
+  border: 2px solid rgba(107, 114, 128, 0.4);
+  color: #6b7280;
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 1;
@@ -595,6 +619,14 @@
 
 .request-timeline-item--rejected .request-timeline-title-text {
   color: #dc2626;
+}
+
+.request-timeline-item--correction .request-timeline-title-text {
+  color: #ea580c;
+}
+
+.request-timeline-item--cancelled .request-timeline-title-text {
+  color: #6b7280;
 }
 
 .request-timeline-description {

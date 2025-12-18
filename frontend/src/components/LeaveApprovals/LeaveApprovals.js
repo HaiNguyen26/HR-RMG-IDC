@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
     attendanceAdjustmentsAPI,
     leaveRequestsAPI,
@@ -112,6 +112,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [activeModule, setActiveModule] = useState('leave');
     const [managerOverride, setManagerOverride] = useState(null);
     const [managerResolved, setManagerResolved] = useState(false);
+    const [isBranchDirector, setIsBranchDirector] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
 
@@ -243,8 +244,52 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                     return;
                 }
 
-                console.log('[LeaveApprovals] No teamLead match found. Current user name:', currentUserName);
+                // Kiểm tra xem có nhân viên nào có quan_ly_gian_tiep (giám đốc chi nhánh) trùng với tên user hiện tại không
+                const isBranchDir = employees.some((emp) => {
+                    if (!emp.quan_ly_gian_tiep) return false;
+                    const directorName = (emp.quan_ly_gian_tiep || '').trim();
+                    const normalizedDirectorName = directorName.toLowerCase().replace(/\s+/g, ' ').trim();
+                    const normalizedDirectorNameNoAccents = removeVietnameseAccents(normalizedDirectorName);
+
+                    // Match exact (có dấu)
+                    if (normalizedDirectorName === normalizedCurrentName) {
+                        console.log('[LeaveApprovals] Found branch director by exact match (with accents):', directorName);
+                        return true;
+                    }
+
+                    // Match exact (không dấu)
+                    if (normalizedDirectorNameNoAccents === normalizedCurrentNameNoAccents) {
+                        console.log('[LeaveApprovals] Found branch director by exact match (no accents):', directorName);
+                        return true;
+                    }
+
+                    // Fuzzy match (contains)
+                    if (normalizedDirectorName.includes(normalizedCurrentName) || normalizedCurrentName.includes(normalizedDirectorName)) {
+                        console.log('[LeaveApprovals] Found branch director by fuzzy match (contains):', directorName);
+                        return true;
+                    }
+
+                    if (normalizedDirectorNameNoAccents.includes(normalizedCurrentNameNoAccents) || normalizedCurrentNameNoAccents.includes(normalizedDirectorNameNoAccents)) {
+                        console.log('[LeaveApprovals] Found branch director by fuzzy match (no accents, contains):', directorName);
+                        return true;
+                    }
+
+                    return false;
+                });
+
+                if (isBranchDir) {
+                    console.log('[LeaveApprovals] Setting isBranchDirector to true');
+                    if (isMounted) {
+                        setIsBranchDirector(true);
+                        setManagerOverride('teamLead'); // Sử dụng cùng viewerMode như teamLead
+                        setManagerResolved(true);
+                    }
+                    return;
+                }
+
+                console.log('[LeaveApprovals] No teamLead or branch director match found. Current user name:', currentUserName);
                 if (isMounted) {
+                    setIsBranchDirector(false);
                     setManagerOverride(null);
                     setManagerResolved(true);
                 }
@@ -268,6 +313,8 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const viewerMode = managerResolved ? (managerOverride ?? baseViewerMode) : null;
     const isTeamLead = viewerMode === 'teamLead';
     // LeaveApprovals chỉ dành cho Quản lý (teamLead), không dành cho HR
+
+    // *** NOTIFICATION PERMISSION REQUEST ĐÃ CHUYỂN SANG GlobalNotifications (App.js) ***
 
     // Fetch statistics for all modules (after viewerMode is defined)
     useEffect(() => {
@@ -503,6 +550,8 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                     return dateB - dateA;
                 });
 
+                // *** NOTIFICATION LOGIC ĐÃ CHUYỂN SANG GlobalNotifications (App.js) ***
+
                 setRequests(allRequests);
                 setStats({ total: allRequests.length, overdueCount: 0 });
             } else {
@@ -513,8 +562,12 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 });
 
                 if (response.data.success) {
-                    setRequests(response.data.data || []);
-                    setStats({ total: response.data.data?.length || 0, overdueCount: 0 });
+                    const newRequests = response.data.data || [];
+
+                    // *** NOTIFICATION LOGIC ĐÃ CHUYỂN SANG GlobalNotifications (App.js) ***
+
+                    setRequests(newRequests);
+                    setStats({ total: newRequests.length, overdueCount: 0 });
                 }
             }
         } catch (error) {
@@ -534,10 +587,18 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     }, [viewerMode, activeModule]);
 
     useEffect(() => {
-        if (!viewerMode) return;
+        if (!viewerMode) {
+            console.log('[LeaveApprovals] Skipping fetchRequests - no viewerMode');
+            return;
+        }
+        // Fetch requests when changing module or status
         fetchRequests();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [viewerMode, selectedStatus, currentUser?.id, refreshToken, activeModule]);
+
+    // *** POLLING ĐÃ CHUYỂN SANG GlobalNotifications (App.js) ***
+    // GlobalNotifications polling mỗi 10 giây, hoạt động ở TẤT CẢ các module
+
 
     const askForComment = async ({ title, message, required = false }) => {
         if (showConfirm) {
@@ -1065,6 +1126,10 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                             </thead>
                             <tbody>
                                 {requests.map((request) => {
+                                    // Create unique key using requestType and id
+                                    const uniqueKey = request.requestType
+                                        ? `${request.requestType}-${request.id}`
+                                        : `${activeModule}-${request.id}`;
                                     const canAction = isTeamLead && request.status === 'PENDING';
 
                                     // Tính tổng số ngày nghỉ
@@ -1083,7 +1148,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
 
                                     return (
                                         <tr
-                                            key={request.id}
+                                            key={uniqueKey}
                                             className="leave-request-row"
                                             onClick={() => {
                                                 setSelectedRequest(request);

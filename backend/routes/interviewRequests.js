@@ -88,6 +88,7 @@ router.get('/', async (req, res) => {
                    c.vi_tri_ung_tuyen,
                    c.phong_ban,
                    c.so_dien_thoai,
+                   c.trang_thai as candidate_status,
                    rr.chuc_danh_can_tuyen,
                    rr.phong_ban_bo_phan,
                    m.ho_ten as manager_name,

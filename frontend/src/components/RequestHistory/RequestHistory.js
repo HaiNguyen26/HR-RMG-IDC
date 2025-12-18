@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './RequestHistory.css';
-import { leaveRequestsAPI, overtimeRequestsAPI, attendanceAdjustmentsAPI } from '../../services/api';
+import { leaveRequestsAPI, overtimeRequestsAPI, attendanceAdjustmentsAPI, customerEntertainmentExpensesAPI } from '../../services/api';
 import { formatDateDisplay } from '../../utils/dateUtils';
 
 const RequestHistory = ({ currentUser }) => {
@@ -23,10 +23,11 @@ const RequestHistory = ({ currentUser }) => {
       }
 
       // Fetch all types of requests - dùng mode 'employee' hoặc chỉ cần employeeId
-      const [leaveRes, overtimeRes, attendanceRes] = await Promise.all([
+      const [leaveRes, overtimeRes, attendanceRes, customerEntertainmentRes] = await Promise.all([
         leaveRequestsAPI.getAll({ employeeId: currentUser.id }),
         overtimeRequestsAPI.getAll({ employeeId: currentUser.id }),
-        attendanceAdjustmentsAPI.getAll({ employeeId: currentUser.id })
+        attendanceAdjustmentsAPI.getAll({ employeeId: currentUser.id }),
+        customerEntertainmentExpensesAPI.getAll({ employeeId: currentUser.id })
       ]);
 
       const allRequests = [];
@@ -131,6 +132,42 @@ const RequestHistory = ({ currentUser }) => {
         });
       }
 
+      // Process customer entertainment expense requests
+      if (customerEntertainmentRes?.data?.success && customerEntertainmentRes.data.data) {
+        customerEntertainmentRes.data.data.forEach(req => {
+          allRequests.push({
+            id: req.id,
+            type: 'Chi phí tiếp khách',
+            typeCode: 'CUSTOMER_ENTERTAINMENT',
+            code: req.request_number || `CP${String(req.id).padStart(6, '0')}`,
+            startDate: req.start_date,
+            endDate: req.end_date,
+            status: req.status,
+            requestType: 'customer_entertainment',
+            // Additional fields for detail view
+            branch_director_name: req.branch_director_name,
+            branch: req.branch,
+            advance_amount: req.advance_amount,
+            total_amount: req.total_amount,
+            expense_items: req.expense_items || [],
+            created_at: req.created_at,
+            updated_at: req.updated_at,
+            branch_director_decision: req.branch_director_decision,
+            branch_director_notes: req.branch_director_notes,
+            branch_director_decision_at: req.branch_director_decision_at,
+            ceo_decision: req.ceo_decision,
+            ceo_notes: req.ceo_notes,
+            ceo_decision_at: req.ceo_decision_at,
+            accountant_notes: req.accountant_notes,
+            accountant_processed_at: req.accountant_processed_at,
+            payment_method: req.payment_method,
+            payment_notes: req.payment_notes,
+            payment_processed_at: req.payment_processed_at,
+            rawData: req
+          });
+        });
+      }
+
       // Sort by created date (newest first)
       allRequests.sort((a, b) => {
         // Use created_at for sorting if available, otherwise use startDate
@@ -162,15 +199,28 @@ const RequestHistory = ({ currentUser }) => {
       // Giữ lại các status cũ để tương thích ngược
       'PENDING_TEAM_LEAD': 'Chờ duyệt',
       'APPROVED_BY_TEAM_LEAD': 'Đã duyệt',
-      'REJECTED_BY_TEAM_LEAD': 'Đã từ chối'
+      'REJECTED_BY_TEAM_LEAD': 'Đã từ chối',
+      // Customer Entertainment Expense statuses
+      'PENDING_BRANCH_DIRECTOR': 'Chờ giám đốc chi nhánh duyệt',
+      'APPROVED_BRANCH_DIRECTOR': 'Đã duyệt (GĐCN)',
+      'REJECTED_BRANCH_DIRECTOR': 'Đã từ chối (GĐCN)',
+      'REQUEST_CORRECTION': 'Yêu cầu chỉnh sửa',
+      'ACCOUNTANT_PROCESSED': 'Đã xử lý (Kế toán)',
+      'APPROVED_CEO': 'Đã duyệt (CEO)',
+      'REJECTED_CEO': 'Đã từ chối (CEO)',
+      'PAID': 'Đã thanh toán'
     };
     return statusMap[status] || status;
   };
 
   const getStatusTagClass = (status) => {
-    if (status === 'APPROVED' || status === 'APPROVED_BY_TEAM_LEAD') return 'request-status-tag--approved';
-    if (status === 'REJECTED' || status === 'REJECTED_BY_TEAM_LEAD') return 'request-status-tag--rejected';
+    if (status === 'APPROVED' || status === 'APPROVED_BY_TEAM_LEAD' || 
+        status === 'APPROVED_BRANCH_DIRECTOR' || status === 'APPROVED_CEO' || 
+        status === 'ACCOUNTANT_PROCESSED' || status === 'PAID') return 'request-status-tag--approved';
+    if (status === 'REJECTED' || status === 'REJECTED_BY_TEAM_LEAD' || 
+        status === 'REJECTED_BRANCH_DIRECTOR' || status === 'REJECTED_CEO') return 'request-status-tag--rejected';
     if (status === 'CANCELLED') return 'request-status-tag--cancelled';
+    if (status === 'REQUEST_CORRECTION') return 'request-status-tag--correction';
     return 'request-status-tag--pending';
   };
 
@@ -178,6 +228,7 @@ const RequestHistory = ({ currentUser }) => {
     if (typeCode === 'OVERTIME') return 'request-type-tag--overtime'; // Xanh Dương
     if (typeCode === 'RESIGNATION') return 'request-type-tag--resignation'; // Tím
     if (typeCode === 'ATTENDANCE') return 'request-type-tag--attendance'; // Vàng
+    if (typeCode === 'CUSTOMER_ENTERTAINMENT') return 'request-type-tag--customer-entertainment'; // Xanh lá
     return 'request-type-tag--leave'; // Nghỉ phép
   };
 
@@ -236,6 +287,11 @@ const RequestHistory = ({ currentUser }) => {
 
       return `${date} ${timeIn || '-'} → ${timeOut || '-'}`;
     }
+    if (request.requestType === 'customer_entertainment') {
+      const startDate = request.startDate ? formatDateDisplay(request.startDate) : '-';
+      const endDate = request.endDate ? formatDateDisplay(request.endDate) : '-';
+      return `${startDate} → ${endDate}`;
+    }
     // For leave requests, use the existing formatDateTime
     return `${formatDateTime(request.startDate)} → ${formatDateTime(request.endDate)}`;
   };
@@ -266,6 +322,97 @@ const RequestHistory = ({ currentUser }) => {
       description: 'Đơn từ đã được gửi thành công'
     });
 
+    // Customer Entertainment Expense có flow riêng
+    if (request.requestType === 'customer_entertainment') {
+      const status = request.status;
+      
+      // Step 2: Giám đốc chi nhánh
+      if (status === 'PENDING_BRANCH_DIRECTOR') {
+        timeline.push({
+          step: 2,
+          title: 'Chờ giám đốc chi nhánh duyệt',
+          status: 'pending',
+          date: null,
+          description: request.branch_director_name ? `Đang chờ ${request.branch_director_name} duyệt` : 'Đang chờ giám đốc chi nhánh duyệt'
+        });
+      } else if (status === 'APPROVED_BRANCH_DIRECTOR') {
+        timeline.push({
+          step: 2,
+          title: 'Đã được giám đốc chi nhánh duyệt',
+          status: 'completed',
+          date: request.branch_director_decision_at ? new Date(request.branch_director_decision_at) : null,
+          description: request.branch_director_name
+            ? `Đã được ${request.branch_director_name} duyệt${request.branch_director_notes ? `: ${request.branch_director_notes}` : ''}`
+            : 'Đã được giám đốc chi nhánh duyệt'
+        });
+      } else if (status === 'REJECTED_BRANCH_DIRECTOR') {
+        timeline.push({
+          step: 2,
+          title: 'Đã bị giám đốc chi nhánh từ chối',
+          status: 'rejected',
+          date: request.branch_director_decision_at ? new Date(request.branch_director_decision_at) : null,
+          description: request.branch_director_name
+            ? `Đã bị ${request.branch_director_name} từ chối${request.branch_director_notes ? `: ${request.branch_director_notes}` : ''}`
+            : 'Đã bị giám đốc chi nhánh từ chối'
+        });
+        return timeline; // Kết thúc nếu bị từ chối
+      } else if (status === 'REQUEST_CORRECTION') {
+        timeline.push({
+          step: 2,
+          title: 'Yêu cầu chỉnh sửa',
+          status: 'correction',
+          date: request.branch_director_decision_at ? new Date(request.branch_director_decision_at) : null,
+          description: request.branch_director_notes || 'Yêu cầu chỉnh sửa đơn từ'
+        });
+        return timeline;
+      }
+
+      // Step 3: Kế toán xử lý
+      if (status === 'ACCOUNTANT_PROCESSED') {
+        timeline.push({
+          step: 3,
+          title: 'Đã được kế toán xử lý',
+          status: 'completed',
+          date: request.accountant_processed_at ? new Date(request.accountant_processed_at) : null,
+          description: request.accountant_notes || 'Đã được kế toán xử lý'
+        });
+      }
+
+      // Step 4: CEO duyệt (nếu cần)
+      if (status === 'APPROVED_CEO') {
+        timeline.push({
+          step: 4,
+          title: 'Đã được CEO duyệt',
+          status: 'completed',
+          date: request.ceo_decision_at ? new Date(request.ceo_decision_at) : null,
+          description: request.ceo_notes || 'Đã được CEO duyệt'
+        });
+      } else if (status === 'REJECTED_CEO') {
+        timeline.push({
+          step: 4,
+          title: 'Đã bị CEO từ chối',
+          status: 'rejected',
+          date: request.ceo_decision_at ? new Date(request.ceo_decision_at) : null,
+          description: request.ceo_notes || 'Đã bị CEO từ chối'
+        });
+        return timeline;
+      }
+
+      // Step 5: Thanh toán
+      if (status === 'PAID') {
+        timeline.push({
+          step: 5,
+          title: 'Đã thanh toán',
+          status: 'completed',
+          date: request.payment_processed_at ? new Date(request.payment_processed_at) : null,
+          description: request.payment_method ? `Đã thanh toán bằng ${request.payment_method}` : 'Đã thanh toán'
+        });
+      }
+
+      return timeline;
+    }
+
+    // Flow cho các loại đơn khác (leave, overtime, attendance)
     // Step 2: Quản lý trực tiếp duyệt/từ chối
     const isPending = request.status === 'PENDING' || request.status === 'PENDING_TEAM_LEAD';
     const isApproved = request.status === 'APPROVED' || request.status === 'APPROVED_BY_TEAM_LEAD';
@@ -502,6 +649,58 @@ const RequestHistory = ({ currentUser }) => {
                     </>
                   )}
 
+                  {/* Customer Entertainment Expense Request Fields */}
+                  {selectedRequest.requestType === 'customer_entertainment' && (
+                    <>
+                      <div className="request-detail-field">
+                        <label>Ngày bắt đầu:</label>
+                        <span className="request-detail-value">
+                          {selectedRequest.startDate ? formatDateDisplay(selectedRequest.startDate) : '-'}
+                        </span>
+                      </div>
+                      <div className="request-detail-field">
+                        <label>Ngày kết thúc:</label>
+                        <span className="request-detail-value">
+                          {selectedRequest.endDate ? formatDateDisplay(selectedRequest.endDate) : '-'}
+                        </span>
+                      </div>
+                      {selectedRequest.branch && (
+                        <div className="request-detail-field">
+                          <label>Chi nhánh:</label>
+                          <span className="request-detail-value">{selectedRequest.branch}</span>
+                        </div>
+                      )}
+                      {selectedRequest.branch_director_name && (
+                        <div className="request-detail-field">
+                          <label>Giám đốc chi nhánh:</label>
+                          <span className="request-detail-value">{selectedRequest.branch_director_name}</span>
+                        </div>
+                      )}
+                      {selectedRequest.advance_amount !== undefined && selectedRequest.advance_amount !== null && (
+                        <div className="request-detail-field">
+                          <label>Số tiền tạm ứng:</label>
+                          <span className="request-detail-value">
+                            {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(selectedRequest.advance_amount)}
+                          </span>
+                        </div>
+                      )}
+                      {selectedRequest.total_amount !== undefined && selectedRequest.total_amount !== null && (
+                        <div className="request-detail-field">
+                          <label>Tổng chi phí:</label>
+                          <span className="request-detail-value">
+                            {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(selectedRequest.total_amount)}
+                          </span>
+                        </div>
+                      )}
+                      {selectedRequest.payment_method && (
+                        <div className="request-detail-field">
+                          <label>Phương thức thanh toán:</label>
+                          <span className="request-detail-value">{selectedRequest.payment_method}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+
                   <div className="request-detail-field">
                     <label>Trạng thái:</label>
                     <span className={`request-status-tag ${getStatusTagClass(selectedRequest.status)}`}>
@@ -543,6 +742,16 @@ const RequestHistory = ({ currentUser }) => {
                         {item.status === 'rejected' && (
                           <svg className="request-timeline-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                          </svg>
+                        )}
+                        {item.status === 'correction' && (
+                          <svg className="request-timeline-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                          </svg>
+                        )}
+                        {item.status === 'cancelled' && (
+                          <svg className="request-timeline-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
                           </svg>
                         )}
                       </div>

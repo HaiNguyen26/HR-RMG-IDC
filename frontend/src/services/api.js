@@ -251,6 +251,7 @@ export const candidatesAPI = {
     });
   },
   delete: (id) => api.delete(`/candidates/${id}`),
+  startProbation: (id, data) => api.post(`/candidates/${id}/start-probation`, data),
 };
 
 export const travelExpensesAPI = {
