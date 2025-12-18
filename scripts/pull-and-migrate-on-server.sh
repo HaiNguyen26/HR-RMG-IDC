@@ -47,14 +47,25 @@ else
 fi
 echo ""
 
-# 2.5. Build lại frontend
-echo -e "${YELLOW}[3/5] Build lại frontend...${NC}"
+# 2.5. Install dependencies và Build lại frontend
+echo -e "${YELLOW}[3/5] Install dependencies và Build lại frontend...${NC}"
 cd "$PROJECT_DIR/frontend"
 
 # Kiểm tra xem có file .env không, nếu không thì tạo
 if [ ! -f .env ]; then
     echo "REACT_APP_API_URL=/hr/api" > .env
     echo -e "${BLUE}→ Đã tạo file .env cho frontend${NC}"
+fi
+
+# Install dependencies (để đảm bảo có package mới)
+echo "Đang install dependencies..."
+npm install
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✓ Đã install dependencies thành công${NC}"
+else
+    echo -e "${RED}❌ Lỗi khi install dependencies${NC}"
+    echo -e "${YELLOW}Tiếp tục build...${NC}"
 fi
 
 # Build frontend
