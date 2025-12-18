@@ -1548,3 +1548,130 @@
         padding: 16px 20px;
     }
 }
+
+/* ====================================================
+   CUSTOM DROPDOWN COMPONENT CSS
+   ==================================================== */
+.interview-dropdown-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.interview-dropdown-trigger {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    background: #ffffff;
+    font-size: 0.9375rem;
+    color: #1f2937;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.interview-dropdown-trigger:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
+}
+
+.interview-dropdown-trigger:focus,
+.interview-dropdown-trigger.open {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.interview-dropdown-trigger.error {
+    border-color: #ef4444;
+}
+
+.interview-dropdown-value {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #1f2937;
+}
+
+.interview-dropdown-trigger:not(:has(.interview-dropdown-value:not(:empty))) .interview-dropdown-value,
+.interview-dropdown-value:empty {
+    color: #9ca3af;
+}
+
+.interview-dropdown-arrow {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+    color: #6b7280;
+    transition: transform 0.2s ease;
+}
+
+.interview-dropdown-trigger.open .interview-dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.interview-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 50;
+    padding: 0.5rem 0;
+}
+
+.interview-dropdown-option {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: none;
+    background: transparent;
+    text-align: left;
+    font-size: 0.9375rem;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.interview-dropdown-option:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+
+.interview-dropdown-option.selected {
+    background: #eff6ff;
+    color: #1e40af;
+    font-weight: 500;
+}
+
+.interview-dropdown-option.selected:hover {
+    background: #dbeafe;
+}
+
+/* Scrollbar cho dropdown menu */
+.interview-dropdown-menu::-webkit-scrollbar {
+    width: 6px;
+}
+
+.interview-dropdown-menu::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.interview-dropdown-menu::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.interview-dropdown-menu::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}

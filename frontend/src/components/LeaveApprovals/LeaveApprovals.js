@@ -109,16 +109,16 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [selectedStatus, setSelectedStatus] = useState('PENDING');
     const [stats, setStats] = useState({ total: 0, overdueCount: 0 });
     const [refreshToken, setRefreshToken] = useState(0);
-    const [activeModule, setActiveModule] = useState('leave');
+    const [activeModule, setActiveModule] = useState('all');
     const [managerOverride, setManagerOverride] = useState(null);
     const [managerResolved, setManagerResolved] = useState(false);
     const [isBranchDirector, setIsBranchDirector] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
 
-    // Reset activeModule về 'leave' khi component mount
+    // Reset activeModule về 'all' khi component mount để hiển thị tất cả đơn
     useEffect(() => {
-        setActiveModule('leave');
+        setActiveModule('all');
     }, []);
 
     // Statistics for badge counts - overall (tính từ requests hiện tại)
@@ -1811,8 +1811,8 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                             {/* Reason */}
                             {renderReasonSection(selectedRequest)}
 
-                            {/* Decision Trace */}
-                            {renderDecisionTrace(selectedRequest)}
+                            {/* Decision Trace - Chỉ hiển thị cho HR, không hiển thị cho Quản lý/Giám đốc */}
+                            {!isTeamLead && renderDecisionTrace(selectedRequest)}
 
                             {/* Action Buttons */}
                             <div className="leave-approvals-modal-actions">

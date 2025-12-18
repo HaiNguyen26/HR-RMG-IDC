@@ -1691,7 +1691,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
 
                     {/* Action Buttons */}
                     <div className="recruitment-management-header-actions">
-                        {/* Recruitment Requests Button */}
+                        {/* Recruitment Requests Button - Chức năng tạo yêu cầu tuyển dụng */}
                         <button
                             type="button"
                             className="recruitment-management-requests-btn"
@@ -4401,37 +4401,38 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     <label className="send-recruitment-info-label">
                                                         Người báo cáo trực tiếp <span className="required">*</span>
                                                     </label>
-                                                    <input
-                                                        type="text"
-                                                        className="send-recruitment-info-input"
-                                                        value={
-                                                            recruitmentInfoForm.baoCaoTrucTiep
-                                                                ? (() => {
-                                                                    const manager = managers.find(m => m.id === parseInt(recruitmentInfoForm.baoCaoTrucTiep));
-                                                                    return manager ? `${manager.ho_ten || manager.hoTen}${manager.chuc_danh || manager.chucDanh ? ` - ${manager.chuc_danh || manager.chucDanh}` : ''}` : '';
-                                                                })()
-                                                                : ''
-                                                        }
-                                                        readOnly
-                                                    />
+                                                    <select
+                                                        className="send-recruitment-info-select"
+                                                        value={recruitmentInfoForm.baoCaoTrucTiep}
+                                                        onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, baoCaoTrucTiep: e.target.value })}
+                                                        required
+                                                    >
+                                                        <option value="">-- Chọn người báo cáo trực tiếp --</option>
+                                                        {managers.map((manager) => (
+                                                            <option key={manager.id} value={manager.id}>
+                                                                {manager.ho_ten || manager.hoTen}
+                                                                {manager.chuc_danh || manager.chucDanh ? ` - ${manager.chuc_danh || manager.chucDanh}` : ''}
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                                 <div className="send-recruitment-info-form-group">
                                                     <label className="send-recruitment-info-label">
                                                         Người báo cáo gián tiếp
                                                     </label>
-                                                    <input
-                                                        type="text"
-                                                        className="send-recruitment-info-input"
-                                                        value={
-                                                            recruitmentInfoForm.baoCaoGianTiep
-                                                                ? (() => {
-                                                                    const manager = managers.find(m => m.id === parseInt(recruitmentInfoForm.baoCaoGianTiep));
-                                                                    return manager ? `${manager.ho_ten || manager.hoTen}${manager.chuc_danh || manager.chucDanh ? ` - ${manager.chuc_danh || manager.chucDanh}` : ''}` : '';
-                                                                })()
-                                                                : ''
-                                                        }
-                                                        readOnly
-                                                    />
+                                                    <select
+                                                        className="send-recruitment-info-select"
+                                                        value={recruitmentInfoForm.baoCaoGianTiep}
+                                                        onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, baoCaoGianTiep: e.target.value })}
+                                                    >
+                                                        <option value="">-- Chọn người báo cáo gián tiếp --</option>
+                                                        {managers.map((manager) => (
+                                                            <option key={manager.id} value={manager.id}>
+                                                                {manager.ho_ten || manager.hoTen}
+                                                                {manager.chuc_danh || manager.chucDanh ? ` - ${manager.chuc_danh || manager.chucDanh}` : ''}
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                             </div>
 

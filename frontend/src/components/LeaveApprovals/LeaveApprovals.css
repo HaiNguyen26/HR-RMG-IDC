@@ -1716,7 +1716,8 @@
 /* Timeline - Modern Vertical Timeline */
 .leave-approvals-timeline {
   position: relative;
-  padding-left: 2rem;
+  padding-left: 0;
+  /* Bỏ padding-left để tránh đường kẻ đè lên content */
 }
 
 .timeline-step {
@@ -1733,7 +1734,8 @@
 
 .timeline-step-connector {
   position: absolute;
-  left: 0.75rem;
+  left: 1.125rem;
+  /* Căn giữa icon 2.5rem: 2.5rem / 2 - 1px = 1.125rem */
   top: 2.5rem;
   width: 2px;
   height: calc(100% - 1rem);
