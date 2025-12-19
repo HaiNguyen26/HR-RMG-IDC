@@ -86,6 +86,20 @@ const findBranchDirector = async (branchDirectorName) => {
 // Ensure recruitment_requests table exists
 const ensureRecruitmentRequestsTable = async () => {
     try {
+        // Kiểm tra xem bảng employees có tồn tại không
+        const employeesTableCheck = await pool.query(`
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = 'employees'
+            );
+        `);
+        
+        if (!employeesTableCheck.rows[0].exists) {
+            console.error('[ensureRecruitmentRequestsTable] Bảng employees chưa tồn tại! Không thể tạo recruitment_requests table.');
+            throw new Error('Bảng employees chưa tồn tại. Vui lòng chạy migration database trước.');
+        }
+        
         await pool.query(`
             CREATE TABLE IF NOT EXISTS recruitment_requests (
                 id SERIAL PRIMARY KEY,
@@ -143,7 +157,11 @@ ensureRecruitmentRequestsTable().catch(err => {
 // GET /api/recruitment-requests - Lấy danh sách yêu cầu tuyển dụng
 router.get('/', async (req, res) => {
     try {
+        console.log('[GET /api/recruitment-requests] Request received');
+        console.log('[GET /api/recruitment-requests] Query params:', req.query);
+        
         await ensureRecruitmentRequestsTable();
+        console.log('[GET /api/recruitment-requests] Table ensured');
 
         const { employeeId, branchDirectorId, status, forHr } = req.query;
 
@@ -202,17 +220,34 @@ router.get('/', async (req, res) => {
             ORDER BY rr.created_at DESC
         `;
 
+        console.log('[GET /api/recruitment-requests] Executing query:', query);
+        console.log('[GET /api/recruitment-requests] Query params:', params);
+        
         const result = await pool.query(query, params);
+        console.log('[GET /api/recruitment-requests] Query result rows:', result.rows.length);
 
         res.json({
             success: true,
             data: result.rows
         });
     } catch (error) {
-        console.error('[GET /api/recruitment-requests] Error:', error);
+        console.error('[GET /api/recruitment-requests] ========== ERROR START ==========');
+        console.error('[GET /api/recruitment-requests] Error name:', error.name);
+        console.error('[GET /api/recruitment-requests] Error message:', error.message);
+        console.error('[GET /api/recruitment-requests] Error code:', error.code);
+        console.error('[GET /api/recruitment-requests] Error detail:', error.detail);
+        console.error('[GET /api/recruitment-requests] Error constraint:', error.constraint);
+        console.error('[GET /api/recruitment-requests] Error stack:', error.stack);
+        console.error('[GET /api/recruitment-requests] Query params:', req.query);
+        console.error('[GET /api/recruitment-requests] ========== ERROR END ==========');
+        
         res.status(500).json({
             success: false,
-            message: 'Lỗi khi lấy danh sách yêu cầu tuyển dụng: ' + error.message
+            message: 'Lỗi khi lấy danh sách yêu cầu tuyển dụng: ' + error.message,
+            errorCode: error.code,
+            errorDetail: error.detail,
+            errorConstraint: error.constraint,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });
