@@ -126,14 +126,24 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
+        console.log('[GET /api/candidates/:id] Request received for id:', id);
 
         // Lấy thông tin ứng viên
-        const candidateQuery = await pool.query(
-            'SELECT * FROM candidates WHERE id = $1',
-            [id]
-        );
+        let candidateQuery;
+        try {
+            candidateQuery = await pool.query(
+                'SELECT * FROM candidates WHERE id = $1',
+                [id]
+            );
+        } catch (queryError) {
+            console.error('[GET /api/candidates/:id] Error querying candidate:', queryError);
+            console.error('[GET /api/candidates/:id] Error code:', queryError.code);
+            console.error('[GET /api/candidates/:id] Error message:', queryError.message);
+            throw queryError;
+        }
 
         if (candidateQuery.rows.length === 0) {
+            console.log('[GET /api/candidates/:id] Candidate not found for id:', id);
             return res.status(404).json({
                 success: false,
                 message: 'Không tìm thấy ứng viên'
@@ -141,39 +151,73 @@ router.get('/:id', async (req, res) => {
         }
 
         const candidate = candidateQuery.rows[0];
+        console.log('[GET /api/candidates/:id] Candidate found:', candidate.ho_ten);
 
-        // Lấy kinh nghiệm làm việc
-        const workExperiences = await pool.query(
-            'SELECT * FROM candidate_work_experiences WHERE candidate_id = $1 ORDER BY ngay_bat_dau DESC',
-            [id]
-        );
+        // Lấy kinh nghiệm làm việc (với error handling riêng)
+        let workExperiences = { rows: [] };
+        try {
+            workExperiences = await pool.query(
+                'SELECT * FROM candidate_work_experiences WHERE candidate_id = $1 ORDER BY ngay_bat_dau DESC',
+                [id]
+            );
+        } catch (workExpError) {
+            console.warn('[GET /api/candidates/:id] Error fetching work experiences (table may not exist):', workExpError.message);
+            // Continue without work experiences if table doesn't exist
+        }
 
-        // Lấy quá trình đào tạo
-        const trainingProcesses = await pool.query(
-            'SELECT * FROM candidate_training_processes WHERE candidate_id = $1 ORDER BY ngay_bat_dau DESC',
-            [id]
-        );
+        // Lấy quá trình đào tạo (với error handling riêng)
+        let trainingProcesses = { rows: [] };
+        try {
+            trainingProcesses = await pool.query(
+                'SELECT * FROM candidate_training_processes WHERE candidate_id = $1 ORDER BY ngay_bat_dau DESC',
+                [id]
+            );
+        } catch (trainingError) {
+            console.warn('[GET /api/candidates/:id] Error fetching training processes (table may not exist):', trainingError.message);
+            // Continue without training processes if table doesn't exist
+        }
 
-        // Lấy trình độ ngoại ngữ
-        const foreignLanguages = await pool.query(
-            'SELECT * FROM candidate_foreign_languages WHERE candidate_id = $1',
-            [id]
-        );
+        // Lấy trình độ ngoại ngữ (với error handling riêng)
+        let foreignLanguages = { rows: [] };
+        try {
+            foreignLanguages = await pool.query(
+                'SELECT * FROM candidate_foreign_languages WHERE candidate_id = $1',
+                [id]
+            );
+        } catch (langError) {
+            console.warn('[GET /api/candidates/:id] Error fetching foreign languages (table may not exist):', langError.message);
+            // Continue without foreign languages if table doesn't exist
+        }
+
+        console.log('[GET /api/candidates/:id] Successfully fetched candidate data');
 
         res.json({
             success: true,
             data: {
                 ...candidate,
-                workExperiences: workExperiences.rows,
-                trainingProcesses: trainingProcesses.rows,
-                foreignLanguages: foreignLanguages.rows
+                workExperiences: workExperiences.rows || [],
+                trainingProcesses: trainingProcesses.rows || [],
+                foreignLanguages: foreignLanguages.rows || []
             }
         });
     } catch (error) {
-        console.error('Error fetching candidate:', error);
+        console.error('[GET /api/candidates/:id] ========== ERROR START ==========');
+        console.error('[GET /api/candidates/:id] Error name:', error.name);
+        console.error('[GET /api/candidates/:id] Error message:', error.message);
+        console.error('[GET /api/candidates/:id] Error code:', error.code);
+        console.error('[GET /api/candidates/:id] Error detail:', error.detail);
+        console.error('[GET /api/candidates/:id] Error constraint:', error.constraint);
+        console.error('[GET /api/candidates/:id] Error stack:', error.stack);
+        console.error('[GET /api/candidates/:id] Request params:', req.params);
+        console.error('[GET /api/candidates/:id] ========== ERROR END ==========');
+        
         res.status(500).json({
             success: false,
-            message: 'Lỗi khi lấy thông tin ứng viên: ' + error.message
+            message: 'Lỗi khi lấy thông tin ứng viên: ' + error.message,
+            errorCode: error.code,
+            errorDetail: error.detail,
+            errorConstraint: error.constraint,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });
