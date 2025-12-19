@@ -116,6 +116,21 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 2: $MIGRATION2${NC}"
 fi
 
+# Migration 3a: add_chi_nhanh_to_candidates.sql (Quick fix for immediate error)
+MIGRATION3A="$PROJECT_DIR/database/add_chi_nhanh_to_candidates.sql"
+if [ -f "$MIGRATION3A" ]; then
+    echo -e "${BLUE}→ Chạy migration: add_chi_nhanh_to_candidates.sql${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION3A"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 3a thành công${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 3a${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 3a: $MIGRATION3A${NC}"
+fi
+
 # Migration 3: add_cccd_fields_to_candidates.sql
 MIGRATION3="$PROJECT_DIR/database/add_cccd_fields_to_candidates.sql"
 if [ -f "$MIGRATION3" ]; then
