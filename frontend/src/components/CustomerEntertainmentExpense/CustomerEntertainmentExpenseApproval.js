@@ -92,6 +92,26 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
             (userNameNoAccents.includes('hoang dinh') && userNameNoAccents.includes('sach'));
     };
 
+    // Helper function to check if current user is Huỳnh Phúc Văn (quản lý được đặc cách duyệt)
+    const isHuynhPhucVan = (user) => {
+        if (!user) return false;
+        const userName = (user.hoTen || user.username || '').trim().toLowerCase();
+        const removeVietnameseAccents = (str) => {
+            if (!str) return '';
+            return str
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/đ/g, 'd')
+                .replace(/Đ/g, 'D');
+        };
+        const userNameNoAccents = removeVietnameseAccents(userName);
+        return userName.includes('huỳnh phúc văn') ||
+            userName.includes('huynh phuc van') ||
+            userNameNoAccents.includes('huynh phuc van') ||
+            (userName.includes('huỳnh phúc') && userName.includes('văn')) ||
+            (userNameNoAccents.includes('huynh phuc') && userNameNoAccents.includes('van'));
+    };
+
     // Fetch requests from API
     useEffect(() => {
         const fetchRequests = async () => {
@@ -100,14 +120,14 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
             try {
                 setLoading(true);
 
-                // Check if user is Hoàng Đình Sạch (direct manager) or branch director
-                const isManager = isHoangDinhSach(currentUser);
+                // Check if user is Hoàng Đình Sạch or Huỳnh Phúc Văn (direct managers) or branch director
+                const isManager = isHoangDinhSach(currentUser) || isHuynhPhucVan(currentUser);
 
                 const params = {
                     status: 'PENDING_BRANCH_DIRECTOR'
                 };
 
-                // If user is manager, filter by managerId; otherwise filter by branchDirectorId
+                // If user is manager (Hoàng Đình Sạch or Huỳnh Phúc Văn), filter by managerId; otherwise filter by branchDirectorId
                 if (isManager) {
                     params.managerId = currentUser.id;
                 } else {
@@ -251,8 +271,8 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
 
         setIsProcessing(true);
         try {
-            // Determine if current user is manager or branch director
-            const isManager = isHoangDinhSach(currentUser);
+            // Determine if current user is manager (Hoàng Đình Sạch or Huỳnh Phúc Văn) or branch director
+            const isManager = isHoangDinhSach(currentUser) || isHuynhPhucVan(currentUser);
             const approverType = isManager ? 'MANAGER' : 'BRANCH_DIRECTOR';
 
             const response = await customerEntertainmentExpensesAPI.approve(selectedRequest.id, {
@@ -308,8 +328,8 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
 
         setIsProcessing(true);
         try {
-            // Determine if current user is manager or branch director
-            const isManager = isHoangDinhSach(currentUser);
+            // Determine if current user is manager (Hoàng Đình Sạch or Huỳnh Phúc Văn) or branch director
+            const isManager = isHoangDinhSach(currentUser) || isHuynhPhucVan(currentUser);
             const approverType = isManager ? 'MANAGER' : 'BRANCH_DIRECTOR';
 
             const response = await customerEntertainmentExpensesAPI.requestCorrection(selectedRequest.id, {
@@ -366,8 +386,8 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
 
         setIsProcessing(true);
         try {
-            // Determine if current user is manager or branch director
-            const isManager = isHoangDinhSach(currentUser);
+            // Determine if current user is manager (Hoàng Đình Sạch or Huỳnh Phúc Văn) or branch director
+            const isManager = isHoangDinhSach(currentUser) || isHuynhPhucVan(currentUser);
             const approverType = isManager ? 'MANAGER' : 'BRANCH_DIRECTOR';
 
             const response = await customerEntertainmentExpensesAPI.reject(selectedRequest.id, {
@@ -442,7 +462,7 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
                                 XEM XÉT VÀ PHÊ DUYỆT CHI PHÍ
                             </h1>
                             <p className="customer-entertainment-expense-approval-subtitle">
-                                {isHoangDinhSach(currentUser)
+                                {isHoangDinhSach(currentUser) || isHuynhPhucVan(currentUser)
                                     ? 'Bước 2: Quản lý trực tiếp (Lần Duyệt 1)'
                                     : 'Bước 2: Giám đốc Chi nhánh (Lần Duyệt 1)'}
                             </p>

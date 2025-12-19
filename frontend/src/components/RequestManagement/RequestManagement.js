@@ -25,29 +25,30 @@ const LEAVE_TYPE_LABELS = {
     maternity: 'Nghỉ Thai Sản'
 };
 
+// Module options - Chỉ cho HR/ADMIN (xem toàn bộ đơn trong hệ thống)
 const MODULE_OPTIONS = [
     {
         key: 'all',
         label: 'Tất cả đơn',
         header: 'Quản lý đơn từ',
-        description: 'Xem và theo dõi tất cả các đơn xin phép, đơn tăng ca, đơn bổ sung chấm công.'
+        description: 'Xem và theo dõi tất cả các đơn xin phép, đơn tăng ca, đơn bổ sung chấm công trong hệ thống.'
     },
     {
         key: 'leave',
         label: 'Đơn xin nghỉ',
-        header: 'Theo dõi đơn nghỉ',
+        header: 'Quản lý đơn nghỉ',
         description: 'Theo dõi trạng thái và tiến độ phê duyệt đơn nghỉ.'
     },
     {
         key: 'overtime',
         label: 'Đơn tăng ca',
-        header: 'Theo dõi đơn tăng ca',
+        header: 'Quản lý đơn tăng ca',
         description: 'Theo dõi tiến độ phê duyệt đơn tăng ca.'
     },
     {
         key: 'attendance',
         label: 'Đơn bổ sung công',
-        header: 'Theo dõi đơn bổ sung công',
+        header: 'Quản lý đơn bổ sung công',
         description: 'Theo dõi tiến độ phê duyệt đơn bổ sung công.'
     }
 ];
@@ -69,9 +70,11 @@ const formatDateDisplay = (value, withTime = false) => {
     });
 };
 
+// Component này CHỈ dành cho HR/ADMIN
 const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false); // Indicator cho realtime update
     const [selectedStatus, setSelectedStatus] = useState('ALL');
     const [activeModule, setActiveModule] = useState('all');
     const [selectedRequest, setSelectedRequest] = useState(null);
@@ -94,80 +97,92 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         attendance: { pending: 0, total: 0 }
     });
 
-    // Fetch statistics for all modules
-    useEffect(() => {
-        const fetchModuleStatistics = async () => {
-            if (!currentUser?.id) return;
+    // Function để fetch statistics - có thể gọi từ nhiều nơi
+    const fetchModuleStatistics = async (silent = false) => {
+        if (!currentUser?.id) return;
 
-            try {
-                const statuses = ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'];
+        if (!silent) setIsRefreshing(true);
+        try {
+            const statuses = ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'];
 
-                // Fetch tất cả các status cho mỗi module để tính tổng
-                const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
-                    Promise.all(statuses.map(status => leaveRequestsAPI.getAll({ status }))),
-                    Promise.all(statuses.map(status => overtimeRequestsAPI.getAll({ status }))),
-                    Promise.all(statuses.map(status => attendanceAdjustmentsAPI.getAll({ status })))
-                ]);
+            // Không thêm employeeId - lấy toàn bộ đơn trong hệ thống
+            const baseParams = {};
 
-                const leaveStats = {
-                    pending: leaveResponse[0].data.success ? (leaveResponse[0].data.data || []).length : 0,
-                    approved: leaveResponse[1].data.success ? (leaveResponse[1].data.data || []).length : 0,
-                    rejected: leaveResponse[2].data.success ? (leaveResponse[2].data.data || []).length : 0,
-                    cancelled: leaveResponse[3].data.success ? (leaveResponse[3].data.data || []).length : 0,
-                    total: 0
-                };
-                leaveStats.total = leaveStats.pending + leaveStats.approved + leaveStats.rejected + leaveStats.cancelled;
+            const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
+                Promise.all(statuses.map(status => leaveRequestsAPI.getAll({ ...baseParams, status }))),
+                Promise.all(statuses.map(status => overtimeRequestsAPI.getAll({ ...baseParams, status }))),
+                Promise.all(statuses.map(status => attendanceAdjustmentsAPI.getAll({ ...baseParams, status })))
+            ]);
 
-                const overtimeStats = {
-                    pending: overtimeResponse[0].data.success ? (overtimeResponse[0].data.data || []).length : 0,
-                    approved: overtimeResponse[1].data.success ? (overtimeResponse[1].data.data || []).length : 0,
-                    rejected: overtimeResponse[2].data.success ? (overtimeResponse[2].data.data || []).length : 0,
-                    cancelled: overtimeResponse[3].data.success ? (overtimeResponse[3].data.data || []).length : 0,
-                    total: 0
-                };
-                overtimeStats.total = overtimeStats.pending + overtimeStats.approved + overtimeStats.rejected + overtimeStats.cancelled;
+            const leaveStats = {
+                pending: leaveResponse[0].data.success ? (leaveResponse[0].data.data || []).length : 0,
+                approved: leaveResponse[1].data.success ? (leaveResponse[1].data.data || []).length : 0,
+                rejected: leaveResponse[2].data.success ? (leaveResponse[2].data.data || []).length : 0,
+                cancelled: leaveResponse[3].data.success ? (leaveResponse[3].data.data || []).length : 0,
+                total: 0
+            };
+            // Không tính CANCELLED vào total
+            leaveStats.total = leaveStats.pending + leaveStats.approved + leaveStats.rejected;
 
-                const attendanceStats = {
-                    pending: attendanceResponse[0].data.success ? (attendanceResponse[0].data.data || []).length : 0,
-                    approved: attendanceResponse[1].data.success ? (attendanceResponse[1].data.data || []).length : 0,
-                    rejected: attendanceResponse[2].data.success ? (attendanceResponse[2].data.data || []).length : 0,
-                    cancelled: attendanceResponse[3].data.success ? (attendanceResponse[3].data.data || []).length : 0,
-                    total: 0
-                };
-                attendanceStats.total = attendanceStats.pending + attendanceStats.approved + attendanceStats.rejected + attendanceStats.cancelled;
+            const overtimeStats = {
+                pending: overtimeResponse[0].data.success ? (overtimeResponse[0].data.data || []).length : 0,
+                approved: overtimeResponse[1].data.success ? (overtimeResponse[1].data.data || []).length : 0,
+                rejected: overtimeResponse[2].data.success ? (overtimeResponse[2].data.data || []).length : 0,
+                cancelled: overtimeResponse[3].data.success ? (overtimeResponse[3].data.data || []).length : 0,
+                total: 0
+            };
+            // Không tính CANCELLED vào total
+            overtimeStats.total = overtimeStats.pending + overtimeStats.approved + overtimeStats.rejected;
 
-                const allStats = {
-                    pending: leaveStats.pending + overtimeStats.pending + attendanceStats.pending,
-                    approved: leaveStats.approved + overtimeStats.approved + attendanceStats.approved,
-                    rejected: leaveStats.rejected + overtimeStats.rejected + attendanceStats.rejected,
-                    cancelled: leaveStats.cancelled + overtimeStats.cancelled + attendanceStats.cancelled,
-                    total: leaveStats.total + overtimeStats.total + attendanceStats.total
-                };
+            const attendanceStats = {
+                pending: attendanceResponse[0].data.success ? (attendanceResponse[0].data.data || []).length : 0,
+                approved: attendanceResponse[1].data.success ? (attendanceResponse[1].data.data || []).length : 0,
+                rejected: attendanceResponse[2].data.success ? (attendanceResponse[2].data.data || []).length : 0,
+                cancelled: attendanceResponse[3].data.success ? (attendanceResponse[3].data.data || []).length : 0,
+                total: 0
+            };
+            // Không tính CANCELLED vào total
+            attendanceStats.total = attendanceStats.pending + attendanceStats.approved + attendanceStats.rejected;
 
-                setModuleStatistics({
-                    all: { pending: allStats.pending, total: allStats.total },
-                    leave: { pending: leaveStats.pending, total: leaveStats.total },
-                    overtime: { pending: overtimeStats.pending, total: overtimeStats.total },
-                    attendance: { pending: attendanceStats.pending, total: attendanceStats.total }
-                });
+            const allStats = {
+                pending: leaveStats.pending + overtimeStats.pending + attendanceStats.pending,
+                approved: leaveStats.approved + overtimeStats.approved + attendanceStats.approved,
+                rejected: leaveStats.rejected + overtimeStats.rejected + attendanceStats.rejected,
+                cancelled: leaveStats.cancelled + overtimeStats.cancelled + attendanceStats.cancelled,
+                total: leaveStats.total + overtimeStats.total + attendanceStats.total // Đã loại bỏ CANCELLED
+            };
 
-                // Set module status statistics based on active module
-                if (activeModule === 'all') {
-                    setModuleStatusStatistics(allStats);
-                } else if (activeModule === 'leave') {
-                    setModuleStatusStatistics(leaveStats);
-                } else if (activeModule === 'overtime') {
-                    setModuleStatusStatistics(overtimeStats);
-                } else if (activeModule === 'attendance') {
-                    setModuleStatusStatistics(attendanceStats);
-                }
-            } catch (error) {
-                console.error('Error fetching module statistics:', error);
+            setModuleStatistics({
+                all: { pending: allStats.pending, total: allStats.total },
+                leave: { pending: leaveStats.pending, total: leaveStats.total },
+                overtime: { pending: overtimeStats.pending, total: overtimeStats.total },
+                attendance: { pending: attendanceStats.pending, total: attendanceStats.total }
+            });
+
+            // Set module status statistics based on active module
+            if (activeModule === 'all') {
+                setModuleStatusStatistics(allStats);
+            } else if (activeModule === 'leave') {
+                setModuleStatusStatistics(leaveStats);
+            } else if (activeModule === 'overtime') {
+                setModuleStatusStatistics(overtimeStats);
+            } else if (activeModule === 'attendance') {
+                setModuleStatusStatistics(attendanceStats);
             }
-        };
+        } catch (error) {
+            console.error('Error fetching module statistics:', error);
+        } finally {
+            if (!silent) {
+                setTimeout(() => setIsRefreshing(false), 300);
+            }
+        }
+    };
 
-        fetchModuleStatistics();
-        const interval = setInterval(fetchModuleStatistics, 30000);
+    // Fetch statistics với realtime update
+    useEffect(() => {
+        fetchModuleStatistics(false); // Lần đầu hiển thị loading
+        // Realtime update: polling mỗi 5 giây (silent mode - không hiển thị loading)
+        const interval = setInterval(() => fetchModuleStatistics(true), 5000);
         return () => clearInterval(interval);
     }, [currentUser?.id, activeModule]);
 
@@ -176,18 +191,18 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             { key: 'PENDING', label: 'Chờ duyệt' },
             { key: 'APPROVED', label: 'Đã duyệt' },
             { key: 'REJECTED', label: 'Đã từ chối' },
-            { key: 'CANCELLED', label: 'Đã hủy' },
             { key: 'ALL', label: 'Tất cả' }
         ];
     }, []);
 
-    // Fetch requests based on active module and selected status
+    // Fetch requests based on active module and selected status - LẤY TOÀN BỘ ĐƠN (HR/ADMIN)
     useEffect(() => {
         const fetchRequests = async () => {
             if (!currentUser?.id) return;
 
             setLoading(true);
             try {
+                // Không thêm employeeId - lấy toàn bộ đơn trong hệ thống
                 const params = {};
                 if (selectedStatus !== 'ALL') {
                     params.status = selectedStatus;
@@ -236,6 +251,9 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         };
 
         fetchRequests();
+        // Realtime update: polling mỗi 5 giây
+        const interval = setInterval(fetchRequests, 5000);
+        return () => clearInterval(interval);
     }, [activeModule, selectedStatus, currentUser?.id, showToast]);
 
     const getStatusLabel = (status) => {
@@ -256,62 +274,14 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         setShowRequestDetails(false);
     };
 
+    // HR không có quyền xóa đơn - Function này đã bị vô hiệu hóa
+    /* eslint-disable no-unused-vars */
     const handleDelete = async (request) => {
-        if (!showConfirm) return;
-
-        const confirmed = await showConfirm(
-            'Xác nhận xóa đơn',
-            `Bạn có chắc chắn muốn xóa đơn này không?`
-        );
-
-        if (!confirmed) return;
-
-        try {
-            setLoading(true);
-            let response;
-            if (request.requestType === 'leave') {
-                response = await leaveRequestsAPI.delete(request.id);
-            } else if (request.requestType === 'overtime') {
-                response = await overtimeRequestsAPI.delete(request.id);
-            } else if (request.requestType === 'attendance') {
-                response = await attendanceAdjustmentsAPI.delete(request.id);
-            }
-
-            if (response?.data?.success) {
-                if (showToast) {
-                    showToast('Đã xóa đơn thành công', 'success');
-                }
-                setShowDetailModal(false);
-                setSelectedRequest(null);
-                // Refresh requests
-                const params = {};
-                if (selectedStatus !== 'ALL') {
-                    params.status = selectedStatus;
-                }
-                if (activeModule === 'all') {
-                    const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
-                        leaveRequestsAPI.getAll(params),
-                        overtimeRequestsAPI.getAll(params),
-                        attendanceAdjustmentsAPI.getAll(params)
-                    ]);
-                    const allRequests = [
-                        ...(leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: 'leave' })) : []),
-                        ...(overtimeResponse.data.success ? (overtimeResponse.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
-                        ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : [])
-                    ];
-                    allRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                    setRequests(allRequests);
-                }
-            }
-        } catch (error) {
-            console.error('Error deleting request:', error);
-            if (showToast) {
-                showToast('Lỗi khi xóa đơn', 'error');
-            }
-        } finally {
-            setLoading(false);
-        }
+        // Function disabled - HR không có quyền xóa đơn
+        console.warn('HR không có quyền xóa đơn');
+        return;
     };
+    /* eslint-enable no-unused-vars */
 
     const renderCardHeader = (request) => {
         const requestType = request.requestType || activeModule;
@@ -663,8 +633,11 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     };
 
     const filteredRequests = useMemo(() => {
-        if (selectedStatus === 'ALL') return requests;
-        return requests.filter(r => r.status === selectedStatus);
+        // Loại bỏ đơn đã hủy (CANCELLED) khỏi danh sách
+        const nonCancelledRequests = requests.filter(request => request.status !== 'CANCELLED');
+
+        if (selectedStatus === 'ALL') return nonCancelledRequests;
+        return nonCancelledRequests.filter(r => r.status === selectedStatus);
     }, [requests, selectedStatus]);
 
     return (
@@ -683,9 +656,17 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         <div className="request-management-header-text">
                             <h1 className="request-management-title">
                                 {MODULE_OPTIONS.find(m => m.key === activeModule)?.header || 'QUẢN LÝ ĐƠN TỪ'}
+                                {isRefreshing && (
+                                    <span style={{ marginLeft: '10px', fontSize: '0.7em', color: '#10b981', opacity: 0.8 }}>
+                                        ● Đang cập nhật...
+                                    </span>
+                                )}
                             </h1>
                             <p className="request-management-subtitle">
                                 {MODULE_OPTIONS.find(m => m.key === activeModule)?.description || 'Xem và theo dõi tất cả các đơn từ.'}
+                                <span style={{ marginLeft: '10px', fontSize: '0.85em', opacity: 0.7 }}>
+                                    {!isRefreshing && '● Cập nhật tự động mỗi 5 giây'}
+                                </span>
                             </p>
                         </div>
                     </div>
@@ -750,20 +731,11 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
                             );
-                        } else if (filter.key === 'CANCELLED') {
-                            count = moduleStatusStatistics.cancelled;
-                            gradient = 'linear-gradient(135deg, rgba(107, 114, 128, 0.15), rgba(75, 85, 99, 0.25))';
-                            icon = (
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
-                                </svg>
-                            );
                         } else if (filter.key === 'ALL') {
-                            // Tính tổng tất cả các status
+                            // Không tính CANCELLED vào tổng
                             count = moduleStatusStatistics.pending +
                                 moduleStatusStatistics.approved +
-                                moduleStatusStatistics.rejected +
-                                moduleStatusStatistics.cancelled;
+                                moduleStatusStatistics.rejected;
                             gradient = 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.25))';
                             icon = (
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -926,18 +898,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    {request.status === 'REJECTED' && (
-                                                        <button
-                                                            type="button"
-                                                            className="btn-delete-small"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDelete(request);
-                                                            }}
-                                                        >
-                                                            Xóa
-                                                        </button>
-                                                    )}
+                                                    {/* HR không có quyền xóa đơn */}
                                                 </td>
                                             </>
                                         )}
@@ -954,18 +915,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    {request.status === 'REJECTED' && (
-                                                        <button
-                                                            type="button"
-                                                            className="btn-delete-small"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDelete(request);
-                                                            }}
-                                                        >
-                                                            Xóa
-                                                        </button>
-                                                    )}
+                                                    {/* HR không có quyền xóa đơn */}
                                                 </td>
                                             </>
                                         )}
@@ -981,18 +931,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    {request.status === 'REJECTED' && (
-                                                        <button
-                                                            type="button"
-                                                            className="btn-delete-small"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDelete(request);
-                                                            }}
-                                                        >
-                                                            Xóa
-                                                        </button>
-                                                    )}
+                                                    {/* HR không có quyền xóa đơn */}
                                                 </td>
                                             </>
                                         )}
@@ -1011,18 +950,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    {request.status === 'REJECTED' && (
-                                                        <button
-                                                            type="button"
-                                                            className="btn-delete-small"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDelete(request);
-                                                            }}
-                                                        >
-                                                            Xóa
-                                                        </button>
-                                                    )}
+                                                    {/* HR không có quyền xóa đơn */}
                                                 </td>
                                             </>
                                         )}
@@ -1095,15 +1023,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                             >
                                 Đóng
                             </button>
-                            {selectedRequest.status === 'REJECTED' && (
-                                <button
-                                    type="button"
-                                    className="request-management-modal-btn request-management-modal-btn--delete"
-                                    onClick={() => handleDelete(selectedRequest)}
-                                >
-                                    Xóa đơn
-                                </button>
-                            )}
+                            {/* HR không có quyền xóa đơn */}
                         </div>
                     </div>
                 </div>

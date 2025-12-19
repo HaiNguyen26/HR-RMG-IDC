@@ -1,9 +1,9 @@
-/* Request Management - Gradient Calm Integrity Theme for HR */
+/* Employee Request History - Gradient Calm Integrity Theme */
 
 /* I. CẤU TRÚC NỀN & VỎ ỨNG DỤNG (SHELL & GLASS CARD) */
 /* Nền BODY: Nền sáng, mềm mại (Light Mode) với Gradient Calm Integrity - xanh dương/xanh lá nhạt tạo cảm giác yên bình */
 /* Container chính */
-.request-management {
+.employee-request-history {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
@@ -23,31 +23,31 @@
 }
 
 /* Custom Scrollbar - Tối ưu cho nền gradient Calm Integrity */
-.request-management::-webkit-scrollbar {
+.employee-request-history::-webkit-scrollbar {
   width: 8px;
 }
 
-.request-management::-webkit-scrollbar-track {
+.employee-request-history::-webkit-scrollbar-track {
   background: rgba(224, 242, 254, 0.3);
   /* Sky blue nhạt với transparency */
   border-radius: 4px;
   backdrop-filter: blur(5px);
 }
 
-.request-management::-webkit-scrollbar-thumb {
+.employee-request-history::-webkit-scrollbar-thumb {
   background: rgba(14, 165, 233, 0.4);
   /* Sky blue với transparency */
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.request-management::-webkit-scrollbar-thumb:hover {
+.employee-request-history::-webkit-scrollbar-thumb:hover {
   background: rgba(14, 165, 233, 0.6);
 }
 
 /* Màu Chủ Đạo: Gradient Calm Integrity - Gradient xanh dương/xanh lá nhạt tạo cảm giác yên bình và chuyên nghiệp */
 /* Header với tiêu đề chính */
-.request-management-header {
+.employee-request-history-header {
   margin-bottom: 0;
   /* Không cần margin vì container đã có gap: 1.5rem */
   flex-shrink: 0;
@@ -57,7 +57,7 @@
 }
 
 /* Header Top Container - Calm Gradient Header */
-.request-management-header-top {
+.employee-request-history-header-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -79,7 +79,7 @@
   -webkit-backdrop-filter: blur(10px);
 }
 
-.request-management-header-top:hover {
+.employee-request-history-header-top:hover {
   box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15),
     0 2px 6px rgba(16, 185, 129, 0.12);
   transform: translateY(-3px);
@@ -90,7 +90,7 @@
       #d1fae5 100%);
 }
 
-.request-management-header-content {
+.employee-request-history-header-content {
   display: flex;
   align-items: center;
   gap: 1.5rem;
@@ -98,7 +98,7 @@
 }
 
 /* Icon Banner Block - Glass Block Xanh Dương Nhạt */
-.request-management-icon-wrapper {
+.employee-request-history-icon-wrapper {
   width: 4.5rem;
   height: 4.5rem;
   border-radius: 0.75rem;
@@ -117,12 +117,12 @@
   cursor: pointer;
 }
 
-.request-management-icon-wrapper:hover {
+.employee-request-history-icon-wrapper:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-.request-management-icon {
+.employee-request-history-icon {
   width: 2rem;
   height: 2rem;
   color: #0ea5e9;
@@ -131,7 +131,7 @@
 }
 
 /* Header Text Block */
-.request-management-header-text {
+.employee-request-history-header-text {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -139,7 +139,7 @@
 }
 
 /* Tiêu đề chính */
-.request-management-title {
+.employee-request-history-title {
   font-size: 1.5rem;
   font-weight: 700;
   color: #0f172a;
@@ -151,7 +151,7 @@
 }
 
 /* Mô tả */
-.request-management-subtitle {
+.employee-request-history-subtitle {
   font-size: 0.875rem;
   color: #475569;
   /* slate-600 */
@@ -160,7 +160,7 @@
 }
 
 /* Nội dung chính */
-.request-management-content {
+.employee-request-history-content {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -172,7 +172,7 @@
 }
 
 /* Main Filter Bar - Lọc theo Loại Yêu cầu */
-.request-management-main-filter-bar {
+.employee-request-history-main-filter-bar {
   padding-top: 0.5rem;
   padding-bottom: 1rem;
   margin-bottom: 0.5rem;
@@ -420,14 +420,14 @@
 }
 
 /* Summary Cards - Gradient Glass Style */
-.request-management-summary-cards {
+.employee-request-history-summary-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
 
-.request-management-summary-card {
+.employee-request-history-summary-card {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -443,7 +443,7 @@
   overflow: hidden;
 }
 
-.request-management-summary-card::before {
+.employee-request-history-summary-card::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -452,16 +452,16 @@
   transition: opacity 0.3s;
 }
 
-.request-management-summary-card:hover::before {
+.employee-request-history-summary-card:hover::before {
   opacity: 1;
 }
 
-.request-management-summary-card:hover {
+.employee-request-history-summary-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.15), 0 4px 8px -2px rgba(0, 0, 0, 0.1);
 }
 
-.request-management-summary-card.active {
+.employee-request-history-summary-card.active {
   border-color: rgba(59, 130, 246, 0.5);
   box-shadow: 0 8px 16px -4px rgba(59, 130, 246, 0.2), 0 4px 8px -2px rgba(59, 130, 246, 0.15), inset 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
@@ -506,47 +506,52 @@
   line-height: 1;
 }
 
-.request-management-summary-card.active .summary-card-count {
+.employee-request-history-summary-card.active .summary-card-count {
   color: #1e40af;
 }
 
 /* Request Table */
-.request-management-table-container {
+.employee-request-history-table-container {
   flex: 1;
-  min-height: 0;
+  min-height: 400px;
+  /* Chiều cao tối thiểu để luôn hiển thị */
   max-height: 600px;
   /* Cố định chiều cao tối đa */
+  height: 600px;
+  /* Chiều cao cố định */
   overflow-y: auto;
   /* Cho phép cuộn dọc */
   overflow-x: auto;
   /* Cho phép cuộn ngang nếu cần */
   border-radius: 0.75rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: #ffffff;
+  /* Nền trắng */
 }
 
 /* Custom scrollbar cho table container */
-.request-management-table-container::-webkit-scrollbar {
+.employee-request-history-table-container::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-.request-management-table-container::-webkit-scrollbar-track {
+.employee-request-history-table-container::-webkit-scrollbar-track {
   background: rgba(224, 242, 254, 0.3);
   border-radius: 4px;
 }
 
-.request-management-table-container::-webkit-scrollbar-thumb {
+.employee-request-history-table-container::-webkit-scrollbar-thumb {
   background: rgba(14, 165, 233, 0.4);
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.request-management-table-container::-webkit-scrollbar-thumb:hover {
+.employee-request-history-table-container::-webkit-scrollbar-thumb:hover {
   background: rgba(14, 165, 233, 0.6);
 }
 
-.request-management-loading,
-.request-management-empty {
+.employee-request-history-loading,
+.employee-request-history-empty {
   text-align: center;
   padding: 3rem;
   color: #64748b;
@@ -557,14 +562,14 @@
   min-height: 400px;
 }
 
-.request-management-table {
+.employee-request-history-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
   background: #ffffff;
 }
 
-.request-management-table thead {
+.employee-request-history-table thead {
   background: #e8f3ff;
   /* Light blue background */
   position: sticky;
@@ -573,7 +578,7 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-.request-management-table th {
+.employee-request-history-table th {
   padding: 1rem;
   text-align: left;
   font-weight: 700;
@@ -587,35 +592,42 @@
   /* Đảm bảo background không trong suốt khi sticky */
 }
 
-.request-management-table tbody tr {
+.employee-request-history-table tbody tr {
   transition: background-color 0.2s ease;
 }
 
-.request-management-table tbody tr:hover {
+.employee-request-history-table tbody tr:hover {
   background-color: #e0f2fe;
   /* Light blue hover */
 }
 
-.request-management-table tbody tr.even-row-bg {
+.employee-request-history-table tbody tr.even-row-bg {
   background-color: #f8fafc;
 }
 
-.request-management-table tbody tr.even-row-bg:hover {
+.employee-request-history-table tbody tr.even-row-bg:hover {
   background-color: #e0f2fe;
 }
 
-.request-management-table td {
+.employee-request-history-table td {
   padding: 1rem;
   border-bottom: 1px solid #e5e7eb;
   color: #1e293b;
   font-size: 0.875rem;
 }
 
-.request-management-table tbody tr:last-child td {
+.employee-request-history-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.request-management-period {
+.employee-request-history-period {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+/* Alias for backward compatibility */
+.request-period {
   margin: 0.25rem 0 0 0;
   font-size: 0.8125rem;
   color: #64748b;
@@ -668,7 +680,7 @@
 }
 
 /* Modal */
-.request-management-modal-overlay {
+.employee-request-history-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
@@ -680,7 +692,7 @@
   padding: 1rem;
 }
 
-.request-management-modal-container {
+.employee-request-history-modal-container {
   background: #ffffff;
   border-radius: 1rem;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
@@ -692,7 +704,7 @@
   overflow: hidden;
 }
 
-.request-management-modal-header {
+.employee-request-history-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -700,13 +712,13 @@
   border-bottom: 1px solid #e5e7eb;
 }
 
-.request-management-modal-header-actions {
+.employee-request-history-modal-header-actions {
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
-.request-management-modal-btn-details {
+.employee-request-history-modal-btn-details {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -721,18 +733,18 @@
   transition: all 0.2s ease;
 }
 
-.request-management-modal-btn-details:hover {
+.employee-request-history-modal-btn-details:hover {
   background: linear-gradient(135deg, #2563eb, #059669);
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
 }
 
-.request-management-modal-btn-details svg {
+.employee-request-history-modal-btn-details svg {
   width: 1rem;
   height: 1rem;
 }
 
-.request-management-modal-details-section {
+.employee-request-history-modal-details-section {
   padding: 1.5rem;
   background: linear-gradient(135deg, #f0f9ff, #f0fdf4);
   border-bottom: 1px solid #e5e7eb;
@@ -788,26 +800,26 @@
     grid-template-columns: 1fr;
   }
 
-  .request-management-modal-header-actions {
+  .employee-request-history-modal-header-actions {
     flex-direction: column;
     align-items: flex-end;
     gap: 0.5rem;
   }
 
-  .request-management-modal-btn-details {
+  .employee-request-history-modal-btn-details {
     font-size: 0.8125rem;
     padding: 0.375rem 0.75rem;
   }
 }
 
-.request-management-modal-title {
+.employee-request-history-modal-title {
   font-size: 1.25rem;
   font-weight: 700;
   color: #1e293b;
   margin: 0;
 }
 
-.request-management-modal-close {
+.employee-request-history-modal-close {
   width: 2rem;
   height: 2rem;
   display: flex;
@@ -821,26 +833,26 @@
   transition: all 0.2s ease;
 }
 
-.request-management-modal-close:hover {
+.employee-request-history-modal-close:hover {
   background: #f1f5f9;
   color: #1e293b;
 }
 
-.request-management-modal-body {
+.employee-request-history-modal-body {
   flex: 1;
   overflow-y: auto;
   padding: 1.5rem;
 }
 
-.request-management-modal-section {
+.employee-request-history-modal-section {
   margin-bottom: 1.5rem;
 }
 
-.request-management-modal-section:last-child {
+.employee-request-history-modal-section:last-child {
   margin-bottom: 0;
 }
 
-.request-management-modal-section-title {
+.employee-request-history-modal-section-title {
   font-size: 1.125rem;
   font-weight: 700;
   color: #6366f1;
@@ -852,19 +864,19 @@
   gap: 0.5rem;
 }
 
-.request-management-modal-section-title .section-icon {
+.employee-request-history-modal-section-title .section-icon {
   width: 1.25rem;
   height: 1.25rem;
   flex-shrink: 0;
 }
 
-.request-management-modal-info-grid {
+.employee-request-history-modal-info-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
 }
 
-.request-management-modal-footer {
+.employee-request-history-modal-footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -873,7 +885,7 @@
   border-top: 1px solid #e5e7eb;
 }
 
-.request-management-modal-btn {
+.employee-request-history-modal-btn {
   padding: 0.625rem 1.25rem;
   border-radius: 0.5rem;
   font-size: 0.875rem;
@@ -883,26 +895,26 @@
   border: none;
 }
 
-.request-management-modal-btn--cancel {
+.employee-request-history-modal-btn--cancel {
   background: #f1f5f9;
   color: #64748b;
 }
 
-.request-management-modal-btn--cancel:hover {
+.employee-request-history-modal-btn--cancel:hover {
   background: #e2e8f0;
 }
 
-.request-management-modal-btn--delete {
+.employee-request-history-modal-btn--delete {
   background: #ef4444;
   color: #ffffff;
 }
 
-.request-management-modal-btn--delete:hover {
+.employee-request-history-modal-btn--delete:hover {
   background: #dc2626;
 }
 
 /* Timeline - Modern Vertical Timeline */
-.request-management-timeline {
+.employee-request-history-timeline {
   position: relative;
   padding-left: 2rem;
 }
@@ -1043,20 +1055,20 @@
 
 /* Responsive */
 @media (max-width: 768px) {
-  .request-management {
+  .employee-request-history {
     padding: 1rem;
   }
 
-  .request-management-summary-cards {
+  .employee-request-history-summary-cards {
     grid-template-columns: 1fr;
   }
 
-  .request-management-modal-container {
+  .employee-request-history-modal-container {
     max-width: 100%;
     max-height: 95vh;
   }
 
-  .request-management-modal-info-grid {
+  .employee-request-history-modal-info-grid {
     grid-template-columns: 1fr;
   }
 }

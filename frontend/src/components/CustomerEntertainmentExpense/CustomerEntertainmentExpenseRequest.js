@@ -68,16 +68,18 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                 if (response.data && response.data.success) {
                     const employees = response.data.data || [];
 
-                    // Filter branch directors: Châu Quang Hải, Nguyễn Ngọc Luyễn, Nguyễn Văn Khải
+                    // Filter branch directors: Châu Quang Hải, Nguyễn Ngọc Luyễn, Nguyễn Văn Khải, Huỳnh Phúc Văn
                     // Also include Hoàng Đình Sạch (quản lý trực tiếp được đặc cách duyệt)
                     const allowedBranchDirectorNames = [
                         'châu quang hải', 'chau quang hai',
                         'nguyễn ngọc luyễn', 'nguyen ngoc luyen',
-                        'nguyễn văn khải', 'nguyen van khai'
+                        'nguyễn văn khải', 'nguyen van khai',
+                        'huỳnh phúc văn', 'huynh phuc van'
                     ];
 
                     const allowedManagerNames = [
-                        'hoàng đình sạch', 'hoang dinh sach'
+                        'hoàng đình sạch', 'hoang dinh sach',
+                        'huỳnh phúc văn', 'huynh phuc van'
                     ];
 
                     const removeVietnameseAccents = (str) => {
@@ -131,7 +133,8 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                     { id: 1, hoTen: 'Châu Quang Hải', chucDanh: 'Giám đốc Chi nhánh' },
                     { id: 2, hoTen: 'Nguyễn Ngọc Luyễn', chucDanh: 'Giám đốc Chi nhánh' },
                     { id: 3, hoTen: 'Nguyễn Văn Khải', chucDanh: 'Giám đốc Chi nhánh' },
-                    { id: 4, hoTen: 'Hoàng Đình Sạch', chucDanh: 'Quản lý trực tiếp' }
+                    { id: 4, hoTen: 'Huỳnh Phúc Văn', chucDanh: 'Giám đốc Chi nhánh' },
+                    { id: 5, hoTen: 'Hoàng Đình Sạch', chucDanh: 'Quản lý trực tiếp' }
                 ]);
             } finally {
                 setLoading(false);

@@ -228,14 +228,16 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                     return false;
                 });
 
-                // Kiểm tra giám đốc chi nhánh: Danh sách 3 giám đốc chi nhánh cụ thể
+                // Kiểm tra giám đốc chi nhánh: Danh sách giám đốc chi nhánh cụ thể
                 const allowedBranchDirectors = [
                     'châu quang hải',
                     'chau quang hai',
                     'nguyễn ngọc luyễn',
                     'nguyen ngoc luyen',
                     'nguyễn văn khải',
-                    'nguyen van khai'
+                    'nguyen van khai',
+                    'huỳnh phúc văn',
+                    'huynh phuc van'
                 ];
 
                 const isBranchDir = allowedBranchDirectors.some(name =>
@@ -338,7 +340,15 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
             (normalizedCurrentNameNoAccents.includes('hoang dinh') && normalizedCurrentNameNoAccents.includes('sach'))
         );
 
-        if (!isAllowedBD && !isHoangDinhSach) {
+        const isHuynhPhucVan = (
+            normalizedCurrentName.includes('huỳnh phúc văn') ||
+            normalizedCurrentName.includes('huynh phuc van') ||
+            normalizedCurrentNameNoAccents.includes('huynh phuc van') ||
+            (normalizedCurrentName.includes('huỳnh phúc') && normalizedCurrentName.includes('văn')) ||
+            (normalizedCurrentNameNoAccents.includes('huynh phuc') && normalizedCurrentNameNoAccents.includes('van'))
+        );
+
+        if (!isAllowedBD && !isHoangDinhSach && !isHuynhPhucVan) {
             setPendingExpenseApprovalCount(0);
             return;
         }
@@ -349,8 +359,8 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                     status: 'PENDING_BRANCH_DIRECTOR'
                 };
 
-                // If user is manager, filter by managerId; otherwise filter by branchDirectorId
-                if (isHoangDinhSach) {
+                // If user is manager (Hoàng Đình Sạch or Huỳnh Phúc Văn), filter by managerId; otherwise filter by branchDirectorId
+                if (isHoangDinhSach || isHuynhPhucVan) {
                     params.managerId = currentUser.id;
                 } else {
                     params.branchDirectorId = currentUser.id;
@@ -462,7 +472,9 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
         'nguyễn ngọc luyễn',
         'nguyen ngoc luyen',
         'nguyễn văn khải',
-        'nguyen van khai'
+        'nguyen van khai',
+        'huỳnh phúc văn',
+        'huynh phuc van'
     ];
 
     const isAllowedBranchDirector = isBranchDirector && (
@@ -548,7 +560,8 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                             <span className="nav-label">Dashboard</span>
                         </button>
                     </li>
-                    {(currentUser?.role === 'HR' || currentUser?.role === 'ADMIN') && (
+                    {/* Quản lý đơn từ (HR/ADMIN) hoặc Lịch sử đơn từ (EMPLOYEE) - Module riêng biệt */}
+                    {currentUser?.role === 'HR' || currentUser?.role === 'ADMIN' ? (
                         <li>
                             <button
                                 onClick={() => onNavigate('request-management')}
@@ -562,9 +575,22 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                     </svg>
                                 </span>
                                 <span className="nav-label">Quản lý đơn từ</span>
-                                {pendingLeaveApprovalsCount > 0 && (
-                                    <span className="nav-badge nav-badge-pending">{pendingLeaveApprovalsCount > 99 ? '99+' : pendingLeaveApprovalsCount}</span>
-                                )}
+                            </button>
+                        </li>
+                    ) : (
+                        <li>
+                            <button
+                                onClick={() => onNavigate('employee-request-history')}
+                                className={`nav-item ${currentView === 'employee-request-history' ? 'active' : ''}`}
+                            >
+                                <span className="nav-icon-wrapper">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                        </path>
+                                    </svg>
+                                </span>
+                                <span className="nav-label">Lịch sử đơn từ</span>
                             </button>
                         </li>
                     )}
@@ -910,21 +936,6 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                         )}
                                 </>
                             )}
-                            <li>
-                                <button
-                                    onClick={() => onNavigate('request-history')}
-                                    className={`nav-item nav-item-approval ${currentView === 'request-history' ? 'active' : ''}`}
-                                >
-                                    <span className="nav-icon-wrapper">
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                                            </path>
-                                        </svg>
-                                    </span>
-                                    <span className="nav-label">Lịch sử đơn từ</span>
-                                </button>
-                            </li>
                         </>
                     )}
                     {/* Divider sau nhóm module duyệt và lịch sử đơn từ */}

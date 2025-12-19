@@ -10,12 +10,12 @@ import LeaveRequest from './components/LeaveRequest/LeaveRequest';
 import ResignRequest from './components/ResignRequest/ResignRequest';
 import LeaveApprovals from './components/LeaveApprovals/LeaveApprovals';
 import RequestManagement from './components/RequestManagement/RequestManagement';
+import EmployeeRequestHistory from './components/EmployeeRequestHistory/EmployeeRequestHistory';
 import ProbationList from './components/ProbationList/ProbationList';
 import RecruitmentManagement from './components/RecruitmentManagement/RecruitmentManagement';
 import InterviewApprovals from './components/InterviewApprovals/InterviewApprovals';
 import OvertimeRequest from './components/OvertimeRequest/OvertimeRequest';
 import AttendanceRequest from './components/AttendanceRequest/AttendanceRequest';
-import RequestHistory from './components/RequestHistory/RequestHistory';
 import TravelExpense from './components/TravelExpense/TravelExpense';
 import TravelExpenseManagement from './components/TravelExpense/TravelExpenseManagement';
 import TravelExpenseAdvanceProcessing from './components/TravelExpense/TravelExpenseAdvanceProcessing';
@@ -305,10 +305,12 @@ function App() {
               showToast={showToast}
             />
           );
-        case 'request-history':
+        case 'employee-request-history':
           return (
-            <RequestHistory
+            <EmployeeRequestHistory
               currentUser={currentUser}
+              showToast={showToast}
+              showConfirm={showConfirm}
             />
           );
         case 'interview-approvals':
