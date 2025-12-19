@@ -323,7 +323,9 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
             'nguyễn ngọc luyễn',
             'nguyen ngoc luyen',
             'nguyễn văn khải',
-            'nguyen van khai'
+            'nguyen van khai',
+            'huỳnh phúc văn',
+            'huynh phuc van'
         ];
 
         const isAllowedBD = allowedBranchDirectors.some(name =>
