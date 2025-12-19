@@ -8,11 +8,24 @@ const fs = require('fs');
 // Cấu hình multer để lưu file
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, '../uploads/candidates');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
+        try {
+            const uploadDir = path.join(__dirname, '../uploads/candidates');
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
+                console.log('[Multer] Created upload directory:', uploadDir);
+            }
+            // Kiểm tra quyền ghi
+            try {
+                fs.accessSync(uploadDir, fs.constants.W_OK);
+            } catch (err) {
+                console.error('[Multer] Upload directory is not writable:', uploadDir, err);
+                return cb(new Error('Upload directory không có quyền ghi'));
+            }
+            cb(null, uploadDir);
+        } catch (error) {
+            console.error('[Multer] Error setting up upload directory:', error);
+            cb(error);
         }
-        cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -166,10 +179,25 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/candidates - Tạo ứng viên mới
-router.post('/', upload.fields([
-    { name: 'anhDaiDien', maxCount: 1 },
-    { name: 'cvDinhKem', maxCount: 1 }
-]), async (req, res) => {
+router.post('/', (req, res, next) => {
+    upload.fields([
+        { name: 'anhDaiDien', maxCount: 1 },
+        { name: 'cvDinhKem', maxCount: 1 }
+    ])(req, res, (err) => {
+        if (err) {
+            console.error('[POST /api/candidates] Multer error:', err);
+            return res.status(400).json({
+                success: false,
+                message: 'Lỗi khi upload file: ' + err.message
+            });
+        }
+        next();
+    });
+}, async (req, res) => {
+    console.log('[POST /api/candidates] Request received');
+    console.log('[POST /api/candidates] Body keys:', Object.keys(req.body));
+    console.log('[POST /api/candidates] Files:', req.files ? Object.keys(req.files).map(k => ({ key: k, count: req.files[k]?.length || 0 })) : 'none');
+    
     const client = await pool.connect();
 
     try {
@@ -373,13 +401,39 @@ router.post('/', upload.fields([
             data: fullCandidate.rows[0]
         });
     } catch (error) {
-        await client.query('ROLLBACK');
-        console.error('Error creating candidate:', error);
-        console.error('Error stack:', error.stack);
-        console.error('Request body:', JSON.stringify(req.body, null, 2));
+        await client.query('ROLLBACK').catch(rollbackErr => {
+            console.error('[POST /api/candidates] Rollback error:', rollbackErr);
+        });
+        
+        console.error('[POST /api/candidates] Error creating candidate:', error);
+        console.error('[POST /api/candidates] Error name:', error.name);
+        console.error('[POST /api/candidates] Error message:', error.message);
+        console.error('[POST /api/candidates] Error code:', error.code);
+        console.error('[POST /api/candidates] Error stack:', error.stack);
+        console.error('[POST /api/candidates] Request body keys:', Object.keys(req.body));
+        console.error('[POST /api/candidates] Files received:', req.files ? Object.keys(req.files) : 'none');
+        
+        // Kiểm tra lỗi database constraint
+        let errorMessage = 'Lỗi khi tạo ứng viên: ' + error.message;
+        if (error.code === '23505') { // Unique constraint violation
+            if (error.constraint === 'unique_email') {
+                errorMessage = 'Email đã tồn tại trong hệ thống';
+            } else if (error.constraint === 'unique_cccd') {
+                errorMessage = 'Số CCCD đã tồn tại trong hệ thống';
+            } else {
+                errorMessage = 'Dữ liệu trùng lặp: ' + error.message;
+            }
+        } else if (error.code === '23503') { // Foreign key violation
+            errorMessage = 'Dữ liệu không hợp lệ: ' + error.message;
+        } else if (error.code === '23514') { // Check constraint violation
+            errorMessage = 'Dữ liệu không đúng định dạng: ' + error.message;
+        }
+        
         res.status(500).json({
             success: false,
-            message: 'Lỗi khi tạo ứng viên: ' + error.message,
+            message: errorMessage,
+            errorCode: error.code,
+            errorConstraint: error.constraint,
             details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     } finally {

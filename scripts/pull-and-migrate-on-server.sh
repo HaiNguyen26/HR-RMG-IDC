@@ -116,6 +116,15 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 2: $MIGRATION2${NC}"
 fi
 
+# 4.5. Tạo và cấp quyền cho thư mục uploads
+echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
+UPLOADS_DIR="$PROJECT_DIR/backend/uploads"
+mkdir -p "$UPLOADS_DIR/candidates"
+mkdir -p "$UPLOADS_DIR/customer-entertainment-expenses"
+chmod -R 755 "$UPLOADS_DIR"
+echo -e "${GREEN}✓ Đã tạo và cấp quyền cho thư mục uploads${NC}"
+echo ""
+
 # 5. Khởi động lại PM2
 echo -e "${YELLOW}[5/5] Khởi động lại PM2...${NC}"
 pm2 start hr-management-api
