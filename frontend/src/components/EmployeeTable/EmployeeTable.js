@@ -175,6 +175,40 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
     fetchOptions();
   }, [showToast]);
 
+  // Update editForm values when jobTitles or departments are loaded and modal is in edit mode
+  useEffect(() => {
+    if (detailModal.mode === 'edit' && detailModal.employee && (jobTitles.length > 0 || departments.length > 0)) {
+      const emp = detailModal.employee;
+      const currentChucDanh = editForm.chucDanh;
+      const currentPhongBan = editForm.phongBan;
+
+      // Only update if current value is empty or doesn't match properly
+      if (jobTitles.length > 0) {
+        const matchedChucDanh = matchValueWithOptions(emp.chuc_danh, jobTitles);
+        if (matchedChucDanh && matchedChucDanh !== currentChucDanh) {
+          console.log('[EmployeeTable] Updating chucDanh after jobTitles loaded', {
+            old: currentChucDanh,
+            new: matchedChucDanh,
+            original: emp.chuc_danh
+          });
+          setEditForm(prev => ({ ...prev, chucDanh: matchedChucDanh }));
+        }
+      }
+
+      if (departments.length > 0) {
+        const matchedPhongBan = matchValueWithOptions(emp.phong_ban, departments);
+        if (matchedPhongBan && matchedPhongBan !== currentPhongBan) {
+          console.log('[EmployeeTable] Updating phongBan after departments loaded', {
+            old: currentPhongBan,
+            new: matchedPhongBan,
+            original: emp.phong_ban
+          });
+          setEditForm(prev => ({ ...prev, phongBan: matchedPhongBan }));
+        }
+      }
+    }
+  }, [jobTitles, departments, detailModal.mode, detailModal.employee]);
+
   const getDepartmentLabel = (dept) => {
     const labels = {
       IT: 'Phòng IT',
@@ -276,6 +310,56 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
     }));
   };
 
+  // Helper function to match value from database with options list
+  const matchValueWithOptions = (value, optionsList) => {
+    if (!value || !optionsList || optionsList.length === 0) {
+      console.log('[EmployeeTable] matchValueWithOptions: No value or options', { value, optionsListLength: optionsList?.length });
+      return value || '';
+    }
+
+    const normalizedValue = String(value).trim();
+    if (!normalizedValue) return '';
+
+    // Normalize all options for comparison
+    const normalizedOptions = optionsList.map(opt => String(opt).trim());
+
+    // Try exact match first
+    const exactMatch = normalizedOptions.find(opt => opt === normalizedValue);
+    if (exactMatch) {
+      console.log('[EmployeeTable] matchValueWithOptions: Exact match found', { originalValue: value, matched: exactMatch });
+      return exactMatch;
+    }
+
+    // Try case-insensitive match
+    const caseInsensitiveMatch = normalizedOptions.find(opt =>
+      opt.toLowerCase() === normalizedValue.toLowerCase()
+    );
+    if (caseInsensitiveMatch) {
+      console.log('[EmployeeTable] matchValueWithOptions: Case-insensitive match found', { originalValue: value, matched: caseInsensitiveMatch });
+      return caseInsensitiveMatch;
+    }
+
+    // Try partial match (contains)
+    const partialMatch = normalizedOptions.find(opt =>
+      opt.toLowerCase().includes(normalizedValue.toLowerCase()) ||
+      normalizedValue.toLowerCase().includes(opt.toLowerCase())
+    );
+    if (partialMatch) {
+      console.log('[EmployeeTable] matchValueWithOptions: Partial match found', { originalValue: value, matched: partialMatch });
+      return partialMatch;
+    }
+
+    // Log when no match found
+    console.warn('[EmployeeTable] matchValueWithOptions: No match found', {
+      originalValue: value,
+      normalizedValue,
+      availableOptions: normalizedOptions.slice(0, 10) // Log first 10 options
+    });
+
+    // Return original normalized value if no match found
+    return normalizedValue;
+  };
+
   const closeModal = () => {
     setDetailModal({ isOpen: false, mode: 'view', employee: null, equipment: [], loading: false });
     setEditForm({
@@ -300,11 +384,32 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
   const startEditing = () => {
     if (!detailModal.employee || !canManage) return;
     const emp = detailModal.employee;
+
+    console.log('[EmployeeTable] startEditing called', {
+      employeeChucDanh: emp.chuc_danh,
+      employeePhongBan: emp.phong_ban,
+      jobTitlesLength: jobTitles.length,
+      departmentsLength: departments.length,
+      jobTitlesSample: jobTitles.slice(0, 5),
+      departmentsSample: departments.slice(0, 5)
+    });
+
+    // Match chức danh and phòng ban with loaded options
+    const matchedChucDanh = matchValueWithOptions(emp.chuc_danh, jobTitles);
+    const matchedPhongBan = matchValueWithOptions(emp.phong_ban, departments);
+
+    console.log('[EmployeeTable] startEditing: Matching results', {
+      originalChucDanh: emp.chuc_danh,
+      matchedChucDanh,
+      originalPhongBan: emp.phong_ban,
+      matchedPhongBan
+    });
+
     setEditForm({
       hoTen: emp.ho_ten || '',
       chiNhanh: emp.chi_nhanh || emp.chiNhanh || '',
-      chucDanh: emp.chuc_danh || '',
-      phongBan: emp.phong_ban || '',
+      chucDanh: matchedChucDanh,
+      phongBan: matchedPhongBan,
       boPhan: emp.bo_phan || '',
       ngayGiaNhap: normalizeDateForInput(emp.ngay_gia_nhap),
       maChamCong: emp.ma_cham_cong || '',
@@ -699,13 +804,29 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                             onChange={handleEditChange}
                             placeholder="Chọn chức danh"
                             required
-                            options={[
-                              { value: '', label: 'Chọn chức danh' },
-                              ...jobTitles.map((title) => ({
-                                value: title,
-                                label: title
-                              }))
-                            ]}
+                            options={(() => {
+                              const baseOptions = [
+                                { value: '', label: 'Chọn chức danh' },
+                                ...jobTitles.map((title) => ({
+                                  value: String(title).trim(),
+                                  label: String(title).trim()
+                                }))
+                              ];
+
+                              // If current value exists but not in jobTitles, add it to options
+                              if (editForm.chucDanh && editForm.chucDanh.trim() !== '') {
+                                const currentValue = editForm.chucDanh.trim();
+                                const existsInOptions = baseOptions.some(
+                                  opt => String(opt.value).trim() === currentValue
+                                );
+                                if (!existsInOptions) {
+                                  console.log('[EmployeeTable] Adding current chucDanh to options', currentValue);
+                                  baseOptions.push({ value: currentValue, label: currentValue });
+                                }
+                              }
+
+                              return baseOptions;
+                            })()}
                           />
                         </div>
                         <div className="form-group">
@@ -717,15 +838,31 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                             onChange={handleEditChange}
                             placeholder="Chọn phòng ban"
                             required
-                            options={[
-                              { value: '', label: 'Chọn phòng ban' },
-                              ...departments
-                                .filter(dept => dept && String(dept).trim() !== '')
-                                .map((dept) => {
-                                  const value = String(dept).trim();
-                                  return { value, label: value };
-                                })
-                            ]}
+                            options={(() => {
+                              const baseOptions = [
+                                { value: '', label: 'Chọn phòng ban' },
+                                ...departments
+                                  .filter(dept => dept && String(dept).trim() !== '')
+                                  .map((dept) => {
+                                    const value = String(dept).trim();
+                                    return { value, label: value };
+                                  })
+                              ];
+
+                              // If current value exists but not in departments, add it to options
+                              if (editForm.phongBan && editForm.phongBan.trim() !== '') {
+                                const currentValue = editForm.phongBan.trim();
+                                const existsInOptions = baseOptions.some(
+                                  opt => String(opt.value).trim() === currentValue
+                                );
+                                if (!existsInOptions) {
+                                  console.log('[EmployeeTable] Adding current phongBan to options', currentValue);
+                                  baseOptions.push({ value: currentValue, label: currentValue });
+                                }
+                              }
+
+                              return baseOptions;
+                            })()}
                           />
                         </div>
                         <div className="form-group">
@@ -840,6 +977,7 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                             value={editForm.quanLyTrucTiep}
                             onChange={handleEditChange}
                             placeholder="Chọn quản lý trực tiếp"
+                            dropup={true}
                             options={[
                               { value: '', label: 'Chọn quản lý trực tiếp' },
                               ...managersList.map((manager) => ({
@@ -857,6 +995,7 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                             value={editForm.quanLyGianTiep}
                             onChange={handleEditChange}
                             placeholder="Chọn quản lý gián tiếp"
+                            dropup={true}
                             options={[
                               { value: '', label: 'Chọn quản lý gián tiếp' },
                               ...indirectManagersList.map((manager) => ({

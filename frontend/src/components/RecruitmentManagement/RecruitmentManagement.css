@@ -152,7 +152,7 @@
   border-radius: 0.875rem;
   /* Bo tròn toàn bộ wrapper */
   /* Hiệu ứng nổi lên nhẹ - Elevation Effect */
-  box-shadow: 
+  box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.08),
     0 4px 12px rgba(0, 0, 0, 0.05),
     0 2px 6px rgba(0, 0, 0, 0.03);
@@ -235,7 +235,7 @@
   outline: none;
 }
 
-.recruitment-management-search-input:focus ~ .recruitment-management-search-icon {
+.recruitment-management-search-input:focus~.recruitment-management-search-icon {
   color: #0096FF;
 }
 
@@ -377,9 +377,9 @@
   background: linear-gradient(135deg, #1890FF 0%, #40A9FF 50%, #69C0FF 100%);
   color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 4px 16px rgba(24, 144, 255, 0.4), 
-              0 2px 8px rgba(24, 144, 255, 0.3),
-              inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 16px rgba(24, 144, 255, 0.4),
+    0 2px 8px rgba(24, 144, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
   /* Inner highlight để tạo độ sâu */
   border: 1px solid rgba(255, 255, 255, 0.3);
   position: relative;
@@ -402,10 +402,13 @@
 }
 
 @keyframes pulseGlow {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.3;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.5;
     transform: scale(1.05);
@@ -415,18 +418,18 @@
 .recruitment-management-pill.pill-active:hover {
   /* Gradient sáng hơn khi hover */
   background: linear-gradient(135deg, #40A9FF 0%, #69C0FF 50%, #91D5FF 100%);
-  box-shadow: 0 6px 20px rgba(24, 144, 255, 0.5), 
-              0 4px 12px rgba(24, 144, 255, 0.4),
-              inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: 0 6px 20px rgba(24, 144, 255, 0.5),
+    0 4px 12px rgba(24, 144, 255, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
   transform: translateY(-2px) scale(1.03);
   border-color: rgba(255, 255, 255, 0.4);
 }
 
 .recruitment-management-pill.pill-active:active {
   transform: translateY(-1px) scale(0.98);
-  box-shadow: 0 3px 12px rgba(24, 144, 255, 0.4), 
-              0 2px 6px rgba(24, 144, 255, 0.3),
-              inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: 0 3px 12px rgba(24, 144, 255, 0.4),
+    0 2px 6px rgba(24, 144, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
   transition: all 0.1s ease;
 }
 
@@ -555,11 +558,14 @@
 }
 
 @keyframes badgeBlink {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
     box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5), 0 0 0 3px #ffffff;
   }
+
   50% {
     opacity: 0.8;
     transform: scale(1.1);
@@ -920,9 +926,9 @@
 }
 
 .recruitment-status-badge.status-probation {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    color: #92400e;
-    border: 1px solid #fbbf24;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+  border: 1px solid #fbbf24;
 }
 
 .recruitment-status-badge.status-passed {
@@ -1046,6 +1052,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -1057,7 +1064,8 @@
   border-radius: 1rem;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   width: 100%;
-  max-width: 80rem; /* max-w-5xl */
+  max-width: 80rem;
+  /* max-w-5xl */
   max-height: 95vh;
   overflow: hidden;
   display: flex;
@@ -1070,6 +1078,7 @@
     transform: translateY(-20px);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -1733,7 +1742,7 @@
   .recruitment-preview-grid-4 {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .recruitment-preview-field--full-width {
     grid-column: span 2;
   }
@@ -1743,22 +1752,22 @@
   .recruitment-preview-grid-4 {
     grid-template-columns: 1fr;
   }
-  
+
   .recruitment-preview-field--full-width {
     grid-column: span 1;
   }
-  
+
   .recruitment-preview-table-header,
   .recruitment-preview-table-row {
     grid-template-columns: 1fr;
   }
-  
+
   .recruitment-preview-table-header-cell,
   .recruitment-preview-table-cell {
     border-right: none;
     border-bottom: 1px solid #e2e8f0;
   }
-  
+
   .recruitment-preview-table-header-cell:last-child,
   .recruitment-preview-table-cell:last-child {
     border-bottom: none;
@@ -1799,6 +1808,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -1809,6 +1819,7 @@
     transform: translateY(20px);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -2015,12 +2026,13 @@
 /* ===============================
    TRANSFER INTERVIEW MODAL
    =============================== */
+/* Transfer Interview Modal - Should appear above view candidate modal */
 .transfer-interview-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(4px);
-  z-index: 1400;
+  z-index: 1200;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2240,6 +2252,7 @@
     opacity: 0;
     transform: translateY(10px) scale(0.985);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -2276,11 +2289,13 @@
     max-width: 100%;
     max-height: 95vh;
   }
+
   .recruitment-request-detail-header,
   .recruitment-request-detail-body,
   .recruitment-request-detail-footer {
     padding: 1rem;
   }
+
   .recruitment-request-detail-grid {
     grid-template-columns: 1fr;
   }
@@ -2450,7 +2465,7 @@
   inset: 0;
   background: rgba(15, 23, 42, 0.6);
   backdrop-filter: blur(8px);
-  z-index: 1000;
+  z-index: 1100;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2795,6 +2810,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -2819,6 +2835,7 @@
     opacity: 0;
     transform: translateY(20px) scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -2964,9 +2981,12 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
   }
+
   50% {
     box-shadow: 0 4px 24px rgba(16, 185, 129, 0.6);
   }
@@ -2983,9 +3003,12 @@
 }
 
 @keyframes pulsePending {
-  0%, 100% {
+
+  0%,
+  100% {
     border-color: #cbd5e1;
   }
+
   50% {
     border-color: #94a3b8;
   }
@@ -3363,7 +3386,7 @@
   gap: 1rem;
 }
 
-.evaluation-summary-info-grid > div {
+.evaluation-summary-info-grid>div {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
@@ -3714,11 +3737,11 @@
     max-width: 95%;
     max-height: 95vh;
   }
-  
+
   .send-recruitment-info-form-columns {
     flex-direction: column;
   }
-  
+
   .send-recruitment-info-form-left,
   .send-recruitment-info-form-right {
     width: 100%;
@@ -3730,7 +3753,7 @@
     max-width: 100%;
     max-height: 95vh;
   }
-  
+
   .send-recruitment-info-modal-body {
     padding: 1rem;
     min-height: 400px;
@@ -4102,11 +4125,11 @@
   .recruitment-info-preview-modal-container {
     max-width: 95%;
   }
-  
+
   .recruitment-info-preview-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .recruitment-info-preview-allowance-grid {
     grid-template-columns: 1fr;
   }
@@ -4116,15 +4139,15 @@
   .recruitment-info-preview-modal-container {
     max-width: 100%;
   }
-  
+
   .recruitment-info-preview-modal-body {
     padding: 1rem;
   }
-  
+
   .recruitment-info-preview-modal-footer {
     flex-direction: column;
   }
-  
+
   .recruitment-info-preview-modal-btn {
     width: 100%;
   }
@@ -4665,7 +4688,7 @@
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
 }
 
-.send-recruitment-info-modal-footer > div {
+.send-recruitment-info-modal-footer>div {
   display: flex;
   gap: 0.75rem;
 }
@@ -5007,300 +5030,306 @@
 
 /* Probation Status Modal */
 .probation-status-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    animation: fadeInOverlay 0.3s ease-out;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeInOverlay 0.3s ease-out;
 }
 
 .probation-status-modal-container {
-    background: white;
-    border-radius: 1.25rem;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
-    width: 90%;
-    max-width: 800px;
-    max-height: 90vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    animation: slideInModal 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  background: white;
+  border-radius: 1.25rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideInModal 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .probation-status-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.5rem 2rem;
-    background: linear-gradient(to right, #e0f2fe, #ecfdf5);
-    border-bottom: 1px solid rgba(226, 232, 240, 0.6);
-    flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  background: linear-gradient(to right, #e0f2fe, #ecfdf5);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+  flex-shrink: 0;
 }
 
 .probation-status-modal-header-content {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .probation-status-modal-icon {
-    width: 2.5rem;
-    height: 2.5rem;
-    color: #3b82f6;
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #3b82f6;
 }
 
 .probation-status-modal-title {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #1e293b;
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
 }
 
 .probation-status-modal-subtitle {
-    margin: 0.25rem 0 0 0;
-    font-size: 0.875rem;
-    color: #64748b;
+  margin: 0.25rem 0 0 0;
+  font-size: 0.875rem;
+  color: #64748b;
 }
 
 .probation-status-modal-close {
-    background: transparent;
-    border: none;
-    font-size: 1.5rem;
-    color: #64748b;
-    cursor: pointer;
-    padding: 0.5rem;
-    width: 2.5rem;
-    height: 2.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.5rem;
-    transition: all 0.2s;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
 }
 
 .probation-status-modal-close:hover {
-    background: rgba(0, 0, 0, 0.05);
-    color: #1e293b;
+  background: rgba(0, 0, 0, 0.05);
+  color: #1e293b;
 }
 
 .probation-status-modal-body {
-    padding: 2rem;
-    flex: 1;
-    overflow-y: auto;
+  padding: 2rem;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .probation-status-content {
-    width: 100%;
+  width: 100%;
 }
 
 .probation-status-card {
-    display: flex;
-    gap: 2rem;
-    padding: 2rem;
-    background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 50%, #f5f6ff 100%);
-    border-radius: 1rem;
-    border: 1px solid rgba(226, 232, 240, 0.8);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  gap: 2rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 50%, #f5f6ff 100%);
+  border-radius: 1rem;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .probation-status-left {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
 }
 
 .probation-status-label {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .probation-status-countdown {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .probation-status-countdown-digits {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
-    font-size: 2.5rem;
-    font-weight: 700;
-    letter-spacing: 0.05rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: 0.05rem;
 }
 
 .probation-status-digit {
-    display: inline-block;
-    padding: 0.5rem 0.75rem;
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
-    border-radius: 0.5rem;
-    color: #ffffff;
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
-    backdrop-filter: blur(8px);
-    min-width: 3rem;
-    text-align: center;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  display: inline-block;
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  border-radius: 0.5rem;
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+  min-width: 3rem;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .probation-status-separator {
-    display: inline-block;
-    color: #3b82f6;
-    font-weight: 700;
-    padding: 0 0.25rem;
-    animation: blink 1s infinite;
+  display: inline-block;
+  color: #3b82f6;
+  font-weight: 700;
+  padding: 0 0.25rem;
+  animation: blink 1s infinite;
 }
 
 .probation-status-labels {
-    display: flex;
-    gap: 1.5rem;
-    font-size: 0.75rem;
-    color: #64748b;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .probation-status-labels span {
-    min-width: 3rem;
-    text-align: center;
+  min-width: 3rem;
+  text-align: center;
 }
 
 .probation-status-right {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .probation-status-header-text {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: #1e293b;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1e293b;
 }
 
 .probation-status-title {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin-bottom: 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
 }
 
 .probation-status-start-date {
-    font-size: 0.875rem;
-    color: #64748b;
-    margin-bottom: 1rem;
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-bottom: 1rem;
 }
 
 .probation-status-progress-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .probation-status-progress-bar-container {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .probation-status-progress-bar {
-    width: 100%;
-    height: 1rem;
-    background: #e5e7eb;
-    border-radius: 0.5rem;
-    overflow: hidden;
-    position: relative;
+  width: 100%;
+  height: 1rem;
+  background: #e5e7eb;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  position: relative;
 }
 
 .probation-status-progress-bar::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    animation: shimmer 2s infinite;
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
 }
 
 @keyframes blink {
-    0%, 50% {
-        opacity: 1;
-    }
-    51%, 100% {
-        opacity: 0.3;
-    }
+
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  51%,
+  100% {
+    opacity: 0.3;
+  }
 }
 
 @keyframes fadeInOverlay {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideInModal {
-    from {
-        transform: translateY(-20px) scale(0.95);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0) scale(1);
-        opacity: 1;
-    }
+  from {
+    transform: translateY(-20px) scale(0.95);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
 }
 
 @keyframes shimmer {
-    0% {
-        transform: translateX(-100%);
-    }
-    100% {
-        transform: translateX(100%);
-    }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .probation-status-progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #3b82f6, #2563eb);
-    border-radius: 0.5rem;
-    transition: width 0.3s ease;
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  border-radius: 0.5rem;
+  transition: width 0.3s ease;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
 }
 
 .probation-status-progress-label {
-    font-size: 0.75rem;
-    color: #64748b;
-    font-weight: 600;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
 }
 
 .probation-status-progress-percent {
-    font-size: 0.875rem;
-    color: #3b82f6;
-    font-weight: 700;
+  font-size: 0.875rem;
+  color: #3b82f6;
+  font-weight: 700;
 }
 
 .probation-status-progress-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.75rem;
-    color: #64748b;
-    font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
 }
-

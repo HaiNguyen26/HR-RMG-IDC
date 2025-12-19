@@ -1623,6 +1623,12 @@
   gap: 0.5rem;
 }
 
+
+.leave-approvals-manager-comment-text {
+  border-left-color: #10b981;
+  background: #f0fdf4;
+}
+
 .leave-approvals-notes .info-label,
 .leave-approvals-manager-comment .info-label {
   font-size: 0.875rem;
@@ -1638,11 +1644,6 @@
   width: 1rem;
   height: 1rem;
   color: #9ca3af;
-}
-
-.leave-approvals-manager-comment-text {
-  border-left-color: #10b981;
-  background: #f0fdf4;
 }
 
 /* Decision Trace Steps */

@@ -1230,6 +1230,491 @@
     transform: scale(1.1);
 }
 
+/* ============================================
+   INTERVIEW REQUEST DETAIL MODAL
+   ============================================ */
+
+/* Header Section - Header với tên và status */
+.interview-approvals-detail-header-section {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #e0f2fe 0%, #f0fdf4 100%);
+    border-radius: 0.75rem;
+    border: 1px solid #bfdbfe;
+    box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);
+}
+
+.interview-approvals-detail-header-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.interview-approvals-detail-header-icon {
+    width: 3rem;
+    height: 3rem;
+    background: #ffffff;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.interview-approvals-detail-header-icon svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    color: #0d9488;
+}
+
+.interview-approvals-detail-header-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.interview-approvals-detail-header-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+    line-height: 1.2;
+}
+
+/* Status Badge */
+.interview-approvals-detail-status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.interview-approvals-detail-status-badge.status-pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.interview-approvals-detail-status-badge.status-waiting {
+    background: #fde68a;
+    color: #78350f;
+}
+
+.interview-approvals-detail-status-badge.status-ready {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+/* Detail Grid - Grid layout cho các thông tin */
+.interview-approvals-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+    .interview-approvals-detail-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
+/* Detail Item */
+.interview-approvals-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.interview-approvals-detail-item:hover {
+    border-color: #0d9488;
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.1);
+}
+
+.interview-approvals-detail-item-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.interview-approvals-detail-item-icon {
+    width: 1rem;
+    height: 1rem;
+    color: #0d9488;
+    flex-shrink: 0;
+}
+
+.interview-approvals-detail-item-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.interview-approvals-detail-item-label-text {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.interview-approvals-detail-item-value {
+    font-size: 0.875rem;
+    color: #1f2937;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+/* Modal Footer Buttons - Additional styles */
+.interview-approvals-modal-btn--info {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.interview-approvals-modal-btn--info:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.interview-approvals-modal-btn--info:active {
+    transform: scale(0.95);
+}
+
+.interview-approvals-modal-btn--approve {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.interview-approvals-modal-btn--approve:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.interview-approvals-modal-btn--approve:active {
+    transform: scale(0.95);
+}
+
+.interview-approvals-modal-btn--reject {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.interview-approvals-modal-btn--reject:hover {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.interview-approvals-modal-btn--reject:active {
+    transform: scale(0.95);
+}
+
+/* ============================================
+   VIEW CANDIDATE MODAL (when opened from Interview Approvals)
+   Must have higher z-index than interview request detail modal (10000)
+   ============================================ */
+
+.recruitment-view-candidate-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(8px);
+    z-index: 11000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.recruitment-view-candidate-modal-container {
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
+    width: 100%;
+    max-width: 1000px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideUp 0.3s ease-out;
+}
+
+.recruitment-view-candidate-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 2px solid #0d9488;
+    flex-shrink: 0;
+    background: linear-gradient(to right, #e0f2fe, #ecfdf5);
+}
+
+.recruitment-view-candidate-modal-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #0d9488;
+    margin: 0;
+}
+
+.recruitment-view-candidate-modal-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.recruitment-view-candidate-modal-close {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.recruitment-view-candidate-modal-close:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+
+.recruitment-view-candidate-modal-close svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.recruitment-view-candidate-modal-body {
+    padding: 2rem;
+    overflow-y: auto;
+    flex: 1;
+    background: #f8fafc;
+}
+
+.recruitment-view-candidate-section {
+    background: #ffffff;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.recruitment-view-candidate-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0d9488;
+    margin: 0 0 1.25rem 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #0d9488;
+}
+
+.recruitment-view-candidate-section-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    color: #0d9488;
+}
+
+.recruitment-view-candidate-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.recruitment-view-candidate-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.recruitment-view-candidate-field-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.recruitment-view-candidate-field-icon {
+    width: 1rem;
+    height: 1rem;
+    color: #0d9488;
+}
+
+.recruitment-view-candidate-field-value {
+    font-size: 0.875rem;
+    color: #1f2937;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.recruitment-view-candidate-work-experience,
+.recruitment-view-candidate-training,
+.recruitment-view-candidate-languages {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.recruitment-view-candidate-work-item,
+.recruitment-view-candidate-training-item,
+.recruitment-view-candidate-language-item {
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+}
+
+.recruitment-view-candidate-work-header,
+.recruitment-view-candidate-training-header,
+.recruitment-view-candidate-language-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.recruitment-view-candidate-work-icon,
+.recruitment-view-candidate-training-icon,
+.recruitment-view-candidate-language-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    color: #0d9488;
+    flex-shrink: 0;
+    margin-top: 0.25rem;
+}
+
+.recruitment-view-candidate-work-company,
+.recruitment-view-candidate-training-school,
+.recruitment-view-candidate-language-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+}
+
+.recruitment-view-candidate-work-position,
+.recruitment-view-candidate-training-major,
+.recruitment-view-candidate-language-cert {
+    font-size: 0.875rem;
+    color: #4b5563;
+    margin-bottom: 0.25rem;
+}
+
+.recruitment-view-candidate-work-period,
+.recruitment-view-candidate-training-period,
+.recruitment-view-candidate-language-score {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.recruitment-view-candidate-training-degree,
+.recruitment-view-candidate-language-level {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+}
+
+.recruitment-view-candidate-empty {
+    text-align: center;
+    padding: 2rem;
+    color: #9ca3af;
+    font-size: 0.875rem;
+}
+
+.recruitment-view-candidate-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-top: 1px solid #e5e7eb;
+    flex-shrink: 0;
+    background: #ffffff;
+}
+
+.recruitment-view-candidate-modal-btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    outline: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.recruitment-view-candidate-modal-btn--close {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.recruitment-view-candidate-modal-btn--close:hover {
+    background: #e5e7eb;
+    color: #1f2937;
+}
+
+.recruitment-view-candidate-modal-btn--edit {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.recruitment-view-candidate-modal-btn--edit:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.recruitment-view-candidate-modal-btn svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+@media (max-width: 768px) {
+    .recruitment-view-candidate-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .recruitment-view-candidate-modal-container {
+        max-width: 100%;
+        max-height: 100vh;
+    }
+
+    .recruitment-view-candidate-modal-header,
+    .recruitment-view-candidate-modal-body,
+    .recruitment-view-candidate-modal-footer {
+        padding: 1rem;
+    }
+}
+
 .interview-evaluation-modal-close svg {
     width: 20px;
     height: 20px;

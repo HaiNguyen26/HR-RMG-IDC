@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
     attendanceAdjustmentsAPI,
     leaveRequestsAPI,
@@ -79,7 +79,6 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     const [activeModule, setActiveModule] = useState('all');
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
-    const [showRequestDetails, setShowRequestDetails] = useState(false);
 
     // Statistics cho tất cả các status của module hiện tại
     const [moduleStatusStatistics, setModuleStatusStatistics] = useState({
@@ -97,8 +96,36 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         attendance: { pending: 0, total: 0 }
     });
 
+    // Refs để track previous values và tránh setState không cần thiết
+    const prevModuleStatsRef = useRef(null);
+    const prevModuleStatusStatsRef = useRef(null);
+    const prevRequestsRef = useRef(null);
+
+    // Helper function để so sánh shallow objects
+    const shallowEqual = (obj1, obj2) => {
+        if (obj1 === obj2) return true;
+        if (!obj1 || !obj2) return false;
+        const keys1 = Object.keys(obj1);
+        const keys2 = Object.keys(obj2);
+        if (keys1.length !== keys2.length) return false;
+        for (let key of keys1) {
+            if (obj1[key] !== obj2[key]) return false;
+        }
+        return true;
+    };
+
+    // Helper function để so sánh arrays
+    const arraysEqual = (arr1, arr2) => {
+        if (arr1 === arr2) return true;
+        if (!arr1 || !arr2) return false;
+        if (arr1.length !== arr2.length) return false;
+        const arr1Str = JSON.stringify(arr1.map(r => ({ id: r.id, status: r.status, updated_at: r.updated_at })));
+        const arr2Str = JSON.stringify(arr2.map(r => ({ id: r.id, status: r.status, updated_at: r.updated_at })));
+        return arr1Str === arr2Str;
+    };
+
     // Function để fetch statistics - có thể gọi từ nhiều nơi
-    const fetchModuleStatistics = async (silent = false) => {
+    const fetchModuleStatistics = useCallback(async (silent = false) => {
         if (!currentUser?.id) return;
 
         if (!silent) setIsRefreshing(true);
@@ -152,22 +179,40 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 total: leaveStats.total + overtimeStats.total + attendanceStats.total // Đã loại bỏ CANCELLED
             };
 
-            setModuleStatistics({
+            const newModuleStats = {
                 all: { pending: allStats.pending, total: allStats.total },
                 leave: { pending: leaveStats.pending, total: leaveStats.total },
                 overtime: { pending: overtimeStats.pending, total: overtimeStats.total },
                 attendance: { pending: attendanceStats.pending, total: attendanceStats.total }
-            });
+            };
+
+            // Chỉ update state nếu data thực sự thay đổi
+            if (!prevModuleStatsRef.current || !shallowEqual(prevModuleStatsRef.current.all, newModuleStats.all) ||
+                !shallowEqual(prevModuleStatsRef.current.leave, newModuleStats.leave) ||
+                !shallowEqual(prevModuleStatsRef.current.overtime, newModuleStats.overtime) ||
+                !shallowEqual(prevModuleStatsRef.current.attendance, newModuleStats.attendance)) {
+                setModuleStatistics(newModuleStats);
+                prevModuleStatsRef.current = newModuleStats;
+            }
 
             // Set module status statistics based on active module
+            let newStatusStats;
             if (activeModule === 'all') {
-                setModuleStatusStatistics(allStats);
+                newStatusStats = allStats;
             } else if (activeModule === 'leave') {
-                setModuleStatusStatistics(leaveStats);
+                newStatusStats = leaveStats;
             } else if (activeModule === 'overtime') {
-                setModuleStatusStatistics(overtimeStats);
+                newStatusStats = overtimeStats;
             } else if (activeModule === 'attendance') {
-                setModuleStatusStatistics(attendanceStats);
+                newStatusStats = attendanceStats;
+            } else {
+                newStatusStats = allStats;
+            }
+
+            // Chỉ update state nếu data thực sự thay đổi
+            if (!prevModuleStatusStatsRef.current || !shallowEqual(prevModuleStatusStatsRef.current, newStatusStats)) {
+                setModuleStatusStatistics(newStatusStats);
+                prevModuleStatusStatsRef.current = newStatusStats;
             }
         } catch (error) {
             console.error('Error fetching module statistics:', error);
@@ -176,7 +221,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 setTimeout(() => setIsRefreshing(false), 300);
             }
         }
-    };
+    }, [currentUser?.id, activeModule]);
 
     // Fetch statistics với realtime update
     useEffect(() => {
@@ -184,7 +229,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         // Realtime update: polling mỗi 5 giây (silent mode - không hiển thị loading)
         const interval = setInterval(() => fetchModuleStatistics(true), 5000);
         return () => clearInterval(interval);
-    }, [currentUser?.id, activeModule]);
+    }, [fetchModuleStatistics]);
 
     const statusFilters = useMemo(() => {
         return [
@@ -196,66 +241,74 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     }, []);
 
     // Fetch requests based on active module and selected status - LẤY TOÀN BỘ ĐƠN (HR/ADMIN)
-    useEffect(() => {
-        const fetchRequests = async () => {
-            if (!currentUser?.id) return;
+    const fetchRequests = useCallback(async (silent = false) => {
+        if (!currentUser?.id) return;
 
-            setLoading(true);
-            try {
-                // Không thêm employeeId - lấy toàn bộ đơn trong hệ thống
-                const params = {};
-                if (selectedStatus !== 'ALL') {
-                    params.status = selectedStatus;
+        if (!silent) setLoading(true);
+        try {
+            // Không thêm employeeId - lấy toàn bộ đơn trong hệ thống
+            const params = {};
+            if (selectedStatus !== 'ALL') {
+                params.status = selectedStatus;
+            }
+
+            let newRequests = [];
+
+            if (activeModule === 'all') {
+                const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
+                    leaveRequestsAPI.getAll(params),
+                    overtimeRequestsAPI.getAll(params),
+                    attendanceAdjustmentsAPI.getAll(params)
+                ]);
+
+                newRequests = [
+                    ...(leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: 'leave' })) : []),
+                    ...(overtimeResponse.data.success ? (overtimeResponse.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
+                    ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : [])
+                ];
+
+                // Sắp xếp theo thời gian tạo mới nhất
+                newRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            } else if (activeModule === 'leave') {
+                const response = await leaveRequestsAPI.getAll(params);
+                if (response.data.success) {
+                    newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'leave' }));
                 }
-
-                if (activeModule === 'all') {
-                    const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
-                        leaveRequestsAPI.getAll(params),
-                        overtimeRequestsAPI.getAll(params),
-                        attendanceAdjustmentsAPI.getAll(params)
-                    ]);
-
-                    const allRequests = [
-                        ...(leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: 'leave' })) : []),
-                        ...(overtimeResponse.data.success ? (overtimeResponse.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
-                        ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : [])
-                    ];
-
-                    // Sắp xếp theo thời gian tạo mới nhất
-                    allRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                    setRequests(allRequests);
-                } else if (activeModule === 'leave') {
-                    const response = await leaveRequestsAPI.getAll(params);
-                    if (response.data.success) {
-                        setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'leave' })));
-                    }
-                } else if (activeModule === 'overtime') {
-                    const response = await overtimeRequestsAPI.getAll(params);
-                    if (response.data.success) {
-                        setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'overtime' })));
-                    }
-                } else if (activeModule === 'attendance') {
-                    const response = await attendanceAdjustmentsAPI.getAll(params);
-                    if (response.data.success) {
-                        setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'attendance' })));
-                    }
+            } else if (activeModule === 'overtime') {
+                const response = await overtimeRequestsAPI.getAll(params);
+                if (response.data.success) {
+                    newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'overtime' }));
                 }
-            } catch (error) {
-                console.error('Error fetching requests:', error);
-                if (showToast) {
-                    showToast('Lỗi khi tải danh sách đơn từ', 'error');
+            } else if (activeModule === 'attendance') {
+                const response = await attendanceAdjustmentsAPI.getAll(params);
+                if (response.data.success) {
+                    newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'attendance' }));
                 }
-            } finally {
+            }
+
+            // Chỉ update state nếu data thực sự thay đổi
+            if (!prevRequestsRef.current || !arraysEqual(prevRequestsRef.current, newRequests)) {
+                setRequests(newRequests);
+                prevRequestsRef.current = newRequests;
+            }
+        } catch (error) {
+            console.error('Error fetching requests:', error);
+            if (showToast && !silent) {
+                showToast('Lỗi khi tải danh sách đơn từ', 'error');
+            }
+        } finally {
+            if (!silent) {
                 setLoading(false);
             }
-        };
+        }
+    }, [activeModule, selectedStatus, currentUser?.id, showToast]);
 
-        fetchRequests();
-        // Realtime update: polling mỗi 5 giây
-        const interval = setInterval(fetchRequests, 5000);
+    useEffect(() => {
+        fetchRequests(false); // Lần đầu hiển thị loading
+        // Realtime update: polling mỗi 5 giây (silent mode - không hiển thị loading)
+        const interval = setInterval(() => fetchRequests(true), 5000);
         return () => clearInterval(interval);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeModule, selectedStatus, currentUser?.id]);
+    }, [fetchRequests]);
 
     const getStatusLabel = (status) => {
         return STATUS_LABELS[status] || status;
@@ -269,11 +322,10 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         return LEAVE_TYPE_LABELS[leaveType] || leaveType;
     };
 
-    const handleViewRequest = (request) => {
+    const handleViewRequest = useCallback((request) => {
         setSelectedRequest(request);
         setShowDetailModal(true);
-        setShowRequestDetails(false);
-    };
+    }, []);
 
     // HR không có quyền xóa đơn - Function này đã bị vô hiệu hóa
     /* eslint-disable no-unused-vars */
@@ -332,301 +384,527 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         return getStatusLabel(value);
     };
 
-    const renderDecisionTrace = (request) => {
-        // Xác định bước hiện tại của đơn
-        const getCurrentStep = () => {
-            if (request.status === 'PENDING') {
-                return 1; // Đang ở bước chờ quản lý duyệt
-            } else if (['APPROVED', 'REJECTED'].includes(request.status)) {
-                return 2; // Đã hoàn thành bước quản lý duyệt
-            }
-            return 0;
-        };
-
-        const currentStep = getCurrentStep();
-
-        return (
-            <div className="request-management-modal-section">
-                <h3 className="request-management-modal-section-title">
-                    <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                    </svg>
-                    Timeline đơn từ
-                </h3>
-                <div className="request-management-timeline">
-                    {/* Bước 1: Nhân viên gửi đơn */}
-                    <div className={`timeline-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'current' : ''}`}>
-                        <div className="timeline-step-connector"></div>
-                        <div className="timeline-step-icon">
-                            {currentStep >= 1 ? (
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                                </svg>
-                            ) : (
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                            )}
-                        </div>
-                        <div className="timeline-step-content">
-                            <div className="timeline-step-title">Nhân viên gửi đơn</div>
-                            <div className="timeline-step-date">{formatDateDisplay(request.created_at, true)}</div>
-                            {currentStep === 1 && (
-                                <div className="timeline-step-badge current-badge">Bước hiện tại</div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Bước 2: Quản lý trực tiếp */}
-                    <div className={`timeline-step ${currentStep >= 2 ? 'completed' : ''} ${currentStep === 2 ? 'current' : ''}`}>
-                        <div className="timeline-step-connector"></div>
-                        <div className="timeline-step-icon">
-                            {currentStep >= 2 ? (
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                                </svg>
-                            ) : (
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                            )}
-                        </div>
-                        <div className="timeline-step-content">
-                            <div className="timeline-step-title">Quản lý trực tiếp</div>
-                            <div className="timeline-step-date">
-                                {request.status === 'PENDING'
-                                    ? 'Chờ duyệt'
-                                    : (
-                                        <>
-                                            {mapDecisionLabel(request.team_lead_action, request.status)}
-                                            {request.team_lead_action_at && ` - ${formatDateDisplay(request.team_lead_action_at, true)}`}
-                                        </>
-                                    )
-                                }
-                            </div>
-                            {currentStep === 2 && (
-                                <div className="timeline-step-badge current-badge">Bước hiện tại</div>
-                            )}
-                            {currentStep >= 2 && request.status === 'APPROVED' && (
-                                <div className="timeline-step-badge success-badge">Đã duyệt</div>
-                            )}
-                            {currentStep >= 2 && request.status === 'REJECTED' && (
-                                <div className="timeline-step-badge error-badge">Đã từ chối</div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
     const renderRequestDetails = (request) => {
         if (!request) return null;
 
         const requestType = request.requestType || activeModule;
 
         if (requestType === 'leave' || activeModule === 'leave') {
+            // Tính số ngày nghỉ
+            let totalDays = '-';
+            if (request.request_type === 'LEAVE' && request.start_date && request.end_date) {
+                const start = new Date(request.start_date);
+                const end = new Date(request.end_date);
+                const diffTime = Math.abs(end - start);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                totalDays = `${diffDays} ngày`;
+            } else if (request.duration) {
+                totalDays = request.duration;
+            }
+
             return (
-                <div className="request-details-content">
-                    <div className="request-details-grid">
-                        <div className="request-details-item">
-                            <span className="request-details-label">
-                                <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
-                                Nhân viên
-                            </span>
-                            <span className="request-details-value">{request.employee_name || request.ho_ten || '-'}</span>
-                        </div>
-                        <div className="request-details-item">
-                            <span className="request-details-label">
-                                <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                                Mã đơn
-                            </span>
-                            <span className="request-details-value">{request.id || '-'}</span>
-                        </div>
-                        <div className="request-details-item">
-                            <span className="request-details-label">
-                                <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
-                                Loại nghỉ
-                            </span>
-                            <span className="request-details-value">{getLeaveTypeLabel(request.leave_type) || '-'}</span>
-                        </div>
-                        <div className="request-details-item">
-                            <span className="request-details-label">
-                                <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
-                                Ngày bắt đầu
-                            </span>
-                            <span className="request-details-value">{formatDateDisplay(request.start_date) || '-'}</span>
-                        </div>
-                        {request.end_date && (
-                            <div className="request-details-item">
-                                <span className="request-details-label">
-                                    <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                <>
+                    {/* Thông tin đơn */}
+                    <div className="request-management-modal-section">
+                        <h3 className="request-management-modal-section-title">
+                            <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Thông tin đơn
+                        </h3>
+                        <div className="request-management-modal-info-grid">
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                     </svg>
-                                    Ngày kết thúc
+                                    Tên nhân viên
                                 </span>
-                                <span className="request-details-value">{formatDateDisplay(request.end_date)}</span>
+                                <span className="info-value">{request.employee_name || request.ho_ten || '-'}</span>
                             </div>
-                        )}
-                        {request.reason && (
-                            <div className="request-details-item request-details-item-full">
-                                <span className="request-details-label">
-                                    <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            {request.ma_nhan_vien && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path>
+                                        </svg>
+                                        Mã nhân viên
+                                    </span>
+                                    <span className="info-value">{request.ma_nhan_vien}</span>
+                                </div>
+                            )}
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                     </svg>
-                                    Lý do
+                                    Mã đơn
                                 </span>
-                                <span className="request-details-value">{request.reason}</span>
+                                <span className="info-value">ĐN{String(request.id).padStart(6, '0')}</span>
                             </div>
-                        )}
-                        {request.notes && (
-                            <div className="request-details-item request-details-item-full">
-                                <span className="request-details-label">
-                                    <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                     </svg>
-                                    Ghi chú
+                                    Trạng thái
                                 </span>
-                                <span className="request-details-value">{request.notes}</span>
+                                <span className={`leave-status-tag ${request.status?.toLowerCase() || 'pending'}`}>
+                                    {getStatusLabel(request.status)}
+                                </span>
                             </div>
-                        )}
+                            {request.created_at && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Ngày tạo
+                                    </span>
+                                    <span className="info-value">{formatDateDisplay(request.created_at, true)}</span>
+                                </div>
+                            )}
+                            {request.team_lead_action_at && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Ngày quản lý xử lý
+                                    </span>
+                                    <span className="info-value">{formatDateDisplay(request.team_lead_action_at, true)}</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+
+                    {/* Chi tiết nghỉ phép */}
+                    <div className="request-management-modal-section">
+                        <h3 className="request-management-modal-section-title">
+                            <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            Chi tiết nghỉ phép
+                        </h3>
+                        <div className="request-management-modal-info-grid">
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                                    </svg>
+                                    Loại đơn
+                                </span>
+                                <span className="info-value">{getRequestTypeLabel(request.request_type) || '-'}</span>
+                            </div>
+                            {request.leave_type && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                        </svg>
+                                        Loại phép
+                                    </span>
+                                    <span className="info-value">{getLeaveTypeLabel(request.leave_type)}</span>
+                                </div>
+                            )}
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Ngày bắt đầu
+                                </span>
+                                <span className="info-value">{formatDateDisplay(request.start_date) || '-'}</span>
+                            </div>
+                            {request.end_date && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                        </svg>
+                                        Ngày kết thúc
+                                    </span>
+                                    <span className="info-value">{formatDateDisplay(request.end_date)}</span>
+                                </div>
+                            )}
+                            {totalDays !== '-' && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Tổng số ngày nghỉ
+                                    </span>
+                                    <span className="info-value info-value-highlight">{totalDays}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Lý do và Ghi chú */}
+                    {(request.reason || request.notes || request.manager_comment || request.team_lead_comment) && (
+                        <div className="request-management-modal-section">
+                            <h3 className="request-management-modal-section-title">
+                                <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Lý do và Ghi chú
+                            </h3>
+                            {request.reason && (
+                                <div className="request-management-reason-text">
+                                    <strong>Lý do:</strong> {request.reason}
+                                </div>
+                            )}
+                            {request.notes && (
+                                <div className="request-management-notes-text">
+                                    <strong>Ghi chú:</strong> {request.notes}
+                                </div>
+                            )}
+                            {(request.manager_comment || request.team_lead_comment) && (
+                                <div className="request-management-manager-comment-text">
+                                    <strong>Nhận xét của quản lý:</strong> {request.manager_comment || request.team_lead_comment}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
             );
         }
 
         if (requestType === 'overtime' || activeModule === 'overtime') {
             return (
-                <div className="request-details-content">
-                    <div className="request-details-grid">
-                        <div className="request-details-item">
-                            <span className="request-details-label">
-                                <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
-                                Nhân viên
-                            </span>
-                            <span className="request-details-value">{request.employee_name || request.ho_ten || '-'}</span>
-                        </div>
-                        <div className="request-details-item">
-                            <span className="request-details-label">
-                                <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
-                                Ngày tăng ca
-                            </span>
-                            <span className="request-details-value">{formatDateDisplay(request.request_date) || '-'}</span>
-                        </div>
-                        <div className="request-details-item">
-                            <span className="request-details-label">
-                                <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                                Giờ bắt đầu
-                            </span>
-                            <span className="request-details-value">{request.start_time?.slice(0, 5) || '-'}</span>
-                        </div>
-                        <div className="request-details-item">
-                            <span className="request-details-label">
-                                <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                                Giờ kết thúc
-                            </span>
-                            <span className="request-details-value">{request.end_time?.slice(0, 5) || '-'}</span>
-                        </div>
-                        {request.duration && (
-                            <div className="request-details-item">
-                                <span className="request-details-label">
-                                    <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                <>
+                    {/* Thông tin đơn */}
+                    <div className="request-management-modal-section">
+                        <h3 className="request-management-modal-section-title">
+                            <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Thông tin đơn
+                        </h3>
+                        <div className="request-management-modal-info-grid">
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                     </svg>
-                                    Thời lượng
+                                    Tên nhân viên
                                 </span>
-                                <span className="request-details-value">{request.duration}</span>
+                                <span className="info-value">{request.employee_name || request.ho_ten || '-'}</span>
                             </div>
-                        )}
-                        {request.reason && (
-                            <div className="request-details-item request-details-item-full">
-                                <span className="request-details-label">
-                                    <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            {request.ma_nhan_vien && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path>
+                                        </svg>
+                                        Mã nhân viên
+                                    </span>
+                                    <span className="info-value">{request.ma_nhan_vien}</span>
+                                </div>
+                            )}
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                     </svg>
-                                    Lý do
+                                    Mã đơn
                                 </span>
-                                <span className="request-details-value">{request.reason}</span>
+                                <span className="info-value">ĐTC{String(request.id).padStart(6, '0')}</span>
                             </div>
-                        )}
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    Trạng thái
+                                </span>
+                                <span className={`leave-status-tag ${request.status?.toLowerCase() || 'pending'}`}>
+                                    {getStatusLabel(request.status)}
+                                </span>
+                            </div>
+                            {request.created_at && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Ngày tạo
+                                    </span>
+                                    <span className="info-value">{formatDateDisplay(request.created_at, true)}</span>
+                                </div>
+                            )}
+                            {request.team_lead_action_at && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Ngày quản lý xử lý
+                                    </span>
+                                    <span className="info-value">{formatDateDisplay(request.team_lead_action_at, true)}</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+
+                    {/* Chi tiết tăng ca */}
+                    <div className="request-management-modal-section">
+                        <h3 className="request-management-modal-section-title">
+                            <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Chi tiết tăng ca
+                        </h3>
+                        <div className="request-management-modal-info-grid">
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Ngày tăng ca
+                                </span>
+                                <span className="info-value">{formatDateDisplay(request.request_date) || '-'}</span>
+                            </div>
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    Giờ bắt đầu
+                                </span>
+                                <span className="info-value">{request.start_time?.slice(0, 5) || '-'}</span>
+                            </div>
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    Giờ kết thúc
+                                </span>
+                                <span className="info-value">{request.end_time?.slice(0, 5) || '-'}</span>
+                            </div>
+                            {request.duration && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                        </svg>
+                                        Thời lượng
+                                    </span>
+                                    <span className="info-value info-value-highlight">{request.duration}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Nội dung công việc và Nhận xét */}
+                    {(request.reason || request.manager_comment || request.team_lead_comment) && (
+                        <div className="request-management-modal-section">
+                            <h3 className="request-management-modal-section-title">
+                                <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Nội dung công việc và Nhận xét
+                            </h3>
+                            {request.reason && (
+                                <div className="request-management-reason-text">
+                                    <strong>Nội dung công việc:</strong> {request.reason}
+                                </div>
+                            )}
+                            {(request.manager_comment || request.team_lead_comment) && (
+                                <div className="request-management-manager-comment-text">
+                                    <strong>Nhận xét của quản lý:</strong> {request.manager_comment || request.team_lead_comment}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
             );
         }
 
         if (requestType === 'attendance' || activeModule === 'attendance') {
+            // Lấy loại bổ sung công từ notes hoặc attendance_type
+            const notes = request.notes || '';
+            const attendanceType = request.attendance_type ||
+                (notes.includes('ATTENDANCE_TYPE:')
+                    ? notes.split('ATTENDANCE_TYPE:')[1]?.split('\n')[0]?.trim()
+                    : null);
+            let attendanceTypeLabel = 'Quên Chấm Công';
+            if (attendanceType === 'FORGOT_CHECK' || attendanceType === '1') {
+                attendanceTypeLabel = 'Quên Chấm Công';
+            } else if (attendanceType === 'CONSTRUCTION_SITE' || attendanceType === '2') {
+                attendanceTypeLabel = 'Đi Công Trình';
+            } else if (attendanceType === 'OUTSIDE_WORK' || attendanceType === '3') {
+                attendanceTypeLabel = 'Làm việc bên ngoài';
+            }
+
+            // Lọc bỏ ATTENDANCE_TYPE từ notes khi hiển thị
+            const cleanNotes = notes.replace(/ATTENDANCE_TYPE:[^\n]*\n?/g, '').trim() || null;
+
             return (
-                <div className="request-details-content">
-                    <div className="request-details-grid">
-                        <div className="request-details-item">
-                            <span className="request-details-label">
-                                <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
-                                Nhân viên
-                            </span>
-                            <span className="request-details-value">{request.employee_name || request.ho_ten || '-'}</span>
+                <>
+                    {/* Thông tin đơn */}
+                    <div className="request-management-modal-section">
+                        <h3 className="request-management-modal-section-title">
+                            <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Thông tin đơn
+                        </h3>
+                        <div className="request-management-modal-info-grid">
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                    </svg>
+                                    Tên nhân viên
+                                </span>
+                                <span className="info-value">{request.employee_name || request.ho_ten || '-'}</span>
+                            </div>
+                            {request.ma_nhan_vien && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path>
+                                        </svg>
+                                        Mã nhân viên
+                                    </span>
+                                    <span className="info-value">{request.ma_nhan_vien}</span>
+                                </div>
+                            )}
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    Mã đơn
+                                </span>
+                                <span className="info-value">ĐBSC{String(request.id).padStart(6, '0')}</span>
+                            </div>
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    Trạng thái
+                                </span>
+                                <span className={`leave-status-tag ${request.status?.toLowerCase() || 'pending'}`}>
+                                    {getStatusLabel(request.status)}
+                                </span>
+                            </div>
+                            {request.created_at && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Ngày tạo
+                                    </span>
+                                    <span className="info-value">{formatDateDisplay(request.created_at, true)}</span>
+                                </div>
+                            )}
+                            {request.team_lead_action_at && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Ngày quản lý xử lý
+                                    </span>
+                                    <span className="info-value">{formatDateDisplay(request.team_lead_action_at, true)}</span>
+                                </div>
+                            )}
                         </div>
-                        <div className="request-details-item">
-                            <span className="request-details-label">
-                                <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
-                                Ngày bổ sung
-                            </span>
-                            <span className="request-details-value">{formatDateDisplay(request.adjustment_date || request.request_date) || '-'}</span>
-                        </div>
-                        {request.check_in_time && (
-                            <div className="request-details-item">
-                                <span className="request-details-label">
-                                    <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                    </svg>
-                                    Giờ vào
-                                </span>
-                                <span className="request-details-value">{request.check_in_time.slice(0, 5)}</span>
-                            </div>
-                        )}
-                        {request.check_out_time && (
-                            <div className="request-details-item">
-                                <span className="request-details-label">
-                                    <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                    </svg>
-                                    Giờ ra
-                                </span>
-                                <span className="request-details-value">{request.check_out_time.slice(0, 5)}</span>
-                            </div>
-                        )}
-                        {request.notes && (
-                            <div className="request-details-item request-details-item-full">
-                                <span className="request-details-label">
-                                    <svg className="request-details-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                    </svg>
-                                    Ghi chú
-                                </span>
-                                <span className="request-details-value">{request.notes}</span>
-                            </div>
-                        )}
                     </div>
-                </div>
+
+                    {/* Chi tiết bổ sung chấm công */}
+                    <div className="request-management-modal-section">
+                        <h3 className="request-management-modal-section-title">
+                            <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Chi tiết bổ sung chấm công
+                        </h3>
+                        <div className="request-management-modal-info-grid">
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                    </svg>
+                                    Loại bổ sung
+                                </span>
+                                <span className="info-value">{attendanceTypeLabel}</span>
+                            </div>
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Ngày bổ sung
+                                </span>
+                                <span className="info-value">{formatDateDisplay(request.adjustment_date || request.request_date) || '-'}</span>
+                            </div>
+                            {request.check_in_time && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Giờ vào
+                                    </span>
+                                    <span className="info-value">{request.check_in_time.slice(0, 5)}</span>
+                                </div>
+                            )}
+                            {request.check_out_time && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Giờ ra
+                                    </span>
+                                    <span className="info-value">{request.check_out_time.slice(0, 5)}</span>
+                                </div>
+                            )}
+                            {request.check_type && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Loại chấm công
+                                    </span>
+                                    <span className="info-value">
+                                        {request.check_type === 'CHECK_IN' ? 'Chấm vào' : request.check_type === 'CHECK_OUT' ? 'Chấm ra' : request.check_type}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Lý do bổ sung và Nhận xét */}
+                    {(cleanNotes || request.manager_comment || request.team_lead_comment) && (
+                        <div className="request-management-modal-section">
+                            <h3 className="request-management-modal-section-title">
+                                <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Lý do bổ sung và Nhận xét
+                            </h3>
+                            {cleanNotes && (
+                                <div className="request-management-reason-text">
+                                    <strong>Lý do bổ sung:</strong> {cleanNotes}
+                                </div>
+                            )}
+                            {(request.manager_comment || request.team_lead_comment) && (
+                                <div className="request-management-manager-comment-text">
+                                    <strong>Nhận xét của quản lý:</strong> {request.manager_comment || request.team_lead_comment}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
             );
         }
 
@@ -640,6 +918,54 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         if (selectedStatus === 'ALL') return nonCancelledRequests;
         return nonCancelledRequests.filter(r => r.status === selectedStatus);
     }, [requests, selectedStatus]);
+
+    // Memoize table header để tránh render lại
+    const tableHeader = useMemo(() => {
+        if (activeModule === 'all') {
+            return (
+                <>
+                    <th>Loại đơn</th>
+                    <th>Thông tin đơn</th>
+                    <th>Ngày/Thời gian</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                </>
+            );
+        } else if (activeModule === 'leave') {
+            return (
+                <>
+                    <th>Loại đơn</th>
+                    <th>Thời gian nghỉ</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                </>
+            );
+        } else if (activeModule === 'overtime') {
+            return (
+                <>
+                    <th>Ngày tăng ca</th>
+                    <th>Thời gian</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                </>
+            );
+        } else if (activeModule === 'attendance') {
+            return (
+                <>
+                    <th>Ngày bổ sung</th>
+                    <th>Thời gian</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                </>
+            );
+        }
+        return null;
+    }, [activeModule]);
+
+    // Memoize style objects để tránh tạo mới mỗi lần render
+    const rowStyle = useMemo(() => ({ cursor: 'pointer' }), []);
+    const refreshingSpanStyle = useMemo(() => ({ marginLeft: '10px', fontSize: '0.7em', color: '#10b981', opacity: 0.8 }), []);
+    const subtitleSpanStyle = useMemo(() => ({ marginLeft: '10px', fontSize: '0.85em', opacity: 0.7 }), []);
 
     return (
         <div className="request-management">
@@ -658,14 +984,14 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                             <h1 className="request-management-title">
                                 {MODULE_OPTIONS.find(m => m.key === activeModule)?.header || 'QUẢN LÝ ĐƠN TỪ'}
                                 {isRefreshing && (
-                                    <span style={{ marginLeft: '10px', fontSize: '0.7em', color: '#10b981', opacity: 0.8 }}>
+                                    <span style={refreshingSpanStyle}>
                                         ● Đang cập nhật...
                                     </span>
                                 )}
                             </h1>
                             <p className="request-management-subtitle">
                                 {MODULE_OPTIONS.find(m => m.key === activeModule)?.description || 'Xem và theo dõi tất cả các đơn từ.'}
-                                <span style={{ marginLeft: '10px', fontSize: '0.85em', opacity: 0.7 }}>
+                                <span style={subtitleSpanStyle}>
                                     {!isRefreshing && '● Cập nhật tự động mỗi 5 giây'}
                                 </span>
                             </p>
@@ -773,190 +1099,224 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     ) : (
                         <table className="request-management-table">
                             <thead>
-                                {activeModule === 'all' && (
-                                    <>
-                                        <th>Loại đơn</th>
-                                        <th>Thông tin đơn</th>
-                                        <th>Ngày/Thời gian</th>
-                                        <th>Trạng thái</th>
-                                        <th>Hành động</th>
-                                    </>
-                                )}
-                                {activeModule === 'leave' && (
-                                    <>
-                                        <th>Loại đơn</th>
-                                        <th>Thời gian nghỉ</th>
-                                        <th>Trạng thái</th>
-                                        <th>Hành động</th>
-                                    </>
-                                )}
-                                {activeModule === 'overtime' && (
-                                    <>
-                                        <th>Ngày tăng ca</th>
-                                        <th>Thời gian</th>
-                                        <th>Trạng thái</th>
-                                        <th>Hành động</th>
-                                    </>
-                                )}
-                                {activeModule === 'attendance' && (
-                                    <>
-                                        <th>Ngày bổ sung</th>
-                                        <th>Thời gian</th>
-                                        <th>Trạng thái</th>
-                                        <th>Hành động</th>
-                                    </>
-                                )}
+                                <tr>
+                                    {tableHeader}
+                                </tr>
                             </thead>
                             <tbody>
-                                {filteredRequests.map((request, index) => (
-                                    <tr
-                                        key={request.id || index}
-                                        className={`request-management-table-row-clickable ${index % 2 === 1 ? 'even-row-bg' : ''}`}
-                                        onClick={() => handleViewRequest(request)}
-                                        style={{ cursor: 'pointer' }}
-                                    >
-                                        {activeModule === 'all' && (
-                                            <>
-                                                <td className="request-type-cell">
-                                                    <span className={`request-type-badge ${request.requestType || 'leave'}`}>
-                                                        {request.requestType === 'leave' ? 'Đơn xin nghỉ' :
-                                                            request.requestType === 'overtime' ? 'Đơn tăng ca' :
-                                                                request.requestType === 'attendance' ? 'Đơn bổ sung công' : 'Đơn xin nghỉ'}
-                                                    </span>
-                                                </td>
-                                                <td className="request-info-cell">
-                                                    {request.requestType === 'leave' && (
-                                                        <>
-                                                            <strong>{getRequestTypeLabel(request.request_type)}</strong>
-                                                            <p className="request-management-period">{getLeaveTypeLabel(request.leave_type)}</p>
-                                                        </>
-                                                    )}
-                                                    {request.requestType === 'overtime' && (
-                                                        <>
-                                                            <strong>Đơn tăng ca</strong>
-                                                            <p className="request-management-period">{request.reason || 'N/A'}</p>
-                                                        </>
-                                                    )}
-                                                    {request.requestType === 'attendance' && (
-                                                        <>
-                                                            <strong>Đơn bổ sung chấm công</strong>
-                                                            <p className="request-management-period">
-                                                                {(() => {
-                                                                    const notes = request.notes || '';
-                                                                    const attendanceType = request.attendance_type || (notes.includes('ATTENDANCE_TYPE:') ? notes.split('ATTENDANCE_TYPE:')[1]?.split('\n')[0]?.trim() : null);
-                                                                    if (attendanceType === 'FORGOT_CHECK' || attendanceType === '1') return 'Quên Chấm Công';
-                                                                    if (attendanceType === 'CONSTRUCTION_SITE' || attendanceType === '2') return 'Đi Công Trình';
-                                                                    if (attendanceType === 'OUTSIDE_WORK' || attendanceType === '3') return 'Làm việc bên ngoài';
-                                                                    return 'Quên Chấm Công';
-                                                                })()}
-                                                            </p>
-                                                        </>
-                                                    )}
-                                                </td>
-                                                <td className="request-dates-cell">
-                                                    <div className="request-dates-info">
+                                {filteredRequests.map((request, index) => {
+                                    // Create unique key combining request type and id
+                                    const uniqueKey = `${request.requestType || activeModule}-${request.id}-${index}`;
+                                    return (
+                                        <tr
+                                            key={uniqueKey}
+                                            className={`request-management-table-row-clickable ${index % 2 === 1 ? 'even-row-bg' : ''}`}
+                                            onClick={() => handleViewRequest(request)}
+                                            style={rowStyle}
+                                        >
+                                            {activeModule === 'all' && (
+                                                <>
+                                                    <td className="request-type-cell">
+                                                        <span className={`request-type-badge ${request.requestType || 'leave'}`}>
+                                                            {request.requestType === 'leave' ? 'Đơn xin nghỉ' :
+                                                                request.requestType === 'overtime' ? 'Đơn tăng ca' :
+                                                                    request.requestType === 'attendance' ? 'Đơn bổ sung công' : 'Đơn xin nghỉ'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="request-info-cell">
                                                         {request.requestType === 'leave' && (
                                                             <>
-                                                                <span>{formatDateDisplay(request.start_date)}</span>
-                                                                {request.end_date && (
-                                                                    <>
-                                                                        <span className="date-separator"> → </span>
-                                                                        <span>{formatDateDisplay(request.end_date)}</span>
-                                                                    </>
-                                                                )}
+                                                                <strong>{getRequestTypeLabel(request.request_type)}</strong>
+                                                                <p className="request-management-period">{getLeaveTypeLabel(request.leave_type)}</p>
                                                             </>
                                                         )}
                                                         {request.requestType === 'overtime' && (
                                                             <>
-                                                                <span>{formatDateDisplay(request.request_date)}</span>
-                                                                {request.start_time && request.end_time && (
-                                                                    <span className="time-info">{request.start_time.slice(0, 5)} → {request.end_time.slice(0, 5)}</span>
-                                                                )}
+                                                                <strong>Đơn tăng ca</strong>
+                                                                <p className="request-management-period">{request.reason || 'N/A'}</p>
                                                             </>
                                                         )}
                                                         {request.requestType === 'attendance' && (
                                                             <>
-                                                                <span>{formatDateDisplay(request.adjustment_date || request.request_date)}</span>
-                                                                {request.check_in_time && (
-                                                                    <span>Vào: {request.check_in_time.slice(0, 5)}</span>
-                                                                )}
-                                                                {request.check_in_time && request.check_out_time && (
-                                                                    <span className="date-separator"> / </span>
-                                                                )}
-                                                                {request.check_out_time && (
-                                                                    <span>Ra: {request.check_out_time.slice(0, 5)}</span>
-                                                                )}
-                                                                {!request.check_in_time && !request.check_out_time && (
-                                                                    <span>-</span>
-                                                                )}
+                                                                <strong>Đơn bổ sung chấm công</strong>
+                                                                <p className="request-management-period">
+                                                                    {(() => {
+                                                                        const notes = request.notes || '';
+                                                                        const attendanceType = request.attendance_type || (notes.includes('ATTENDANCE_TYPE:') ? notes.split('ATTENDANCE_TYPE:')[1]?.split('\n')[0]?.trim() : null);
+                                                                        if (attendanceType === 'FORGOT_CHECK' || attendanceType === '1') return 'Quên Chấm Công';
+                                                                        if (attendanceType === 'CONSTRUCTION_SITE' || attendanceType === '2') return 'Đi Công Trình';
+                                                                        if (attendanceType === 'OUTSIDE_WORK' || attendanceType === '3') return 'Làm việc bên ngoài';
+                                                                        return 'Quên Chấm Công';
+                                                                    })()}
+                                                                </p>
                                                             </>
                                                         )}
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
-                                                        {getStatusLabel(request.status)}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    {/* HR không có quyền xóa đơn */}
-                                                </td>
-                                            </>
-                                        )}
-                                        {activeModule === 'leave' && (
-                                            <>
-                                                <td>{getRequestTypeLabel(request.request_type)}</td>
-                                                <td>
-                                                    {formatDateDisplay(request.start_date)}
-                                                    {request.end_date && ` → ${formatDateDisplay(request.end_date)}`}
-                                                </td>
-                                                <td>
-                                                    <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
-                                                        {getStatusLabel(request.status)}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    {/* HR không có quyền xóa đơn */}
-                                                </td>
-                                            </>
-                                        )}
-                                        {activeModule === 'overtime' && (
-                                            <>
-                                                <td>{formatDateDisplay(request.request_date)}</td>
-                                                <td>
-                                                    {request.start_time?.slice(0, 5)} → {request.end_time?.slice(0, 5)}
-                                                </td>
-                                                <td>
-                                                    <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
-                                                        {getStatusLabel(request.status)}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    {/* HR không có quyền xóa đơn */}
-                                                </td>
-                                            </>
-                                        )}
-                                        {activeModule === 'attendance' && (
-                                            <>
-                                                <td>{formatDateDisplay(request.adjustment_date || request.request_date)}</td>
-                                                <td>
-                                                    {request.check_in_time && `Vào: ${request.check_in_time.slice(0, 5)}`}
-                                                    {request.check_in_time && request.check_out_time && ' / '}
-                                                    {request.check_out_time && `Ra: ${request.check_out_time.slice(0, 5)}`}
-                                                    {!request.check_in_time && !request.check_out_time && '-'}
-                                                </td>
-                                                <td>
-                                                    <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
-                                                        {getStatusLabel(request.status)}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    {/* HR không có quyền xóa đơn */}
-                                                </td>
-                                            </>
-                                        )}
-                                    </tr>
-                                ))}
+                                                    </td>
+                                                    <td className="request-dates-cell">
+                                                        <div className="request-dates-info">
+                                                            {request.requestType === 'leave' && (
+                                                                <>
+                                                                    <span>{formatDateDisplay(request.start_date)}</span>
+                                                                    {request.end_date && (
+                                                                        <>
+                                                                            <span className="date-separator"> → </span>
+                                                                            <span>{formatDateDisplay(request.end_date)}</span>
+                                                                        </>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                            {request.requestType === 'overtime' && (
+                                                                <>
+                                                                    <span>{formatDateDisplay(request.request_date)}</span>
+                                                                    {request.start_time && request.end_time && (
+                                                                        <span className="time-info">{request.start_time.slice(0, 5)} → {request.end_time.slice(0, 5)}</span>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                            {request.requestType === 'attendance' && (
+                                                                <>
+                                                                    <span>{formatDateDisplay(request.adjustment_date || request.request_date)}</span>
+                                                                    {request.check_in_time && (
+                                                                        <span>Vào: {request.check_in_time.slice(0, 5)}</span>
+                                                                    )}
+                                                                    {request.check_in_time && request.check_out_time && (
+                                                                        <span className="date-separator"> / </span>
+                                                                    )}
+                                                                    {request.check_out_time && (
+                                                                        <span>Ra: {request.check_out_time.slice(0, 5)}</span>
+                                                                    )}
+                                                                    {!request.check_in_time && !request.check_out_time && (
+                                                                        <span>-</span>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
+                                                            {getStatusLabel(request.status)}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-delete-small"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (showToast) {
+                                                                    showToast('Chức năng xóa đơn đang được phát triển', 'info');
+                                                                }
+                                                            }}
+                                                            title="Xóa đơn"
+                                                        >
+                                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '4px' }}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                            </svg>
+                                                            Xóa
+                                                        </button>
+                                                    </td>
+                                                </>
+                                            )}
+                                            {activeModule === 'leave' && (
+                                                <>
+                                                    <td>{getRequestTypeLabel(request.request_type)}</td>
+                                                    <td>
+                                                        {formatDateDisplay(request.start_date)}
+                                                        {request.end_date && ` → ${formatDateDisplay(request.end_date)}`}
+                                                    </td>
+                                                    <td>
+                                                        <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
+                                                            {getStatusLabel(request.status)}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-delete-small"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (showToast) {
+                                                                    showToast('Chức năng xóa đơn đang được phát triển', 'info');
+                                                                }
+                                                            }}
+                                                            title="Xóa đơn"
+                                                        >
+                                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '4px' }}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                            </svg>
+                                                            Xóa
+                                                        </button>
+                                                    </td>
+                                                </>
+                                            )}
+                                            {activeModule === 'overtime' && (
+                                                <>
+                                                    <td>{formatDateDisplay(request.request_date)}</td>
+                                                    <td>
+                                                        {request.start_time?.slice(0, 5)} → {request.end_time?.slice(0, 5)}
+                                                    </td>
+                                                    <td>
+                                                        <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
+                                                            {getStatusLabel(request.status)}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-delete-small"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (showToast) {
+                                                                    showToast('Chức năng xóa đơn đang được phát triển', 'info');
+                                                                }
+                                                            }}
+                                                            title="Xóa đơn"
+                                                        >
+                                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '4px' }}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                            </svg>
+                                                            Xóa
+                                                        </button>
+                                                    </td>
+                                                </>
+                                            )}
+                                            {activeModule === 'attendance' && (
+                                                <>
+                                                    <td>{formatDateDisplay(request.adjustment_date || request.request_date)}</td>
+                                                    <td>
+                                                        {request.check_in_time && `Vào: ${request.check_in_time.slice(0, 5)}`}
+                                                        {request.check_in_time && request.check_out_time && ' / '}
+                                                        {request.check_out_time && `Ra: ${request.check_out_time.slice(0, 5)}`}
+                                                        {!request.check_in_time && !request.check_out_time && '-'}
+                                                    </td>
+                                                    <td>
+                                                        <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
+                                                            {getStatusLabel(request.status)}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-delete-small"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (showToast) {
+                                                                    showToast('Chức năng xóa đơn đang được phát triển', 'info');
+                                                                }
+                                                            }}
+                                                            title="Xóa đơn"
+                                                        >
+                                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '4px' }}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                            </svg>
+                                                            Xóa
+                                                        </button>
+                                                    </td>
+                                                </>
+                                            )}
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     )}
@@ -972,20 +1332,9 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                             <div className="request-management-modal-header-actions">
                                 <button
                                     type="button"
-                                    className="request-management-modal-btn-details"
-                                    onClick={() => setShowRequestDetails(!showRequestDetails)}
-                                >
-                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                    </svg>
-                                    {showRequestDetails ? 'Ẩn chi tiết đơn' : 'Chi tiết đơn'}
-                                </button>
-                                <button
-                                    type="button"
                                     className="request-management-modal-close"
                                     onClick={() => {
                                         setShowDetailModal(false);
-                                        setShowRequestDetails(false);
                                     }}
                                 >
                                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -994,27 +1343,8 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                 </button>
                             </div>
                         </div>
-                        {showRequestDetails && (
-                            <div className="request-management-modal-details-section">
-                                {renderRequestDetails(selectedRequest)}
-                            </div>
-                        )}
                         <div className="request-management-modal-body">
-                            {/* Request Info */}
-                            <div className="request-management-modal-section">
-                                <h3 className="request-management-modal-section-title">
-                                    <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                    </svg>
-                                    Thông tin đơn
-                                </h3>
-                                <div className="request-management-modal-info-grid">
-                                    {renderCardHeader(selectedRequest)}
-                                </div>
-                            </div>
-
-                            {/* Timeline */}
-                            {renderDecisionTrace(selectedRequest)}
+                            {renderRequestDetails(selectedRequest)}
                         </div>
                         <div className="request-management-modal-footer">
                             <button

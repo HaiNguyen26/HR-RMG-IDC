@@ -1575,13 +1575,12 @@ router.put('/:id', async (req, res) => {
             }
         }
 
-        // Validate phong_ban
-        const validPhongBan = ['IT', 'HR', 'ACCOUNTING', 'OTHER'];
-        if (!validPhongBan.includes(phongBan)) {
+        // Validate phong_ban - chỉ kiểm tra không rỗng, cho phép bất kỳ giá trị nào từ database
+        if (phongBan !== undefined && (!phongBan || !String(phongBan).trim())) {
             await client.query('ROLLBACK');
             return res.status(400).json({
                 success: false,
-                message: 'Phòng ban không hợp lệ'
+                message: 'Phòng ban không được để trống'
             });
         }
 

@@ -161,6 +161,7 @@ export const leaveRequestsAPI = {
 export const overtimeRequestsAPI = {
   create: (data) => api.post('/overtime-requests', data),
   getAll: (params) => api.get('/overtime-requests', { params }),
+  update: (id, data) => api.put(`/overtime-requests/${id}`, data),
   decide: (id, data) => api.post(`/overtime-requests/${id}/decision`, data),
   escalate: (id, data) => api.post(`/overtime-requests/${id}/escalate`, data),
   processOverdue: () => api.post('/overtime-requests/overdue/process'),

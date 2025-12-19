@@ -482,6 +482,131 @@ router.post('/:id/decision', async (req, res) => {
     }
 });
 
+// PUT /api/overtime-requests/:id - Cập nhật đơn tăng ca (bổ sung giờ, chỉ áp dụng cho đơn đã duyệt)
+router.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { employeeId, additionalHours, newEndTime, reason } = req.body;
+
+        if (!employeeId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu employeeId'
+            });
+        }
+
+        if (!additionalHours || parseFloat(additionalHours) <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Số giờ bổ sung phải lớn hơn 0'
+            });
+        }
+
+        // Lấy thông tin đơn hiện tại
+        const requestResult = await pool.query(
+            `SELECT * FROM overtime_requests WHERE id = $1`,
+            [parseInt(id, 10)]
+        );
+
+        if (requestResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy đơn'
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Chỉ cho phép nhân viên sở hữu đơn mới được cập nhật
+        if (request.employee_id !== parseInt(employeeId, 10)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền cập nhật đơn này'
+            });
+        }
+
+        // Chỉ cho phép cập nhật đơn đã được duyệt (APPROVED)
+        if (request.status !== STATUSES.APPROVED) {
+            return res.status(400).json({
+                success: false,
+                message: 'Chỉ có thể bổ sung giờ cho đơn đã được duyệt'
+            });
+        }
+
+        // Tính toán duration mới (cộng thêm giờ)
+        const currentDuration = parseFloat(request.duration) || 0;
+        const additionalHoursFloat = parseFloat(additionalHours);
+        const newDuration = currentDuration + additionalHoursFloat;
+
+        // Cập nhật đơn: tăng duration, cập nhật end_time nếu có, chuyển về PENDING, reset comments
+        const now = new Date();
+        const updateFields = [
+            `duration = $1`,
+            `status = $2`,
+            `updated_at = $3`,
+            `team_lead_action = NULL`,
+            `team_lead_action_at = NULL`,
+            `team_lead_comment = NULL`
+        ];
+        const updateValues = [
+            newDuration,
+            STATUSES.PENDING,
+            now.toISOString()
+        ];
+        let paramIndex = 4;
+
+        // Nếu có newEndTime, cập nhật end_time
+        if (newEndTime) {
+            updateFields.push(`end_time = $${paramIndex++}`);
+            updateValues.push(newEndTime);
+        }
+
+        // Thêm reason vào reason field nếu có (để lưu lý do bổ sung)
+        if (reason) {
+            const reasonPrefix = request.reason ? `${request.reason}\n\n` : '';
+            updateFields.push(`reason = $${paramIndex++}`);
+            updateValues.push(`${reasonPrefix}[Bổ sung giờ: +${additionalHoursFloat}h] ${reason}`);
+        }
+
+        updateFields.push(`id = $${paramIndex++}`);
+        updateValues.push(parseInt(id, 10));
+
+        await pool.query(
+            `UPDATE overtime_requests 
+             SET ${updateFields.slice(0, -1).join(', ')}
+             WHERE id = $${paramIndex - 1}`,
+            updateValues.slice(0, -1).concat([parseInt(id, 10)])
+        );
+
+        // Lấy đơn đã cập nhật
+        const updatedResult = await pool.query(
+            `SELECT orq.*,
+                    e.ho_ten AS employee_name,
+                    e.email AS employee_email,
+                    team.ho_ten AS team_lead_name,
+                    team.email AS team_lead_email
+             FROM overtime_requests orq
+             LEFT JOIN employees e ON orq.employee_id = e.id
+             LEFT JOIN employees team ON orq.team_lead_id = team.id
+             WHERE orq.id = $1`,
+            [parseInt(id, 10)]
+        );
+
+        res.json({
+            success: true,
+            message: `Đã bổ sung ${additionalHoursFloat} giờ tăng ca. Đơn đã được chuyển về trạng thái chờ duyệt.`,
+            data: updatedResult.rows[0]
+        });
+    } catch (error) {
+        console.error('Error updating overtime request:', error);
+        console.error('Error stack:', error.stack);
+        res.status(500).json({
+            success: false,
+            message: 'Không thể cập nhật đơn: ' + error.message
+        });
+    }
+});
+
 // DELETE /api/overtime-requests/:id - Nhân viên hủy đơn (PENDING) hoặc HR xóa đơn (REJECTED/CANCELLED)
 router.delete('/:id', async (req, res) => {
     try {

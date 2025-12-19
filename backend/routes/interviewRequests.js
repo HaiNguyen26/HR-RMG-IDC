@@ -10,6 +10,56 @@ const STATUSES = {
     REJECTED: 'REJECTED'
 };
 
+// Ensure candidates table has required status values in constraint
+const ensureCandidatesStatusConstraint = async () => {
+    try {
+        // Kiểm tra constraint hiện tại
+        const checkConstraint = await pool.query(`
+            SELECT constraint_name, check_clause
+            FROM information_schema.check_constraints
+            WHERE constraint_name = 'candidates_trang_thai_check';
+        `);
+
+        // Kiểm tra xem constraint có chứa TRANSFERRED_TO_INTERVIEW chưa
+        const constraintClause = checkConstraint.rows[0]?.check_clause || '';
+        const hasTransferredStatus = constraintClause.includes('TRANSFERRED_TO_INTERVIEW');
+        const hasReadyStatus = constraintClause.includes('READY_FOR_INTERVIEW');
+        const hasWaitingStatus = constraintClause.includes('WAITING_FOR_OTHER_APPROVAL');
+
+        // Nếu thiếu các status cần thiết, cập nhật constraint
+        if (!hasTransferredStatus || !hasReadyStatus || !hasWaitingStatus) {
+            console.log('[ensureCandidatesStatusConstraint] Updating constraint to include interview-related statuses');
+
+            // Drop constraint cũ
+            await pool.query(`
+                ALTER TABLE candidates DROP CONSTRAINT IF EXISTS candidates_trang_thai_check;
+            `);
+
+            // Thêm constraint mới với đầy đủ các status
+            await pool.query(`
+                ALTER TABLE candidates 
+                ADD CONSTRAINT candidates_trang_thai_check 
+                CHECK (trang_thai IN (
+                    'NEW',
+                    'PENDING_INTERVIEW',
+                    'PENDING_MANAGER',
+                    'TRANSFERRED_TO_INTERVIEW',
+                    'WAITING_FOR_OTHER_APPROVAL',
+                    'READY_FOR_INTERVIEW',
+                    'PASSED',
+                    'FAILED',
+                    'ON_PROBATION'
+                ));
+            `);
+
+            console.log('[ensureCandidatesStatusConstraint] Updated constraint successfully');
+        }
+    } catch (error) {
+        console.error('[ensureCandidatesStatusConstraint] Error:', error.message);
+        // Không throw error, chỉ log để không block request
+    }
+};
+
 // Ensure table
 const ensureInterviewRequestsTable = async () => {
     await pool.query(`
@@ -45,6 +95,9 @@ const ensureInterviewRequestsTable = async () => {
         // Ignore error if column already exists or table doesn't exist yet
         console.log('[ensureInterviewRequestsTable] Note about updated_at column:', error.message);
     }
+
+    // Đảm bảo candidates constraint có đầy đủ status
+    await ensureCandidatesStatusConstraint();
 };
 
 // GET /api/interview-requests?managerId=&branchDirectorId=&status=&candidateId=
@@ -116,7 +169,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     const client = await pool.connect();
     try {
-        await ensureInterviewRequestsTable();
+        await ensureInterviewRequestsTable(); // This also ensures candidates constraint
         await client.query('BEGIN');
 
         const {

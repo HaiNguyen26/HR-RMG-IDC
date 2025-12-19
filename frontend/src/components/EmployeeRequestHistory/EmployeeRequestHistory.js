@@ -77,7 +77,11 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
     const [activeModule, setActiveModule] = useState('all');
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
-    const [showRequestDetails, setShowRequestDetails] = useState(false);
+    const [showOvertimeEditModal, setShowOvertimeEditModal] = useState(false);
+    const [editingOvertimeRequest, setEditingOvertimeRequest] = useState(null);
+    const [additionalHours, setAdditionalHours] = useState('');
+    const [editReason, setEditReason] = useState('');
+    const [isUpdatingOvertime, setIsUpdatingOvertime] = useState(false);
 
     // Statistics cho tất cả các status của module hiện tại
     const [moduleStatusStatistics, setModuleStatusStatistics] = useState({
@@ -194,60 +198,60 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
     }, []);
 
     // Fetch requests based on active module and selected status - CHỈ LẤY ĐƠN CỦA NHÂN VIÊN HIỆN TẠI
-    useEffect(() => {
-        const fetchRequests = async () => {
-            if (!currentUser?.id) return;
+    const fetchRequests = async () => {
+        if (!currentUser?.id) return;
 
-            setLoading(true);
-            try {
-                // Luôn thêm employeeId để chỉ lấy đơn của nhân viên hiện tại
-                const params = { employeeId: currentUser.id };
-                if (selectedStatus !== 'ALL') {
-                    params.status = selectedStatus;
-                }
-
-                if (activeModule === 'all') {
-                    const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
-                        leaveRequestsAPI.getAll(params),
-                        overtimeRequestsAPI.getAll(params),
-                        attendanceAdjustmentsAPI.getAll(params)
-                    ]);
-
-                    const allRequests = [
-                        ...(leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: 'leave' })) : []),
-                        ...(overtimeResponse.data.success ? (overtimeResponse.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
-                        ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : [])
-                    ];
-
-                    // Sắp xếp theo thời gian tạo mới nhất
-                    allRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                    setRequests(allRequests);
-                } else if (activeModule === 'leave') {
-                    const response = await leaveRequestsAPI.getAll(params);
-                    if (response.data.success) {
-                        setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'leave' })));
-                    }
-                } else if (activeModule === 'overtime') {
-                    const response = await overtimeRequestsAPI.getAll(params);
-                    if (response.data.success) {
-                        setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'overtime' })));
-                    }
-                } else if (activeModule === 'attendance') {
-                    const response = await attendanceAdjustmentsAPI.getAll(params);
-                    if (response.data.success) {
-                        setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'attendance' })));
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching requests:', error);
-                if (showToast) {
-                    showToast('Lỗi khi tải danh sách đơn từ', 'error');
-                }
-            } finally {
-                setLoading(false);
+        setLoading(true);
+        try {
+            // Luôn thêm employeeId để chỉ lấy đơn của nhân viên hiện tại
+            const params = { employeeId: currentUser.id };
+            if (selectedStatus !== 'ALL') {
+                params.status = selectedStatus;
             }
-        };
 
+            if (activeModule === 'all') {
+                const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
+                    leaveRequestsAPI.getAll(params),
+                    overtimeRequestsAPI.getAll(params),
+                    attendanceAdjustmentsAPI.getAll(params)
+                ]);
+
+                const allRequests = [
+                    ...(leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: 'leave' })) : []),
+                    ...(overtimeResponse.data.success ? (overtimeResponse.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
+                    ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : [])
+                ];
+
+                // Sắp xếp theo thời gian tạo mới nhất
+                allRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                setRequests(allRequests);
+            } else if (activeModule === 'leave') {
+                const response = await leaveRequestsAPI.getAll(params);
+                if (response.data.success) {
+                    setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'leave' })));
+                }
+            } else if (activeModule === 'overtime') {
+                const response = await overtimeRequestsAPI.getAll(params);
+                if (response.data.success) {
+                    setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'overtime' })));
+                }
+            } else if (activeModule === 'attendance') {
+                const response = await attendanceAdjustmentsAPI.getAll(params);
+                if (response.data.success) {
+                    setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'attendance' })));
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching requests:', error);
+            if (showToast) {
+                showToast('Lỗi khi tải danh sách đơn từ', 'error');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchRequests();
         // Realtime update: polling mỗi 5 giây
         const interval = setInterval(fetchRequests, 5000);
@@ -270,7 +274,6 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
     const handleViewRequest = (request) => {
         setSelectedRequest(request);
         setShowDetailModal(true);
-        setShowRequestDetails(false);
     };
 
     const handleDelete = async (request) => {
@@ -310,51 +313,105 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 setSelectedRequest(null);
 
                 // Refresh requests - Luôn thêm employeeId
-                const params = { employeeId: currentUser.id };
-                if (selectedStatus !== 'ALL') {
-                    params.status = selectedStatus;
-                }
-
-                if (activeModule === 'all') {
-                    const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
-                        leaveRequestsAPI.getAll(params),
-                        overtimeRequestsAPI.getAll(params),
-                        attendanceAdjustmentsAPI.getAll(params)
-                    ]);
-                    const allRequests = [
-                        ...(leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: 'leave' })) : []),
-                        ...(overtimeResponse.data.success ? (overtimeResponse.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
-                        ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : [])
-                    ];
-                    allRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                    setRequests(allRequests);
-                } else if (activeModule === 'leave') {
-                    const response = await leaveRequestsAPI.getAll(params);
-                    if (response.data.success) {
-                        setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'leave' })));
-                    }
-                } else if (activeModule === 'overtime') {
-                    const response = await overtimeRequestsAPI.getAll(params);
-                    if (response.data.success) {
-                        setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'overtime' })));
-                    }
-                } else if (activeModule === 'attendance') {
-                    const response = await attendanceAdjustmentsAPI.getAll(params);
-                    if (response.data.success) {
-                        setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'attendance' })));
-                    }
-                }
-
-                // Realtime update: Refresh statistics và badges ngay lập tức (không silent)
+                await fetchRequests();
                 await fetchModuleStatistics(false);
             }
         } catch (error) {
             console.error('Error deleting request:', error);
+            const errorMessage = error.response?.data?.message || error.message || 'Lỗi khi xóa đơn';
             if (showToast) {
-                showToast('Lỗi khi xóa đơn', 'error');
+                showToast(errorMessage, 'error');
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Hàm tính toán giờ kết thúc mới dựa trên số giờ bổ sung
+    const calculateNewEndTime = (startTime, endTime, additionalHours) => {
+        if (!startTime || !endTime || !additionalHours || parseFloat(additionalHours) <= 0) {
+            return endTime;
+        }
+
+        try {
+            // Parse giờ kết thúc hiện tại
+            const [endHour, endMinute] = endTime.split(':').map(Number);
+
+            // Tính tổng phút từ giờ bổ sung
+            const additionalMinutes = parseFloat(additionalHours) * 60;
+
+            // Tạo Date object từ ngày hiện tại và giờ kết thúc
+            const endDate = new Date();
+            endDate.setHours(endHour, endMinute, 0, 0);
+
+            // Cộng thêm số phút
+            endDate.setMinutes(endDate.getMinutes() + additionalMinutes);
+
+            // Format lại thành HH:mm
+            const newHour = String(endDate.getHours()).padStart(2, '0');
+            const newMinute = String(endDate.getMinutes()).padStart(2, '0');
+
+            return `${newHour}:${newMinute}:00`;
+        } catch (error) {
+            console.error('Error calculating new end time:', error);
+            return endTime;
+        }
+    };
+
+    // Xử lý bổ sung giờ tăng ca
+    const handleUpdateOvertime = async () => {
+        if (!editingOvertimeRequest || !currentUser?.id) return;
+
+        if (!additionalHours || parseFloat(additionalHours) <= 0) {
+            if (showToast) {
+                showToast('Vui lòng nhập số giờ bổ sung lớn hơn 0', 'error');
+            }
+            return;
+        }
+
+        setIsUpdatingOvertime(true);
+        try {
+            // Tính toán giờ kết thúc mới
+            const newEndTime = calculateNewEndTime(
+                editingOvertimeRequest.start_time,
+                editingOvertimeRequest.end_time,
+                additionalHours
+            );
+
+            const payload = {
+                employeeId: currentUser.id,
+                additionalHours: parseFloat(additionalHours),
+                newEndTime: newEndTime,
+                reason: editReason || undefined
+            };
+
+            const response = await overtimeRequestsAPI.update(editingOvertimeRequest.id, payload);
+
+            if (response.data?.success) {
+                if (showToast) {
+                    showToast(response.data.message || 'Đã bổ sung giờ tăng ca thành công. Đơn đã được chuyển về trạng thái chờ duyệt.', 'success');
+                }
+
+                // Đóng modal và reset form
+                setShowOvertimeEditModal(false);
+                setEditingOvertimeRequest(null);
+                setAdditionalHours('');
+                setEditReason('');
+
+                // Refresh danh sách đơn
+                await fetchRequests();
+                await fetchModuleStatistics(false);
+            } else {
+                throw new Error(response.data?.message || 'Không thể cập nhật đơn. Vui lòng thử lại.');
+            }
+        } catch (error) {
+            console.error('Error updating overtime request:', error);
+            const message = error.response?.data?.message || error.message || 'Có lỗi xảy ra. Vui lòng thử lại.';
+            if (showToast) {
+                showToast(message, 'error');
+            }
+        } finally {
+            setIsUpdatingOvertime(false);
         }
     };
 
@@ -577,18 +634,95 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                             </span>
                                         </td>
                                         <td>
-                                            {(request.status === 'PENDING' || request.status === 'REJECTED') && (
-                                                <button
-                                                    type="button"
-                                                    className="btn-delete-small"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDelete(request);
-                                                    }}
-                                                >
-                                                    Xóa
-                                                </button>
-                                            )}
+                                            {(() => {
+                                                const isHr = currentUser?.role && currentUser.role !== 'EMPLOYEE';
+                                                const canCancel = request.status === 'PENDING';
+                                                const canDelete = isHr && (request.status === 'REJECTED' || request.status === 'CANCELLED');
+                                                const showDeleteButton = canCancel || canDelete;
+
+                                                return (
+                                                    <>
+                                                        {request.status === 'PENDING' && request.requestType !== 'overtime' && (
+                                                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-edit-small"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (showToast) {
+                                                                            showToast('Chức năng sửa đơn đang được phát triển', 'info');
+                                                                        }
+                                                                    }}
+                                                                    title="Sửa đơn"
+                                                                >
+                                                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '4px' }}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                                    </svg>
+                                                                    Sửa
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-delete-small"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDelete(request);
+                                                                    }}
+                                                                    title="Hủy đơn"
+                                                                >
+                                                                    Xóa
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        {request.requestType === 'overtime' && request.status === 'APPROVED' && (
+                                                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-edit-small"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setEditingOvertimeRequest(request);
+                                                                        setAdditionalHours('');
+                                                                        setEditReason('');
+                                                                        setShowOvertimeEditModal(true);
+                                                                    }}
+                                                                    title="Bổ sung giờ tăng ca"
+                                                                >
+                                                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '4px' }}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                                                                    </svg>
+                                                                    Bổ sung giờ
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        {request.requestType === 'overtime' && showDeleteButton && (
+                                                            <button
+                                                                type="button"
+                                                                className="btn-delete-small"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDelete(request);
+                                                                }}
+                                                                title={canCancel ? "Hủy đơn" : "Xóa đơn"}
+                                                            >
+                                                                Xóa
+                                                            </button>
+                                                        )}
+                                                        {request.requestType !== 'overtime' && canDelete && (
+                                                            <button
+                                                                type="button"
+                                                                className="btn-delete-small"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDelete(request);
+                                                                }}
+                                                                title="Xóa đơn"
+                                                            >
+                                                                Xóa
+                                                            </button>
+                                                        )}
+                                                    </>
+                                                );
+                                            })()}
                                         </td>
                                     </tr>
                                 ))}
@@ -597,6 +731,178 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                     )}
                 </div>
             </div>
+
+            {/* Modal bổ sung giờ tăng ca */}
+            {showOvertimeEditModal && editingOvertimeRequest && (
+                <div className="overtime-edit-modal-overlay" onClick={() => {
+                    if (!isUpdatingOvertime) {
+                        setShowOvertimeEditModal(false);
+                        setEditingOvertimeRequest(null);
+                        setAdditionalHours('');
+                        setEditReason('');
+                    }
+                }}>
+                    <div className="overtime-edit-modal-container" onClick={(e) => e.stopPropagation()}>
+                        <div className="overtime-edit-modal-header">
+                            <h2 className="overtime-edit-modal-title">
+                                <svg className="overtime-edit-modal-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                                Yêu cầu bổ sung giờ tăng ca
+                            </h2>
+                            <button
+                                className="overtime-edit-modal-close"
+                                onClick={() => {
+                                    if (!isUpdatingOvertime) {
+                                        setShowOvertimeEditModal(false);
+                                        setEditingOvertimeRequest(null);
+                                        setAdditionalHours('');
+                                        setEditReason('');
+                                    }
+                                }}
+                                disabled={isUpdatingOvertime}
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="overtime-edit-modal-body">
+                            <div className="overtime-edit-info-section">
+                                <h3 className="overtime-edit-info-title">Thông tin đơn hiện tại</h3>
+                                <div className="overtime-edit-info-grid">
+                                    <div className="overtime-edit-info-item">
+                                        <span className="overtime-edit-info-label">Ngày tăng ca:</span>
+                                        <span className="overtime-edit-info-value">
+                                            {formatDateDisplay(editingOvertimeRequest.request_date)}
+                                        </span>
+                                    </div>
+                                    <div className="overtime-edit-info-item">
+                                        <span className="overtime-edit-info-label">Giờ đã được duyệt:</span>
+                                        <span className="overtime-edit-info-value">
+                                            {editingOvertimeRequest.duration || 0} giờ
+                                        </span>
+                                    </div>
+                                    <div className="overtime-edit-info-item">
+                                        <span className="overtime-edit-info-label">Thời gian hiện tại:</span>
+                                        <span className="overtime-edit-info-value">
+                                            {editingOvertimeRequest.start_time?.slice(0, 5)} → {editingOvertimeRequest.end_time?.slice(0, 5)}
+                                        </span>
+                                    </div>
+                                    {additionalHours && parseFloat(additionalHours) > 0 && (
+                                        <div className="overtime-edit-info-item" style={{ gridColumn: '1 / -1', marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid #e5e7eb' }}>
+                                            <span className="overtime-edit-info-label" style={{ color: '#3b82f6', fontWeight: '700' }}>Thời gian sau bổ sung:</span>
+                                            <span className="overtime-edit-info-value" style={{ color: '#3b82f6', fontWeight: '700', fontSize: '1.1rem' }}>
+                                                {editingOvertimeRequest.start_time?.slice(0, 5)} → {(() => {
+                                                    const newEndTime = calculateNewEndTime(
+                                                        editingOvertimeRequest.start_time,
+                                                        editingOvertimeRequest.end_time,
+                                                        additionalHours
+                                                    );
+                                                    return newEndTime?.slice(0, 5) || editingOvertimeRequest.end_time?.slice(0, 5);
+                                                })()}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="overtime-edit-form-section">
+                                <div className="overtime-edit-form-group">
+                                    <label htmlFor="additionalHours" className="overtime-edit-form-label">
+                                        Số giờ bổ sung <span style={{ color: '#ef4444' }}>*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        id="additionalHours"
+                                        className="overtime-edit-form-input"
+                                        value={additionalHours}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 24)) {
+                                                setAdditionalHours(value);
+                                            }
+                                        }}
+                                        placeholder="Nhập số giờ cần bổ sung"
+                                        min="0.5"
+                                        max="24"
+                                        step="0.5"
+                                        disabled={isUpdatingOvertime}
+                                        required
+                                    />
+                                    <small className="overtime-edit-form-hint">
+                                        Tổng số giờ sau bổ sung: {(parseFloat(editingOvertimeRequest.duration || 0) + parseFloat(additionalHours || 0)).toFixed(1)} giờ
+                                    </small>
+                                </div>
+
+                                <div className="overtime-edit-form-group">
+                                    <label htmlFor="editReason" className="overtime-edit-form-label">
+                                        Lý do bổ sung giờ
+                                    </label>
+                                    <textarea
+                                        id="editReason"
+                                        className="overtime-edit-form-textarea"
+                                        value={editReason}
+                                        onChange={(e) => setEditReason(e.target.value)}
+                                        placeholder="Nhập lý do cần bổ sung giờ tăng ca..."
+                                        rows="4"
+                                        disabled={isUpdatingOvertime}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="overtime-edit-modal-notice">
+                                <svg className="overtime-edit-notice-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span>Đơn tăng ca sẽ được chuyển về trạng thái chờ duyệt sau khi bạn xác nhận bổ sung giờ.</span>
+                            </div>
+                        </div>
+
+                        <div className="overtime-edit-modal-actions">
+                            <button
+                                type="button"
+                                className="overtime-edit-modal-btn-cancel"
+                                onClick={() => {
+                                    if (!isUpdatingOvertime) {
+                                        setShowOvertimeEditModal(false);
+                                        setEditingOvertimeRequest(null);
+                                        setAdditionalHours('');
+                                        setEditReason('');
+                                    }
+                                }}
+                                disabled={isUpdatingOvertime}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type="button"
+                                className="overtime-edit-modal-btn-submit"
+                                onClick={handleUpdateOvertime}
+                                disabled={isUpdatingOvertime || !additionalHours || parseFloat(additionalHours) <= 0}
+                            >
+                                {isUpdatingOvertime ? (
+                                    <>
+                                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Đang xử lý...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        <span>Xác nhận bổ sung giờ</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

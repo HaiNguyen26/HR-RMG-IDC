@@ -107,6 +107,7 @@
 .custom-select-menu {
     position: absolute;
     top: calc(100% + 8px);
+    bottom: auto;
     left: 0;
     right: 0;
     background: #ffffff;
@@ -131,6 +132,26 @@
     /* Only when animating */
     /* Ensure it's above everything */
     isolation: isolate;
+}
+
+/* Dropup Mode - Menu hiển thị phía trên */
+.custom-select-wrapper.dropup .custom-select-menu {
+    top: auto;
+    bottom: calc(100% + 8px);
+    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dropup Animation - Slide Up */
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 /* Smooth scrollbar styling */

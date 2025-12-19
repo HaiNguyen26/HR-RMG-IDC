@@ -11,7 +11,8 @@ const CustomSelect = ({
     error,
     required = false,
     className = '',
-    disabled = false
+    disabled = false,
+    dropup = false // Prop để dropdown xổ lên thay vì xổ xuống
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -105,7 +106,7 @@ const CustomSelect = ({
 
     return (
         <div
-            className={`custom-select-wrapper ${className} ${error ? 'has-error' : ''} ${disabled ? 'disabled' : ''} ${isOpen ? 'is-open' : ''}`}
+            className={`custom-select-wrapper ${className} ${error ? 'has-error' : ''} ${disabled ? 'disabled' : ''} ${isOpen ? 'is-open' : ''} ${dropup ? 'dropup' : ''}`}
             ref={dropdownRef}
         >
             <button
