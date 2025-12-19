@@ -96,8 +96,52 @@ const ensureRecruitmentRequestsTable = async () => {
         `);
         
         if (!employeesTableCheck.rows[0].exists) {
-            console.error('[ensureRecruitmentRequestsTable] Bảng employees chưa tồn tại! Không thể tạo recruitment_requests table.');
-            throw new Error('Bảng employees chưa tồn tại. Vui lòng chạy migration database trước.');
+            console.warn('[ensureRecruitmentRequestsTable] Bảng employees chưa tồn tại! Tạo recruitment_requests table mà không có foreign key constraint.');
+            // Tạo bảng mà không có foreign key constraint nếu employees chưa tồn tại
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS recruitment_requests (
+                    id SERIAL PRIMARY KEY,
+                    created_by_employee_id INTEGER,
+                    branch_director_id INTEGER,
+                    chuc_danh_can_tuyen VARCHAR(255) NOT NULL,
+                    phong_ban_bo_phan VARCHAR(255) NOT NULL,
+                    nguoi_quan_ly_truc_tiep VARCHAR(255) NOT NULL,
+                    nguoi_quan_ly_gian_tiep VARCHAR(255),
+                    mo_ta_cong_viec VARCHAR(20) NOT NULL CHECK (mo_ta_cong_viec IN ('co', 'chua_co')),
+                    yeu_cau_chi_tiet_cong_viec TEXT,
+                    ly_do_khac_ghi_chu TEXT,
+                    so_luong_yeu_cau INTEGER DEFAULT 1,
+                    loai_lao_dong VARCHAR(20) NOT NULL CHECK (loai_lao_dong IN ('toan_thoi_gian', 'thoi_vu')),
+                    ly_do_tuyen VARCHAR(20) NOT NULL CHECK (ly_do_tuyen IN ('thay_the', 'nhu_cau_tang', 'vi_tri_moi')),
+                    gioi_tinh VARCHAR(20) DEFAULT 'bat_ky' CHECK (gioi_tinh IN ('bat_ky', 'nam', 'nu')),
+                    do_tuoi VARCHAR(50),
+                    trinh_do_hoc_van_yeu_cau TEXT,
+                    kinh_nghiem_chuyen_mon VARCHAR(20) DEFAULT 'khong_yeu_cau' CHECK (kinh_nghiem_chuyen_mon IN ('khong_yeu_cau', 'co_yeu_cau')),
+                    chi_tiet_kinh_nghiem TEXT,
+                    kien_thuc_chuyen_mon_khac TEXT,
+                    yeu_cau_ngoai_ngu TEXT,
+                    yeu_cau_vi_tinh_ky_nang_khac TEXT,
+                    ky_nang_giao_tiep TEXT,
+                    thai_do_lam_viec TEXT,
+                    ky_nang_quan_ly TEXT,
+                    status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
+                    rejection_reason TEXT,
+                    approved_at TIMESTAMP NULL,
+                    rejected_at TIMESTAMP NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            `);
+            
+            // Tạo indexes
+            await pool.query(`
+                CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_by ON recruitment_requests(created_by_employee_id);
+                CREATE INDEX IF NOT EXISTS idx_recruitment_requests_branch_director ON recruitment_requests(branch_director_id);
+                CREATE INDEX IF NOT EXISTS idx_recruitment_requests_status ON recruitment_requests(status);
+                CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_at ON recruitment_requests(created_at DESC);
+            `);
+            
+            return; // Return early để không tạo lại bảng
         }
         
         await pool.query(`
@@ -160,8 +204,18 @@ router.get('/', async (req, res) => {
         console.log('[GET /api/recruitment-requests] Request received');
         console.log('[GET /api/recruitment-requests] Query params:', req.query);
         
-        await ensureRecruitmentRequestsTable();
-        console.log('[GET /api/recruitment-requests] Table ensured');
+        // Đảm bảo bảng tồn tại, nhưng không throw error nếu có vấn đề
+        try {
+            await ensureRecruitmentRequestsTable();
+            console.log('[GET /api/recruitment-requests] Table ensured');
+        } catch (tableError) {
+            console.error('[GET /api/recruitment-requests] Error ensuring table:', tableError);
+            // Nếu bảng chưa thể tạo, trả về danh sách rỗng thay vì lỗi
+            return res.json({
+                success: true,
+                data: []
+            });
+        }
 
         const { employeeId, branchDirectorId, status, forHr } = req.query;
 
@@ -208,23 +262,76 @@ router.get('/', async (req, res) => {
 
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-        const query = `
-            SELECT 
-                rr.*,
-                e1.ho_ten as created_by_name,
-                e2.ho_ten as branch_director_name
-            FROM recruitment_requests rr
-            LEFT JOIN employees e1 ON rr.created_by_employee_id = e1.id
-            LEFT JOIN employees e2 ON rr.branch_director_id = e2.id
-            ${whereClause}
-            ORDER BY rr.created_at DESC
-        `;
+        // Kiểm tra xem bảng employees có tồn tại không trước khi JOIN
+        let query;
+        let hasEmployeesTable = false;
+        
+        try {
+            const employeesTableCheck = await pool.query(`
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = 'employees'
+                );
+            `);
+            hasEmployeesTable = employeesTableCheck.rows[0].exists;
+            console.log('[GET /api/recruitment-requests] Employees table exists:', hasEmployeesTable);
+        } catch (checkError) {
+            console.error('[GET /api/recruitment-requests] Error checking employees table:', checkError.message);
+            hasEmployeesTable = false;
+        }
+        
+        if (hasEmployeesTable) {
+            query = `
+                SELECT 
+                    rr.*,
+                    e1.ho_ten as created_by_name,
+                    e2.ho_ten as branch_director_name
+                FROM recruitment_requests rr
+                LEFT JOIN employees e1 ON rr.created_by_employee_id = e1.id
+                LEFT JOIN employees e2 ON rr.branch_director_id = e2.id
+                ${whereClause}
+                ORDER BY rr.created_at DESC
+            `;
+        } else {
+            // Nếu bảng employees chưa tồn tại, chỉ query từ recruitment_requests
+            console.warn('[GET /api/recruitment-requests] Bảng employees chưa tồn tại, query không có JOIN');
+            query = `
+                SELECT 
+                    rr.*,
+                    NULL::text as created_by_name,
+                    NULL::text as branch_director_name
+                FROM recruitment_requests rr
+                ${whereClause}
+                ORDER BY rr.created_at DESC
+            `;
+        }
 
         console.log('[GET /api/recruitment-requests] Executing query:', query);
         console.log('[GET /api/recruitment-requests] Query params:', params);
         
-        const result = await pool.query(query, params);
-        console.log('[GET /api/recruitment-requests] Query result rows:', result.rows.length);
+        let result;
+        try {
+            result = await pool.query(query, params);
+            console.log('[GET /api/recruitment-requests] Query result rows:', result.rows.length);
+        } catch (queryError) {
+            console.error('[GET /api/recruitment-requests] Query execution error:', queryError);
+            console.error('[GET /api/recruitment-requests] Query error name:', queryError.name);
+            console.error('[GET /api/recruitment-requests] Query error message:', queryError.message);
+            console.error('[GET /api/recruitment-requests] Query error code:', queryError.code);
+            
+            // Nếu bảng chưa tồn tại (42P01), trả về danh sách rỗng
+            if (queryError.code === '42P01') {
+                console.warn('[GET /api/recruitment-requests] Table does not exist, returning empty array');
+                return res.json({
+                    success: true,
+                    data: []
+                });
+            }
+            
+            // Với các lỗi khác, vẫn throw để được catch ở ngoài
+            throw queryError;
+        }
 
         res.json({
             success: true,
