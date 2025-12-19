@@ -116,6 +116,21 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 2: $MIGRATION2${NC}"
 fi
 
+# Migration 3: add_cccd_fields_to_candidates.sql
+MIGRATION3="$PROJECT_DIR/database/add_cccd_fields_to_candidates.sql"
+if [ -f "$MIGRATION3" ]; then
+    echo -e "${BLUE}→ Chạy migration: add_cccd_fields_to_candidates.sql${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION3"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 3 thành công${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 3${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 3: $MIGRATION3${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"
