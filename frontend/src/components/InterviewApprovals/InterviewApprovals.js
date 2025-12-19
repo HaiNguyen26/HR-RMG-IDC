@@ -294,7 +294,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
         // Realtime update: polling mỗi 5 giây (silent mode)
         const interval = setInterval(() => fetchRecruitmentRequests(true), 5000);
         return () => clearInterval(interval);
-    }, [isBranchDirector, selectedFilter, currentUser]);
+    }, [isBranchDirector, selectedFilter]);
 
     // Fetch interview requests counts for badges (luôn fetch để hiển thị badge đúng)
     useEffect(() => {
@@ -335,12 +335,12 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 }
             }
         };
-        
+
         fetchInterviewRequestCounts(false); // Lần đầu hiển thị loading
         // Realtime update: polling mỗi 5 giây (silent mode)
         const interval = setInterval(() => fetchInterviewRequestCounts(true), 5000);
         return () => clearInterval(interval);
-    }, [isBranchDirector, currentUser]);
+    }, [isBranchDirector]);
 
     // Fetch interview requests details khi filter thay đổi (để hiển thị table)
     useEffect(() => {
@@ -393,7 +393,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
             const interval = setInterval(() => fetchInterviewRequestsDetails(true), 5000);
             return () => clearInterval(interval);
         }
-    }, [isBranchDirector, currentUser, selectedFilter]);
+    }, [isBranchDirector, selectedFilter]);
 
     // HR fetch approved recruitment requests
     useEffect(() => {

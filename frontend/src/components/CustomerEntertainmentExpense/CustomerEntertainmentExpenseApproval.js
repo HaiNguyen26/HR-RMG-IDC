@@ -236,7 +236,8 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
         // Realtime update: polling mỗi 5 giây (silent mode)
         const interval = setInterval(() => fetchRequests(true), 5000);
         return () => clearInterval(interval);
-    }, [currentUser, showToast]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentUser?.id]);
 
     // Calculate total amount from expense items
     const calculateTotalAmount = (expenseItems) => {

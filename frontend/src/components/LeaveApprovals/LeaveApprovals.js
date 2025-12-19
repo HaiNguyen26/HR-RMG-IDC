@@ -402,7 +402,8 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             const interval = setInterval(() => fetchModuleStatistics(true), 5000);
             return () => clearInterval(interval);
         }
-    }, [viewerMode, currentUser?.id, isTeamLead, refreshToken]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [viewerMode, isTeamLead]);
 
     const statusFilters = useMemo(() => {
         if (isTeamLead) {
@@ -504,6 +505,22 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
         [activeModule]
     );
 
+    // Helper function to compare if requests array actually changed
+    const requestsAreEqual = (oldReqs, newReqs) => {
+        if (oldReqs.length !== newReqs.length) return false;
+        // Create map by id for comparison (order-independent)
+        const oldMap = new Map(oldReqs.map(r => [r.id, r.status]));
+        const newMap = new Map(newReqs.map(r => [r.id, r.status]));
+        // Check if all ids and statuses match
+        for (const [id, status] of oldMap) {
+            if (newMap.get(id) !== status) return false;
+        }
+        for (const id of newMap.keys()) {
+            if (!oldMap.has(id)) return false;
+        }
+        return true;
+    };
+
     const fetchRequests = async (statusOverride = null) => {
         if (!viewerMode || !currentUser?.id) {
             console.log('[LeaveApprovals] Cannot fetch - viewerMode:', viewerMode, 'currentUser.id:', currentUser?.id);
@@ -565,8 +582,14 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
 
                 // *** NOTIFICATION LOGIC ĐÃ CHUYỂN SANG GlobalNotifications (App.js) ***
 
-                setRequests(allRequests);
-                setStats({ total: allRequests.length, overdueCount: 0 });
+                // Chỉ update state nếu data thực sự thay đổi (tránh re-render không cần thiết)
+                if (!requestsAreEqual(requests, allRequests)) {
+                    console.log('[LeaveApprovals] Data changed, updating table');
+                    setRequests(allRequests);
+                    setStats({ total: allRequests.length, overdueCount: 0 });
+                } else {
+                    console.log('[LeaveApprovals] Data unchanged, skipping update');
+                }
             } else {
                 const response = await moduleApiMap[activeModule].getAll(params);
                 console.log('[LeaveApprovals] Response:', {
@@ -579,8 +602,14 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
 
                     // *** NOTIFICATION LOGIC ĐÃ CHUYỂN SANG GlobalNotifications (App.js) ***
 
-                    setRequests(newRequests);
-                    setStats({ total: newRequests.length, overdueCount: 0 });
+                    // Chỉ update state nếu data thực sự thay đổi (tránh re-render không cần thiết)
+                    if (!requestsAreEqual(requests, newRequests)) {
+                        console.log('[LeaveApprovals] Data changed, updating table');
+                        setRequests(newRequests);
+                        setStats({ total: newRequests.length, overdueCount: 0 });
+                    } else {
+                        console.log('[LeaveApprovals] Data unchanged, skipping update');
+                    }
                 }
             }
         } catch (error) {
@@ -611,7 +640,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
         const interval = setInterval(() => fetchRequests(), 5000);
         return () => clearInterval(interval);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [viewerMode, selectedStatus, currentUser?.id, refreshToken, activeModule]);
+    }, [viewerMode, selectedStatus, activeModule]);
 
 
     const askForComment = async ({ title, message, required = false }) => {
@@ -695,7 +724,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 }, 300);
             } else {
                 // Nếu không từ chối hoặc không ở tab PENDING, refresh như bình thường
-                setRefreshToken((prev) => prev + 1);
+                fetchRequests();
             }
         } catch (error) {
             console.error('Error updating decision:', error);
@@ -730,7 +759,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 showToast('Đã xóa đơn đã từ chối', 'success');
             }
 
-            setRefreshToken((prev) => prev + 1);
+            fetchRequests();
         } catch (error) {
             console.error('Error deleting request:', error);
             if (showToast) {
@@ -767,7 +796,6 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                     className={`module-chip ${activeModule === module.key ? 'active' : ''}`}
                     onClick={() => {
                         setActiveModule(module.key);
-                        setRefreshToken((prev) => prev + 1);
                     }}
                 >
                     {module.label}

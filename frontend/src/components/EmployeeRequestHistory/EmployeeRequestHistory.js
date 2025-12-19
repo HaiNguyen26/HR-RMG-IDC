@@ -252,7 +252,8 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
         // Realtime update: polling mỗi 5 giây
         const interval = setInterval(fetchRequests, 5000);
         return () => clearInterval(interval);
-    }, [activeModule, selectedStatus, currentUser?.id, showToast]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeModule, selectedStatus, currentUser?.id]);
 
     const getStatusLabel = (status) => {
         return STATUS_LABELS[status] || status;
