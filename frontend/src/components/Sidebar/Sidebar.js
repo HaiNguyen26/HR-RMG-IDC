@@ -493,8 +493,17 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
         (normalizedCurrentNameNoAccents.includes('hoang dinh') && normalizedCurrentNameNoAccents.includes('sach'))
     );
 
-    // Allow access if user is branch director OR Hoàng Đình Sạch
-    const canApproveCustomerEntertainment = isAllowedBranchDirector || isHoangDinhSach;
+    // Check if user is Huỳnh Phúc Văn (direct manager who can approve customer entertainment expenses)
+    const isHuynhPhucVan = (
+        normalizedCurrentName.includes('huỳnh phúc văn') ||
+        normalizedCurrentName.includes('huynh phuc van') ||
+        normalizedCurrentNameNoAccents.includes('huynh phuc van') ||
+        (normalizedCurrentName.includes('huỳnh phúc') && normalizedCurrentName.includes('văn')) ||
+        (normalizedCurrentNameNoAccents.includes('huynh phuc') && normalizedCurrentNameNoAccents.includes('van'))
+    );
+
+    // Allow access if user is branch director OR Hoàng Đình Sạch OR Huỳnh Phúc Văn
+    const canApproveCustomerEntertainment = isAllowedBranchDirector || isHoangDinhSach || isHuynhPhucVan;
 
     const canApproveAsEmployee = isEmployee && (
         normalizedTitle.includes('quản lý gián tiếp') ||
