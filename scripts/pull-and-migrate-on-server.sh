@@ -236,6 +236,21 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 8: $MIGRATION8${NC}"
 fi
 
+# Migration 9: ensure_all_candidates_columns.sql (COMPREHENSIVE - adds ALL missing columns)
+MIGRATION9="$PROJECT_DIR/database/ensure_all_candidates_columns.sql"
+if [ -f "$MIGRATION9" ]; then
+    echo -e "${BLUE}→ Chạy migration: ensure_all_candidates_columns.sql (TỔNG HỢP - thêm TẤT CẢ cột còn thiếu)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION9"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 9 thành công - Tất cả cột đã được đảm bảo${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 9${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 9: $MIGRATION9${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"
