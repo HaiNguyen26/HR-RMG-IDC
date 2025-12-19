@@ -11,17 +11,13 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
     const [isProcessing, setIsProcessing] = useState(false);
     const [selectedItemFiles, setSelectedItemFiles] = useState(null);
     const [isFileModalOpen, setIsFileModalOpen] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // Helper function to check if current user is the branch director for a request
+    // Helper function to check if current user is the branch director OR manager for a request
     const isRequestForCurrentDirector = (request) => {
         // If no current user, don't show any requests
         if (!currentUser) {
             return false;
-        }
-
-        // If request doesn't have branch director info, show it (for backward compatibility)
-        if (!request.branchDirectorId && !request.branchDirectorName) {
-            return true;
         }
 
         const removeVietnameseAccents = (str) => {
@@ -35,20 +31,53 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
 
         const currentUserName = (currentUser.hoTen || currentUser.username || '').trim().toLowerCase();
         const currentUserNameNoAccents = removeVietnameseAccents(currentUserName);
-        const requestDirectorName = (request.branchDirectorName || '').trim().toLowerCase();
-        const requestDirectorNameNoAccents = removeVietnameseAccents(requestDirectorName);
 
+        // Check if request is assigned to current user as MANAGER (managerId)
+        if (request.managerId && currentUser.id) {
+            if (parseInt(request.managerId) === parseInt(currentUser.id)) {
+                return true;
+            }
+        }
 
-        // Check by ID if available
+        // Check by manager name
+        if (request.managerName) {
+            const requestManagerName = (request.managerName || '').trim().toLowerCase();
+            const requestManagerNameNoAccents = removeVietnameseAccents(requestManagerName);
+
+            const normalizeName = (name) => {
+                return name.replace(/\s+/g, ' ').trim();
+            };
+
+            const normalizedCurrentName = normalizeName(currentUserName);
+            const normalizedCurrentNameNoAccents = normalizeName(currentUserNameNoAccents);
+            const normalizedRequestName = normalizeName(requestManagerName);
+            const normalizedRequestNameNoAccents = normalizeName(requestManagerNameNoAccents);
+
+            const nameMatch =
+                normalizedCurrentName === normalizedRequestName ||
+                normalizedCurrentNameNoAccents === normalizedRequestNameNoAccents ||
+                normalizedCurrentName.includes(normalizedRequestName) ||
+                normalizedCurrentNameNoAccents.includes(normalizedRequestNameNoAccents) ||
+                normalizedRequestName.includes(normalizedCurrentName) ||
+                normalizedRequestNameNoAccents.includes(normalizedCurrentNameNoAccents);
+
+            if (nameMatch) {
+                return true;
+            }
+        }
+
+        // Check if request is assigned to current user as BRANCH DIRECTOR (branchDirectorId)
         if (request.branchDirectorId && currentUser.id) {
             if (parseInt(request.branchDirectorId) === parseInt(currentUser.id)) {
                 return true;
             }
         }
 
-        // Check by name (with and without accents) - more flexible matching
-        if (requestDirectorName) {
-            // Normalize both names for comparison
+        // Check by branch director name
+        if (request.branchDirectorName) {
+            const requestDirectorName = (request.branchDirectorName || '').trim().toLowerCase();
+            const requestDirectorNameNoAccents = removeVietnameseAccents(requestDirectorName);
+
             const normalizeName = (name) => {
                 return name.replace(/\s+/g, ' ').trim();
             };
@@ -67,6 +96,11 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
                 normalizedRequestNameNoAccents.includes(normalizedCurrentNameNoAccents);
 
             return nameMatch;
+        }
+
+        // If request doesn't have any director/manager info, show it (for backward compatibility)
+        if (!request.branchDirectorId && !request.branchDirectorName && !request.managerId && !request.managerName) {
+            return true;
         }
 
         return false;
@@ -114,12 +148,14 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
 
     // Fetch requests from API
     useEffect(() => {
-        const fetchRequests = async () => {
+        const fetchRequests = async (silent = false) => {
             if (!currentUser) return;
 
-            try {
+            if (!silent) {
                 setLoading(true);
-
+                setIsRefreshing(true);
+            }
+            try {
                 // Check if user is Hoàng Đình Sạch or Huỳnh Phúc Văn (direct managers) or branch director
                 const isManager = isHoangDinhSach(currentUser) || isHuynhPhucVan(currentUser);
 
@@ -183,15 +219,23 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
                 }
             } catch (error) {
                 console.error('Error fetching requests:', error);
-                showToast?.('Lỗi khi tải danh sách yêu cầu', 'error');
+                if (!silent) {
+                    showToast?.('Lỗi khi tải danh sách yêu cầu', 'error');
+                }
                 setRequests([]);
                 setSelectedRequest(null);
             } finally {
-                setLoading(false);
+                if (!silent) {
+                    setLoading(false);
+                    setTimeout(() => setIsRefreshing(false), 300);
+                }
             }
         };
 
-        fetchRequests();
+        fetchRequests(false); // Lần đầu hiển thị loading
+        // Realtime update: polling mỗi 5 giây (silent mode)
+        const interval = setInterval(() => fetchRequests(true), 5000);
+        return () => clearInterval(interval);
     }, [currentUser, showToast]);
 
     // Calculate total amount from expense items
@@ -460,11 +504,19 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
                         <div className="customer-entertainment-expense-approval-header-text">
                             <h1 className="customer-entertainment-expense-approval-title">
                                 XEM XÉT VÀ PHÊ DUYỆT CHI PHÍ
+                                {isRefreshing && (
+                                    <span style={{ marginLeft: '10px', fontSize: '0.7em', color: '#10b981', opacity: 0.8 }}>
+                                        ● Đang cập nhật...
+                                    </span>
+                                )}
                             </h1>
                             <p className="customer-entertainment-expense-approval-subtitle">
                                 {isHoangDinhSach(currentUser) || isHuynhPhucVan(currentUser)
                                     ? 'Bước 2: Quản lý trực tiếp (Lần Duyệt 1)'
                                     : 'Bước 2: Giám đốc Chi nhánh (Lần Duyệt 1)'}
+                                <span style={{ marginLeft: '10px', fontSize: '0.85em', opacity: 0.7 }}>
+                                    {!isRefreshing && '● Cập nhật tự động mỗi 5 giây'}
+                                </span>
                             </p>
                         </div>
                     </div>

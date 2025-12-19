@@ -170,6 +170,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [currentUserHasEvaluated, setCurrentUserHasEvaluated] = useState(false);
     const [bothEvaluated, setBothEvaluated] = useState(false);
     const [isEvaluationReadOnly, setIsEvaluationReadOnly] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     // Dropdown options
     const [jobTitles, setJobTitles] = useState([]);
@@ -263,9 +264,10 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
 
     // Fetch recruitment requests for branch director
     useEffect(() => {
-        const fetchRecruitmentRequests = async () => {
+        const fetchRecruitmentRequests = async (silent = false) => {
             if (!isBranchDirector) return;
 
+            if (!silent) setIsRefreshing(true);
             try {
                 // Fetch pending requests for badge count
                 const pendingResponse = await recruitmentRequestsAPI.getAll({
@@ -281,21 +283,26 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 }
             } catch (error) {
                 console.error('Error fetching recruitment requests:', error);
+            } finally {
+                if (!silent) {
+                    setTimeout(() => setIsRefreshing(false), 300);
+                }
             }
         };
 
-        fetchRecruitmentRequests();
-        // Refresh every 30 seconds
-        const interval = setInterval(fetchRecruitmentRequests, 30000);
+        fetchRecruitmentRequests(false); // Lần đầu hiển thị loading
+        // Realtime update: polling mỗi 5 giây (silent mode)
+        const interval = setInterval(() => fetchRecruitmentRequests(true), 5000);
         return () => clearInterval(interval);
     }, [isBranchDirector, selectedFilter, currentUser]);
 
     // Fetch interview requests counts for badges (luôn fetch để hiển thị badge đúng)
     useEffect(() => {
-        const fetchInterviewRequestCounts = async () => {
+        const fetchInterviewRequestCounts = async (silent = false) => {
             // Allow fetch for branch directors, managers, team leads, and employees
             if (!['EMPLOYEE', 'MANAGER', 'TEAM_LEAD', 'BRANCH_DIRECTOR'].includes(currentUser?.role) && !isBranchDirector) return;
 
+            if (!silent) setIsRefreshing(true);
             try {
                 const params = {
                     managerId: currentUser?.id,
@@ -322,17 +329,26 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 setReadyInterviewRequestsCount(readyRequests.length);
             } catch (error) {
                 console.error('Error fetching interview request counts:', error);
+            } finally {
+                if (!silent) {
+                    setTimeout(() => setIsRefreshing(false), 300);
+                }
             }
         };
-        fetchInterviewRequestCounts();
+        
+        fetchInterviewRequestCounts(false); // Lần đầu hiển thị loading
+        // Realtime update: polling mỗi 5 giây (silent mode)
+        const interval = setInterval(() => fetchInterviewRequestCounts(true), 5000);
+        return () => clearInterval(interval);
     }, [isBranchDirector, currentUser]);
 
     // Fetch interview requests details khi filter thay đổi (để hiển thị table)
     useEffect(() => {
-        const fetchInterviewRequestsDetails = async () => {
+        const fetchInterviewRequestsDetails = async (silent = false) => {
             // Allow fetch for branch directors, managers, team leads, and employees
             if (!['EMPLOYEE', 'MANAGER', 'TEAM_LEAD', 'BRANCH_DIRECTOR'].includes(currentUser?.role) && !isBranchDirector) return;
 
+            if (!silent) setIsRefreshing(true);
             try {
                 const params = {
                     managerId: currentUser?.id,
@@ -363,12 +379,19 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 }
             } catch (error) {
                 console.error('Error fetching interview requests details:', error);
+            } finally {
+                if (!silent) {
+                    setTimeout(() => setIsRefreshing(false), 300);
+                }
             }
         };
 
         // Chỉ fetch details khi filter là 'interview' hoặc 'ready'
         if (selectedFilter === 'interview' || selectedFilter === 'ready') {
-            fetchInterviewRequestsDetails();
+            fetchInterviewRequestsDetails(false); // Lần đầu hiển thị loading
+            // Realtime update: polling mỗi 5 giây (silent mode)
+            const interval = setInterval(() => fetchInterviewRequestsDetails(true), 5000);
+            return () => clearInterval(interval);
         }
     }, [isBranchDirector, currentUser, selectedFilter]);
 
@@ -1227,9 +1250,19 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                         </svg>
                     </div>
                     <div style={{ flex: 1 }}>
-                        <h1 className="interview-approvals-title">Phỏng vấn & Duyệt ứng viên</h1>
+                        <h1 className="interview-approvals-title">
+                            Phỏng vấn & Duyệt ứng viên
+                            {isRefreshing && (
+                                <span style={{ marginLeft: '10px', fontSize: '0.7em', color: '#10b981', opacity: 0.8 }}>
+                                    ● Đang cập nhật...
+                                </span>
+                            )}
+                        </h1>
                         <p className="interview-approvals-subtitle">
                             Xem và xử lý các yêu cầu phỏng vấn ứng viên được HR gửi đến bạn
+                            <span style={{ marginLeft: '10px', fontSize: '0.85em', opacity: 0.7 }}>
+                                {!isRefreshing && '● Cập nhật tự động mỗi 5 giây'}
+                            </span>
                         </p>
                     </div>
                     <button

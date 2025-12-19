@@ -252,7 +252,37 @@ ufw enable              # Enable firewall
 
 ## 🚀 Build & Deploy
 
-### Build Commands
+### ⭐ DEPLOYMENT WORKFLOW CHUẨN (Sử dụng Script Tự động)
+
+**Khi có code mới hoặc database migration mới, LUÔN LUÔN sử dụng script tự động:**
+
+```bash
+# Step 1: SSH vào server
+ssh root@27.71.16.15
+
+# Step 2: Navigate to project
+cd /var/www/hr-management
+
+# Step 3: Chạy script tự động
+bash scripts/pull-and-migrate-on-server.sh
+
+# Step 4: Verify (sau khi script hoàn tất)
+pm2 status
+pm2 logs hr-management-api --lines 20 --nostream
+```
+
+**Script sẽ tự động thực hiện:**
+1. ✅ Dừng PM2 process
+2. ✅ Pull code mới từ GitHub (main branch)
+3. ✅ Build frontend với `REACT_APP_API_URL="/hr/api"`
+4. ✅ Chạy SQL migrations
+5. ✅ Restart PM2 và save config
+
+**Thời gian deploy:** 2-5 phút (tùy vào kích thước build)
+
+---
+
+### Build Commands (Manual - CHỈ dùng khi cần thiết)
 ```bash
 # Build frontend
 cd /var/www/hr-management/frontend
@@ -261,22 +291,20 @@ REACT_APP_API_URL="/hr/api" npm run build
 # Backend không cần build (chạy trực tiếp server.js)
 ```
 
-### Deploy Workflow
-1. Pull code từ GitHub: `cd /var/www/hr-management && git pull origin main`
-2. Install dependencies: 
-   ```bash
-   cd backend && npm install && cd ..
-   cd frontend && npm install && cd ..
-   ```
-3. Build frontend: `cd frontend && REACT_APP_API_URL="/hr/api" npm run build && cd ..`
-4. Restart PM2: `pm2 restart hr-management-api`
-5. Reload Nginx: `systemctl reload nginx`
-
-### Deploy Script (Tự động)
+### Deploy Script Khác (Tham khảo)
 ```bash
+# Full deploy (setup lần đầu)
 cd /var/www/hr-management
 ./scripts/deploy-hr-to-server.sh
+
+# Pull code only (không build, không migrate)
+cd /var/www/hr-management
+./scripts/pull-code-on-server.sh
 ```
+
+**⚠️ LƯU Ý:** 
+- **KHUYÊN DÙNG:** `pull-and-migrate-on-server.sh` (tự động hóa hoàn toàn)
+- Không deploy thủ công trừ khi script gặp lỗi
 
 ---
 
@@ -456,21 +484,63 @@ PGPASSWORD=Hainguyen261097 psql -h localhost -U hr_user -d HR_Management_System 
 
 ---
 
-## 📅 Last Updated
-- **Date**: 2025-12-05
+## 🔄 Deployment History & Workflow
+
+### Latest Deployment
+- **Date**: 2025-12-18
+- **Commit**: `b3977ec` - Major Update: Login by Employee Code + Branch Director Logic + CEO Tracking + User Info Card
+- **Method**: Automated script (`pull-and-migrate-on-server.sh`)
+- **Status**: ✅ Success
+
+### Standard Deployment Procedure
+```bash
+# 1. SSH to server
+ssh root@27.71.16.15
+
+# 2. Navigate & Deploy
+cd /var/www/hr-management
+bash scripts/pull-and-migrate-on-server.sh
+
+# 3. Verify
+pm2 status
+pm2 logs hr-management-api --lines 20 --nostream
+curl http://localhost:3000/api/employees | head -5
+```
+
+### Quick Verification Checklist
+- [ ] PM2 status = **online**
+- [ ] No errors in logs (last 50 lines)
+- [ ] Backend API responds: `curl http://localhost:3000/api/employees`
+- [ ] Public API responds: `curl http://27.71.16.15/hr/api/employees`
+- [ ] Browser: `http://27.71.16.15/hr` loads correctly
+- [ ] Login works with Employee Code
+- [ ] New features visible (User Info Card, CEO Tracking, etc.)
+
+---
+
+## 📅 Version Information
+- **Date**: 2025-12-18
 - **Status**: Production
-- **Version**: 1.0.0
-- **Deployment Date**: 2025-12-05
+- **Version**: 1.1.0
+- **Last Deployment**: 2025-12-18
+- **Deploy Method**: Automated Script
 
 ---
 
 ## 📌 Quick Reference
 
-### Restart App
+### ⭐ Deploy Update (Code mới / Database mới)
 ```bash
+# ============================================
+# WORKFLOW CHUẨN - LUÔN LUÔN SỬ DỤNG SCRIPT NÀY
+# ============================================
+ssh root@27.71.16.15
 cd /var/www/hr-management
-pm2 restart hr-management-api
-systemctl reload nginx
+bash scripts/pull-and-migrate-on-server.sh
+
+# Verify sau khi script hoàn tất
+pm2 status
+pm2 logs hr-management-api --lines 20 --nostream
 ```
 
 ### Check Status
@@ -488,6 +558,13 @@ tail -f /var/log/pm2/hr-api-error.log
 tail -f /var/log/nginx/it-request-error.log | grep hr
 ```
 
+### Restart App (Chỉ restart, không deploy)
+```bash
+cd /var/www/hr-management
+pm2 restart hr-management-api
+systemctl reload nginx
+```
+
 ### Backup Database
 ```bash
 # Trên server
@@ -497,14 +574,14 @@ PGPASSWORD=Hainguyen261097 pg_dump -h localhost -U hr_user -d HR_Management_Syst
 scp root@27.71.16.15:/tmp/backup_HR_Management_System_*.sql database/
 ```
 
-### Update Code
+### Manual Update (CHỈ khi script lỗi)
 ```bash
 cd /var/www/hr-management
+pm2 stop hr-management-api
 git pull origin main
-cd backend && npm install && cd ..
-cd frontend && npm install && cd ..
 cd frontend && REACT_APP_API_URL="/hr/api" npm run build && cd ..
-pm2 restart hr-management-api
+pm2 start hr-management-api
+pm2 save
 ```
 
 ---

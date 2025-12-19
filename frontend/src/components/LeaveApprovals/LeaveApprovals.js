@@ -106,6 +106,7 @@ const deriveViewerMode = (currentUser) => {
 const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false); // Realtime update indicator
     const [selectedStatus, setSelectedStatus] = useState('PENDING');
     const [stats, setStats] = useState({ total: 0, overdueCount: 0 });
     const [refreshToken, setRefreshToken] = useState(0);
@@ -322,79 +323,86 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     // *** NOTIFICATION PERMISSION REQUEST ĐÃ CHUYỂN SANG GlobalNotifications (App.js) ***
 
     // Fetch statistics for all modules (after viewerMode is defined)
-    useEffect(() => {
-        const fetchModuleStatistics = async () => {
-            if (!viewerMode || !currentUser?.id) return;
+    const fetchModuleStatistics = async (silent = false) => {
+        if (!viewerMode || !currentUser?.id) return;
 
-            try {
-                const params = {};
-                if (isTeamLead) {
-                    params.teamLeadId = currentUser.id;
-                }
-
-                // Fetch tất cả các status cho mỗi module để tính tổng
-                const statuses = isTeamLead
-                    ? ['PENDING', 'APPROVED', 'REJECTED']
-                    : ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'];
-
-                // Fetch cho từng module với tất cả các status
-                const leavePromises = statuses.map(status =>
-                    leaveRequestsAPI.getAll({ ...params, status })
-                );
-                const overtimePromises = statuses.map(status =>
-                    overtimeRequestsAPI.getAll({ ...params, status })
-                );
-                const attendancePromises = statuses.map(status =>
-                    attendanceAdjustmentsAPI.getAll({ ...params, status })
-                );
-
-                const [leaveResults, overtimeResults, attendanceResults] = await Promise.all([
-                    Promise.all(leavePromises),
-                    Promise.all(overtimePromises),
-                    Promise.all(attendancePromises)
-                ]);
-
-                // Tính tổng và pending cho từng module
-                const calculateStats = (results) => {
-                    let pending = 0;
-                    let total = 0;
-                    results.forEach((result, index) => {
-                        const count = result.data?.success && Array.isArray(result.data.data)
-                            ? result.data.data.length : 0;
-                        total += count;
-                        // Kết quả đầu tiên là PENDING (index 0)
-                        if (index === 0) {
-                            pending = count;
-                        }
-                    });
-                    return { pending, total };
-                };
-
-                const leaveStats = calculateStats(leaveResults);
-                const overtimeStats = calculateStats(overtimeResults);
-                const attendanceStats = calculateStats(attendanceResults);
-
-                const allStats = {
-                    pending: leaveStats.pending + overtimeStats.pending + attendanceStats.pending,
-                    total: leaveStats.total + overtimeStats.total + attendanceStats.total
-                };
-
-                setModuleStatistics({
-                    all: allStats,
-                    leave: leaveStats,
-                    overtime: overtimeStats,
-                    attendance: attendanceStats
-                });
-            } catch (error) {
-                console.error('[LeaveApprovals] Error fetching module statistics:', error);
+        if (!silent) setIsRefreshing(true);
+        try {
+            const params = {};
+            if (isTeamLead) {
+                params.teamLeadId = currentUser.id;
             }
-        };
 
-        fetchModuleStatistics();
-        // Refresh every 30 seconds
-        const interval = setInterval(fetchModuleStatistics, 30000);
-        return () => clearInterval(interval);
-    }, [viewerMode, currentUser?.id, isTeamLead]);
+            // Fetch tất cả các status cho mỗi module để tính tổng
+            const statuses = isTeamLead
+                ? ['PENDING', 'APPROVED', 'REJECTED']
+                : ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'];
+
+            // Fetch cho từng module với tất cả các status
+            const leavePromises = statuses.map(status =>
+                leaveRequestsAPI.getAll({ ...params, status })
+            );
+            const overtimePromises = statuses.map(status =>
+                overtimeRequestsAPI.getAll({ ...params, status })
+            );
+            const attendancePromises = statuses.map(status =>
+                attendanceAdjustmentsAPI.getAll({ ...params, status })
+            );
+
+            const [leaveResults, overtimeResults, attendanceResults] = await Promise.all([
+                Promise.all(leavePromises),
+                Promise.all(overtimePromises),
+                Promise.all(attendancePromises)
+            ]);
+
+            // Tính tổng và pending cho từng module
+            const calculateStats = (results) => {
+                let pending = 0;
+                let total = 0;
+                results.forEach((result, index) => {
+                    const count = result.data?.success && Array.isArray(result.data.data)
+                        ? result.data.data.length : 0;
+                    total += count;
+                    // Kết quả đầu tiên là PENDING (index 0)
+                    if (index === 0) {
+                        pending = count;
+                    }
+                });
+                return { pending, total };
+            };
+
+            const leaveStats = calculateStats(leaveResults);
+            const overtimeStats = calculateStats(overtimeResults);
+            const attendanceStats = calculateStats(attendanceResults);
+
+            const allStats = {
+                pending: leaveStats.pending + overtimeStats.pending + attendanceStats.pending,
+                total: leaveStats.total + overtimeStats.total + attendanceStats.total
+            };
+
+            setModuleStatistics({
+                all: allStats,
+                leave: leaveStats,
+                overtime: overtimeStats,
+                attendance: attendanceStats
+            });
+        } catch (error) {
+            console.error('[LeaveApprovals] Error fetching module statistics:', error);
+        } finally {
+            if (!silent) {
+                setTimeout(() => setIsRefreshing(false), 300);
+            }
+        }
+    };
+
+    useEffect(() => {
+        if (viewerMode) {
+            fetchModuleStatistics(false); // Lần đầu hiển thị loading
+            // Realtime update: polling mỗi 5 giây (silent mode)
+            const interval = setInterval(() => fetchModuleStatistics(true), 5000);
+            return () => clearInterval(interval);
+        }
+    }, [viewerMode, currentUser?.id, isTeamLead, refreshToken]);
 
     const statusFilters = useMemo(() => {
         if (isTeamLead) {
@@ -598,11 +606,12 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
         }
         // Fetch requests when changing module or status
         fetchRequests();
+
+        // Realtime update: polling mỗi 5 giây để cập nhật danh sách
+        const interval = setInterval(() => fetchRequests(), 5000);
+        return () => clearInterval(interval);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [viewerMode, selectedStatus, currentUser?.id, refreshToken, activeModule]);
-
-    // *** POLLING ĐÃ CHUYỂN SANG GlobalNotifications (App.js) ***
-    // GlobalNotifications polling mỗi 10 giây, hoạt động ở TẤT CẢ các module
 
 
     const askForComment = async ({ title, message, required = false }) => {

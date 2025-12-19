@@ -97,16 +97,14 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                         const chucDanh = (emp.chucDanh || emp.chuc_danh || '').toLowerCase().trim();
                         const chucDanhNoAccents = removeVietnameseAccents(chucDanh);
 
-                        // Check if is Hoàng Đình Sạch (quản lý trực tiếp được đặc cách)
-                        const isHoangDinhSach = allowedManagerNames.some(name => {
+                        // Check if is manager (Hoàng Đình Sạch or Huỳnh Phúc Văn - quản lý được đặc cách duyệt)
+                        const isManager = allowedManagerNames.some(name => {
                             const nameNoAccents = removeVietnameseAccents(name);
-                            return hoTen.includes(name) || hoTenNoAccents.includes(nameNoAccents) ||
-                                (hoTen.includes('hoàng đình') && hoTen.includes('sạch')) ||
-                                (hoTenNoAccents.includes('hoang dinh') && hoTenNoAccents.includes('sach'));
+                            return hoTen.includes(name) || hoTenNoAccents.includes(nameNoAccents);
                         });
 
-                        if (isHoangDinhSach) {
-                            return true; // Include Hoàng Đình Sạch
+                        if (isManager) {
+                            return true; // Include managers (Hoàng Đình Sạch, Huỳnh Phúc Văn)
                         }
 
                         // Check by name for branch directors
@@ -381,20 +379,29 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                 }
             });
 
-            // Check if selected director is Hoàng Đình Sạch (manager)
+            // Check if selected director is manager (Hoàng Đình Sạch or Huỳnh Phúc Văn)
             const selectedDirector = branchDirectors.find(d => d.id === parseInt(formData.branchDirectorId));
+            const directorNameLower = (selectedDirector?.hoTen || selectedDirector?.ho_ten || '').toLowerCase();
+
             const isHoangDinhSach = selectedDirector && (
-                (selectedDirector.hoTen || selectedDirector.ho_ten || '').toLowerCase().includes('hoàng đình sạch') ||
-                (selectedDirector.hoTen || selectedDirector.ho_ten || '').toLowerCase().includes('hoang dinh sach')
+                directorNameLower.includes('hoàng đình sạch') ||
+                directorNameLower.includes('hoang dinh sach')
             );
+
+            const isHuynhPhucVan = selectedDirector && (
+                directorNameLower.includes('huỳnh phúc văn') ||
+                directorNameLower.includes('huynh phuc van')
+            );
+
+            const isManager = isHoangDinhSach || isHuynhPhucVan;
 
             const submitData = {
                 employeeId: currentUser?.id,
                 branchDirectorId: formData.branchDirectorId,
                 branchDirectorName: formData.branchDirectorName,
-                // If Hoàng Đình Sạch is selected, also set as manager
-                managerId: isHoangDinhSach ? formData.branchDirectorId : undefined,
-                managerName: isHoangDinhSach ? formData.branchDirectorName : undefined,
+                // If manager (Hoàng Đình Sạch or Huỳnh Phúc Văn) is selected, also set as manager
+                managerId: isManager ? formData.branchDirectorId : undefined,
+                managerName: isManager ? formData.branchDirectorName : undefined,
                 branch: formData.branch,
                 startDate: formData.startDate,
                 endDate: formData.endDate,
