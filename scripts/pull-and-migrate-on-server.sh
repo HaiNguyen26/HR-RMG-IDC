@@ -161,6 +161,51 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 5: $MIGRATION5${NC}"
 fi
 
+# Migration 6: add_cv_fields_to_candidates.sql
+MIGRATION6="$PROJECT_DIR/database/add_cv_fields_to_candidates.sql"
+if [ -f "$MIGRATION6" ]; then
+    echo -e "${BLUE}→ Chạy migration: add_cv_fields_to_candidates.sql${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION6"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 6 thành công${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 6${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 6: $MIGRATION6${NC}"
+fi
+
+# Migration 7: add_probation_start_date_to_candidates.sql
+MIGRATION7="$PROJECT_DIR/database/add_probation_start_date_to_candidates.sql"
+if [ -f "$MIGRATION7" ]; then
+    echo -e "${BLUE}→ Chạy migration: add_probation_start_date_to_candidates.sql${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION7"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 7 thành công${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 7${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 7: $MIGRATION7${NC}"
+fi
+
+# Migration 8: add_on_probation_status_to_candidates.sql
+MIGRATION8="$PROJECT_DIR/database/add_on_probation_status_to_candidates.sql"
+if [ -f "$MIGRATION8" ]; then
+    echo -e "${BLUE}→ Chạy migration: add_on_probation_status_to_candidates.sql${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION8"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 8 thành công${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 8${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 8: $MIGRATION8${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"

@@ -83,6 +83,24 @@ BEGIN
             RAISE NOTICE 'Added column cv_dinh_kem_path';
         END IF;
         
+        -- ngay_gui_cv
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidates' AND column_name = 'ngay_gui_cv') THEN
+            ALTER TABLE candidates ADD COLUMN ngay_gui_cv DATE;
+            RAISE NOTICE 'Added column ngay_gui_cv';
+        END IF;
+        
+        -- nguon_cv
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidates' AND column_name = 'nguon_cv') THEN
+            ALTER TABLE candidates ADD COLUMN nguon_cv VARCHAR(255);
+            RAISE NOTICE 'Added column nguon_cv';
+        END IF;
+        
+        -- probation_start_date
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidates' AND column_name = 'probation_start_date') THEN
+            ALTER TABLE candidates ADD COLUMN probation_start_date DATE;
+            RAISE NOTICE 'Added column probation_start_date';
+        END IF;
+        
         RAISE NOTICE 'Migration completed for all missing columns';
     ELSE
         RAISE NOTICE 'Candidates table does not exist, skipping migration';
