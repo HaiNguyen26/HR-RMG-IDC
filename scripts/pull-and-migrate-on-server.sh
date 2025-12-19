@@ -146,6 +146,21 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 4: $MIGRATION4${NC}"
 fi
 
+# Migration 5: add_all_missing_columns_to_candidates.sql
+MIGRATION5="$PROJECT_DIR/database/add_all_missing_columns_to_candidates.sql"
+if [ -f "$MIGRATION5" ]; then
+    echo -e "${BLUE}→ Chạy migration: add_all_missing_columns_to_candidates.sql${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION5"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 5 thành công${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 5${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 5: $MIGRATION5${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"
