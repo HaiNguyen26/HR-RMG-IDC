@@ -1128,11 +1128,24 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                         foreignLanguages: []
                     };
 
-                    // Validate tối thiểu
-                    if (!payload.hoTen || !payload.soDienThoai || !payload.email) {
+                    // Validate tối thiểu - kiểm tra cả empty string
+                    const hoTenValid = payload.hoTen && payload.hoTen.trim() !== '';
+                    const soDienThoaiValid = payload.soDienThoai && payload.soDienThoai.trim() !== '';
+                    const emailValid = payload.email && payload.email.trim() !== '';
+                    
+                    if (!hoTenValid || !soDienThoaiValid || !emailValid) {
                         failed += 1;
+                        console.warn(`Row ${row._rowNum || 'unknown'} skipped - missing required fields:`, {
+                            hoTen: hoTenValid,
+                            soDienThoai: soDienThoaiValid,
+                            email: emailValid
+                        });
                         continue;
                     }
+                    
+                    // Normalize email và số điện thoại
+                    payload.email = payload.email.trim().toLowerCase();
+                    payload.soDienThoai = payload.soDienThoai.trim();
 
                     try {
                         const res = await candidatesAPI.create(payload);
@@ -1140,10 +1153,29 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                             success += 1;
                         } else {
                             failed += 1;
+                            console.error(`Import error for row ${row._rowNum || 'unknown'}:`, res.data.message || 'Unknown error');
                         }
                     } catch (err) {
                         failed += 1;
-                        console.error('Import error for row', row, err);
+                        const errorMessage = err.response?.data?.message || err.message || 'Lỗi không xác định';
+                        const errorDetails = err.response?.data?.details || '';
+                        console.error(`Import error for row ${row._rowNum || 'unknown'}:`, {
+                            candidateName: payload.hoTen || 'N/A',
+                            email: payload.email || 'N/A',
+                            phone: payload.soDienThoai || 'N/A',
+                            error: errorMessage,
+                            details: errorDetails,
+                            status: err.response?.status,
+                            errorCode: err.response?.data?.errorCode,
+                            errorConstraint: err.response?.data?.errorConstraint
+                        });
+                        
+                        // Hiển thị toast cho lỗi quan trọng (unique constraint, etc.)
+                        if (err.response?.data?.errorCode === '23505' || errorMessage.includes('đã tồn tại')) {
+                            if (showToast && failed === 1) {
+                                showToast(`Lỗi import hàng ${row._rowNum || 'unknown'}: ${errorMessage}`, 'error');
+                            }
+                        }
                     }
                 }
 
