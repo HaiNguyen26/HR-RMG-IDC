@@ -47,12 +47,12 @@ api.interceptors.response.use(
       // The calling code will handle it gracefully
       return Promise.reject(error);
     }
-    
+
     // Log connection errors for debugging
     if (error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED') {
       console.warn('⚠️ Backend server không khả dụng. Đảm bảo backend đang chạy tại http://localhost:3000');
     }
-    
+
     // For other errors, let them propagate normally
     return Promise.reject(error);
   }
@@ -182,7 +182,7 @@ export const candidatesAPI = {
   getById: (id) => api.get(`/candidates/${id}`),
   create: (data) => {
     const formData = new FormData();
-    
+
     // Append all form fields (skip files, append later)
     Object.keys(data).forEach(key => {
       if (key === 'anhDaiDien' || key === 'cvDinhKem') {
@@ -198,7 +198,7 @@ export const candidatesAPI = {
         formData.append(key, data[key] || '');
       }
     });
-    
+
     // Append files
     if (data.anhDaiDien) {
       formData.append('anhDaiDien', data.anhDaiDien);
@@ -206,7 +206,7 @@ export const candidatesAPI = {
     if (data.cvDinhKem) {
       formData.append('cvDinhKem', data.cvDinhKem);
     }
-    
+
     return api.post('/candidates', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -215,21 +215,21 @@ export const candidatesAPI = {
   },
   update: (id, data) => {
     const formData = new FormData();
-    
+
     // Similar to create (skip files, append later)
     Object.keys(data).forEach(key => {
-        if (key === 'anhDaiDien' || key === 'cvDinhKem') {
-          // Skip files, will be appended separately
-          return;
-        } else if (key === 'workExperiences' || key === 'trainingProcesses' || key === 'foreignLanguages') {
-          formData.append(key, JSON.stringify(data[key]));
-        } else if (key === 'diaChiThuongTru' || key === 'diaChiLienLac') {
-          formData.append(key === 'diaChiThuongTru' ? 'diaChiTamTru' : 'diaChiLienLac', JSON.stringify(data[key]));
-        } else {
-          formData.append(key, data[key] || '');
-        }
-      });
-    
+      if (key === 'anhDaiDien' || key === 'cvDinhKem') {
+        // Skip files, will be appended separately
+        return;
+      } else if (key === 'workExperiences' || key === 'trainingProcesses' || key === 'foreignLanguages') {
+        formData.append(key, JSON.stringify(data[key]));
+      } else if (key === 'diaChiThuongTru' || key === 'diaChiLienLac') {
+        formData.append(key === 'diaChiThuongTru' ? 'diaChiTamTru' : 'diaChiLienLac', JSON.stringify(data[key]));
+      } else {
+        formData.append(key, data[key] || '');
+      }
+    });
+
     // Append files only if they are File objects
     if (data.anhDaiDien && data.anhDaiDien instanceof File) {
       console.log('[candidatesAPI.update] Appending anhDaiDien file:', data.anhDaiDien.name);
@@ -239,11 +239,11 @@ export const candidatesAPI = {
       console.log('[candidatesAPI.update] Appending cvDinhKem file:', data.cvDinhKem.name);
       formData.append('cvDinhKem', data.cvDinhKem);
     }
-    
+
     // Log FormData contents for debugging
     console.log('[candidatesAPI.update] FormData keys:', Array.from(formData.keys()));
     console.log('[candidatesAPI.update] Has cvDinhKem:', formData.has('cvDinhKem'));
-    
+
     return api.put(`/candidates/${id}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -289,6 +289,12 @@ export const customerEntertainmentExpensesAPI = {
     formData.append('employeeId', data.employeeId);
     formData.append('branchDirectorId', data.branchDirectorId);
     formData.append('branchDirectorName', data.branchDirectorName);
+    if (data.managerId) {
+      formData.append('managerId', data.managerId);
+    }
+    if (data.managerName) {
+      formData.append('managerName', data.managerName);
+    }
     formData.append('branch', data.branch);
     formData.append('startDate', data.startDate);
     formData.append('endDate', data.endDate);

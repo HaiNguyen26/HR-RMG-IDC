@@ -72,6 +72,26 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
         return false;
     };
 
+    // Helper function to check if current user is Hoàng Đình Sạch (direct manager)
+    const isHoangDinhSach = (user) => {
+        if (!user) return false;
+        const userName = (user.hoTen || user.username || '').trim().toLowerCase();
+        const removeVietnameseAccents = (str) => {
+            if (!str) return '';
+            return str
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/đ/g, 'd')
+                .replace(/Đ/g, 'D');
+        };
+        const userNameNoAccents = removeVietnameseAccents(userName);
+        return userName.includes('hoàng đình sạch') ||
+            userName.includes('hoang dinh sach') ||
+            userNameNoAccents.includes('hoang dinh sach') ||
+            (userName.includes('hoàng đình') && userName.includes('sạch')) ||
+            (userNameNoAccents.includes('hoang dinh') && userNameNoAccents.includes('sach'));
+    };
+
     // Fetch requests from API
     useEffect(() => {
         const fetchRequests = async () => {
@@ -79,10 +99,20 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
 
             try {
                 setLoading(true);
+
+                // Check if user is Hoàng Đình Sạch (direct manager) or branch director
+                const isManager = isHoangDinhSach(currentUser);
+
                 const params = {
-                    branchDirectorId: currentUser.id,
                     status: 'PENDING_BRANCH_DIRECTOR'
                 };
+
+                // If user is manager, filter by managerId; otherwise filter by branchDirectorId
+                if (isManager) {
+                    params.managerId = currentUser.id;
+                } else {
+                    params.branchDirectorId = currentUser.id;
+                }
 
                 const response = await customerEntertainmentExpensesAPI.getAll(params);
 
@@ -100,6 +130,8 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
                         endDate: request.end_date,
                         branchDirectorId: request.branch_director_id,
                         branchDirectorName: request.branch_director_name,
+                        managerId: request.manager_id,
+                        managerName: request.manager_name,
                         advanceAmount: parseFloat(request.advance_amount) || 0,
                         expenseItems: (request.expenseItems || []).map(item => ({
                             id: item.id,
@@ -219,8 +251,14 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
 
         setIsProcessing(true);
         try {
+            // Determine if current user is manager or branch director
+            const isManager = isHoangDinhSach(currentUser);
+            const approverType = isManager ? 'MANAGER' : 'BRANCH_DIRECTOR';
+
             const response = await customerEntertainmentExpensesAPI.approve(selectedRequest.id, {
-                directorNotes: directorNotes || ''
+                directorNotes: directorNotes || '',
+                approverId: currentUser.id,
+                approverType: approverType
             });
 
             if (response.data && response.data.success) {
@@ -270,8 +308,14 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
 
         setIsProcessing(true);
         try {
+            // Determine if current user is manager or branch director
+            const isManager = isHoangDinhSach(currentUser);
+            const approverType = isManager ? 'MANAGER' : 'BRANCH_DIRECTOR';
+
             const response = await customerEntertainmentExpensesAPI.requestCorrection(selectedRequest.id, {
-                directorNotes: directorNotes
+                directorNotes: directorNotes,
+                approverId: currentUser.id,
+                approverType: approverType
             });
 
             if (response.data && response.data.success) {
@@ -322,8 +366,14 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
 
         setIsProcessing(true);
         try {
+            // Determine if current user is manager or branch director
+            const isManager = isHoangDinhSach(currentUser);
+            const approverType = isManager ? 'MANAGER' : 'BRANCH_DIRECTOR';
+
             const response = await customerEntertainmentExpensesAPI.reject(selectedRequest.id, {
-                directorNotes: directorNotes
+                directorNotes: directorNotes,
+                approverId: currentUser.id,
+                approverType: approverType
             });
 
             if (response.data && response.data.success) {
@@ -392,7 +442,9 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
                                 XEM XÉT VÀ PHÊ DUYỆT CHI PHÍ
                             </h1>
                             <p className="customer-entertainment-expense-approval-subtitle">
-                                Bước 2: Giám đốc Chi nhánh (Lần Duyệt 1)
+                                {isHoangDinhSach(currentUser)
+                                    ? 'Bước 2: Quản lý trực tiếp (Lần Duyệt 1)'
+                                    : 'Bước 2: Giám đốc Chi nhánh (Lần Duyệt 1)'}
                             </p>
                         </div>
                     </div>

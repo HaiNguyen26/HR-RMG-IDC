@@ -69,10 +69,15 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                     const employees = response.data.data || [];
 
                     // Filter branch directors: Châu Quang Hải, Nguyễn Ngọc Luyễn, Nguyễn Văn Khải
-                    const allowedNames = [
+                    // Also include Hoàng Đình Sạch (quản lý trực tiếp được đặc cách duyệt)
+                    const allowedBranchDirectorNames = [
                         'châu quang hải', 'chau quang hai',
                         'nguyễn ngọc luyễn', 'nguyen ngoc luyen',
                         'nguyễn văn khải', 'nguyen van khai'
+                    ];
+
+                    const allowedManagerNames = [
+                        'hoàng đình sạch', 'hoang dinh sach'
                     ];
 
                     const removeVietnameseAccents = (str) => {
@@ -90,8 +95,20 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                         const chucDanh = (emp.chucDanh || emp.chuc_danh || '').toLowerCase().trim();
                         const chucDanhNoAccents = removeVietnameseAccents(chucDanh);
 
-                        // Check by name
-                        const nameMatch = allowedNames.some(name => {
+                        // Check if is Hoàng Đình Sạch (quản lý trực tiếp được đặc cách)
+                        const isHoangDinhSach = allowedManagerNames.some(name => {
+                            const nameNoAccents = removeVietnameseAccents(name);
+                            return hoTen.includes(name) || hoTenNoAccents.includes(nameNoAccents) ||
+                                (hoTen.includes('hoàng đình') && hoTen.includes('sạch')) ||
+                                (hoTenNoAccents.includes('hoang dinh') && hoTenNoAccents.includes('sach'));
+                        });
+
+                        if (isHoangDinhSach) {
+                            return true; // Include Hoàng Đình Sạch
+                        }
+
+                        // Check by name for branch directors
+                        const nameMatch = allowedBranchDirectorNames.some(name => {
                             const nameNoAccents = removeVietnameseAccents(name);
                             return hoTen.includes(name) || hoTenNoAccents.includes(nameNoAccents);
                         });
@@ -113,7 +130,8 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                 setBranchDirectors([
                     { id: 1, hoTen: 'Châu Quang Hải', chucDanh: 'Giám đốc Chi nhánh' },
                     { id: 2, hoTen: 'Nguyễn Ngọc Luyễn', chucDanh: 'Giám đốc Chi nhánh' },
-                    { id: 3, hoTen: 'Nguyễn Văn Khải', chucDanh: 'Giám đốc Chi nhánh' }
+                    { id: 3, hoTen: 'Nguyễn Văn Khải', chucDanh: 'Giám đốc Chi nhánh' },
+                    { id: 4, hoTen: 'Hoàng Đình Sạch', chucDanh: 'Quản lý trực tiếp' }
                 ]);
             } finally {
                 setLoading(false);
@@ -278,7 +296,7 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
             newErrors.requester = 'Vui lòng nhập người yêu cầu';
         }
         if (!formData.branchDirectorId) {
-            newErrors.branchDirectorId = 'Vui lòng chọn Giám đốc Chi nhánh';
+            newErrors.branchDirectorId = 'Vui lòng chọn Người Duyệt';
         }
         if (!formData.startDate) {
             newErrors.startDate = 'Vui lòng chọn ngày bắt đầu';
@@ -360,10 +378,20 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                 }
             });
 
+            // Check if selected director is Hoàng Đình Sạch (manager)
+            const selectedDirector = branchDirectors.find(d => d.id === parseInt(formData.branchDirectorId));
+            const isHoangDinhSach = selectedDirector && (
+                (selectedDirector.hoTen || selectedDirector.ho_ten || '').toLowerCase().includes('hoàng đình sạch') ||
+                (selectedDirector.hoTen || selectedDirector.ho_ten || '').toLowerCase().includes('hoang dinh sach')
+            );
+
             const submitData = {
                 employeeId: currentUser?.id,
                 branchDirectorId: formData.branchDirectorId,
                 branchDirectorName: formData.branchDirectorName,
+                // If Hoàng Đình Sạch is selected, also set as manager
+                managerId: isHoangDinhSach ? formData.branchDirectorId : undefined,
+                managerName: isHoangDinhSach ? formData.branchDirectorName : undefined,
                 branch: formData.branch,
                 startDate: formData.startDate,
                 endDate: formData.endDate,
@@ -480,10 +508,10 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                                     </div>
                                 </div>
 
-                                {/* Chọn Giám đốc Chi nhánh */}
+                                {/* Chọn Người Duyệt (Giám đốc Chi nhánh hoặc Quản lý trực tiếp) */}
                                 <div className="customer-entertainment-expense-form-field">
                                     <label className="customer-entertainment-expense-form-label">
-                                        Chọn Giám đốc Chi nhánh <span className="required">*</span>
+                                        Chọn Người Duyệt <span className="required">*</span>
                                     </label>
                                     <CustomSelect
                                         id="branch-director-select"
@@ -495,13 +523,13 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                                             handleChange('branchDirectorName', selectedDirector ? (selectedDirector.hoTen || selectedDirector.ho_ten) : '');
                                         }}
                                         options={[
-                                            { value: '', label: 'Chọn Giám đốc Chi nhánh' },
+                                            { value: '', label: 'Chọn Người Duyệt' },
                                             ...branchDirectors.map(director => ({
                                                 value: director.id,
                                                 label: `${director.hoTen || director.ho_ten} - ${director.chucDanh || director.chuc_danh || ''}`
                                             }))
                                         ]}
-                                        placeholder="Chọn Giám đốc Chi nhánh"
+                                        placeholder="Chọn Người Duyệt (Giám đốc Chi nhánh hoặc Quản lý trực tiếp)"
                                         error={errors.branchDirectorId}
                                         required={true}
                                     />

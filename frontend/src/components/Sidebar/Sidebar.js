@@ -329,17 +329,34 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
             normalizedCurrentNameNoAccents.includes(removeAccents(name))
         );
 
-        if (!isAllowedBD) {
+        // Check if user is Hoàng Đình Sạch (direct manager)
+        const isHoangDinhSach = (
+            normalizedCurrentName.includes('hoàng đình sạch') ||
+            normalizedCurrentName.includes('hoang dinh sach') ||
+            normalizedCurrentNameNoAccents.includes('hoang dinh sach') ||
+            (normalizedCurrentName.includes('hoàng đình') && normalizedCurrentName.includes('sạch')) ||
+            (normalizedCurrentNameNoAccents.includes('hoang dinh') && normalizedCurrentNameNoAccents.includes('sach'))
+        );
+
+        if (!isAllowedBD && !isHoangDinhSach) {
             setPendingExpenseApprovalCount(0);
             return;
         }
 
         const fetchPendingExpenseCount = async () => {
             try {
-                const response = await customerEntertainmentExpensesAPI.getAll({
-                    branchDirectorId: currentUser.id,
+                const params = {
                     status: 'PENDING_BRANCH_DIRECTOR'
-                });
+                };
+
+                // If user is manager, filter by managerId; otherwise filter by branchDirectorId
+                if (isHoangDinhSach) {
+                    params.managerId = currentUser.id;
+                } else {
+                    params.branchDirectorId = currentUser.id;
+                }
+
+                const response = await customerEntertainmentExpensesAPI.getAll(params);
                 const count = response.data?.data?.length || 0;
                 setPendingExpenseApprovalCount(count);
             } catch (error) {
@@ -454,6 +471,18 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
             normalizedCurrentNameNoAccents.includes(removeVietnameseAccents(name))
         )
     );
+
+    // Check if user is Hoàng Đình Sạch (direct manager who can approve customer entertainment expenses)
+    const isHoangDinhSach = (
+        normalizedCurrentName.includes('hoàng đình sạch') ||
+        normalizedCurrentName.includes('hoang dinh sach') ||
+        normalizedCurrentNameNoAccents.includes('hoang dinh sach') ||
+        (normalizedCurrentName.includes('hoàng đình') && normalizedCurrentName.includes('sạch')) ||
+        (normalizedCurrentNameNoAccents.includes('hoang dinh') && normalizedCurrentNameNoAccents.includes('sach'))
+    );
+
+    // Allow access if user is branch director OR Hoàng Đình Sạch
+    const canApproveCustomerEntertainment = isAllowedBranchDirector || isHoangDinhSach;
 
     const canApproveAsEmployee = isEmployee && (
         normalizedTitle.includes('quản lý gián tiếp') ||
@@ -785,7 +814,7 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                             </button>
                                         </li>
                                     )}
-                                    {isAllowedBranchDirector && (
+                                    {canApproveCustomerEntertainment && (
                                         <li>
                                             <button
                                                 onClick={() => onNavigate('customer-entertainment-expense-approval')}

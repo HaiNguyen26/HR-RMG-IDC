@@ -42,6 +42,8 @@ const ensureTable = async () => {
             request_number VARCHAR(50) UNIQUE,
             branch_director_id INTEGER REFERENCES employees(id),
             branch_director_name VARCHAR(255),
+            manager_id INTEGER REFERENCES employees(id),
+            manager_name VARCHAR(255),
             branch VARCHAR(100),
             start_date DATE NOT NULL,
             end_date DATE NOT NULL,
@@ -52,6 +54,9 @@ const ensureTable = async () => {
             branch_director_decision VARCHAR(20),
             branch_director_notes TEXT,
             branch_director_decision_at TIMESTAMP WITHOUT TIME ZONE,
+            manager_decision VARCHAR(20),
+            manager_notes TEXT,
+            manager_decision_at TIMESTAMP WITHOUT TIME ZONE,
             accountant_id INTEGER REFERENCES employees(id),
             accountant_notes TEXT,
             accountant_processed_at TIMESTAMP WITHOUT TIME ZONE,
@@ -100,11 +105,54 @@ const ensureTable = async () => {
         CREATE INDEX IF NOT EXISTS idx_customer_expense_files_item ON customer_entertainment_expense_files(item_id);
     `;
 
+    // Add manager columns if they don't exist (for existing tables)
+    const addManagerColumns = async () => {
+        const columns = [
+            { name: 'manager_id', type: 'INTEGER REFERENCES employees(id)' },
+            { name: 'manager_name', type: 'VARCHAR(255)' },
+            { name: 'manager_decision', type: 'VARCHAR(20)' },
+            { name: 'manager_notes', type: 'TEXT' },
+            { name: 'manager_decision_at', type: 'TIMESTAMP WITHOUT TIME ZONE' }
+        ];
+
+        for (const col of columns) {
+            try {
+                const checkColumn = await pool.query(`
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'customer_entertainment_expense_requests' 
+                    AND column_name = $1
+                `, [col.name]);
+
+                if (checkColumn.rows.length === 0) {
+                    await pool.query(`
+                        ALTER TABLE customer_entertainment_expense_requests 
+                        ADD COLUMN ${col.name} ${col.type}
+                    `);
+                    console.log(`Added column ${col.name} to customer_entertainment_expense_requests`);
+                }
+            } catch (error) {
+                console.error(`Error adding column ${col.name}:`, error.message);
+            }
+        }
+
+        // Add index for manager_id if it doesn't exist
+        try {
+            await pool.query(`
+                CREATE INDEX IF NOT EXISTS idx_customer_expense_manager 
+                ON customer_entertainment_expense_requests(manager_id)
+            `);
+        } catch (error) {
+            console.error('Error creating manager index:', error.message);
+        }
+    };
+
     try {
         await pool.query(createTableQuery);
         await pool.query(createExpenseItemsTable);
         await pool.query(createExpenseFilesTable);
         await pool.query(createIndexes);
+        await addManagerColumns(); // Add manager columns if they don't exist
         console.log('Customer entertainment expense tables created/verified');
     } catch (error) {
         console.error('Error creating customer entertainment expense tables:', error);
@@ -131,6 +179,8 @@ router.post('/', upload.array('files', 20), async (req, res) => {
             employeeId,
             branchDirectorId,
             branchDirectorName,
+            managerId,
+            managerName,
             branch,
             startDate,
             endDate,
@@ -173,17 +223,57 @@ router.post('/', upload.array('files', 20), async (req, res) => {
         // Generate request number
         const requestNumber = generateRequestNumber(branch, new Date());
 
+        // Get manager info - prioritize from request body, otherwise check employee's direct manager
+        let finalManagerId = managerId ? parseInt(managerId) : null;
+        let finalManagerName = managerName || null;
+
+        // If managerId/managerName not provided, check if employee has Hoàng Đình Sạch as direct manager
+        if (!finalManagerId || !finalManagerName) {
+            try {
+                const employeeResult = await pool.query(
+                    `SELECT quan_ly_truc_tiep FROM employees WHERE id = $1`,
+                    [parseInt(employeeId)]
+                );
+                if (employeeResult.rows.length > 0) {
+                    const quanLyTrucTiep = employeeResult.rows[0].quan_ly_truc_tiep;
+                    if (quanLyTrucTiep) {
+                        const managerNameLower = quanLyTrucTiep.toLowerCase().trim();
+                        // Check if direct manager is Hoàng Đình Sạch
+                        if (managerNameLower.includes('hoàng đình sạch') ||
+                            managerNameLower.includes('hoang dinh sach') ||
+                            (managerNameLower.includes('hoàng đình') && managerNameLower.includes('sạch')) ||
+                            (managerNameLower.includes('hoang dinh') && managerNameLower.includes('sach'))) {
+                            // Find manager's employee ID
+                            const managerResult = await pool.query(
+                                `SELECT id, ho_ten FROM employees WHERE ho_ten ILIKE $1 LIMIT 1`,
+                                [`%${quanLyTrucTiep}%`]
+                            );
+                            if (managerResult.rows.length > 0) {
+                                finalManagerId = managerResult.rows[0].id;
+                                finalManagerName = managerResult.rows[0].ho_ten;
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking manager:', error);
+                // Continue without manager if there's an error
+            }
+        }
+
         // Insert request
         const requestResult = await pool.query(
             `INSERT INTO customer_entertainment_expense_requests (
                 employee_id, request_number, branch_director_id, branch_director_name,
-                branch, start_date, end_date, advance_amount, total_amount, status, current_step
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+                manager_id, manager_name, branch, start_date, end_date, advance_amount, total_amount, status, current_step
+            )             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
             [
                 parseInt(employeeId),
                 requestNumber,
                 parseInt(branchDirectorId),
                 branchDirectorName,
+                finalManagerId,
+                finalManagerName,
                 branch,
                 startDate,
                 endDate,
@@ -256,7 +346,7 @@ router.post('/', upload.array('files', 20), async (req, res) => {
 // GET /api/customer-entertainment-expenses - Lấy danh sách yêu cầu
 router.get('/', async (req, res) => {
     try {
-        const { employeeId, branchDirectorId, status } = req.query;
+        const { employeeId, branchDirectorId, managerId, status } = req.query;
 
         let query = `
             SELECT 
@@ -279,6 +369,12 @@ router.get('/', async (req, res) => {
         if (branchDirectorId) {
             query += ` AND r.branch_director_id = $${paramIndex}`;
             params.push(parseInt(branchDirectorId));
+            paramIndex++;
+        }
+
+        if (managerId) {
+            query += ` AND r.manager_id = $${paramIndex}`;
+            params.push(parseInt(managerId));
             paramIndex++;
         }
 
@@ -394,23 +490,85 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// PUT /api/customer-entertainment-expenses/:id/approve - GĐ chi nhánh duyệt
+// PUT /api/customer-entertainment-expenses/:id/approve - GĐ chi nhánh hoặc Quản lý trực tiếp duyệt
 router.put('/:id/approve', async (req, res) => {
     try {
         const { id } = req.params;
-        const { directorNotes } = req.body;
+        const { directorNotes, approverId, approverType } = req.body;
 
-        await pool.query(
-            `UPDATE customer_entertainment_expense_requests 
-            SET status = 'APPROVED_BRANCH_DIRECTOR',
-                branch_director_decision = 'APPROVED',
-                branch_director_notes = $1,
-                branch_director_decision_at = CURRENT_TIMESTAMP,
-                current_step = 'STEP_2',
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = $2`,
-            [directorNotes, parseInt(id)]
+        // Get the request to check who can approve
+        const requestResult = await pool.query(
+            `SELECT * FROM customer_entertainment_expense_requests WHERE id = $1`,
+            [parseInt(id)]
         );
+
+        if (requestResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy yêu cầu'
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Determine if approver is manager or branch director
+        let isManager = false;
+        let isBranchDirector = false;
+
+        if (approverId) {
+            const approverIdInt = parseInt(approverId);
+            if (request.manager_id && approverIdInt === request.manager_id) {
+                isManager = true;
+            } else if (request.branch_director_id && approverIdInt === request.branch_director_id) {
+                isBranchDirector = true;
+            } else if (approverType === 'MANAGER' && request.manager_id) {
+                isManager = true;
+            } else if (approverType === 'BRANCH_DIRECTOR' && request.branch_director_id) {
+                isBranchDirector = true;
+            }
+        }
+
+        // If neither manager nor branch director, check by name (fallback)
+        if (!isManager && !isBranchDirector && approverType) {
+            if (approverType === 'MANAGER') {
+                isManager = true;
+            } else if (approverType === 'BRANCH_DIRECTOR') {
+                isBranchDirector = true;
+            }
+        }
+
+        if (isManager) {
+            // Manager approval
+            await pool.query(
+                `UPDATE customer_entertainment_expense_requests 
+                SET status = 'APPROVED_BRANCH_DIRECTOR',
+                    manager_decision = 'APPROVED',
+                    manager_notes = $1,
+                    manager_decision_at = CURRENT_TIMESTAMP,
+                    current_step = 'STEP_2',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $2`,
+                [directorNotes || '', parseInt(id)]
+            );
+        } else if (isBranchDirector) {
+            // Branch director approval
+            await pool.query(
+                `UPDATE customer_entertainment_expense_requests 
+                SET status = 'APPROVED_BRANCH_DIRECTOR',
+                    branch_director_decision = 'APPROVED',
+                    branch_director_notes = $1,
+                    branch_director_decision_at = CURRENT_TIMESTAMP,
+                    current_step = 'STEP_2',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $2`,
+                [directorNotes || '', parseInt(id)]
+            );
+        } else {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền duyệt yêu cầu này'
+            });
+        }
 
         res.json({
             success: true,
@@ -425,11 +583,11 @@ router.put('/:id/approve', async (req, res) => {
     }
 });
 
-// PUT /api/customer-entertainment-expenses/:id/reject - GĐ chi nhánh từ chối
+// PUT /api/customer-entertainment-expenses/:id/reject - GĐ chi nhánh hoặc Quản lý trực tiếp từ chối
 router.put('/:id/reject', async (req, res) => {
     try {
         const { id } = req.params;
-        const { directorNotes } = req.body;
+        const { directorNotes, approverId, approverType } = req.body;
 
         if (!directorNotes || !directorNotes.trim()) {
             return res.status(400).json({
@@ -438,16 +596,66 @@ router.put('/:id/reject', async (req, res) => {
             });
         }
 
-        await pool.query(
-            `UPDATE customer_entertainment_expense_requests 
-            SET status = 'REJECTED_BRANCH_DIRECTOR',
-                branch_director_decision = 'REJECTED',
-                branch_director_notes = $1,
-                branch_director_decision_at = CURRENT_TIMESTAMP,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = $2`,
-            [directorNotes, parseInt(id)]
+        // Get the request to check who can reject
+        const requestResult = await pool.query(
+            `SELECT * FROM customer_entertainment_expense_requests WHERE id = $1`,
+            [parseInt(id)]
         );
+
+        if (requestResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy yêu cầu'
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Determine if approver is manager or branch director
+        let isManager = false;
+        let isBranchDirector = false;
+
+        if (approverId) {
+            const approverIdInt = parseInt(approverId);
+            if (request.manager_id && approverIdInt === request.manager_id) {
+                isManager = true;
+            } else if (request.branch_director_id && approverIdInt === request.branch_director_id) {
+                isBranchDirector = true;
+            } else if (approverType === 'MANAGER' && request.manager_id) {
+                isManager = true;
+            } else if (approverType === 'BRANCH_DIRECTOR' && request.branch_director_id) {
+                isBranchDirector = true;
+            }
+        }
+
+        if (isManager) {
+            await pool.query(
+                `UPDATE customer_entertainment_expense_requests 
+                SET status = 'REJECTED_BRANCH_DIRECTOR',
+                    manager_decision = 'REJECTED',
+                    manager_notes = $1,
+                    manager_decision_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $2`,
+                [directorNotes, parseInt(id)]
+            );
+        } else if (isBranchDirector) {
+            await pool.query(
+                `UPDATE customer_entertainment_expense_requests 
+                SET status = 'REJECTED_BRANCH_DIRECTOR',
+                    branch_director_decision = 'REJECTED',
+                    branch_director_notes = $1,
+                    branch_director_decision_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $2`,
+                [directorNotes, parseInt(id)]
+            );
+        } else {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền từ chối yêu cầu này'
+            });
+        }
 
         res.json({
             success: true,
@@ -462,11 +670,11 @@ router.put('/:id/reject', async (req, res) => {
     }
 });
 
-// PUT /api/customer-entertainment-expenses/:id/request-correction - GĐ chi nhánh yêu cầu sửa
+// PUT /api/customer-entertainment-expenses/:id/request-correction - GĐ chi nhánh hoặc Quản lý trực tiếp yêu cầu sửa
 router.put('/:id/request-correction', async (req, res) => {
     try {
         const { id } = req.params;
-        const { directorNotes } = req.body;
+        const { directorNotes, approverId, approverType } = req.body;
 
         if (!directorNotes || !directorNotes.trim()) {
             return res.status(400).json({
@@ -475,16 +683,66 @@ router.put('/:id/request-correction', async (req, res) => {
             });
         }
 
-        await pool.query(
-            `UPDATE customer_entertainment_expense_requests 
-            SET status = 'REQUEST_CORRECTION',
-                branch_director_decision = 'REQUEST_CORRECTION',
-                branch_director_notes = $1,
-                branch_director_decision_at = CURRENT_TIMESTAMP,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = $2`,
-            [directorNotes, parseInt(id)]
+        // Get the request to check who can request correction
+        const requestResult = await pool.query(
+            `SELECT * FROM customer_entertainment_expense_requests WHERE id = $1`,
+            [parseInt(id)]
         );
+
+        if (requestResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy yêu cầu'
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Determine if approver is manager or branch director
+        let isManager = false;
+        let isBranchDirector = false;
+
+        if (approverId) {
+            const approverIdInt = parseInt(approverId);
+            if (request.manager_id && approverIdInt === request.manager_id) {
+                isManager = true;
+            } else if (request.branch_director_id && approverIdInt === request.branch_director_id) {
+                isBranchDirector = true;
+            } else if (approverType === 'MANAGER' && request.manager_id) {
+                isManager = true;
+            } else if (approverType === 'BRANCH_DIRECTOR' && request.branch_director_id) {
+                isBranchDirector = true;
+            }
+        }
+
+        if (isManager) {
+            await pool.query(
+                `UPDATE customer_entertainment_expense_requests 
+                SET status = 'REQUEST_CORRECTION',
+                    manager_decision = 'REQUEST_CORRECTION',
+                    manager_notes = $1,
+                    manager_decision_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $2`,
+                [directorNotes, parseInt(id)]
+            );
+        } else if (isBranchDirector) {
+            await pool.query(
+                `UPDATE customer_entertainment_expense_requests 
+                SET status = 'REQUEST_CORRECTION',
+                    branch_director_decision = 'REQUEST_CORRECTION',
+                    branch_director_notes = $1,
+                    branch_director_decision_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $2`,
+                [directorNotes, parseInt(id)]
+            );
+        } else {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền yêu cầu chỉnh sửa yêu cầu này'
+            });
+        }
 
         res.json({
             success: true,
