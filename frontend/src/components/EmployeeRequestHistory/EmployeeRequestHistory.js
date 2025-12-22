@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import {
     attendanceAdjustmentsAPI,
     leaveRequestsAPI,
@@ -91,6 +91,10 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
         cancelled: 0
     });
 
+    // Refs để lưu giá trị trước đó, tránh re-render không cần thiết
+    const prevRequestsRef = useRef([]);
+    const prevModuleStatusStatsRef = useRef(null);
+
     // Statistics per module - fetch all modules to show badges
     const [moduleStatistics, setModuleStatistics] = useState({
         all: { pending: 0, total: 0 },
@@ -99,8 +103,41 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
         attendance: { pending: 0, total: 0 }
     });
 
+    // Helper function để so sánh requests (chỉ so sánh id và status)
+    const requestsAreEqual = useCallback((oldReqs, newReqs) => {
+        if (!oldReqs || !newReqs) return oldReqs === newReqs;
+        if (oldReqs.length !== newReqs.length) return false;
+        // Create map by id for comparison (order-independent)
+        const oldMap = new Map(oldReqs.map(r => [r.id, r.status]));
+        const newMap = new Map(newReqs.map(r => [r.id, r.status]));
+        // Check if all ids and statuses match
+        for (const [id, status] of oldMap) {
+            if (newMap.get(id) !== status) return false;
+        }
+        for (const id of newMap.keys()) {
+            if (!oldMap.has(id)) return false;
+        }
+        return true;
+    }, []);
+
+    // Helper function để so sánh objects (shallow comparison)
+    const shallowEqual = useCallback((obj1, obj2) => {
+        if (obj1 === obj2) return true;
+        if (!obj1 || !obj2) return false;
+        const keys1 = Object.keys(obj1);
+        const keys2 = Object.keys(obj2);
+        if (keys1.length !== keys2.length) return false;
+        for (let key of keys1) {
+            if (obj1[key] !== obj2[key]) return false;
+        }
+        return true;
+    }, []);
+
+    // Refs cho module statistics
+    const prevModuleStatsRef = useRef(null);
+
     // Function để fetch statistics - có thể gọi từ nhiều nơi
-    const fetchModuleStatistics = async (silent = false) => {
+    const fetchModuleStatistics = useCallback(async (silent = false) => {
         if (!currentUser?.id) return;
 
         if (!silent) setIsRefreshing(true);
@@ -154,22 +191,41 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 total: leaveStats.total + overtimeStats.total + attendanceStats.total // Đã loại bỏ CANCELLED
             };
 
-            setModuleStatistics({
+            const newModuleStats = {
                 all: { pending: allStats.pending, total: allStats.total },
                 leave: { pending: leaveStats.pending, total: leaveStats.total },
                 overtime: { pending: overtimeStats.pending, total: overtimeStats.total },
                 attendance: { pending: attendanceStats.pending, total: attendanceStats.total }
-            });
+            };
+
+            // Chỉ update state nếu data thực sự thay đổi
+            if (!prevModuleStatsRef.current ||
+                !shallowEqual(prevModuleStatsRef.current.all, newModuleStats.all) ||
+                !shallowEqual(prevModuleStatsRef.current.leave, newModuleStats.leave) ||
+                !shallowEqual(prevModuleStatsRef.current.overtime, newModuleStats.overtime) ||
+                !shallowEqual(prevModuleStatsRef.current.attendance, newModuleStats.attendance)) {
+                setModuleStatistics(newModuleStats);
+                prevModuleStatsRef.current = newModuleStats;
+            }
 
             // Set module status statistics based on active module
+            let newStatusStats;
             if (activeModule === 'all') {
-                setModuleStatusStatistics(allStats);
+                newStatusStats = allStats;
             } else if (activeModule === 'leave') {
-                setModuleStatusStatistics(leaveStats);
+                newStatusStats = leaveStats;
             } else if (activeModule === 'overtime') {
-                setModuleStatusStatistics(overtimeStats);
+                newStatusStats = overtimeStats;
             } else if (activeModule === 'attendance') {
-                setModuleStatusStatistics(attendanceStats);
+                newStatusStats = attendanceStats;
+            } else {
+                newStatusStats = allStats;
+            }
+
+            // Chỉ update state nếu data thực sự thay đổi
+            if (!prevModuleStatusStatsRef.current || !shallowEqual(prevModuleStatusStatsRef.current, newStatusStats)) {
+                setModuleStatusStatistics(newStatusStats);
+                prevModuleStatusStatsRef.current = newStatusStats;
             }
         } catch (error) {
             console.error('Error fetching module statistics:', error);
@@ -178,7 +234,7 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 setTimeout(() => setIsRefreshing(false), 300);
             }
         }
-    };
+    }, [currentUser?.id, activeModule, shallowEqual]);
 
     // Fetch module statistics với realtime update
     useEffect(() => {
@@ -198,16 +254,22 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
     }, []);
 
     // Fetch requests based on active module and selected status - CHỈ LẤY ĐƠN CỦA NHÂN VIÊN HIỆN TẠI
-    const fetchRequests = async () => {
+    const fetchRequests = useCallback(async (silent = false) => {
         if (!currentUser?.id) return;
 
-        setLoading(true);
+        // Chỉ hiển thị loading khi không phải silent mode (lần đầu hoặc khi filter thay đổi)
+        if (!silent) {
+            setLoading(true);
+        }
+
         try {
             // Luôn thêm employeeId để chỉ lấy đơn của nhân viên hiện tại
             const params = { employeeId: currentUser.id };
             if (selectedStatus !== 'ALL') {
                 params.status = selectedStatus;
             }
+
+            let newRequests = [];
 
             if (activeModule === 'all') {
                 const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
@@ -216,48 +278,69 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                     attendanceAdjustmentsAPI.getAll(params)
                 ]);
 
-                const allRequests = [
+                newRequests = [
                     ...(leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: 'leave' })) : []),
                     ...(overtimeResponse.data.success ? (overtimeResponse.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
                     ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : [])
                 ];
 
                 // Sắp xếp theo thời gian tạo mới nhất
-                allRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                setRequests(allRequests);
+                newRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             } else if (activeModule === 'leave') {
                 const response = await leaveRequestsAPI.getAll(params);
                 if (response.data.success) {
-                    setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'leave' })));
+                    newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'leave' }));
                 }
             } else if (activeModule === 'overtime') {
                 const response = await overtimeRequestsAPI.getAll(params);
                 if (response.data.success) {
-                    setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'overtime' })));
+                    newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'overtime' }));
                 }
             } else if (activeModule === 'attendance') {
                 const response = await attendanceAdjustmentsAPI.getAll(params);
                 if (response.data.success) {
-                    setRequests((response.data.data || []).map(r => ({ ...r, requestType: 'attendance' })));
+                    newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'attendance' }));
                 }
+            }
+
+            // Chỉ update state nếu data thực sự thay đổi (tránh re-render không cần thiết)
+            const prevReqs = prevRequestsRef.current || [];
+            if (!requestsAreEqual(prevReqs, newRequests)) {
+                setRequests(newRequests);
+                prevRequestsRef.current = newRequests;
             }
         } catch (error) {
             console.error('Error fetching requests:', error);
-            if (showToast) {
+            if (showToast && !silent) {
                 showToast('Lỗi khi tải danh sách đơn từ', 'error');
             }
         } finally {
-            setLoading(false);
+            if (!silent) {
+                setLoading(false);
+            }
         }
-    };
+    }, [currentUser?.id, selectedStatus, activeModule, requestsAreEqual, showToast]);
 
     useEffect(() => {
-        fetchRequests();
-        // Realtime update: polling mỗi 5 giây
-        const interval = setInterval(fetchRequests, 5000);
+        fetchRequests(false); // Lần đầu hiển thị loading
+        // Realtime update: polling mỗi 5 giây (silent mode - không hiển thị loading, không re-render nếu không có thay đổi)
+        const interval = setInterval(() => fetchRequests(true), 5000);
         return () => clearInterval(interval);
+    }, [fetchRequests]);
+
+    // Tự động cập nhật selectedRequest khi requests được refresh và modal đang mở
+    useEffect(() => {
+        if (showDetailModal && selectedRequest && requests.length > 0) {
+            const updatedRequest = requests.find(r =>
+                r.id === selectedRequest.id &&
+                r.requestType === selectedRequest.requestType
+            );
+            if (updatedRequest && updatedRequest.status !== selectedRequest.status) {
+                setSelectedRequest(updatedRequest);
+            }
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeModule, selectedStatus, currentUser?.id]);
+    }, [requests, showDetailModal]);
 
     const getStatusLabel = (status) => {
         return STATUS_LABELS[status] || status;
