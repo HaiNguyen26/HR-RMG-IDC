@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import html2pdf from 'html2pdf.js';
 import { employeesAPI, candidatesAPI, recruitmentRequestsAPI, interviewRequestsAPI, interviewEvaluationsAPI } from '../../services/api';
@@ -123,6 +123,44 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
     const [jobTitles, setJobTitles] = useState([]);
     const [departments, setDepartments] = useState([]);
 
+    // Refs để lưu giá trị trước đó, tránh re-render không cần thiết
+    const prevCandidatesRef = useRef([]);
+    const prevRecruitmentRequestsRef = useRef([]);
+
+    // Helper function để so sánh arrays (chỉ so sánh id và status/trang_thai)
+    const candidatesAreEqual = useCallback((oldCandidates, newCandidates) => {
+        if (!oldCandidates || !newCandidates) return oldCandidates === newCandidates;
+        if (oldCandidates.length !== newCandidates.length) return false;
+        // Create map by id for comparison (order-independent)
+        const oldMap = new Map(oldCandidates.map(c => [c.id, c.trang_thai || c.status]));
+        const newMap = new Map(newCandidates.map(c => [c.id, c.trang_thai || c.status]));
+        // Check if all ids and statuses match
+        for (const [id, status] of oldMap) {
+            if (newMap.get(id) !== status) return false;
+        }
+        for (const id of newMap.keys()) {
+            if (!oldMap.has(id)) return false;
+        }
+        return true;
+    }, []);
+
+    // Helper function để so sánh recruitment requests (chỉ so sánh id và status)
+    const recruitmentRequestsAreEqual = useCallback((oldReqs, newReqs) => {
+        if (!oldReqs || !newReqs) return oldReqs === newReqs;
+        if (oldReqs.length !== newReqs.length) return false;
+        // Create map by id for comparison (order-independent)
+        const oldMap = new Map(oldReqs.map(r => [r.id, r.status]));
+        const newMap = new Map(newReqs.map(r => [r.id, r.status]));
+        // Check if all ids and statuses match
+        for (const [id, status] of oldMap) {
+            if (newMap.get(id) !== status) return false;
+        }
+        for (const id of newMap.keys()) {
+            if (!oldMap.has(id)) return false;
+        }
+        return true;
+    }, []);
+
     // Status filters
     const statusFilters = [
         { key: 'all', label: 'Tất cả' },
@@ -134,9 +172,13 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
     ];
 
     // Fetch candidates
-    const fetchCandidates = async () => {
+    const fetchCandidates = useCallback(async (silent = false) => {
         try {
-            setLoading(true);
+            // Chỉ hiển thị loading khi không phải silent mode (lần đầu hoặc khi filter thay đổi)
+            if (!silent) {
+                setLoading(true);
+            }
+
             const params = {
                 page: 1,
                 limit: 1000
@@ -152,25 +194,34 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
 
             const response = await candidatesAPI.getAll(params);
             if (response.data.success) {
-                setCandidates(response.data.data || []);
+                const newCandidates = response.data.data || [];
+
+                // Chỉ update state nếu data thực sự thay đổi (tránh re-render không cần thiết)
+                const prevCandidates = prevCandidatesRef.current || [];
+                if (!candidatesAreEqual(prevCandidates, newCandidates)) {
+                    setCandidates(newCandidates);
+                    prevCandidatesRef.current = newCandidates;
+                }
             }
         } catch (error) {
             console.error('Error fetching candidates:', error);
             // Không hiển thị toast nếu là lỗi connection (backend chưa chạy)
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNREFUSED') {
-                if (showToast) {
+                if (showToast && !silent) {
                     showToast('Lỗi khi tải danh sách ứng viên: ' + (error.response?.data?.message || error.message), 'error');
                 }
             } else {
                 console.warn('Backend server chưa sẵn sàng hoặc chưa chạy');
             }
         } finally {
-            setLoading(false);
+            if (!silent) {
+                setLoading(false);
+            }
         }
-    };
+    }, [searchQuery, selectedStatus, candidatesAreEqual, showToast]);
 
     // Fetch recruitment requests (HR xem các phiếu đã được giám đốc chi nhánh duyệt)
-    const fetchRecruitmentRequests = async () => {
+    const fetchRecruitmentRequests = useCallback(async (silent = false) => {
         try {
             const response = await recruitmentRequestsAPI.getAll({ forHr: true });
             if (response.data?.success) {
@@ -206,42 +257,55 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                     nguoiQuanLyTrucTiep: req.nguoi_quan_ly_truc_tiep,
                     nguoiQuanLyGianTiep: req.nguoi_quan_ly_gian_tiep
                 }));
-                setRecruitmentRequests(normalized);
-                setPendingRequestsCount(normalized.length);
+
+                // Chỉ update state nếu data thực sự thay đổi (tránh re-render không cần thiết)
+                const prevReqs = prevRecruitmentRequestsRef.current || [];
+                if (!recruitmentRequestsAreEqual(prevReqs, normalized)) {
+                    setRecruitmentRequests(normalized);
+                    setPendingRequestsCount(normalized.length);
+                    prevRecruitmentRequestsRef.current = normalized;
+                }
             } else {
-                setRecruitmentRequests([]);
-                setPendingRequestsCount(0);
+                // Chỉ update nếu thực sự cần (từ có data -> không có data)
+                if (prevRecruitmentRequestsRef.current?.length > 0) {
+                    setRecruitmentRequests([]);
+                    setPendingRequestsCount(0);
+                    prevRecruitmentRequestsRef.current = [];
+                }
             }
         } catch (error) {
             console.error('Error fetching recruitment requests:', error);
-            setRecruitmentRequests([]);
-            setPendingRequestsCount(0);
+            // Chỉ update nếu thực sự cần (từ có data -> không có data)
+            if (prevRecruitmentRequestsRef.current?.length > 0) {
+                setRecruitmentRequests([]);
+                setPendingRequestsCount(0);
+                prevRecruitmentRequestsRef.current = [];
+            }
         }
-    };
+    }, [recruitmentRequestsAreEqual]);
 
     useEffect(() => {
-        fetchCandidates();
-        fetchRecruitmentRequests();
+        fetchCandidates(false); // Lần đầu hiển thị loading
+        fetchRecruitmentRequests(false);
 
-        // Poll for new requests and refresh candidates every 30 seconds
+        // Poll for new requests and refresh candidates every 30 seconds (silent mode - không hiển thị loading, không re-render nếu không có thay đổi)
         const interval = setInterval(() => {
-            fetchCandidates(); // Refresh candidates để cập nhật status
-            fetchRecruitmentRequests();
+            fetchCandidates(true); // Refresh candidates để cập nhật status (silent mode)
+            fetchRecruitmentRequests(true);
         }, 30000);
 
         return () => clearInterval(interval);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchQuery, selectedStatus]);
+    }, [fetchCandidates, fetchRecruitmentRequests]);
 
     // Refresh transfer options when transfer modal opens
     useEffect(() => {
         if (showTransferInterviewModal) {
-            fetchRecruitmentRequests();
+            fetchRecruitmentRequests(false);
             setSelectedTransferRequestId('');
             setTransferInterviewDate('');
             setShowTransferRequestDropdown(false);
         }
-    }, [showTransferInterviewModal]);
+    }, [showTransferInterviewModal, fetchRecruitmentRequests]);
 
     // Auto-select first request when dropdown data available and none selected
     useEffect(() => {
@@ -253,9 +317,9 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
     // Fetch recruitment requests when modal opens
     useEffect(() => {
         if (showRecruitmentRequestsModal) {
-            fetchRecruitmentRequests();
+            fetchRecruitmentRequests(false);
         }
-    }, [showRecruitmentRequestsModal]);
+    }, [showRecruitmentRequestsModal, fetchRecruitmentRequests]);
 
     // Fetch managers, ranks and job titles when send recruitment info modal opens
     useEffect(() => {
@@ -958,7 +1022,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                         showToast('Đã cập nhật ứng viên thành công!', 'success');
                     }
                     handleCloseModal();
-                    fetchCandidates(); // Refresh danh sách
+                    fetchCandidates(false); // Refresh danh sách
                 } else {
                     throw new Error(response.data.message || 'Lỗi khi cập nhật ứng viên');
                 }
@@ -970,7 +1034,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                         showToast('Đã thêm ứng viên thành công!', 'success');
                     }
                     handleCloseModal();
-                    fetchCandidates(); // Refresh danh sách
+                    fetchCandidates(false); // Refresh danh sách
                 } else {
                     throw new Error(response.data.message || 'Lỗi khi thêm ứng viên');
                 }
@@ -1132,7 +1196,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                     const hoTenValid = payload.hoTen && payload.hoTen.trim() !== '';
                     const soDienThoaiValid = payload.soDienThoai && payload.soDienThoai.trim() !== '';
                     const emailValid = payload.email && payload.email.trim() !== '';
-                    
+
                     if (!hoTenValid || !soDienThoaiValid || !emailValid) {
                         failed += 1;
                         console.warn(`Row ${row._rowNum || 'unknown'} skipped - missing required fields:`, {
@@ -1142,7 +1206,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                         });
                         continue;
                     }
-                    
+
                     // Normalize email và số điện thoại
                     payload.email = payload.email.trim().toLowerCase();
                     payload.soDienThoai = payload.soDienThoai.trim();
@@ -1169,7 +1233,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                             errorCode: err.response?.data?.errorCode,
                             errorConstraint: err.response?.data?.errorConstraint
                         });
-                        
+
                         // Hiển thị toast cho lỗi quan trọng (unique constraint, etc.)
                         if (err.response?.data?.errorCode === '23505' || errorMessage.includes('đã tồn tại')) {
                             if (showToast && failed === 1) {
@@ -1182,7 +1246,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                 if (showToast) {
                     showToast(`Import hoàn tất: ${success} thành công, ${failed} thất bại`, failed ? 'warning' : 'success');
                 }
-                fetchCandidates();
+                fetchCandidates(false);
             } catch (err) {
                 console.error('Import Excel error:', err);
                 if (showToast) showToast('Lỗi khi import file Excel', 'error');
@@ -1255,7 +1319,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
             }
 
             setSelectedCandidates([]);
-            fetchCandidates();
+            fetchCandidates(false);
         } catch (error) {
             console.error('Error deleting candidates:', error);
             if (showToast) {
@@ -1306,7 +1370,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
             }
 
             setSelectedCandidates([]);
-            fetchCandidates();
+            fetchCandidates(false);
         } catch (error) {
             console.error('Error deleting all candidates:', error);
             if (showToast) {
@@ -2864,7 +2928,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                             if (viewingCandidate?.id) {
                                                 handleViewCandidate(viewingCandidate.id);
                                             }
-                                            fetchCandidates(); // Refresh danh sách để cập nhật trạng thái
+                                            fetchCandidates(false); // Refresh danh sách để cập nhật trạng thái
                                         })
                                         .catch((error) => {
                                             console.error('Error transferring interview:', error);
@@ -4307,17 +4371,17 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
 
                                                             // Refresh toàn bộ candidate list để đảm bảo đồng bộ
                                                             setTimeout(() => {
-                                                                fetchCandidates();
+                                                                fetchCandidates(false);
                                                             }, 500);
                                                         }
                                                     } catch (err) {
                                                         console.error('Error refreshing candidate after closing timeline:', err);
                                                         // Vẫn refresh list nếu có lỗi
-                                                        fetchCandidates();
+                                                        fetchCandidates(false);
                                                     }
                                                 } else {
                                                     // Refresh list nếu không có viewingCandidate
-                                                    fetchCandidates();
+                                                    fetchCandidates(false);
                                                 }
                                             }}
                                         >
@@ -5273,7 +5337,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                             setShowRecruitmentInfoPreview(false);
                                             setProbationStartDate('');
                                             // Refresh candidate list
-                                            fetchCandidates();
+                                            fetchCandidates(false);
                                         } else {
                                             if (showToast) {
                                                 showToast(response.data?.message || 'Có lỗi xảy ra khi bắt đầu thử việc', 'error');

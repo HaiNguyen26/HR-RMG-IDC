@@ -244,7 +244,7 @@ router.get('/:id', async (req, res) => {
         console.error('[GET /api/candidates/:id] Error stack:', error.stack);
         console.error('[GET /api/candidates/:id] Request params:', req.params);
         console.error('[GET /api/candidates/:id] ========== ERROR END ==========');
-        
+
         res.status(500).json({
             success: false,
             message: 'Lỗi khi lấy thông tin ứng viên: ' + error.message,
@@ -275,7 +275,7 @@ router.post('/', (req, res, next) => {
     console.log('[POST /api/candidates] Request received');
     console.log('[POST /api/candidates] Body keys:', Object.keys(req.body));
     console.log('[POST /api/candidates] Files:', req.files ? Object.keys(req.files).map(k => ({ key: k, count: req.files[k]?.length || 0 })) : 'none');
-    
+
     const client = await pool.connect();
 
     try {
@@ -482,7 +482,7 @@ router.post('/', (req, res, next) => {
         await client.query('ROLLBACK').catch(rollbackErr => {
             console.error('[POST /api/candidates] Rollback error:', rollbackErr);
         });
-        
+
         console.error('[POST /api/candidates] Error creating candidate:', error);
         console.error('[POST /api/candidates] Error name:', error.name);
         console.error('[POST /api/candidates] Error message:', error.message);
@@ -490,7 +490,7 @@ router.post('/', (req, res, next) => {
         console.error('[POST /api/candidates] Error stack:', error.stack);
         console.error('[POST /api/candidates] Request body keys:', Object.keys(req.body));
         console.error('[POST /api/candidates] Files received:', req.files ? Object.keys(req.files) : 'none');
-        
+
         // Kiểm tra lỗi database constraint
         let errorMessage = 'Lỗi khi tạo ứng viên: ' + error.message;
         if (error.code === '23505') { // Unique constraint violation
@@ -506,7 +506,7 @@ router.post('/', (req, res, next) => {
         } else if (error.code === '23514') { // Check constraint violation
             errorMessage = 'Dữ liệu không đúng định dạng: ' + error.message;
         }
-        
+
         res.status(500).json({
             success: false,
             message: errorMessage,
@@ -884,20 +884,20 @@ router.delete('/:id', async (req, res) => {
 // POST /api/candidates/:id/start-probation - Bắt đầu thử việc
 router.post('/:id/start-probation', async (req, res) => {
     const client = await pool.connect();
-    
+
     try {
         await client.query('BEGIN');
-        
+
         const { id } = req.params;
         const { startDate, recruitmentInfo } = req.body;
-        
+
         if (!startDate) {
             return res.status(400).json({
                 success: false,
                 message: 'Vui lòng cung cấp ngày bắt đầu thử việc'
             });
         }
-        
+
         // Kiểm tra ứng viên có tồn tại không
         const checkCandidate = await client.query('SELECT id, trang_thai FROM candidates WHERE id = $1', [id]);
         if (checkCandidate.rows.length === 0) {
@@ -906,7 +906,7 @@ router.post('/:id/start-probation', async (req, res) => {
                 message: 'Không tìm thấy ứng viên'
             });
         }
-        
+
         // Update candidate status và ngày bắt đầu thử việc
         // Thử update với probation_start_date trước
         try {
@@ -931,12 +931,12 @@ router.post('/:id/start-probation', async (req, res) => {
                 throw err;
             }
         }
-        
+
         // Lưu thông tin recruitment info vào bảng riêng nếu có (có thể tạo bảng sau)
         // Hiện tại chỉ update status và ngày bắt đầu
-        
+
         await client.query('COMMIT');
-        
+
         res.json({
             success: true,
             message: 'Bắt đầu thử việc thành công',

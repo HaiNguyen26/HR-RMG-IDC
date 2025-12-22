@@ -94,7 +94,7 @@ const ensureRecruitmentRequestsTable = async () => {
                 AND table_name = 'employees'
             );
         `);
-        
+
         if (!employeesTableCheck.rows[0].exists) {
             console.warn('[ensureRecruitmentRequestsTable] Bảng employees chưa tồn tại! Tạo recruitment_requests table mà không có foreign key constraint.');
             // Tạo bảng mà không có foreign key constraint nếu employees chưa tồn tại
@@ -132,7 +132,7 @@ const ensureRecruitmentRequestsTable = async () => {
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             `);
-            
+
             // Tạo indexes
             await pool.query(`
                 CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_by ON recruitment_requests(created_by_employee_id);
@@ -140,10 +140,10 @@ const ensureRecruitmentRequestsTable = async () => {
                 CREATE INDEX IF NOT EXISTS idx_recruitment_requests_status ON recruitment_requests(status);
                 CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_at ON recruitment_requests(created_at DESC);
             `);
-            
+
             return; // Return early để không tạo lại bảng
         }
-        
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS recruitment_requests (
                 id SERIAL PRIMARY KEY,
@@ -203,7 +203,7 @@ router.get('/', async (req, res) => {
     try {
         console.log('[GET /api/recruitment-requests] Request received');
         console.log('[GET /api/recruitment-requests] Query params:', req.query);
-        
+
         // Đảm bảo bảng tồn tại, nhưng không throw error nếu có vấn đề
         try {
             await ensureRecruitmentRequestsTable();
@@ -265,7 +265,7 @@ router.get('/', async (req, res) => {
         // Kiểm tra xem bảng employees có tồn tại không trước khi JOIN
         let query;
         let hasEmployeesTable = false;
-        
+
         try {
             const employeesTableCheck = await pool.query(`
                 SELECT EXISTS (
@@ -280,7 +280,7 @@ router.get('/', async (req, res) => {
             console.error('[GET /api/recruitment-requests] Error checking employees table:', checkError.message);
             hasEmployeesTable = false;
         }
-        
+
         if (hasEmployeesTable) {
             query = `
                 SELECT 
@@ -309,7 +309,7 @@ router.get('/', async (req, res) => {
 
         console.log('[GET /api/recruitment-requests] Executing query:', query);
         console.log('[GET /api/recruitment-requests] Query params:', params);
-        
+
         let result;
         try {
             result = await pool.query(query, params);
@@ -319,7 +319,7 @@ router.get('/', async (req, res) => {
             console.error('[GET /api/recruitment-requests] Query error name:', queryError.name);
             console.error('[GET /api/recruitment-requests] Query error message:', queryError.message);
             console.error('[GET /api/recruitment-requests] Query error code:', queryError.code);
-            
+
             // Nếu bảng chưa tồn tại (42P01), trả về danh sách rỗng
             if (queryError.code === '42P01') {
                 console.warn('[GET /api/recruitment-requests] Table does not exist, returning empty array');
@@ -328,7 +328,7 @@ router.get('/', async (req, res) => {
                     data: []
                 });
             }
-            
+
             // Với các lỗi khác, vẫn throw để được catch ở ngoài
             throw queryError;
         }
@@ -347,7 +347,7 @@ router.get('/', async (req, res) => {
         console.error('[GET /api/recruitment-requests] Error stack:', error.stack);
         console.error('[GET /api/recruitment-requests] Query params:', req.query);
         console.error('[GET /api/recruitment-requests] ========== ERROR END ==========');
-        
+
         res.status(500).json({
             success: false,
             message: 'Lỗi khi lấy danh sách yêu cầu tuyển dụng: ' + error.message,
