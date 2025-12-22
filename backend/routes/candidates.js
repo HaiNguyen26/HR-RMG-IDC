@@ -128,17 +128,51 @@ router.get('/:id', async (req, res) => {
         const { id } = req.params;
         console.log('[GET /api/candidates/:id] Request received for id:', id);
 
+        // Validate ID
+        const numericId = parseInt(id, 10);
+        if (isNaN(numericId) || numericId <= 0) {
+            console.error('[GET /api/candidates/:id] Invalid ID:', id);
+            return res.status(400).json({
+                success: false,
+                message: 'ID ứng viên không hợp lệ'
+            });
+        }
+
+        // Kiểm tra xem bảng candidates có tồn tại không
+        let tableExists = false;
+        try {
+            const tableCheck = await pool.query(`
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = 'candidates'
+                );
+            `);
+            tableExists = tableCheck.rows[0].exists;
+        } catch (checkError) {
+            console.error('[GET /api/candidates/:id] Error checking table existence:', checkError);
+        }
+
+        if (!tableExists) {
+            console.error('[GET /api/candidates/:id] Candidates table does not exist');
+            return res.status(500).json({
+                success: false,
+                message: 'Bảng candidates chưa được tạo. Vui lòng chạy migration database.'
+            });
+        }
+
         // Lấy thông tin ứng viên
         let candidateQuery;
         try {
             candidateQuery = await pool.query(
                 'SELECT * FROM candidates WHERE id = $1',
-                [id]
+                [numericId]
             );
         } catch (queryError) {
             console.error('[GET /api/candidates/:id] Error querying candidate:', queryError);
             console.error('[GET /api/candidates/:id] Error code:', queryError.code);
             console.error('[GET /api/candidates/:id] Error message:', queryError.message);
+            console.error('[GET /api/candidates/:id] Error detail:', queryError.detail);
             throw queryError;
         }
 
@@ -158,7 +192,7 @@ router.get('/:id', async (req, res) => {
         try {
             workExperiences = await pool.query(
                 'SELECT * FROM candidate_work_experiences WHERE candidate_id = $1 ORDER BY ngay_bat_dau DESC',
-                [id]
+                [numericId]
             );
         } catch (workExpError) {
             console.warn('[GET /api/candidates/:id] Error fetching work experiences (table may not exist):', workExpError.message);
@@ -170,7 +204,7 @@ router.get('/:id', async (req, res) => {
         try {
             trainingProcesses = await pool.query(
                 'SELECT * FROM candidate_training_processes WHERE candidate_id = $1 ORDER BY ngay_bat_dau DESC',
-                [id]
+                [numericId]
             );
         } catch (trainingError) {
             console.warn('[GET /api/candidates/:id] Error fetching training processes (table may not exist):', trainingError.message);
@@ -182,7 +216,7 @@ router.get('/:id', async (req, res) => {
         try {
             foreignLanguages = await pool.query(
                 'SELECT * FROM candidate_foreign_languages WHERE candidate_id = $1',
-                [id]
+                [numericId]
             );
         } catch (langError) {
             console.warn('[GET /api/candidates/:id] Error fetching foreign languages (table may not exist):', langError.message);
