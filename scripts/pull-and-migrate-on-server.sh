@@ -251,6 +251,21 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 9: $MIGRATION9${NC}"
 fi
 
+# Migration 10: create_candidate_related_tables.sql (Tạo các bảng liên quan đến candidates)
+MIGRATION10="$PROJECT_DIR/database/create_candidate_related_tables.sql"
+if [ -f "$MIGRATION10" ]; then
+    echo -e "${BLUE}→ Chạy migration: create_candidate_related_tables.sql (Tạo bảng candidate_work_experiences, candidate_training_processes, candidate_foreign_languages)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION10"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 10 thành công - Đã tạo các bảng liên quan đến candidates${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 10${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 10: $MIGRATION10${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"
