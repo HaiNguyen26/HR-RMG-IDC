@@ -6,7 +6,7 @@ import { DATE_PICKER_LOCALE } from '../../utils/datepickerLocale';
 import TimePicker24h from '../TimePicker24h/TimePicker24h';
 import './OvertimeRequest.css';
 
-const OvertimeRequest = ({ currentUser, showToast }) => {
+const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
   const [formData, setFormData] = useState({
     startDate: '',
     startTime: '',
@@ -255,6 +255,26 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
 
         // Format as HH:mm (2 digits for hours and minutes)
         value = `${hours24.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}`;
+
+        // Kiểm tra không cho phép chọn từ 17:00-17:30
+        if (hours24 === 17 && finalMinutes <= 30) {
+          // Hiển thị modal cảnh báo và không cho phép chọn
+          if (showConfirm) {
+            showConfirm({
+              title: 'Không được chọn giờ từ 17:00-17:30',
+              message: 'Thời gian từ 17:00 đến 17:30 không được phép chọn cho đơn tăng ca. Vui lòng chọn từ 17:45 trở đi.',
+              type: 'warning',
+              confirmText: 'Đã hiểu',
+              cancelText: 'Đóng'
+            }).then(() => {
+              // Modal đã đóng, không cần làm gì
+            });
+          } else if (showToast) {
+            showToast('Không được chọn giờ từ 17:00-17:30. Vui lòng chọn từ 17:45 trở đi.', 'warning');
+          }
+          // Không cập nhật giá trị, giữ nguyên giá trị cũ
+          return;
+        }
       }
     }
 
@@ -283,6 +303,20 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
       const endDateTime = new Date(formData.endDate);
       const [endHour, endMin] = formData.endTime.split(':').map(Number);
       endDateTime.setHours(endHour, endMin || 0, 0, 0);
+
+      // Kiểm tra không cho phép chọn giờ từ 17:00-17:30
+      const isStartTimeInForbiddenRange = startHour === 17 && startMin <= 30;
+      const isEndTimeInForbiddenRange = endHour === 17 && endMin <= 30;
+
+      if (isStartTimeInForbiddenRange) {
+        setError('Không được chọn thời gian bắt đầu từ 17:00-17:30. Vui lòng chọn từ 17:45 trở đi.');
+        return;
+      }
+
+      if (isEndTimeInForbiddenRange) {
+        setError('Không được chọn thời gian kết thúc từ 17:00-17:30. Vui lòng chọn từ 17:45 trở đi.');
+        return;
+      }
 
       if (endDateTime <= startDateTime) {
         setError('Thời gian kết thúc phải sau thời gian bắt đầu.');
@@ -521,6 +555,7 @@ const OvertimeRequest = ({ currentUser, showToast }) => {
                         onChange={handleTimeChange('endTime')}
                         className="overtime-form-timepicker"
                         minuteStep={15}
+                        disabledMinutesForHour={{ hour: 17, minutes: [0, 15, 30] }}
                       />
                     </div>
                   </div>

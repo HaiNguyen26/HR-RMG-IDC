@@ -416,6 +416,74 @@
     margin: 0;
 }
 
+/* Destination Autocomplete Dropdown */
+.travel-expense-destination-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    margin-top: 0.25rem;
+}
+
+.travel-expense-destination-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.travel-expense-destination-item:last-child {
+    border-bottom: none;
+}
+
+.travel-expense-destination-item:hover {
+    background-color: #f9fafb;
+}
+
+.travel-expense-destination-label {
+    font-size: 0.875rem;
+    color: #1f2937;
+    font-weight: 500;
+}
+
+.travel-expense-destination-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-weight: 600;
+    background-color: #e5e7eb;
+    color: #6b7280;
+}
+
+/* Custom scrollbar for dropdown */
+.travel-expense-destination-dropdown::-webkit-scrollbar {
+    width: 6px;
+}
+
+.travel-expense-destination-dropdown::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 3px;
+}
+
+.travel-expense-destination-dropdown::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+.travel-expense-destination-dropdown::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
 /* Overnight Trip Banner - Light blue rounded box */
 .travel-expense-overnight-banner {
     display: flex;

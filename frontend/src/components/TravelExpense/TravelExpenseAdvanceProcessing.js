@@ -7,11 +7,10 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
     const [selectedRequestId, setSelectedRequestId] = useState(null);
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(false);
-    
+
     // Form state
     const [formData, setFormData] = useState({
         actualAmount: '',
-        advanceMethod: '',
         notes: ''
     });
     const [advanceCase, setAdvanceCase] = useState('employee_self'); // 'hr_booked' or 'employee_self'
@@ -22,12 +21,34 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
         const fetchRequests = async () => {
             setLoading(true);
             try {
-                // Fetch PENDING_FINANCE requests (sau khi CEO/Manager duyệt)
+                // Fetch PENDING_FINANCE requests (sau khi Manager/Branch Director/CEO duyệt)
+                // Lưu ý: Đối với công tác trong nước đã được manager duyệt:
+                // - Nếu manager cũng là branch director → tự động chuyển sang PENDING_FINANCE (đã được xử lý bởi backend)
+                // - Nếu manager không phải branch director → chuyển sang PENDING_LEVEL_2, cần branch director duyệt trước khi chuyển sang PENDING_FINANCE
                 const response = await travelExpensesAPI.getAll({
                     status: 'PENDING_FINANCE'
                 });
 
+                console.log('[TravelExpenseAdvanceProcessing] API response for PENDING_FINANCE:', response);
+
                 if (response.data && response.data.success) {
+                    console.log('[TravelExpenseAdvanceProcessing] Found', response.data.data.length, 'requests with PENDING_FINANCE status');
+
+                    // Filter: Chỉ hiển thị các đơn chưa được HR xử lý tạm ứng
+                    // (loại bỏ các đơn đã có advance_status = 'PENDING_ACCOUNTANT' hoặc 'TRANSFERRED')
+                    const unprocessedRequests = response.data.data.filter(req => {
+                        const advanceStatus = req.advance_status || req.advance?.status;
+                        // Chỉ hiển thị nếu chưa có advance_status hoặc advance_status là NULL
+                        return !advanceStatus || (advanceStatus !== 'PENDING_ACCOUNTANT' && advanceStatus !== 'TRANSFERRED');
+                    });
+
+                    console.log('[TravelExpenseAdvanceProcessing] Filtered to', unprocessedRequests.length, 'unprocessed requests (excluding PENDING_ACCOUNTANT/TRANSFERRED)');
+
+                    // Debug: Log status của các requests nếu có
+                    if (unprocessedRequests.length === 0) {
+                        console.warn('[TravelExpenseAdvanceProcessing] No unprocessed requests with PENDING_FINANCE status.');
+                        console.warn('[TravelExpenseAdvanceProcessing] Lưu ý: Nếu manager duyệt công tác trong nước nhưng manager không phải giám đốc chi nhánh, request sẽ ở PENDING_LEVEL_2 (cần giám đốc chi nhánh duyệt trước).');
+                    }
                     // Fetch employee bank accounts
                     const employeesResponse = await employeesAPI.getAll();
                     const employeesMap = new Map();
@@ -37,14 +58,14 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                         });
                     }
 
-                    const formattedRequests = response.data.data.map(req => {
+                    const formattedRequests = unprocessedRequests.map(req => {
                         const employee = employeesMap.get(req.employeeId || req.employee_id);
                         return {
                             id: req.id,
                             code: `CTX-${req.id}`,
                             employeeName: req.employee_name || req.employeeName || 'N/A',
                             location: req.location || '',
-                            isDomestic: req.locationType === 'DOMESTIC',
+                            isDomestic: (req.locationType || req.location_type) === 'DOMESTIC',
                             purpose: req.purpose || '',
                             startDate: req.startTime ? new Date(req.startTime).toLocaleDateString('vi-VN') : '',
                             endDate: req.endTime ? new Date(req.endTime).toLocaleDateString('vi-VN') : '',
@@ -55,18 +76,24 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                             advance: req.advance || null
                         };
                     });
+
                     setRequests(formattedRequests);
+                } else {
+                    setRequests([]);
                 }
             } catch (error) {
-                console.error('Error fetching travel expense requests:', error);
-                showToast?.('Lỗi khi tải danh sách yêu cầu', 'error');
+                console.error('[TravelExpenseAdvanceProcessing] Error fetching travel expense requests:', error);
+                showToast?.('Lỗi khi tải danh sách yêu cầu: ' + (error.message || 'Unknown error'), 'error');
+                setRequests([]);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchRequests();
-    }, [showToast]);
+        if (currentUser) {
+            fetchRequests();
+        }
+    }, [showToast, currentUser]);
 
     const filteredRequests = requests.filter(request =>
         request.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -83,14 +110,12 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                 // Trường hợp 2: Nhân viên tự đặt - mặc định = số tiền nhân viên yêu cầu
                 setFormData({
                     actualAmount: selectedRequest.requestedAdvanceAmount ? selectedRequest.requestedAdvanceAmount.toString() : '',
-                    advanceMethod: '',
                     notes: ''
                 });
             } else {
                 // Trường hợp 1: HR đặt dịch vụ - để trống để HR nhập
                 setFormData({
                     actualAmount: '',
-                    advanceMethod: '',
                     notes: ''
                 });
             }
@@ -112,7 +137,6 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
     // Validate form
     const validateForm = () => {
         if (!formData.actualAmount) return 'Vui lòng nhập số tiền tạm ứng.';
-        if (!formData.advanceMethod) return 'Vui lòng chọn hình thức tạm ứng.';
         if (!formData.notes.trim()) return 'Vui lòng nhập ghi chú.';
 
         const amount = parseInt(formData.actualAmount);
@@ -138,7 +162,6 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
         try {
             const response = await travelExpensesAPI.processAdvance(selectedRequestId, {
                 actualAmount: formData.actualAmount,
-                advanceMethod: formData.advanceMethod,
                 bankAccount: selectedRequest.bankAccount,
                 notes: formData.notes,
                 processedBy: currentUser?.id || null,
@@ -147,20 +170,25 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
 
             if (response.data && response.data.success) {
                 showToast?.('Đã xử lý tạm ứng thành công! Yêu cầu đã được gửi đến Kế toán.', 'success');
-                
+
                 // Reset form
                 setFormData({
                     actualAmount: '',
-                    advanceMethod: '',
                     notes: ''
                 });
                 setSelectedRequestId(null);
-                
+
                 // Refresh requests list
                 const refreshResponse = await travelExpensesAPI.getAll({
                     status: 'PENDING_FINANCE'
                 });
                 if (refreshResponse.data && refreshResponse.data.success) {
+                    // Filter: Chỉ hiển thị các đơn chưa được HR xử lý tạm ứng
+                    const unprocessedRequests = refreshResponse.data.data.filter(req => {
+                        const advanceStatus = req.advance_status || req.advance?.status;
+                        return !advanceStatus || (advanceStatus !== 'PENDING_ACCOUNTANT' && advanceStatus !== 'TRANSFERRED');
+                    });
+
                     const employeesResponse = await employeesAPI.getAll();
                     const employeesMap = new Map();
                     if (employeesResponse.data && employeesResponse.data.success) {
@@ -168,7 +196,7 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                             employeesMap.set(emp.id, emp);
                         });
                     }
-                    const formattedRequests = refreshResponse.data.data.map(req => {
+                    const formattedRequests = unprocessedRequests.map(req => {
                         const employee = employeesMap.get(req.employeeId || req.employee_id);
                         return {
                             id: req.id,
@@ -254,7 +282,16 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                                 {loading ? (
                                     <div className="travel-expense-loading">Đang tải...</div>
                                 ) : filteredRequests.length === 0 ? (
-                                    <div className="travel-expense-empty">Không có yêu cầu nào</div>
+                                    <div className="travel-expense-empty">
+                                        <div style={{ textAlign: 'center', padding: '2rem' }}>
+                                            <p style={{ fontSize: '1.1rem', marginBottom: '0.5rem', fontWeight: '500' }}>
+                                                Không có yêu cầu nào chờ xử lý tạm ứng
+                                            </p>
+                                            <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.5rem' }}>
+                                                Các yêu cầu công tác đã được phê duyệt (bởi Quản lý trực tiếp, Giám đốc chi nhánh, hoặc Tổng giám đốc) sẽ xuất hiện ở đây để HR xử lý tạm ứng.
+                                            </p>
+                                        </div>
+                                    </div>
                                 ) : (
                                     filteredRequests.map((request) => (
                                         <div
@@ -319,7 +356,7 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                                                 <div className="travel-expense-summary-item">
                                                     <span className="travel-expense-summary-label">Số tiền yêu cầu:</span>
                                                     <span className="travel-expense-summary-value">
-                                                        {selectedRequest.requestedAdvanceAmount 
+                                                        {selectedRequest.requestedAdvanceAmount
                                                             ? `${selectedRequest.requestedAdvanceAmount.toLocaleString('vi-VN')} VND`
                                                             : 'Chưa có'}
                                                     </span>
@@ -404,38 +441,16 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                                                     <span className="travel-expense-currency-suffix">VND</span>
                                                 </div>
                                                 <p className="travel-expense-input-hint">
-                                                    {advanceCase === 'hr_booked' 
+                                                    {advanceCase === 'hr_booked'
                                                         ? 'Nhập số tiền thực tế HR đã đặt dịch vụ và cần tạm ứng cho nhân viên.'
                                                         : 'Số tiền mặc định = số tiền nhân viên yêu cầu. Có thể điều chỉnh nếu cần.'}
-                                                </p>
-                                            </div>
-
-                                            {/* Advance Method */}
-                                            <div className="travel-expense-form-group">
-                                                <label htmlFor="advanceMethod" className="travel-expense-form-label">
-                                                    2. Hình thức Tạm ứng <span className="required">*</span>
-                                                </label>
-                                                <select
-                                                    id="advanceMethod"
-                                                    className="travel-expense-form-select"
-                                                    value={formData.advanceMethod}
-                                                    onChange={(e) => setFormData(prev => ({ ...prev, advanceMethod: e.target.value }))}
-                                                    required
-                                                >
-                                                    <option value="">Chọn hình thức thanh toán</option>
-                                                    <option value="bank_transfer">Chuyển khoản Ngân hàng</option>
-                                                    <option value="cash">Tiền mặt</option>
-                                                    <option value="company_card">Thẻ công ty</option>
-                                                </select>
-                                                <p className="travel-expense-input-hint">
-                                                    Chọn hình thức thanh toán tạm ứng.
                                                 </p>
                                             </div>
 
                                             {/* Bank Account (Readonly) */}
                                             <div className="travel-expense-form-group">
                                                 <label htmlFor="bankAccount" className="travel-expense-form-label">
-                                                    3. Tài khoản Ngân hàng nhận
+                                                    2. Tài khoản Ngân hàng nhận
                                                 </label>
                                                 <input
                                                     type="text"
@@ -454,7 +469,7 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                                             {/* Notes */}
                                             <div className="travel-expense-form-group">
                                                 <label htmlFor="notes" className="travel-expense-form-label">
-                                                    4. Ghi chú <span className="required">*</span>
+                                                    3. Ghi chú <span className="required">*</span>
                                                 </label>
                                                 <textarea
                                                     id="notes"
@@ -462,13 +477,13 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                                                     rows="4"
                                                     value={formData.notes}
                                                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                                                    placeholder={advanceCase === 'hr_booked' 
-                                                        ? 'Nhập ghi chú về dịch vụ đã đặt (ví dụ: Đã đặt vé máy bay, khách sạn...)' 
+                                                    placeholder={advanceCase === 'hr_booked'
+                                                        ? 'Nhập ghi chú về dịch vụ đã đặt (ví dụ: Đã đặt vé máy bay, khách sạn...)'
                                                         : 'Nhập ghi chú xác nhận (ví dụ: Xác nhận số tiền nhân viên tự đặt...)'}
                                                     required
                                                 />
                                                 <p className="travel-expense-input-hint">
-                                                    {advanceCase === 'hr_booked' 
+                                                    {advanceCase === 'hr_booked'
                                                         ? 'Mô tả chi tiết về dịch vụ HR đã đặt và cần tạm ứng.'
                                                         : 'Ghi chú xác nhận số tiền tạm ứng cho nhân viên tự đặt.'}
                                                 </p>
@@ -490,7 +505,6 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                                                     onClick={() => {
                                                         setFormData({
                                                             actualAmount: '',
-                                                            advanceMethod: '',
                                                             notes: ''
                                                         });
                                                     }}

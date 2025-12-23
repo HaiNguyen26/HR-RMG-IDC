@@ -133,11 +133,13 @@
 /* Max-width 7xl, rounded-3xl, bg-white/85, backdrop-filter: blur(20px), shadow-2xl */
 .travel-expense-management-main-container {
     width: 100%;
-    height: 951px;
-    /* Chiều cao cố định như khi hiển thị form "Cấp Ngân Sách Tối Đa" */
-    min-height: 951px;
-    /* Chiều cao tối thiểu */
+    height: auto;
+    /* Chiều cao tự động theo nội dung */
+    min-height: auto;
+    /* Không giới hạn chiều cao tối thiểu */
     padding: 0;
+    margin-top: -1rem;
+    /* Dịch container lên trên 1 chút */
     /* Glass Card */
     background: rgba(255, 255, 255, 0.85);
     /* bg-white/85 */
@@ -154,53 +156,55 @@
     flex-direction: column;
     box-sizing: border-box;
     position: relative;
-    overflow: hidden;
-    /* Ẩn overflow để container có chiều cao cố định */
-    flex-shrink: 0;
+    overflow: visible;
+    /* Hiển thị đầy đủ */
+    flex: 0 0 auto;
+    /* Không mở rộng, chỉ chiếm không gian cần thiết */
 }
 
 /* Bố cục chính: Flex - Chia thành hai cột cho Danh sách và Chi tiết */
-/* flex, min-height - Đảm bảo không gian làm việc đủ lớn và mở rộng theo nội dung */
 .travel-expense-management-main-layout {
     width: 100%;
-    height: 100%;
-    /* Chiều cao 100% của container cha */
+    height: auto;
+    /* Chiều cao tự động theo nội dung */
     display: flex;
     flex-direction: row;
     gap: 0;
     box-sizing: border-box;
-    overflow: hidden;
-    /* Ẩn overflow */
+    overflow: visible;
+    /* Hiển thị đầy đủ */
     align-items: flex-start;
-    /* Các cột bắt đầu từ đầu, không kéo dài theo nhau */
-    flex: 1;
-    /* Chiếm toàn bộ không gian còn lại */
-    min-height: 0;
-    /* Cho phép flex item thu nhỏ */
+    /* Các cột bắt đầu từ đầu */
+    flex: 0 0 auto;
+    /* Không mở rộng, chỉ chiếm không gian cần thiết */
 }
 
 /* II. CỘT TRÁI: DANH SÁCH CHỜ CẤP NGÂN SÁCH (35% Width) */
 .travel-expense-management-list-column {
     flex: 0 0 35%;
     /* 35% chiều rộng */
-    height: 100%;
-    /* Chiều cao 100% của layout */
-    overflow: hidden;
-    /* Ẩn overflow */
+    height: 718px;
+    /* Chiều cao cố định: container 670px + padding 1.5rem (24px * 2 = 48px) = 718px */
+    min-height: 718px;
+    /* Chiều cao tối thiểu cố định */
+    overflow: visible;
+    /* Hiển thị đầy đủ */
     border-right: 1px solid rgba(226, 232, 240, 0.6);
     box-sizing: border-box;
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
     align-self: flex-start;
-    /* Bắt đầu từ đầu, không kéo dài theo cột phải */
+    /* Bắt đầu từ đầu */
 }
 
 /* Nền Cột: bg-white (Solid), rounded-xl, shadow-lg - Nền trắng tinh khiết, tách biệt với nền Glass Card */
 .travel-expense-list-column-container {
     width: 100%;
-    height: 100%;
-    /* Chiều cao 100% của cột */
+    height: 670px;
+    /* Chiều cao cố định (giảm 30px từ 700px) */
+    min-height: 670px;
+    /* Chiều cao tối thiểu cố định */
     background: #ffffff;
     /* bg-white (Solid) */
     border-radius: 0.75rem;
@@ -214,10 +218,8 @@
     box-sizing: border-box;
     overflow: hidden;
     /* Ẩn overflow */
-    flex: 1;
-    /* Chiếm toàn bộ không gian còn lại */
-    min-height: 0;
-    /* Cho phép flex item thu nhỏ */
+    flex: 0 0 auto;
+    /* Không mở rộng, chiều cao cố định */
 }
 
 /* Tiêu đề: text-xl font-bold text-indigo-600 - Dùng màu Indigo (tông đậm của Calm Integrity) */
@@ -275,13 +277,12 @@
     flex-direction: column;
     gap: 0.75rem;
     overflow-y: auto;
+    /* Cho phép cuộn dọc khi danh sách dài */
     overflow-x: hidden;
     flex: 1;
     /* Chiếm toàn bộ không gian còn lại trong container */
     min-height: 0;
     /* Cho phép flex item thu nhỏ */
-    max-height: 100%;
-    /* Giới hạn chiều cao để có thể cuộn */
 }
 
 /* Custom Scrollbar cho danh sách */
@@ -428,27 +429,27 @@
 .travel-expense-management-detail-column {
     flex: 1;
     /* Chiếm phần còn lại (65%) */
-    height: 100%;
-    /* Chiều cao 100% của layout */
-    overflow-y: auto;
-    /* Cho phép cuộn dọc khi nội dung dài */
-    overflow-x: hidden;
-    /* Ẩn cuộn ngang */
+    height: 718px;
+    /* Chiều cao cố định bằng cột trái: container 670px + padding 1.5rem (24px * 2 = 48px) = 718px */
+    min-height: 718px;
+    /* Chiều cao tối thiểu cố định */
+    overflow: visible;
+    /* Hiển thị đầy đủ */
     box-sizing: border-box;
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
     align-self: flex-start;
-    /* Bắt đầu từ đầu, không kéo dài */
+    /* Bắt đầu từ đầu */
 }
 
 /* Nền Cột: bg-white (Solid), rounded-xl, shadow-lg - Nền trắng tinh khiết, sạch sẽ */
 .travel-expense-detail-column-container {
     width: 100%;
-    height: auto;
-    /* Cho phép container mở rộng đủ để hiển thị "Cấp Ngân Sách Tối Đa" không cần cuộn */
-    min-height: 100%;
-    /* Chiều cao tối thiểu bằng chiều cao cột */
+    height: 670px;
+    /* Chiều cao cố định bằng cột trái (giảm 30px từ 700px) */
+    min-height: 670px;
+    /* Chiều cao tối thiểu cố định */
     background: #ffffff;
     /* bg-white (Solid) */
     border-radius: 0.75rem;
@@ -460,10 +461,11 @@
     flex-direction: column;
     gap: 1rem;
     box-sizing: border-box;
-    overflow: visible;
-    /* Cho phép container mở rộng để hiển thị đủ nội dung */
-    flex-shrink: 0;
-    /* Không cho phép thu nhỏ, đảm bảo hiển thị đầy đủ */
+    overflow-y: auto;
+    /* Cho phép cuộn nếu nội dung dài hơn */
+    overflow-x: hidden;
+    flex: 0 0 auto;
+    /* Không mở rộng, chiều cao cố định */
 }
 
 /* A. Tóm Tắt & Tab Menu */
@@ -1001,43 +1003,67 @@
     letter-spacing: -0.025em;
 }
 
-/* Form Actions */
+/* Form Actions - Updated design */
 .travel-expense-form-actions {
     display: flex;
-    gap: 0.75rem;
-    padding-top: 0.5rem;
+    gap: 1rem;
+    padding-top: 1rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid #e2e8f0;
 }
 
-/* Nút Chính (Xác Nhận): Fluent Lift Button - bg-blue-600 gradient, text-white */
-/* hover:translate-y-[-2px], shadow-lg shadow-blue-400/50 */
+/* Nút Chính (Xác Nhận): Redesign với gradient và shadow đẹp hơn */
 .travel-expense-primary-button {
     flex: 1;
-    padding: 0.875rem 1.5rem;
+    padding: 1rem 2rem;
     border: none;
     border-radius: 0.75rem;
-    background: linear-gradient(to right, #2563eb, #1d4ed8);
-    /* bg-blue-600 gradient */
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
     color: #ffffff;
-    /* text-white */
-    font-size: 0.9375rem;
+    font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3), 0 2px 4px -1px rgba(37, 99, 235, 0.2);
     outline: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.travel-expense-primary-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.travel-expense-primary-button:hover::before {
+    left: 100%;
 }
 
 .travel-expense-primary-button:hover {
     transform: translateY(-2px);
-    /* hover:translate-y-[-2px] */
-    box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4), 0 4px 6px -2px rgba(59, 130, 246, 0.25);
-    /* shadow-lg shadow-blue-400/50 */
-    background: linear-gradient(to right, #1d4ed8, #1e40af);
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4), 0 4px 6px -2px rgba(37, 99, 235, 0.3);
+    background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
 }
 
 .travel-expense-primary-button:active {
     transform: translateY(0);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3), 0 2px 4px -1px rgba(37, 99, 235, 0.2);
+}
+
+.travel-expense-primary-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
 }
 
 /* Nút Phụ (Hủy): bg-gray-200, text-gray-700 - Nút trung tính */
@@ -1072,10 +1098,13 @@
     align-items: center;
     justify-content: center;
     height: 100%;
+    /* Chiều cao 100% của container cha (đã cố định 670px) */
     color: #9ca3af;
     font-size: 0.9375rem;
     text-align: center;
     padding: 2rem;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Custom Scrollbar cho các cột */
@@ -1103,4 +1132,110 @@
 .travel-expense-management-detail-column::-webkit-scrollbar-thumb:hover,
 .travel-expense-detail-column-container::-webkit-scrollbar-thumb:hover {
     background: rgba(148, 163, 184, 0.6);
+}
+
+/* ============================================
+   TAB C: XÁC NHẬN HOÀN ỨNG - REDESIGN
+   ============================================ */
+
+/* Tab C Container */
+.travel-expense-tab-c {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+    border-radius: 1rem;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+/* Settlement Information Card - Redesign với card style đẹp */
+.travel-expense-settlement-info {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.875rem;
+    padding: 1.75rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* Settlement Info Item - Layout đẹp hơn */
+.travel-expense-settlement-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.travel-expense-settlement-info-item:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.travel-expense-settlement-info-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.travel-expense-settlement-info-value {
+    font-size: 1rem;
+    color: #1e293b;
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+.travel-expense-settlement-info-value.amount {
+    color: #059669;
+    font-weight: 700;
+    font-size: 1.25rem;
+}
+
+/* Attachments Section - Redesign */
+.travel-expense-settlement-attachments {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.travel-expense-settlement-attachment-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    color: #2563eb;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.travel-expense-settlement-attachment-link:hover {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+    color: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
+}
+
+/* Empty Message - Styling đẹp hơn */
+.travel-expense-settlement-empty-message {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: #64748b;
+    font-size: 0.9375rem;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 0.75rem;
+    margin-top: 1rem;
 }

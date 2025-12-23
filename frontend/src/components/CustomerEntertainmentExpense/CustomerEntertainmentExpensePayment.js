@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { customerEntertainmentExpensesAPI } from '../../services/api';
+import { customerEntertainmentExpensesAPI, travelExpensesAPI } from '../../services/api';
 import './CustomerEntertainmentExpensePayment.css';
 
 const CustomerEntertainmentExpensePayment = ({ currentUser, showToast, showConfirm }) => {
+    const [activeTab, setActiveTab] = useState('customer-entertainment'); // 'customer-entertainment' or 'travel-expense'
     const [loading, setLoading] = useState(false);
     const [reports, setReports] = useState([]);
     const [filteredReports, setFilteredReports] = useState([]);
@@ -14,6 +15,9 @@ const CustomerEntertainmentExpensePayment = ({ currentUser, showToast, showConfi
         bankAccount: '',
         notes: ''
     });
+    // Travel Expense state
+    const [travelExpenseRequests, setTravelExpenseRequests] = useState([]);
+    const [travelExpenseLoading, setTravelExpenseLoading] = useState(false);
 
     // Helper function to map API requests to report format
     const mapRequestsToReports = useCallback((apiRequests) => {
@@ -84,11 +88,11 @@ const CustomerEntertainmentExpensePayment = ({ currentUser, showToast, showConfi
                     const apiRequests = response.data.data || [];
                     console.log('[Payment] Fetched requests:', apiRequests.length);
                     console.log('[Payment] Request statuses:', apiRequests.map(r => ({ id: r.id, status: r.status, request_number: r.request_number })));
-                    
+
                     const mappedReports = mapRequestsToReports(apiRequests);
                     console.log('[Payment] Mapped reports:', mappedReports.length);
                     console.log('[Payment] Mapped report statuses:', mappedReports.map(r => ({ id: r.id, status: r.status, reportCode: r.reportCode })));
-                    
+
                     setReports(mappedReports);
                     setFilteredReports(mappedReports);
                 } else {
@@ -107,7 +111,67 @@ const CustomerEntertainmentExpensePayment = ({ currentUser, showToast, showConfi
         };
 
         fetchReports();
-    }, [showToast, currentUser]);
+    }, [showToast, currentUser, mapRequestsToReports]);
+
+    // Fetch Travel Expense requests (completed - SETTLED with payment_confirmed_at)
+    useEffect(() => {
+        const fetchTravelExpenseRequests = async () => {
+            if (activeTab !== 'travel-expense') return;
+
+            try {
+                setTravelExpenseLoading(true);
+                // Fetch SETTLED requests
+                const response = await travelExpensesAPI.getAll({
+                    status: 'SETTLED'
+                });
+
+                if (response.data && response.data.success) {
+                    // Filter chỉ lấy các đơn đã được giải ngân (có payment_confirmed_at)
+                    const completedRequests = (response.data.data || []).filter(req => {
+                        return req.payment?.confirmedAt || req.payment_confirmed_at;
+                    });
+
+                    // Format requests
+                    const formattedRequests = completedRequests.map(req => {
+                        const startDate = req.start_time ? new Date(req.start_time) : null;
+                        const endDate = req.end_time ? new Date(req.end_time) : null;
+                        const paymentDate = req.payment?.confirmedAt ? new Date(req.payment.confirmedAt) : (req.payment_confirmed_at ? new Date(req.payment_confirmed_at) : null);
+
+                        return {
+                            id: req.id,
+                            code: req.code || `CTX-${req.id}`,
+                            employeeName: req.employee_name || 'N/A',
+                            location: req.location || '',
+                            purpose: req.purpose || '',
+                            startDate: startDate && !isNaN(startDate.getTime()) ? startDate.toLocaleDateString('vi-VN') : '',
+                            endDate: endDate && !isNaN(endDate.getTime()) ? endDate.toLocaleDateString('vi-VN') : '',
+                            advanceAmount: req.advance?.amount || req.actual_advance_amount || 0,
+                            actualExpense: req.settlement?.actualExpense || req.actual_expense || 0,
+                            reimbursementAmount: req.accountant?.reimbursementAmount || req.reimbursement_amount || 0,
+                            paymentMethod: req.payment?.method || req.payment_method || '',
+                            paymentReference: req.payment?.reference || req.payment_reference || '',
+                            paymentDate: paymentDate && !isNaN(paymentDate.getTime()) ? paymentDate.toLocaleDateString('vi-VN') : '',
+                            paymentTime: paymentDate && !isNaN(paymentDate.getTime()) ? paymentDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+                            finalStatus: req.final_status || 'SETTLED',
+                            rawData: req
+                        };
+                    });
+
+                    setTravelExpenseRequests(formattedRequests);
+                } else {
+                    setTravelExpenseRequests([]);
+                }
+            } catch (error) {
+                console.error('Error fetching travel expense requests:', error);
+                showToast?.('Lỗi khi tải danh sách đơn công tác', 'error');
+                setTravelExpenseRequests([]);
+            } finally {
+                setTravelExpenseLoading(false);
+            }
+        };
+
+        fetchTravelExpenseRequests();
+    }, [activeTab, showToast]);
 
     // Filter reports by status
     useEffect(() => {
@@ -168,7 +232,7 @@ const CustomerEntertainmentExpensePayment = ({ currentUser, showToast, showConfi
             onConfirm: async () => {
                 try {
                     setLoading(true);
-                    
+
                     // Gọi API để thanh toán
                     // Backend expects: paymentMethod, notes (hoặc bankAccount), paymentProcessedBy
                     const paymentPayload = {
@@ -185,7 +249,7 @@ const CustomerEntertainmentExpensePayment = ({ currentUser, showToast, showConfi
 
                     if (response.data && response.data.success) {
                         showToast('Thanh toán thành công', 'success');
-                        
+
                         // Refresh danh sách
                         const refreshResponse = await customerEntertainmentExpensesAPI.getAll();
                         if (refreshResponse.data && refreshResponse.data.success) {
@@ -227,108 +291,219 @@ const CustomerEntertainmentExpensePayment = ({ currentUser, showToast, showConfi
                         </svg>
                     </div>
                     <div className="customer-entertainment-expense-payment-header-text">
-                        <h1>BƯỚC 4: THỰC HIỆN THANH TOÁN & LƯU TRỮ</h1>
-                        <p>Theo dõi các Báo cáo Quyết toán đã được TGĐ phê duyệt và tiến hành chi tiền.</p>
+                        <h1>THANH TOÁN & LƯU TRỮ</h1>
+                        <p>
+                            {activeTab === 'customer-entertainment'
+                                ? 'Theo dõi các Báo cáo Quyết toán Chi phí Tiếp khách đã được TGĐ phê duyệt và tiến hành chi tiền.'
+                                : 'Danh sách các đơn công tác đã hoàn tất quy trình và được giải ngân - Lưu trữ.'
+                            }
+                        </p>
                     </div>
                 </div>
             </div>
 
-            <div className="customer-entertainment-expense-payment-content">
-                {/* Summary and Filter Section */}
-                <div className="customer-entertainment-expense-payment-summary-filter">
-                    <div className="customer-entertainment-expense-payment-summary">
-                        <span className="summary-label">Tổng số Báo cáo chờ thanh toán:</span>
-                        <span className="summary-value">{pendingPaymentCount}</span>
-                    </div>
-                    <div className="customer-entertainment-expense-payment-filter">
-                        <label>Lọc theo trạng thái:</label>
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="status-filter-select"
-                        >
-                            <option value="all">Tất cả</option>
-                            <option value="PENDING_PAYMENT">Chờ Thanh Toán</option>
-                            <option value="PAID">Đã Thanh Toán</option>
-                            <option value="REIMBURSED">Đã Hoàn Ứng</option>
-                        </select>
-                    </div>
-                </div>
+            {/* Tabs Navigation */}
+            <div className="payment-storage-tabs">
+                <button
+                    type="button"
+                    className={`payment-storage-tab ${activeTab === 'customer-entertainment' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('customer-entertainment')}
+                >
+                    Chi phí Tiếp khách
+                </button>
+                <button
+                    type="button"
+                    className={`payment-storage-tab ${activeTab === 'travel-expense' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('travel-expense')}
+                >
+                    Công tác phí
+                </button>
+            </div>
 
-                {/* Reports Table */}
-                <div className="customer-entertainment-expense-payment-table-container">
-                    <div className="customer-entertainment-expense-payment-table-wrapper">
-                        <table className="customer-entertainment-expense-payment-table">
-                            <thead>
-                                <tr>
-                                    <th>Mã BC</th>
-                                    <th>Nội dung</th>
-                                    <th>TGĐ Phê Duyệt</th>
-                                    <th>Số Tiền Chi Thêm</th>
-                                    <th>Trạng Thái</th>
-                                    <th>Hành Động</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan="6" className="loading-cell">
-                                            <div className="loading-spinner">Đang tải...</div>
-                                        </td>
-                                    </tr>
-                                ) : filteredReports.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="6" className="empty-cell">
-                                            Không có báo cáo nào
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    filteredReports.map((report) => {
-                                        const statusBadge = getStatusBadge(report.status);
-                                        return (
-                                            <tr key={report.id}>
-                                                <td className="report-code">{report.reportCode}</td>
-                                                <td className="report-content">{report.content}</td>
-                                                <td className="approval-date">
-                                                    {formatDateTime(report.generalDirectorApprovalDate)}
-                                                </td>
-                                                <td className="amount-cell">
-                                                    <span className="amount-value">
-                                                        {formatCurrency(report.additionalAmount)}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span className={`status-badge ${statusBadge.class}`}>
-                                                        {statusBadge.text}
-                                                    </span>
-                                                </td>
-                                                <td className="action-cell">
-                                                    {report.status === 'PENDING_PAYMENT' ? (
-                                                        <button
-                                                            className="payment-button"
-                                                            onClick={() => handlePaymentClick(report)}
-                                                            disabled={loading}
-                                                        >
-                                                            {loading ? 'Đang xử lý...' : 'Thanh Toán'}
-                                                        </button>
-                                                    ) : report.status === 'PAID' ? (
-                                                        <span className="payment-completed-badge">
-                                                            Đã thanh toán
-                                                        </span>
-                                                    ) : (
-                                                        <span className="payment-completed-badge">
-                                                            -
-                                                        </span>
-                                                    )}
+            <div className="customer-entertainment-expense-payment-content">
+                {activeTab === 'customer-entertainment' ? (
+                    <>
+                        {/* Summary and Filter Section */}
+                        <div className="customer-entertainment-expense-payment-summary-filter">
+                            <div className="customer-entertainment-expense-payment-summary">
+                                <span className="summary-label">Tổng số Báo cáo chờ thanh toán:</span>
+                                <span className="summary-value">{pendingPaymentCount}</span>
+                            </div>
+                            <div className="customer-entertainment-expense-payment-filter">
+                                <label>Lọc theo trạng thái:</label>
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    className="status-filter-select"
+                                >
+                                    <option value="all">Tất cả</option>
+                                    <option value="PENDING_PAYMENT">Chờ Thanh Toán</option>
+                                    <option value="PAID">Đã Thanh Toán</option>
+                                    <option value="REIMBURSED">Đã Hoàn Ứng</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Reports Table */}
+                        <div className="customer-entertainment-expense-payment-table-container">
+                            <div className="customer-entertainment-expense-payment-table-wrapper">
+                                <table className="customer-entertainment-expense-payment-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Mã BC</th>
+                                            <th>Nội dung</th>
+                                            <th>TGĐ Phê Duyệt</th>
+                                            <th>Số Tiền Chi Thêm</th>
+                                            <th>Trạng Thái</th>
+                                            <th>Hành Động</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {loading ? (
+                                            <tr>
+                                                <td colSpan="6" className="loading-cell">
+                                                    <div className="loading-spinner">Đang tải...</div>
                                                 </td>
                                             </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                                        ) : filteredReports.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="6" className="empty-cell">
+                                                    Không có báo cáo nào
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredReports.map((report) => {
+                                                const statusBadge = getStatusBadge(report.status);
+                                                return (
+                                                    <tr key={report.id}>
+                                                        <td className="report-code">{report.reportCode}</td>
+                                                        <td className="report-content">{report.content}</td>
+                                                        <td className="approval-date">
+                                                            {formatDateTime(report.generalDirectorApprovalDate)}
+                                                        </td>
+                                                        <td className="amount-cell">
+                                                            <span className="amount-value">
+                                                                {formatCurrency(report.additionalAmount)}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span className={`status-badge ${statusBadge.class}`}>
+                                                                {statusBadge.text}
+                                                            </span>
+                                                        </td>
+                                                        <td className="action-cell">
+                                                            {report.status === 'PENDING_PAYMENT' ? (
+                                                                <button
+                                                                    className="payment-button"
+                                                                    onClick={() => handlePaymentClick(report)}
+                                                                    disabled={loading}
+                                                                >
+                                                                    {loading ? 'Đang xử lý...' : 'Thanh Toán'}
+                                                                </button>
+                                                            ) : report.status === 'PAID' ? (
+                                                                <span className="payment-completed-badge">
+                                                                    Đã thanh toán
+                                                                </span>
+                                                            ) : (
+                                                                <span className="payment-completed-badge">
+                                                                    -
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        {/* Travel Expense Storage Table */}
+                        <div className="customer-entertainment-expense-payment-table-container">
+                            <div className="customer-entertainment-expense-payment-table-wrapper">
+                                <table className="customer-entertainment-expense-payment-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Mã Đơn</th>
+                                            <th>Nhân Viên</th>
+                                            <th>Địa Điểm</th>
+                                            <th>Ngày Bắt Đầu</th>
+                                            <th>Ngày Kết Thúc</th>
+                                            <th>Tạm Ứng</th>
+                                            <th>Chi Phí Thực Tế</th>
+                                            <th>Hoàn Ứng</th>
+                                            <th>Phương Thức</th>
+                                            <th>Ngày Giải Ngân</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {travelExpenseLoading ? (
+                                            <tr>
+                                                <td colSpan="10" className="loading-cell">
+                                                    <div className="loading-spinner">Đang tải...</div>
+                                                </td>
+                                            </tr>
+                                        ) : travelExpenseRequests.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="10" className="empty-cell">
+                                                    Không có đơn công tác nào đã hoàn tất
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            travelExpenseRequests.map((request) => (
+                                                <tr key={request.id}>
+                                                    <td className="report-code">{request.code}</td>
+                                                    <td>{request.employeeName}</td>
+                                                    <td>{request.location}</td>
+                                                    <td>{request.startDate}</td>
+                                                    <td>{request.endDate}</td>
+                                                    <td className="amount-cell">
+                                                        <span className="amount-value">
+                                                            {request.advanceAmount.toLocaleString('vi-VN')} ₫
+                                                        </span>
+                                                    </td>
+                                                    <td className="amount-cell">
+                                                        <span className="amount-value">
+                                                            {request.actualExpense.toLocaleString('vi-VN')} ₫
+                                                        </span>
+                                                    </td>
+                                                    <td className="amount-cell">
+                                                        <span className="amount-value" style={{ color: '#059669', fontWeight: '600' }}>
+                                                            {request.reimbursementAmount.toLocaleString('vi-VN')} ₫
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span className="status-badge status-paid">
+                                                            {request.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' :
+                                                                request.paymentMethod === 'CASH' ? 'Tiền mặt' :
+                                                                    request.paymentMethod || 'N/A'}
+                                                        </span>
+                                                        {request.paymentReference && (
+                                                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                                                                {request.paymentReference}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <div>{request.paymentDate}</div>
+                                                        {request.paymentTime && (
+                                                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                                                {request.paymentTime}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Payment Modal */}

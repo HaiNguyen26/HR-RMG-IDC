@@ -9,7 +9,8 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [attachments, setAttachments] = useState([]);
+    const [attachments, setAttachments] = useState([]); // Existing attachments from server
+    const [selectedFiles, setSelectedFiles] = useState([]); // Files selected for upload
 
     // Form state
     const [formData, setFormData] = useState({
@@ -17,77 +18,100 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
         notes: ''
     });
 
+    // Fetch requests function (extracted for reuse)
+    const fetchRequests = async () => {
+        setLoading(true);
+        try {
+            // Fetch all requests (we'll filter by settlement status on frontend)
+            const response = await travelExpensesAPI.getAll({});
+
+            if (response.data && response.data.success) {
+                // Fetch employees to get department info
+                const employeesResponse = await employeesAPI.getAll();
+                const employeesMap = new Map();
+                if (employeesResponse.data && employeesResponse.data.success) {
+                    employeesResponse.data.data.forEach(emp => {
+                        employeesMap.set(emp.id, emp);
+                    });
+                }
+
+                const formattedRequests = (response.data.data || [])
+                    .filter(req => {
+                        // Only show requests that have advance (TRANSFERRED) and are ready for settlement
+                        const hasAdvance = req.advance?.status === 'TRANSFERRED' || req.advance_status === 'TRANSFERRED';
+                        const settlementStatus = req.settlement?.status || req.settlement_status;
+                        // Include all settlement-related statuses or PENDING_SETTLEMENT
+                        return hasAdvance && (
+                            req.status === 'PENDING_SETTLEMENT' ||
+                            settlementStatus === 'PENDING' ||
+                            settlementStatus === 'SUBMITTED' ||
+                            settlementStatus === 'HR_CONFIRMED' ||
+                            settlementStatus === 'ACCOUNTANT_DONE' ||
+                            settlementStatus === 'REJECTED'
+                        );
+                    })
+                    .map(req => {
+                        // API có thể trả về startTime/endTime (camelCase) hoặc start_time/end_time (snake_case)
+                        const startTimeValue = req.startTime || req.start_time;
+                        const endTimeValue = req.endTime || req.end_time;
+                        const startDate = startTimeValue ? (() => {
+                            const d = new Date(startTimeValue);
+                            return !isNaN(d.getTime()) ? d : null;
+                        })() : null;
+                        const endDate = endTimeValue ? (() => {
+                            const d = new Date(endTimeValue);
+                            return !isNaN(d.getTime()) ? d : null;
+                        })() : null;
+                        const employee = employeesMap.get(req.employee_id || req.employeeId);
+                        const createdDate = req.created_at ? new Date(req.created_at) : null;
+
+                        // Xác định settlementStatus: nếu đã giải ngân (có payment_confirmed_at), status là ACCOUNTANT_DONE
+                        const hasPaymentConfirmed = req.payment?.confirmedAt || req.payment_confirmed_at;
+                        const baseSettlementStatus = req.settlement?.status || req.settlement_status || 'PENDING';
+                        const finalSettlementStatus = hasPaymentConfirmed ? 'ACCOUNTANT_DONE' : baseSettlementStatus;
+
+                        return {
+                            id: req.id,
+                            code: `TC-${String(req.id).padStart(3, '0')}`,
+                            employeeName: req.employee_name || 'N/A',
+                            department: employee?.phong_ban || employee?.department || 'N/A',
+                            location: req.location || '',
+                            locationType: req.locationType || req.location_type,
+                            locationFull: (req.locationType || req.location_type) === 'INTERNATIONAL'
+                                ? `${req.location || ''} (Nước ngoài)`
+                                : `${req.location || ''} (Trong nước)`,
+                            purpose: req.purpose || '',
+                            companyName: req.companyName || req.company_name || null,
+                            companyAddress: req.companyAddress || req.company_address || null,
+                            startDate: startDate ? startDate.toLocaleDateString('vi-VN') : '',
+                            endDate: endDate ? endDate.toLocaleDateString('vi-VN') : '',
+                            startDateRaw: startDate,
+                            endDateRaw: endDate,
+                            createdDate: createdDate ? createdDate.toLocaleDateString('vi-VN') : '',
+                            advanceAmount: req.advance?.amount || req.actual_advance_amount || 0,
+                            actualExpense: req.settlement?.actualExpense || req.actual_expense || null,
+                            settlementStatus: finalSettlementStatus,
+                            settlementNotes: req.settlement?.notes || req.settlement_notes || null,
+                            paymentConfirmed: hasPaymentConfirmed,
+                            livingAllowance: req.livingAllowance || null
+                        };
+                    });
+                setRequests(formattedRequests);
+            }
+        } catch (error) {
+            console.error('Error fetching travel expense requests:', error);
+            showToast?.('Lỗi khi tải danh sách yêu cầu', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Fetch requests that are ready for settlement
     useEffect(() => {
-        const fetchRequests = async () => {
-            setLoading(true);
-            try {
-                // Fetch all requests (we'll filter by settlement status on frontend)
-                const response = await travelExpensesAPI.getAll({});
-
-                if (response.data && response.data.success) {
-                    // Fetch employees to get department info
-                    const employeesResponse = await employeesAPI.getAll();
-                    const employeesMap = new Map();
-                    if (employeesResponse.data && employeesResponse.data.success) {
-                        employeesResponse.data.data.forEach(emp => {
-                            employeesMap.set(emp.id, emp);
-                        });
-                    }
-
-                    const formattedRequests = (response.data.data || [])
-                        .filter(req => {
-                            // Only show requests that have advance (TRANSFERRED) and are ready for settlement
-                            const hasAdvance = req.advance?.status === 'TRANSFERRED' || req.advance_status === 'TRANSFERRED';
-                            const settlementStatus = req.settlement?.status || req.settlement_status;
-                            // Include all settlement-related statuses or PENDING_SETTLEMENT
-                            return hasAdvance && (
-                                req.status === 'PENDING_SETTLEMENT' ||
-                                settlementStatus === 'PENDING' ||
-                                settlementStatus === 'SUBMITTED' ||
-                                settlementStatus === 'HR_CONFIRMED' ||
-                                settlementStatus === 'ACCOUNTANT_DONE' ||
-                                settlementStatus === 'REJECTED'
-                            );
-                        })
-                        .map(req => {
-                            const startDate = req.start_time ? new Date(req.start_time) : null;
-                            const endDate = req.end_time ? new Date(req.end_time) : null;
-                            const employee = employeesMap.get(req.employee_id || req.employeeId);
-                            const createdDate = req.created_at ? new Date(req.created_at) : null;
-
-                            return {
-                                id: req.id,
-                                code: `TC-${String(req.id).padStart(3, '0')}`,
-                                employeeName: req.employee_name || 'N/A',
-                                department: employee?.phong_ban || employee?.department || 'N/A',
-                                location: req.location || '',
-                                locationType: req.locationType || req.location_type,
-                                purpose: req.purpose || '',
-                                startDate: startDate ? startDate.toLocaleDateString('vi-VN') : '',
-                                endDate: endDate ? endDate.toLocaleDateString('vi-VN') : '',
-                                startDateRaw: startDate,
-                                endDateRaw: endDate,
-                                createdDate: createdDate ? createdDate.toLocaleDateString('vi-VN') : '',
-                                advanceAmount: req.advance?.amount || req.actual_advance_amount || 0,
-                                actualExpense: req.settlement?.actualExpense || req.actual_expense || null,
-                                settlementStatus: req.settlement?.status || req.settlement_status || 'PENDING',
-                                settlementNotes: req.settlement?.notes || req.settlement_notes || null
-                            };
-                        });
-                    setRequests(formattedRequests);
-                }
-            } catch (error) {
-                console.error('Error fetching travel expense requests:', error);
-                showToast?.('Lỗi khi tải danh sách yêu cầu', 'error');
-            } finally {
-                setLoading(false);
-            }
-        };
-
         if (currentUser) {
             fetchRequests();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentUser, showToast]);
 
     const selectedRequest = requests.find(req => req.id === selectedRequestId) || null;
@@ -121,35 +145,37 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
                 actualExpense: selectedRequest.actualExpense ? selectedRequest.actualExpense.toString() : '',
                 notes: selectedRequest.settlementNotes || ''
             });
+            setSelectedFiles([]); // Reset selected files when changing request
         } else {
             setFormData({
                 actualExpense: '',
                 notes: ''
             });
+            setSelectedFiles([]);
         }
     }, [selectedRequestId]);
 
     // Filter requests
     const filteredRequests = requests.filter(request => {
-        const matchesSearch = 
+        const matchesSearch =
             request.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
             request.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
             request.employeeName.toLowerCase().includes(searchQuery.toLowerCase());
-        
-        const matchesStatus = statusFilter === 'ALL' || 
+
+        const matchesStatus = statusFilter === 'ALL' ||
             (statusFilter === 'PENDING' && request.settlementStatus === 'PENDING') ||
             (statusFilter === 'SUBMITTED' && request.settlementStatus === 'SUBMITTED') ||
             (statusFilter === 'HR_CONFIRMED' && request.settlementStatus === 'HR_CONFIRMED') ||
             (statusFilter === 'ACCOUNTANT_DONE' && request.settlementStatus === 'ACCOUNTANT_DONE') ||
             (statusFilter === 'REJECTED' && request.settlementStatus === 'REJECTED');
-        
+
         return matchesSearch && matchesStatus;
     });
 
     // Handle form submit
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         if (!selectedRequest) return;
         if (isSubmitting) return;
 
@@ -162,13 +188,24 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
         try {
             const response = await travelExpensesAPI.submitSettlement(selectedRequest.id, {
                 actualExpense: parseFloat(formData.actualExpense),
-                notes: formData.notes || null
+                notes: formData.notes || null,
+                attachments: selectedFiles
             });
 
             if (response.data && response.data.success) {
                 showToast?.('Báo cáo hoàn ứng đã được gửi thành công', 'success');
-                // Refresh requests
-                window.location.reload();
+
+                // Reset form
+                setFormData({
+                    actualExpense: '',
+                    notes: ''
+                });
+                setAttachments([]);
+                setSelectedFiles([]);
+                setSelectedRequestId(null);
+
+                // Refresh requests list
+                await fetchRequests();
             }
         } catch (error) {
             console.error('Error submitting settlement:', error);
@@ -226,7 +263,7 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
     // Calculate result
     const calculateResult = () => {
         if (!selectedRequest || !formData.actualExpense) return null;
-        
+
         const advance = selectedRequest.advanceAmount;
         const actual = parseFloat(formData.actualExpense);
         const difference = advance - actual;
@@ -380,19 +417,49 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
                                             I. THÔNG TIN CÔNG TÁC VÀ TÓM TẮT NGÂN SÁCH
                                         </h3>
                                         <div className="travel-expense-settlement-section-content travel-expense-settlement-section-summary-content">
-                                            <div className="travel-expense-settlement-info-item-full">
-                                                <div>
+                                            <div className="travel-expense-settlement-info-grid">
+                                                <div className="travel-expense-settlement-info-item">
+                                                    <span className="travel-expense-settlement-info-label">Nhân viên:</span>
+                                                    <span className="travel-expense-settlement-info-value">{selectedRequest.employeeName}</span>
+                                                </div>
+                                                <div className="travel-expense-settlement-info-item">
+                                                    <span className="travel-expense-settlement-info-label">Địa điểm:</span>
+                                                    <span className="travel-expense-settlement-info-value">{selectedRequest.locationFull || selectedRequest.location}</span>
+                                                </div>
+                                                {selectedRequest.companyName && (
+                                                    <div className="travel-expense-settlement-info-item">
+                                                        <span className="travel-expense-settlement-info-label">Công ty/Đối tác:</span>
+                                                        <span className="travel-expense-settlement-info-value">{selectedRequest.companyName}</span>
+                                                    </div>
+                                                )}
+                                                {selectedRequest.companyAddress && (
+                                                    <div className="travel-expense-settlement-info-item">
+                                                        <span className="travel-expense-settlement-info-label">Địa chỉ công ty:</span>
+                                                        <span className="travel-expense-settlement-info-value">{selectedRequest.companyAddress}</span>
+                                                    </div>
+                                                )}
+                                                <div className="travel-expense-settlement-info-item-full">
                                                     <span className="travel-expense-settlement-info-label">Mục Đích Công Tác:</span>
                                                     <span className="travel-expense-settlement-info-value">{selectedRequest.purpose}</span>
                                                 </div>
-                                                <div>
+                                                <div className="travel-expense-settlement-info-item">
                                                     <span className="travel-expense-settlement-info-label">Từ Ngày:</span>
                                                     <span className="travel-expense-settlement-info-value">{selectedRequest.startDate}</span>
                                                 </div>
-                                                <div>
+                                                <div className="travel-expense-settlement-info-item">
                                                     <span className="travel-expense-settlement-info-label">Đến Ngày:</span>
                                                     <span className="travel-expense-settlement-info-value">{selectedRequest.endDate}</span>
                                                 </div>
+                                                {selectedRequest.livingAllowance && (
+                                                    <div className="travel-expense-settlement-info-item">
+                                                        <span className="travel-expense-settlement-info-label">Phụ cấp/Phí sinh hoạt:</span>
+                                                        <span className="travel-expense-settlement-info-value">
+                                                            {selectedRequest.livingAllowance.currency === 'VND'
+                                                                ? selectedRequest.livingAllowance.amount.toLocaleString('vi-VN')
+                                                                : selectedRequest.livingAllowance.amount} {selectedRequest.livingAllowance.currency}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="travel-expense-settlement-advance-amount-large">
                                                 <span className="travel-expense-settlement-advance-label">Số Tiền Tạm Ứng Ban Đầu:</span>
@@ -453,30 +520,93 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
                                                 )}
                                             </div>
                                             {/* Attachments Section */}
-                                            <div className="travel-expense-settlement-attachments">
-                                                <div className="travel-expense-settlement-attachments-box">
-                                                    {attachments.length > 0 ? (
-                                                        <>
+                                            <div className="travel-expense-settlement-form-group">
+                                                <label className="travel-expense-settlement-form-label">
+                                                    3. Đính Kèm Chứng Từ (PDF, JPG, PNG)
+                                                </label>
+                                                {selectedRequest.actualExpense ? (
+                                                    // If already submitted, show existing attachments
+                                                    <div className="travel-expense-settlement-attachments-box">
+                                                        {attachments.length > 0 ? (
+                                                            <>
+                                                                <div className="travel-expense-settlement-attachments-info">
+                                                                    Chứng từ đính kèm: {attachments.length} files đã được HR xác nhận.
+                                                                </div>
+                                                                <a
+                                                                    href="#"
+                                                                    className="travel-expense-settlement-attachments-link"
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        // TODO: Show attachment list modal
+                                                                    }}
+                                                                >
+                                                                    Xem danh sách files
+                                                                </a>
+                                                            </>
+                                                        ) : (
                                                             <div className="travel-expense-settlement-attachments-info">
-                                                                Chứng từ đính kèm: {attachments.length} files đã được HR xác nhận.
+                                                                Chưa có chứng từ đính kèm.
                                                             </div>
-                                                            <a 
-                                                                href="#" 
-                                                                className="travel-expense-settlement-attachments-link"
-                                                                onClick={(e) => {
-                                                                    e.preventDefault();
-                                                                    // TODO: Show attachment list modal
-                                                                }}
-                                                            >
-                                                                Xem danh sách files
-                                                            </a>
-                                                        </>
-                                                    ) : (
-                                                        <div className="travel-expense-settlement-attachments-info">
-                                                            Chưa có chứng từ đính kèm.
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    // If not submitted yet, show file upload
+                                                    <div>
+                                                        <input
+                                                            type="file"
+                                                            id="fileUpload"
+                                                            multiple
+                                                            accept=".pdf,.jpg,.jpeg,.png"
+                                                            onChange={(e) => {
+                                                                const files = Array.from(e.target.files || []);
+                                                                setSelectedFiles(files);
+                                                            }}
+                                                            className="travel-expense-settlement-file-input"
+                                                            style={{
+                                                                width: '100%',
+                                                                padding: '0.75rem',
+                                                                border: '1px solid #d1d5db',
+                                                                borderRadius: '0.5rem',
+                                                                fontSize: '0.875rem',
+                                                                cursor: 'pointer'
+                                                            }}
+                                                        />
+                                                        {selectedFiles.length > 0 && (
+                                                            <div style={{ marginTop: '0.5rem' }}>
+                                                                <div className="travel-expense-settlement-attachments-info">
+                                                                    Đã chọn {selectedFiles.length} file(s):
+                                                                </div>
+                                                                <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem', fontSize: '0.875rem', color: '#4b5563' }}>
+                                                                    {selectedFiles.map((file, index) => (
+                                                                        <li key={index}>{file.name}</li>
+                                                                    ))}
+                                                                </ul>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setSelectedFiles([]);
+                                                                        document.getElementById('fileUpload').value = '';
+                                                                    }}
+                                                                    style={{
+                                                                        marginTop: '0.5rem',
+                                                                        padding: '0.5rem 1rem',
+                                                                        backgroundColor: '#ef4444',
+                                                                        color: 'white',
+                                                                        border: 'none',
+                                                                        borderRadius: '0.375rem',
+                                                                        cursor: 'pointer',
+                                                                        fontSize: '0.875rem'
+                                                                    }}
+                                                                >
+                                                                    Xóa tất cả
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        <div style={{ marginTop: '0.5rem', fontSize: '0.8125rem', color: '#6b7280' }}>
+                                                            Chấp nhận các file: PDF, JPG, JPEG, PNG (tối đa 10MB mỗi file)
                                                         </div>
-                                                    )}
-                                                </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -511,11 +641,11 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
                                                         {Math.abs(result.difference).toLocaleString('vi-VN')} VND
                                                     </div>
                                                     <div className="travel-expense-settlement-result-description">
-                                                        {result.needsRefund 
+                                                        {result.needsRefund
                                                             ? 'Số tiền CẦN HOÀN TRẢ lại công ty.'
                                                             : result.needsSupplement
-                                                            ? 'Số tiền CÔNG TY CẦN BỔ SUNG.'
-                                                            : 'Số tiền khớp với tạm ứng.'}
+                                                                ? 'Số tiền CÔNG TY CẦN BỔ SUNG.'
+                                                                : 'Số tiền khớp với tạm ứng.'}
                                                     </div>
                                                 </div>
                                             </div>

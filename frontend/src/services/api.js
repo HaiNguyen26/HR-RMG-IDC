@@ -281,6 +281,8 @@ export const travelExpensesAPI = {
   accountantCheck: (id, data) => api.post(`/travel-expenses/${id}/accountant/check`, data),
   processAdvance: (id, data) => api.post(`/travel-expenses/${id}/advance/process`, data),
   confirmAdvanceTransfer: (id, data) => api.post(`/travel-expenses/${id}/advance`, data),
+  approveException: (id, data) => api.post(`/travel-expenses/${id}/exception-approval`, data),
+  confirmPayment: (id, data) => api.post(`/travel-expenses/${id}/payment`, data),
 };
 
 // Customer Entertainment Expenses API

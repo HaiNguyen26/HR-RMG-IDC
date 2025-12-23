@@ -266,6 +266,36 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 10: $MIGRATION10${NC}"
 fi
 
+# Migration 11: add_exception_approval_fields_to_travel_expenses.sql (Thêm các trường cho phê duyệt ngoại lệ vượt ngân sách)
+MIGRATION11="$PROJECT_DIR/database/add_exception_approval_fields_to_travel_expenses.sql"
+if [ -f "$MIGRATION11" ]; then
+    echo -e "${BLUE}→ Chạy migration: add_exception_approval_fields_to_travel_expenses.sql (Thêm các trường exception approval)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION11"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 11 thành công - Đã thêm các trường exception approval${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 11${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 11: $MIGRATION11${NC}"
+fi
+
+# Migration 12: add_payment_fields_to_travel_expenses.sql (Thêm các trường cho giải ngân - Bước 8)
+MIGRATION12="$PROJECT_DIR/database/add_payment_fields_to_travel_expenses.sql"
+if [ -f "$MIGRATION12" ]; then
+    echo -e "${BLUE}→ Chạy migration: add_payment_fields_to_travel_expenses.sql (Thêm các trường payment - Giải ngân)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION12"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 12 thành công - Đã thêm các trường payment${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 12${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 12: $MIGRATION12${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"

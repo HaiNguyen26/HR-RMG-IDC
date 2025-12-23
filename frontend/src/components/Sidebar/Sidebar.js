@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { employeesAPI, leaveRequestsAPI, overtimeRequestsAPI, attendanceAdjustmentsAPI, recruitmentRequestsAPI, customerEntertainmentExpensesAPI } from '../../services/api';
+import { employeesAPI, leaveRequestsAPI, overtimeRequestsAPI, attendanceAdjustmentsAPI, recruitmentRequestsAPI, customerEntertainmentExpensesAPI, travelExpensesAPI } from '../../services/api';
 import './Sidebar.css';
 
 const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout, isOpen = false, onClose }) => {
@@ -12,6 +12,9 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
     const [isBranchDirectorForRecruitment, setIsBranchDirectorForRecruitment] = useState(false);
     const [pendingExpenseApprovalCount, setPendingExpenseApprovalCount] = useState(0);
     const [pendingExpenseCeoCount, setPendingExpenseCeoCount] = useState(0);
+    const [pendingTravelExpenseApprovalCount, setPendingTravelExpenseApprovalCount] = useState(0);
+    const [pendingTravelExpenseManagementCount, setPendingTravelExpenseManagementCount] = useState(0); // PENDING_SETTLEMENT
+    const [pendingTravelExpenseAdvanceProcessingCount, setPendingTravelExpenseAdvanceProcessingCount] = useState(0); // PENDING_FINANCE with advance_status = PENDING_ACCOUNTANT
 
     useEffect(() => {
         let isMounted = true;
@@ -518,6 +521,271 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
     // Show approval module if user can approve OR is branch director
     const showEmployeeApprovalModule = canApproveAsEmployee || isBranchDirector || (managerAccessResolved && canApproveFromManagerLookup);
 
+    // Fetch pending travel expense approvals for managers/CEOs
+    useEffect(() => {
+        if (!currentUser?.id || !showEmployeeApprovalModule) {
+            setPendingTravelExpenseApprovalCount(0);
+            return;
+        }
+
+        const fetchPendingTravelExpenseCount = async () => {
+            try {
+                // Helper function to normalize Vietnamese names (remove accents, lowercase, trim)
+                const normalizeName = (name) => {
+                    if (!name) return '';
+                    return name
+                        .toString()
+                        .trim()
+                        .toLowerCase()
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/đ/g, 'd')
+                        .replace(/Đ/g, 'D');
+                };
+
+                // Helper function to check if two names match (fuzzy matching)
+                const namesMatch = (name1, name2) => {
+                    const normalized1 = normalizeName(name1);
+                    const normalized2 = normalizeName(name2);
+                    return normalized1 === normalized2 ||
+                        normalized1.includes(normalized2) ||
+                        normalized2.includes(normalized1);
+                };
+
+                const currentUserName = (currentUser.hoTen || currentUser.username || '').trim();
+                const currentUserChucDanh = (currentUser.chucDanh || '').trim();
+                const currentUserChiNhanh = (currentUser.chiNhanh || currentUser.chi_nhanh || '').trim();
+
+                // Determine user role
+                let userRole = null;
+                if (namesMatch(currentUserName, 'Lê Thanh Tùng')) {
+                    userRole = 'CEO';
+                }
+                const isAdmin = currentUser?.role === 'ADMIN';
+
+                // Determine status filter based on user role
+                let statusFilter = 'PENDING_LEVEL_1,PENDING_LEVEL_2';
+                if (userRole === 'CEO' || isAdmin) {
+                    statusFilter = 'PENDING_CEO,PENDING_EXCEPTION_APPROVAL';
+                }
+
+                // Fetch requests
+                const response = await travelExpensesAPI.getAll({
+                    status: statusFilter
+                });
+                const allRequests = response.data?.data || [];
+
+                // Fetch employees list to check quan_ly_truc_tiep
+                const employeesResponse = await employeesAPI.getAll();
+                const employeesList = employeesResponse.data?.data || [];
+
+                // Filter requests that user can actually approve AND haven't been approved yet
+                let count = 0;
+                for (const req of allRequests) {
+                    let shouldCount = false;
+
+                    // Check if user is CEO/Admin for PENDING_CEO or PENDING_EXCEPTION_APPROVAL
+                    if ((userRole === 'CEO' || isAdmin) && (req.status === 'PENDING_CEO' || req.status === 'PENDING_EXCEPTION_APPROVAL')) {
+                        if (req.status === 'PENDING_EXCEPTION_APPROVAL') {
+                            // Kiểm tra xem chưa được duyệt
+                            const exceptionStatus = req.exception_approval_status || req.exceptionApproval?.status || null;
+                            if (!exceptionStatus || exceptionStatus !== 'APPROVED_EXCEPTION') {
+                                shouldCount = true;
+                            }
+                        } else if (req.status === 'PENDING_CEO' && req.location_type === 'INTERNATIONAL') {
+                            // Kiểm tra xem CEO chưa duyệt
+                            const ceoDecision = req.ceo_decision || req.decisions?.ceo?.decision || null;
+                            if (!ceoDecision || ceoDecision !== 'APPROVE') {
+                                shouldCount = true;
+                            }
+                        }
+                    }
+                    // Check if user is Branch Director for PENDING_LEVEL_2
+                    else if (req.status === 'PENDING_LEVEL_2' && currentUserChucDanh) {
+                        // Normalize chucDanh để kiểm tra (bỏ dấu, lowercase) - giống logic trong TravelExpenseApproval
+                        const normalizeChucDanh = (chucDanh) => {
+                            if (!chucDanh) return '';
+                            return chucDanh
+                                .toString()
+                                .trim()
+                                .toLowerCase()
+                                .normalize('NFD')
+                                .replace(/[\u0300-\u036f]/g, '')
+                                .replace(/đ/g, 'd')
+                                .replace(/Đ/g, 'D');
+                        };
+
+                        const normalizedChucDanh = normalizeChucDanh(currentUserChucDanh);
+                        const isBranchDirector = normalizedChucDanh.includes('giam doc') || normalizedChucDanh.includes('giamdoc');
+
+                        if (isBranchDirector) {
+                            // Check if same branch
+                            const employeeId = req.employee_id || req.employeeId;
+                            const requestEmployee = employeesList.find(emp => emp.id === employeeId);
+                            let hasPermission = false;
+
+                            if (requestEmployee) {
+                                const employeeBranchRaw = requestEmployee.chi_nhanh || requestEmployee.chiNhanh;
+                                const employeeBranch = (employeeBranchRaw || '').toString().trim();
+                                const userBranch = (currentUserChiNhanh || '').toString().trim();
+
+                                // So sánh chi nhánh (case-insensitive, normalize, bỏ dấu, bỏ khoảng trắng thừa)
+                                const normalizeBranch = (branch) => {
+                                    if (!branch) return '';
+                                    return branch
+                                        .toString()
+                                        .trim()
+                                        .toLowerCase()
+                                        .normalize('NFD')
+                                        .replace(/[\u0300-\u036f]/g, '')
+                                        .replace(/đ/g, 'd')
+                                        .replace(/Đ/g, 'D')
+                                        .replace(/\s+/g, '');
+                                };
+
+                                const normalizedUserBranch = normalizeBranch(userBranch);
+                                const normalizedEmployeeBranch = normalizeBranch(employeeBranch);
+
+                                // Nếu có thông tin chi nhánh cho cả hai, so sánh
+                                if (employeeBranch && userBranch) {
+                                    if (normalizedUserBranch === normalizedEmployeeBranch) {
+                                        hasPermission = true;
+                                    }
+                                } else {
+                                    // Nếu một trong hai không có thông tin chi nhánh, vẫn cho phép nếu là Giám đốc (fallback)
+                                    hasPermission = true;
+                                }
+                            } else {
+                                // Nếu không tìm thấy employee, vẫn cho phép nếu là Giám đốc (fallback)
+                                hasPermission = true;
+                            }
+
+                            if (hasPermission) {
+                                // Kiểm tra xem chưa được duyệt
+                                const branchDirectorDecision = req.branch_director_decision || req.decisions?.branchDirector?.decision || null;
+                                if (!branchDirectorDecision || branchDirectorDecision !== 'APPROVE') {
+                                    shouldCount = true;
+                                }
+                            }
+                        }
+                    }
+                    // Check if user is Direct Manager for PENDING_LEVEL_1
+                    else if (req.status === 'PENDING_LEVEL_1') {
+                        const employeeId = req.employee_id || req.employeeId;
+                        if (employeeId) {
+                            const requestEmployee = employeesList.find(emp => emp.id === employeeId);
+                            if (requestEmployee && requestEmployee.quan_ly_truc_tiep) {
+                                const managerName = requestEmployee.quan_ly_truc_tiep.trim();
+                                if (namesMatch(currentUserName, managerName)) {
+                                    // Kiểm tra xem chưa được duyệt
+                                    const managerDecision = req.manager_decision || req.decisions?.manager?.decision || null;
+                                    if (!managerDecision || managerDecision !== 'APPROVE') {
+                                        shouldCount = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (shouldCount) {
+                        count++;
+                    }
+                }
+
+                console.log('[Sidebar] Travel expense approval count:', {
+                    allRequestsCount: allRequests.length,
+                    filteredCount: count,
+                    currentUser: currentUserName,
+                    userRole,
+                    isAdmin,
+                    statusFilter
+                });
+
+                setPendingTravelExpenseApprovalCount(count);
+            } catch (error) {
+                console.error('Error fetching pending travel expense approval count:', error);
+                setPendingTravelExpenseApprovalCount(0);
+            }
+        };
+
+        fetchPendingTravelExpenseCount();
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchPendingTravelExpenseCount, 30000);
+        return () => clearInterval(interval);
+    }, [currentUser?.id, currentUser?.hoTen, currentUser?.username, currentUser?.chucDanh, currentUser?.chiNhanh, currentUser?.chi_nhanh, currentUser?.role, showEmployeeApprovalModule]);
+
+    // Fetch pending travel expense management count (PENDING_SETTLEMENT with settlement.status = 'SUBMITTED')
+    useEffect(() => {
+        if (!currentUser?.id || currentUser?.role !== 'HR') {
+            setPendingTravelExpenseManagementCount(0);
+            return;
+        }
+
+        const fetchPendingTravelExpenseManagementCount = async () => {
+            try {
+                const response = await travelExpensesAPI.getAll({
+                    status: 'PENDING_SETTLEMENT'
+                });
+
+                if (response.data && response.data.success) {
+                    // Chỉ lấy các request đã được nhân viên submit báo cáo (settlement.status = 'SUBMITTED')
+                    const submittedRequests = (response.data.data || []).filter(req =>
+                        req.settlement && req.settlement.status === 'SUBMITTED'
+                    );
+
+                    setPendingTravelExpenseManagementCount(submittedRequests.length);
+                } else {
+                    setPendingTravelExpenseManagementCount(0);
+                }
+            } catch (error) {
+                console.error('Error fetching pending travel expense management count:', error);
+                setPendingTravelExpenseManagementCount(0);
+            }
+        };
+
+        fetchPendingTravelExpenseManagementCount();
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchPendingTravelExpenseManagementCount, 30000);
+        return () => clearInterval(interval);
+    }, [currentUser?.id, currentUser?.role]);
+
+    // Fetch pending travel expense advance processing count (PENDING_FINANCE with advance_status = null or not PENDING_ACCOUNTANT/TRANSFERRED)
+    useEffect(() => {
+        if (!currentUser?.id || currentUser?.role !== 'HR') {
+            setPendingTravelExpenseAdvanceProcessingCount(0);
+            return;
+        }
+
+        const fetchPendingTravelExpenseAdvanceProcessingCount = async () => {
+            try {
+                const response = await travelExpensesAPI.getAll({
+                    status: 'PENDING_FINANCE'
+                });
+
+                if (response.data && response.data.success) {
+                    // Chỉ lấy các đơn chưa được HR xử lý tạm ứng
+                    // (loại bỏ các đơn đã có advance_status = 'PENDING_ACCOUNTANT' hoặc 'TRANSFERRED')
+                    const unprocessedRequests = (response.data.data || []).filter(req => {
+                        const advanceStatus = req.advance_status || req.advance?.status;
+                        return !advanceStatus || (advanceStatus !== 'PENDING_ACCOUNTANT' && advanceStatus !== 'TRANSFERRED');
+                    });
+
+                    setPendingTravelExpenseAdvanceProcessingCount(unprocessedRequests.length);
+                } else {
+                    setPendingTravelExpenseAdvanceProcessingCount(0);
+                }
+            } catch (error) {
+                console.error('Error fetching pending travel expense advance processing count:', error);
+                setPendingTravelExpenseAdvanceProcessingCount(0);
+            }
+        };
+
+        fetchPendingTravelExpenseAdvanceProcessingCount();
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchPendingTravelExpenseAdvanceProcessingCount, 30000);
+        return () => clearInterval(interval);
+    }, [currentUser?.id, currentUser?.role]);
+
     // Debug log
     useEffect(() => {
         if (currentUser) {
@@ -606,21 +874,63 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                         </li>
                     )}
                     {currentUser?.role === 'HR' && (
-                        <li>
-                            <button
-                                onClick={() => onNavigate('recruitment-management')}
-                                className={`nav-item ${currentView === 'recruitment-management' ? 'active' : ''}`}
-                            >
-                                <span className="nav-icon-wrapper">
-                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                            d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
-                                        </path>
-                                    </svg>
-                                </span>
-                                <span className="nav-label">Quản lý tuyển dụng</span>
-                            </button>
-                        </li>
+                        <>
+                            <li>
+                                <button
+                                    onClick={() => onNavigate('recruitment-management')}
+                                    className={`nav-item ${currentView === 'recruitment-management' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                                            </path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Quản lý tuyển dụng</span>
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => onNavigate('travel-expense-management')}
+                                    className={`nav-item ${currentView === 'travel-expense-management' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                            </path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Quản lý công tác</span>
+                                    {pendingTravelExpenseManagementCount > 0 && (
+                                        <span className="nav-badge nav-badge-pulse">
+                                            {pendingTravelExpenseManagementCount > 99 ? '99+' : pendingTravelExpenseManagementCount}
+                                        </span>
+                                    )}
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => onNavigate('travel-expense-advance-processing')}
+                                    className={`nav-item ${currentView === 'travel-expense-advance-processing' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z">
+                                            </path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Xử lý tạm ứng</span>
+                                    {pendingTravelExpenseAdvanceProcessingCount > 0 && (
+                                        <span className="nav-badge nav-badge-pulse">
+                                            {pendingTravelExpenseAdvanceProcessingCount > 99 ? '99+' : pendingTravelExpenseAdvanceProcessingCount}
+                                        </span>
+                                    )}
+                                </button>
+                            </li>
+                        </>
                     )}
                     {/* Placeholder for future modules */}
                     <li className="nav-section-label">
@@ -687,6 +997,36 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                         </svg>
                                     </span>
                                     <span className="nav-label">Chi phí Tiếp khách</span>
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => onNavigate('travel-expense')}
+                                    className={`nav-item ${currentView === 'travel-expense' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                                            </path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Yêu cầu công tác</span>
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => onNavigate('travel-expense-settlement')}
+                                    className={`nav-item ${currentView === 'travel-expense-settlement' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                            </path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Quyết toán công tác</span>
                                 </button>
                             </li>
                             {/* Kế toán: Trần Nhật Thanh - Báo Cáo Tổng Hợp Chi Phí Tiếp Khách */}
@@ -771,6 +1111,21 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                                     </svg>
                                                 </span>
                                                 <span className="nav-label">Thanh Toán & Lưu Trữ</span>
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button
+                                                onClick={() => onNavigate('travel-expense-accountant')}
+                                                className={`nav-item ${currentView === 'travel-expense-accountant' ? 'active' : ''}`}
+                                            >
+                                                <span className="nav-icon-wrapper">
+                                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4">
+                                                        </path>
+                                                    </svg>
+                                                </span>
+                                                <span className="nav-label">Kiểm tra quyết toán công tác</span>
                                             </button>
                                         </li>
                                     </>
@@ -868,6 +1223,28 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                                 {pendingExpenseApprovalCount > 0 && (
                                                     <span className="nav-badge nav-badge-pulse">
                                                         {pendingExpenseApprovalCount}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        </li>
+                                    )}
+                                    {showEmployeeApprovalModule && (
+                                        <li>
+                                            <button
+                                                onClick={() => onNavigate('travel-expense-approval')}
+                                                className={`nav-item nav-item-approval ${currentView === 'travel-expense-approval' ? 'active' : ''}`}
+                                            >
+                                                <span className="nav-icon-wrapper">
+                                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                                                        </path>
+                                                    </svg>
+                                                </span>
+                                                <span className="nav-label">Phê duyệt công tác</span>
+                                                {pendingTravelExpenseApprovalCount > 0 && (
+                                                    <span className="nav-badge nav-badge-pulse">
+                                                        {pendingTravelExpenseApprovalCount > 99 ? '99+' : pendingTravelExpenseApprovalCount}
                                                     </span>
                                                 )}
                                             </button>

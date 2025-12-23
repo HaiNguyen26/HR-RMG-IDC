@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './TimePicker24h.css';
 
-const TimePicker24h = ({ value, onChange, className = '', placeholder = '--:--', minuteStep = 1 }) => {
+const TimePicker24h = ({ value, onChange, className = '', placeholder = '--:--', minuteStep = 1, disabledMinutesForHour = null }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [hours, setHours] = useState('');
   const [minutes, setMinutes] = useState('');
@@ -32,7 +32,7 @@ const TimePicker24h = ({ value, onChange, className = '', placeholder = '--:--',
           hourButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }
-      
+
       // Scroll to selected minute
       if (minutesGridRef.current && minutes !== '') {
         const minuteValue = parseInt(minutes, 10);
@@ -71,6 +71,15 @@ const TimePicker24h = ({ value, onChange, className = '', placeholder = '--:--',
   };
 
   const handleMinuteSelect = (minute) => {
+    // Kiểm tra nếu phút này bị disable cho giờ hiện tại
+    const isDisabled = disabledMinutesForHour &&
+      parseInt(hours || 0, 10) === disabledMinutesForHour.hour &&
+      disabledMinutesForHour.minutes.includes(minute);
+
+    if (isDisabled) {
+      return; // Không cho phép chọn
+    }
+
     const newMinutes = minute.toString().padStart(2, '0');
     setMinutes(newMinutes);
     const timeValue = `${hours || '00'}:${newMinutes}`;
@@ -115,12 +124,23 @@ const TimePicker24h = ({ value, onChange, className = '', placeholder = '--:--',
             <div className="time-picker-24h-grid" ref={minutesGridRef}>
               {Array.from({ length: Math.floor(60 / minuteStep) }, (_, i) => {
                 const minute = i * minuteStep;
+                // Kiểm tra nếu phút này bị disable cho giờ hiện tại
+                const isDisabled = disabledMinutesForHour &&
+                  parseInt(hours || 0, 10) === disabledMinutesForHour.hour &&
+                  disabledMinutesForHour.minutes.includes(minute);
+
                 return (
                   <button
                     key={minute}
                     type="button"
-                    className={`time-picker-24h-option ${minutes === minute.toString().padStart(2, '0') ? 'selected' : ''}`}
-                    onClick={() => handleMinuteSelect(minute)}
+                    className={`time-picker-24h-option ${minutes === minute.toString().padStart(2, '0') ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
+                    onClick={() => {
+                      if (!isDisabled) {
+                        handleMinuteSelect(minute);
+                      }
+                    }}
+                    disabled={isDisabled}
+                    style={isDisabled ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
                   >
                     {minute.toString().padStart(2, '0')}
                   </button>

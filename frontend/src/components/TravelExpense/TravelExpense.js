@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import './TravelExpense.css';
+import { destinations } from './destinations';
 
 const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
     // State cho form
@@ -12,11 +13,16 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
         endDateTime: '',         // Ngày giờ kết thúc
         requestedAdvanceAmount: '' // Số tiền cần tạm ứng
     });
-    
-    // State cho phí sinh hoạt tự động
+
+    // State cho phí sinh hoạt tự động và châu lục
     const [livingAllowance, setLivingAllowance] = useState(null);
-    const [notification, setNotification] = useState(null);
+    const [continent, setContinent] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // State cho autocomplete dropdown
+    const [isDestinationDropdownOpen, setIsDestinationDropdownOpen] = useState(false);
+    const [destinationSearchQuery, setDestinationSearchQuery] = useState('');
+    const destinationDropdownRef = useRef(null);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -24,58 +30,76 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
             ...prev,
             [name]: value
         }));
+
+        // Khi nhập địa điểm, mở dropdown và cập nhật search query
+        if (name === 'destination') {
+            setDestinationSearchQuery(value);
+            setIsDestinationDropdownOpen(true);
+        }
     };
 
-    const domesticLocations = useMemo(() => ['Hà Nội', 'TP.HCM'], []);
-    const internationalLocations = useMemo(() => ['Singapore', 'New York', 'Paris', 'London', 'Berlin', 'Tokyo', 'Seoul', 'Bangkok', 'Jakarta', 'Manila'], []);
+    // Filter destinations based on search query
+    const filteredDestinations = useMemo(() => {
+        if (!destinationSearchQuery) return destinations.slice(0, 50); // Show first 50 when no search
 
+        const query = destinationSearchQuery.toLowerCase().trim();
+        return destinations.filter(dest =>
+            dest.label.toLowerCase().includes(query) ||
+            dest.value.toLowerCase().includes(query)
+        ).slice(0, 50); // Limit to 50 results
+    }, [destinationSearchQuery]);
+
+    // Handle destination selection
+    const handleDestinationSelect = (destination) => {
+        setFormData(prev => ({
+            ...prev,
+            destination: destination.value
+        }));
+        setDestinationSearchQuery(destination.value);
+        setIsDestinationDropdownOpen(false);
+    };
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (destinationDropdownRef.current && !destinationDropdownRef.current.contains(event.target)) {
+                setIsDestinationDropdownOpen(false);
+            }
+        };
+
+        if (isDestinationDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isDestinationDropdownOpen]);
+
+    // Xác định travelScope từ destination đã chọn
     const travelScope = useMemo(() => {
         if (!formData.destination) return null;
-        if (internationalLocations.includes(formData.destination)) return 'international';
-        if (domesticLocations.includes(formData.destination)) return 'domestic';
-        return null;
-    }, [formData.destination, domesticLocations, internationalLocations]);
 
-    // Xác định châu lục và tính phí sinh hoạt tự động
-    useEffect(() => {
-        if (travelScope === 'international' && formData.destination) {
-            const location = formData.destination.toLowerCase();
-            
-            // Danh sách các thành phố/quốc gia Châu Âu (EU)
-            const europeanLocations = ['paris', 'london', 'berlin', 'madrid', 'rome', 'amsterdam', 'vienna', 'brussels', 'stockholm', 'copenhagen', 'dublin', 'lisbon', 'warsaw', 'prague', 'budapest', 'athens', 'helsinki', 'oslo', 'reykjavik', 'zurich', 'geneva'];
-            
-            // Danh sách các thành phố/quốc gia Châu Á
-            const asianLocations = ['tokyo', 'seoul', 'beijing', 'shanghai', 'hong kong', 'bangkok', 'jakarta', 'manila', 'kuala lumpur', 'singapore', 'hanoi', 'ho chi minh', 'sai gon', 'dhaka', 'colombo', 'kathmandu', 'thimphu', 'male', 'islamabad', 'kabul', 'tehran', 'baghdad', 'riyadh', 'dubai', 'abu dhabi', 'doha', 'kuwait', 'manama', 'muscat', 'sanaa', 'amman', 'beirut', 'damascus', 'jerusalem', 'tel aviv', 'ankara', 'istanbul', 'ulaanbaatar', 'astana', 'tashkent'];
-            
-            let continent = null;
-            let allowance = null;
-            
-            // Kiểm tra Châu Âu
-            for (const euLoc of europeanLocations) {
-                if (location.includes(euLoc)) {
-                    continent = 'EU';
-                    allowance = { amount: 60, currency: 'USD' };
-                    break;
-                }
-            }
-            
-            // Kiểm tra Châu Á (nếu chưa tìm thấy Châu Âu)
-            if (!continent) {
-                for (const asianLoc of asianLocations) {
-                    if (location.includes(asianLoc)) {
-                        continent = 'ASIAN';
-                        allowance = { amount: 40, currency: 'USD' };
-                        break;
-                    }
-                }
-            }
-            
-            setLivingAllowance(allowance);
-        } else {
-            setLivingAllowance(null);
+        // Tìm destination trong danh sách
+        const selectedDest = destinations.find(d => d.value === formData.destination);
+        if (selectedDest) {
+            return selectedDest.type === 'domestic' ? 'domestic' : 'international';
         }
-    }, [travelScope, formData.destination]);
 
+        // Fallback: kiểm tra theo keyword nếu không tìm thấy exact match
+        const destinationLower = formData.destination.toLowerCase().trim();
+        const domesticKeywords = ['hà nội', 'hanoi', 'tp.hcm', 'tphcm', 'ho chi minh', 'hồ chí minh', 'đà nẵng', 'da nang', 'hải phòng', 'hai phong', 'cần thơ', 'can tho', 'việt nam', 'vietnam'];
+
+        for (const keyword of domesticKeywords) {
+            if (destinationLower.includes(keyword)) {
+                return 'domestic';
+            }
+        }
+
+        return 'international'; // Default to international if not domestic
+    }, [formData.destination]);
+
+    // Tính toán travelTiming
     const travelTiming = useMemo(() => {
         if (!formData.startDateTime || !formData.endDateTime) {
             return { ready: false };
@@ -107,6 +131,47 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
             isOvernight
         };
     }, [formData.startDateTime, formData.endDateTime]);
+
+    // Xác định châu lục và tính phí sinh hoạt tự động
+    useEffect(() => {
+        if (travelScope === 'international' && formData.destination) {
+            // Tìm destination trong danh sách để lấy continent
+            const selectedDest = destinations.find(d => d.value === formData.destination);
+
+            let detectedContinent = selectedDest?.continent || null;
+            let allowance = null;
+
+            // Tính phí sinh hoạt dựa trên châu lục
+            if (detectedContinent === 'EU') {
+                allowance = { amount: 60, currency: 'USD' };
+            } else if (detectedContinent === 'ASIAN') {
+                allowance = { amount: 40, currency: 'USD' };
+            } else if (detectedContinent === 'AMERICAS') {
+                allowance = { amount: 50, currency: 'USD' };
+            } else if (detectedContinent === 'OCEANIA') {
+                allowance = { amount: 55, currency: 'USD' };
+            } else if (detectedContinent === 'AFRICA') {
+                allowance = { amount: 45, currency: 'USD' };
+            }
+
+            setContinent(detectedContinent);
+            setLivingAllowance(allowance);
+        } else if (travelScope === 'domestic' && travelTiming.ready && travelTiming.isOvernight) {
+            // Trong nước và qua đêm: phụ cấp 230k/ngày
+            const start = new Date(formData.startDateTime);
+            const end = new Date(formData.endDateTime);
+            const diffMs = end - start;
+            const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24)); // Số ngày (làm tròn lên)
+            const allowanceAmount = diffDays * 230000; // 230k VND mỗi ngày
+
+            setContinent(null);
+            setLivingAllowance({ amount: allowanceAmount, currency: 'VND' });
+        } else {
+            setContinent(null);
+            setLivingAllowance(null);
+        }
+    }, [travelScope, formData.destination, formData.startDateTime, formData.endDateTime, travelTiming]);
+
 
     const travelTimeInsight = useMemo(() => {
         if (!travelTiming.ready) return null;
@@ -167,11 +232,13 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
             id: 'livingAllowance',
             icon: '💰',
             label: 'Phí Sinh Hoạt Tự Động',
-            value: `${livingAllowance.amount} ${livingAllowance.currency}`,
+            value: `${livingAllowance.currency === 'VND' ? livingAllowance.amount.toLocaleString('vi-VN') : livingAllowance.amount} ${livingAllowance.currency}`,
             tone: 'indigo',
-            note: `Hệ thống tự động cấp phí sinh hoạt cho công tác ${travelScope === 'international' ? 'nước ngoài' : ''}`
+            note: travelScope === 'domestic' && travelTiming.isOvernight
+                ? `Hệ thống tự động cấp phụ cấp lưu trú 230,000 VND/ngày cho công tác trong nước qua đêm`
+                : `Hệ thống tự động cấp phí sinh hoạt cho công tác ${travelScope === 'international' ? (continent === 'EU' ? 'Châu Âu' : continent === 'ASIAN' ? 'Châu Á' : 'nước ngoài') : 'trong nước'}`
         }] : [])
-    ], [travelScope, travelTiming, livingAllowance]);
+    ], [travelScope, travelTiming, livingAllowance, continent]);
 
     const isFormReady = Boolean(
         formData.purpose.trim() &&
@@ -199,8 +266,8 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
             errors.push('Vui lòng nhập mục đích công tác.');
         }
 
-        if (!formData.destination) {
-            errors.push('Vui lòng chọn địa điểm công tác.');
+        if (!formData.destination || !formData.destination.trim()) {
+            errors.push('Vui lòng chọn địa điểm công tác từ danh sách.');
         }
 
         if (!formData.startDateTime || !formData.endDateTime) {
@@ -222,7 +289,9 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
         const errors = validateForm();
 
         if (errors.length > 0) {
-            setNotification({ type: 'error', message: errors[0] });
+            if (showToast) {
+                showToast(errors[0], 'error');
+            }
             return;
         }
 
@@ -231,10 +300,10 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
         try {
             // Import API
             const { travelExpensesAPI } = await import('../../services/api');
-            
-            // Xác định locationType
-            const locationType = travelScope === 'international' ? 'INTERNATIONAL' : 'DOMESTIC';
-            
+
+            // Xác định locationType (đảm bảo travelScope đã được xác định qua validation)
+            const locationType = travelScope === 'international' ? 'INTERNATIONAL' : (travelScope === 'domestic' ? 'DOMESTIC' : 'DOMESTIC');
+
             // Format datetime
             const startTime = new Date(formData.startDateTime).toISOString();
             const endTime = new Date(formData.endDateTime).toISOString();
@@ -254,7 +323,9 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
             const response = await travelExpensesAPI.create(requestData);
 
             if (response.data.success) {
-                setNotification({ type: 'success', message: '✅ Yêu cầu công tác đã được gửi thành công!' });
+                if (showToast) {
+                    showToast('✅ Yêu cầu công tác đã được gửi thành công!', 'success');
+                }
                 // Reset form
                 setFormData({
                     purpose: '',
@@ -265,30 +336,25 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
                     endDateTime: '',
                     requestedAdvanceAmount: ''
                 });
+                setContinent(null);
                 setLivingAllowance(null);
             } else {
-                setNotification({ type: 'error', message: response.data.message || 'Có lỗi xảy ra khi gửi yêu cầu' });
+                if (showToast) {
+                    showToast(response.data.message || 'Có lỗi xảy ra khi gửi yêu cầu', 'error');
+                }
             }
         } catch (error) {
             console.error('Error submitting travel expense request:', error);
-            setNotification({ 
-                type: 'error', 
-                message: error.response?.data?.message || 'Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại.' 
-            });
+            if (showToast) {
+                showToast(
+                    error.response?.data?.message || 'Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại.',
+                    'error'
+                );
+            }
         } finally {
             setIsSubmitting(false);
         }
     };
-
-    useEffect(() => {
-        if (!notification) return;
-
-        const timer = setTimeout(() => {
-            setNotification(null);
-        }, 3000);
-
-        return () => clearTimeout(timer);
-    }, [notification]);
 
     return (
         <div className="travel-expense-module">
@@ -391,34 +457,43 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
                         </div>
 
                         <div className="travel-expense-grid">
-                            <div className="travel-expense-form-group">
+                            <div className="travel-expense-form-group" ref={destinationDropdownRef} style={{ position: 'relative' }}>
                                 <label htmlFor="destination" className="travel-expense-label">
                                     Địa Điểm Công Tác <span className="required">*</span>
                                 </label>
-                                <select
+                                <input
+                                    type="text"
                                     id="destination"
                                     name="destination"
-                                    className="travel-expense-select"
+                                    className="travel-expense-input"
                                     value={formData.destination}
                                     onChange={handleInputChange}
+                                    onFocus={() => setIsDestinationDropdownOpen(true)}
+                                    placeholder="Nhập hoặc chọn địa điểm công tác..."
                                     required
-                                >
-                                    <option value="">Chọn địa điểm công tác</option>
-                                    <optgroup label="Trong nước">
-                                        {domesticLocations.map((city) => (
-                                            <option key={city} value={city}>{city}</option>
+                                    autoComplete="off"
+                                />
+                                {isDestinationDropdownOpen && filteredDestinations.length > 0 && (
+                                    <div className="travel-expense-destination-dropdown">
+                                        {filteredDestinations.map((dest) => (
+                                            <div
+                                                key={dest.value}
+                                                className="travel-expense-destination-item"
+                                                onClick={() => handleDestinationSelect(dest)}
+                                                onMouseDown={(e) => e.preventDefault()}
+                                            >
+                                                <span className="travel-expense-destination-label">{dest.label}</span>
+                                                <span className="travel-expense-destination-badge">
+                                                    {dest.type === 'domestic' ? 'Trong nước' : dest.continent === 'EU' ? 'Châu Âu' : dest.continent === 'ASIAN' ? 'Châu Á' : dest.continent === 'AMERICAS' ? 'Châu Mỹ' : dest.continent === 'OCEANIA' ? 'Châu Úc' : dest.continent === 'AFRICA' ? 'Châu Phi' : 'Quốc tế'}
+                                                </span>
+                                            </div>
                                         ))}
-                                    </optgroup>
-                                    <optgroup label="Nước ngoài">
-                                        {internationalLocations.map((city) => (
-                                            <option key={city} value={city}>{city}</option>
-                                        ))}
-                                    </optgroup>
-                                </select>
+                                    </div>
+                                )}
                                 {travelScope && (
                                     <div className={`travel-expense-scope-banner ${travelScope}`}>
                                         {travelScope === 'international'
-                                            ? 'Phạm vi: Quốc tế • Kích hoạt kiểm tra ngân sách ngoại tệ'
+                                            ? `Phạm vi: Quốc tế ${continent ? `• ${continent === 'EU' ? 'Châu Âu' : continent === 'ASIAN' ? 'Châu Á' : continent === 'AMERICAS' ? 'Châu Mỹ' : continent === 'OCEANIA' ? 'Châu Úc' : continent === 'AFRICA' ? 'Châu Phi' : ''}` : ''} • Kích hoạt kiểm tra ngân sách ngoại tệ`
                                             : 'Phạm vi: Trong nước • Áp dụng hạn mức tiêu chuẩn'}
                                     </div>
                                 )}
@@ -529,14 +604,6 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
                 </div>
             </form>
 
-            {notification && (
-                <div className={`travel-expense-notification ${notification.type}`}>
-                    <span className="travel-expense-notification-icon">
-                        {notification.type === 'success' ? '✅' : '⚠️'}
-                    </span>
-                    <p className="travel-expense-notification-message">{notification.message}</p>
-                </div>
-            )}
         </div>
     );
 };

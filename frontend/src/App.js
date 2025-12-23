@@ -296,6 +296,7 @@ function App() {
             <OvertimeRequest
               currentUser={currentUser}
               showToast={showToast}
+              showConfirm={showConfirm}
             />
           );
         case 'attendance-request':

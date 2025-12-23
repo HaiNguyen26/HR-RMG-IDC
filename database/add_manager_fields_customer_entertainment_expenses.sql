@@ -75,3 +75,4 @@ COMMENT ON COLUMN customer_entertainment_expense_requests.manager_decision IS 'Q
 COMMENT ON COLUMN customer_entertainment_expense_requests.manager_notes IS 'Ghi chú của quản lý trực tiếp khi duyệt';
 COMMENT ON COLUMN customer_entertainment_expense_requests.manager_decision_at IS 'Thời gian quản lý trực tiếp đưa ra quyết định';
 
+

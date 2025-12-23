@@ -19,9 +19,14 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                 });
 
                 if (settlementResponse.data && settlementResponse.data.success) {
+                    // Lọc chỉ các request đã được nhân viên submit báo cáo (settlement_status = 'SUBMITTED')
+                    const submittedRequests = (settlementResponse.data.data || []).filter(req =>
+                        req.settlement && req.settlement.status === 'SUBMITTED'
+                    );
+
                     // Fetch attachments for each request
                     const requestsWithAttachments = await Promise.all(
-                        (settlementResponse.data.data || []).map(async (req) => {
+                        submittedRequests.map(async (req) => {
                             try {
                                 const attachmentsResponse = await travelExpensesAPI.getAttachments(req.id);
                                 return {
@@ -98,9 +103,14 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                     status: 'PENDING_SETTLEMENT'
                 });
                 if (refreshResponse.data && refreshResponse.data.success) {
+                    // Lọc chỉ các request đã được nhân viên submit báo cáo (settlement_status = 'SUBMITTED')
+                    const submittedRequests = (refreshResponse.data.data || []).filter(req =>
+                        req.settlement && req.settlement.status === 'SUBMITTED'
+                    );
+
                     // Fetch attachments for each request
                     const requestsWithAttachments = await Promise.all(
-                        (refreshResponse.data.data || []).map(async (req) => {
+                        submittedRequests.map(async (req) => {
                             try {
                                 const attachmentsResponse = await travelExpensesAPI.getAttachments(req.id);
                                 return {
@@ -283,17 +293,7 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                                         </div>
                                     </div>
 
-                                    {/* A.2. Tab Menu: Chỉ còn Tab C - Xác Nhận Hoàn Ứng */}
-                                    <div className="travel-expense-tab-menu">
-                                        <button
-                                            className="travel-expense-tab-button active"
-                                            disabled
-                                        >
-                                            C. Xác Nhận Hoàn Ứng
-                                        </button>
-                                    </div>
-
-                                    {/* B. Nội dung Tab - Chỉ hiển thị Tab C */}
+                                    {/* Nội dung Xác Nhận Hoàn Ứng */}
                                     <div className="travel-expense-tab-content">
                                         {/* Tab C: Xác Nhận Hoàn Ứng */}
                                         {selectedRequestFull && selectedRequestFull.settlement && selectedRequestFull.settlement.status === 'SUBMITTED' ? (
@@ -305,14 +305,14 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                                                 {/* Settlement Information */}
                                                 <div className="travel-expense-settlement-info">
                                                     <div className="travel-expense-settlement-info-item">
-                                                        <span className="travel-expense-settlement-info-label">Chi phí thực tế:</span>
-                                                        <span className="travel-expense-settlement-info-value">
+                                                        <span className="travel-expense-settlement-info-label">Chi phí thực tế</span>
+                                                        <span className="travel-expense-settlement-info-value amount">
                                                             {selectedRequestFull.settlement.actualExpense?.toLocaleString('vi-VN')} VND
                                                         </span>
                                                     </div>
                                                     {selectedRequestFull.settlement.notes && (
                                                         <div className="travel-expense-settlement-info-item">
-                                                            <span className="travel-expense-settlement-info-label">Ghi chú:</span>
+                                                            <span className="travel-expense-settlement-info-label">Ghi chú</span>
                                                             <span className="travel-expense-settlement-info-value">
                                                                 {selectedRequestFull.settlement.notes}
                                                             </span>
@@ -320,7 +320,7 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     )}
                                                     {selectedRequestFull.attachments && selectedRequestFull.attachments.length > 0 && (
                                                         <div className="travel-expense-settlement-info-item">
-                                                            <span className="travel-expense-settlement-info-label">Hóa đơn/Chứng từ:</span>
+                                                            <span className="travel-expense-settlement-info-label">Hóa đơn/Chứng từ</span>
                                                             <div className="travel-expense-settlement-attachments">
                                                                 {selectedRequestFull.attachments.map((att, idx) => (
                                                                     <a
@@ -330,7 +330,10 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                         rel="noopener noreferrer"
                                                                         className="travel-expense-settlement-attachment-link"
                                                                     >
-                                                                        📄 {att.fileName}
+                                                                        <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                        </svg>
+                                                                        {att.fileName}
                                                                     </a>
                                                                 ))}
                                                             </div>
