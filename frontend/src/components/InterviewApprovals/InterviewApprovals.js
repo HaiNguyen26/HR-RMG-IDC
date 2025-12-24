@@ -1110,15 +1110,46 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 }
 
                 // Nếu filter là 'approved', cũng fetch recruitment requests đã duyệt
-                if (selectedFilter === 'approved' && isBranchDirector) {
+                if (selectedFilter === 'approved') {
                     try {
-                        const recruitmentResponse = await recruitmentRequestsAPI.getAll({
-                            branchDirectorId: currentUser?.id,
-                            status: 'APPROVED'
-                        });
+                        let recruitmentData = [];
 
-                        if (recruitmentResponse.data?.success) {
-                            const recruitmentData = recruitmentResponse.data.data || [];
+                        // Fetch recruitment requests đã duyệt cho quản lý trực tiếp (người gửi)
+                        if (['EMPLOYEE', 'MANAGER', 'TEAM_LEAD'].includes(currentUser?.role)) {
+                            try {
+                                const employeeResponse = await recruitmentRequestsAPI.getAll({
+                                    employeeId: currentUser?.id,
+                                    status: 'APPROVED'
+                                });
+                                if (employeeResponse.data?.success) {
+                                    recruitmentData = [...recruitmentData, ...(employeeResponse.data.data || [])];
+                                }
+                            } catch (employeeError) {
+                                console.error('Error fetching approved recruitment requests for employee:', employeeError);
+                            }
+                        }
+
+                        // Fetch recruitment requests đã duyệt cho giám đốc chi nhánh
+                        if (isBranchDirector) {
+                            try {
+                                const directorResponse = await recruitmentRequestsAPI.getAll({
+                                    branchDirectorId: currentUser?.id,
+                                    status: 'APPROVED'
+                                });
+                                if (directorResponse.data?.success) {
+                                    const directorData = directorResponse.data.data || [];
+                                    // Loại bỏ trùng lặp nếu đã có trong recruitmentData (trường hợp user vừa là employee vừa là branch director)
+                                    const existingIds = new Set(recruitmentData.map(r => r.id));
+                                    const uniqueDirectorData = directorData.filter(r => !existingIds.has(r.id));
+                                    recruitmentData = [...recruitmentData, ...uniqueDirectorData];
+                                }
+                            } catch (directorError) {
+                                console.error('Error fetching approved recruitment requests for branch director:', directorError);
+                            }
+                        }
+
+                        // Map recruitment requests data
+                        if (recruitmentData.length > 0) {
                             const mappedRecruitmentRequests = recruitmentData.map(request => ({
                                 id: `recruitment-${request.id}`,
                                 requestId: request.id,
