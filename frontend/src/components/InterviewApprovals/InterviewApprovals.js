@@ -2410,7 +2410,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                 </svg>
                                 <span>Đóng</span>
                             </button>
-                            {isBranchDirector && (
+                            {isBranchDirector && selectedRequest.status === 'PENDING' && (
                                 <>
                                     <button
                                         type="button"
