@@ -309,6 +309,21 @@ BEGIN
     END IF;
 END $$;
 
+-- Sửa constraint NOT NULL của manager_id nếu tồn tại (làm cho nullable)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'recruitment_requests' 
+        AND column_name = 'manager_id'
+        AND is_nullable = 'NO'
+    ) THEN
+        ALTER TABLE recruitment_requests ALTER COLUMN manager_id DROP NOT NULL;
+        RAISE NOTICE 'Đã chuyển manager_id sang nullable';
+    END IF;
+END $$;
+
 -- Tạo indexes nếu chưa tồn tại
 CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_by 
 ON recruitment_requests(created_by_employee_id);

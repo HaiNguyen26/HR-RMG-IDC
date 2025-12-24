@@ -397,6 +397,33 @@ const ensureRecruitmentRequestsTable = async () => {
         } catch (dropError) {
             console.warn('[ensureRecruitmentRequestsTable] Không thể xóa cột tieu_chuan_tuyen_chon:', dropError.message);
         }
+
+        // Kiểm tra và sửa constraint NOT NULL của manager_id nếu tồn tại (làm cho nullable)
+        try {
+            const managerIdCheck = await pool.query(`
+                SELECT 
+                    c.column_name,
+                    c.is_nullable,
+                    c.column_default
+                FROM information_schema.columns c
+                WHERE c.table_name = 'recruitment_requests' 
+                AND c.column_name = 'manager_id'
+            `);
+
+            if (managerIdCheck.rows.length > 0 && managerIdCheck.rows[0].is_nullable === 'NO') {
+                console.log('[ensureRecruitmentRequestsTable] Phát hiện cột manager_id có NOT NULL constraint, đang chuyển sang nullable...');
+                await pool.query(`
+                    ALTER TABLE recruitment_requests 
+                    ALTER COLUMN manager_id DROP NOT NULL
+                `);
+                console.log('[ensureRecruitmentRequestsTable] Đã chuyển manager_id sang nullable thành công');
+            } else if (managerIdCheck.rows.length === 0) {
+                // Nếu cột không tồn tại, có thể thêm nó như nullable (tùy chọn)
+                console.log('[ensureRecruitmentRequestsTable] Cột manager_id không tồn tại (có thể thêm nếu cần)');
+            }
+        } catch (managerIdError) {
+            console.warn('[ensureRecruitmentRequestsTable] Không thể sửa constraint manager_id:', managerIdError.message);
+        }
     } catch (error) {
         console.error('Error ensuring recruitment_requests table:', error);
         throw error;
