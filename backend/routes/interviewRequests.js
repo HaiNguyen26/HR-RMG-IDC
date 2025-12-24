@@ -62,6 +62,7 @@ const ensureCandidatesStatusConstraint = async () => {
 
 // Ensure table
 const ensureInterviewRequestsTable = async () => {
+    // Tạo bảng trước (không tạo index trên branch_director_id ngay)
     await pool.query(`
         CREATE TABLE IF NOT EXISTS interview_requests (
             id SERIAL PRIMARY KEY,
@@ -78,9 +79,12 @@ const ensureInterviewRequestsTable = async () => {
             branch_director_approved_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+        )
+    `);
+
+    // Tạo các index cơ bản (không bao gồm branch_director_id)
+    await pool.query(`
         CREATE INDEX IF NOT EXISTS idx_interview_requests_manager ON interview_requests(manager_id);
-        CREATE INDEX IF NOT EXISTS idx_interview_requests_director ON interview_requests(branch_director_id);
         CREATE INDEX IF NOT EXISTS idx_interview_requests_status ON interview_requests(status);
         CREATE INDEX IF NOT EXISTS idx_interview_requests_candidate ON interview_requests(candidate_id);
     `);
@@ -126,8 +130,19 @@ const ensureInterviewRequestsTable = async () => {
             } catch (fkError) {
                 console.warn('[ensureInterviewRequestsTable] Không thể thêm foreign key constraint cho branch_director_id:', fkError.message);
             }
+        }
 
-            // Tạo index cho cột mới
+        // Tạo index cho branch_director_id (chỉ khi cột đã tồn tại)
+        const indexCheck = await pool.query(`
+            SELECT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_name = 'interview_requests' 
+                AND column_name = 'branch_director_id'
+            )
+        `);
+
+        if (indexCheck.rows[0].exists) {
             try {
                 await pool.query(`
                     CREATE INDEX IF NOT EXISTS idx_interview_requests_director ON interview_requests(branch_director_id)
