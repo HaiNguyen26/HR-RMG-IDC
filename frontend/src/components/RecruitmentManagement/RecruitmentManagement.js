@@ -1024,8 +1024,28 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                     if (showToast) {
                         showToast('Đã cập nhật ứng viên thành công!', 'success');
                     }
+
+                    // Nếu modal "Thông tin Ứng viên" đang mở và đang hiển thị ứng viên vừa cập nhật, refresh dữ liệu TRƯỚC KHI đóng modal chỉnh sửa
+                    const shouldRefreshViewModal = showViewCandidateModal && viewingCandidate && viewingCandidate.id === editingCandidateId;
+
                     handleCloseModal();
                     fetchCandidates(false); // Refresh danh sách
+
+                    // Refresh dữ liệu trong modal "Thông tin Ứng viên" nếu đang mở
+                    if (shouldRefreshViewModal) {
+                        try {
+                            const updatedResponse = await candidatesAPI.getById(editingCandidateId);
+                            if (updatedResponse.data.success && updatedResponse.data.data) {
+                                setViewingCandidate(updatedResponse.data.data);
+                                // Cập nhật candidate trong list để đồng bộ
+                                setCandidates(prevCandidates =>
+                                    prevCandidates.map(c => c.id === editingCandidateId ? updatedResponse.data.data : c)
+                                );
+                            }
+                        } catch (err) {
+                            console.error('Error refreshing candidate detail:', err);
+                        }
+                    }
                 } else {
                     throw new Error(response.data.message || 'Lỗi khi cập nhật ứng viên');
                 }
