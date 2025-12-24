@@ -179,10 +179,52 @@ const ensureRecruitmentRequestsTable = async () => {
             )
         `);
 
-        // Tạo indexes riêng biệt
-        await pool.query(`
-            CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_by ON recruitment_requests(created_by_employee_id)
+        // Kiểm tra và thêm cột created_by_employee_id nếu bảng đã tồn tại nhưng thiếu cột này
+        const columnCheck = await pool.query(`
+            SELECT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_name = 'recruitment_requests' 
+                AND column_name = 'created_by_employee_id'
+            )
         `);
+        
+        if (!columnCheck.rows[0].exists) {
+            console.log('[ensureRecruitmentRequestsTable] Bảng đã tồn tại nhưng thiếu cột created_by_employee_id, đang thêm cột...');
+            await pool.query(`
+                ALTER TABLE recruitment_requests 
+                ADD COLUMN created_by_employee_id INTEGER
+            `);
+            
+            // Thêm foreign key constraint nếu có
+            try {
+                await pool.query(`
+                    ALTER TABLE recruitment_requests
+                    ADD CONSTRAINT fk_recruitment_requests_created_by_employee 
+                    FOREIGN KEY (created_by_employee_id) 
+                    REFERENCES employees(id) 
+                    ON DELETE CASCADE
+                `);
+            } catch (fkError) {
+                console.warn('[ensureRecruitmentRequestsTable] Không thể thêm foreign key constraint:', fkError.message);
+            }
+        }
+
+        // Tạo indexes riêng biệt (chỉ tạo index nếu cột tồn tại)
+        const indexCheck = await pool.query(`
+            SELECT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_name = 'recruitment_requests' 
+                AND column_name = 'created_by_employee_id'
+            )
+        `);
+        
+        if (indexCheck.rows[0].exists) {
+            await pool.query(`
+                CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_by ON recruitment_requests(created_by_employee_id)
+            `);
+        }
         await pool.query(`
             CREATE INDEX IF NOT EXISTS idx_recruitment_requests_branch_director ON recruitment_requests(branch_director_id)
         `);
