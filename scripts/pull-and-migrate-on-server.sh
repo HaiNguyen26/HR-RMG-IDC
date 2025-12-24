@@ -326,6 +326,36 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 14: $MIGRATION14${NC}"
 fi
 
+# Migration 15: migrate_candidates_file_fields.sql (Đảm bảo các cột file đính kèm tồn tại - QUAN TRỌNG)
+MIGRATION15="$PROJECT_DIR/database/migrate_candidates_file_fields.sql"
+if [ -f "$MIGRATION15" ]; then
+    echo -e "${BLUE}→ Chạy migration: migrate_candidates_file_fields.sql (Đảm bảo các cột anh_dai_dien_path, cv_dinh_kem_path tồn tại)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION15"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 15 thành công - Đã đảm bảo các cột file đính kèm tồn tại${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 15${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 15: $MIGRATION15${NC}"
+fi
+
+# Migration 16: ensure_candidate_related_tables.sql (Đảm bảo các bảng liên quan tồn tại)
+MIGRATION16="$PROJECT_DIR/database/ensure_candidate_related_tables.sql"
+if [ -f "$MIGRATION16" ]; then
+    echo -e "${BLUE}→ Chạy migration: ensure_candidate_related_tables.sql (Đảm bảo các bảng candidate_work_experiences, candidate_training_processes, candidate_foreign_languages tồn tại)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION16"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 16 thành công - Đã đảm bảo các bảng liên quan tồn tại${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 16${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 16: $MIGRATION16${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"
