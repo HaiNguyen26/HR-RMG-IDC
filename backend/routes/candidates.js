@@ -776,63 +776,95 @@ router.put('/:id', upload.fields([
             await client.query(updateQuery, updateValues);
         }
 
-        // Xóa các bản ghi cũ trong các bảng con
-        await client.query('DELETE FROM candidate_work_experiences WHERE candidate_id = $1', [id]);
-        await client.query('DELETE FROM candidate_training_processes WHERE candidate_id = $1', [id]);
-        await client.query('DELETE FROM candidate_foreign_languages WHERE candidate_id = $1', [id]);
+        // Xóa các bản ghi cũ trong các bảng con (với error handling)
+        try {
+            await client.query('DELETE FROM candidate_work_experiences WHERE candidate_id = $1', [id]);
+        } catch (workExpDeleteError) {
+            console.warn('[PUT /api/candidates/:id] Error deleting work experiences (table may not exist):', workExpDeleteError.message);
+            // Continue without deleting if table doesn't exist
+        }
 
-        // Thêm lại kinh nghiệm làm việc
+        try {
+            await client.query('DELETE FROM candidate_training_processes WHERE candidate_id = $1', [id]);
+        } catch (trainingDeleteError) {
+            console.warn('[PUT /api/candidates/:id] Error deleting training processes (table may not exist):', trainingDeleteError.message);
+            // Continue without deleting if table doesn't exist
+        }
+
+        try {
+            await client.query('DELETE FROM candidate_foreign_languages WHERE candidate_id = $1', [id]);
+        } catch (langDeleteError) {
+            console.warn('[PUT /api/candidates/:id] Error deleting foreign languages (table may not exist):', langDeleteError.message);
+            // Continue without deleting if table doesn't exist
+        }
+
+        // Thêm lại kinh nghiệm làm việc (với error handling)
         if (workExp && Array.isArray(workExp)) {
-            for (const exp of workExp) {
-                if (exp.ngayBatDau || exp.ngayKetThuc || exp.congTy || exp.chucDanh) {
-                    await client.query(`
-                        INSERT INTO candidate_work_experiences (candidate_id, ngay_bat_dau, ngay_ket_thuc, cong_ty, chuc_danh)
-                        VALUES ($1, $2, $3, $4, $5)
-                    `, [
-                        id,
-                        exp.ngayBatDau || null,
-                        exp.ngayKetThuc || null,
-                        exp.congTy || null,
-                        exp.chucDanh || null
-                    ]);
+            try {
+                for (const exp of workExp) {
+                    if (exp.ngayBatDau || exp.ngayKetThuc || exp.congTy || exp.chucDanh) {
+                        await client.query(`
+                            INSERT INTO candidate_work_experiences (candidate_id, ngay_bat_dau, ngay_ket_thuc, cong_ty, chuc_danh)
+                            VALUES ($1, $2, $3, $4, $5)
+                        `, [
+                            id,
+                            exp.ngayBatDau || null,
+                            exp.ngayKetThuc || null,
+                            exp.congTy || null,
+                            exp.chucDanh || null
+                        ]);
+                    }
                 }
+            } catch (workExpInsertError) {
+                console.warn('[PUT /api/candidates/:id] Error inserting work experiences (table may not exist):', workExpInsertError.message);
+                // Continue without inserting if table doesn't exist
             }
         }
 
-        // Thêm lại quá trình đào tạo
+        // Thêm lại quá trình đào tạo (với error handling)
         if (trainingProc && Array.isArray(trainingProc)) {
-            for (const tp of trainingProc) {
-                if (tp.ngayBatDau || tp.ngayKetThuc || tp.truongDaoTao || tp.chuyenNganh || tp.vanBang) {
-                    await client.query(`
-                        INSERT INTO candidate_training_processes (candidate_id, ngay_bat_dau, ngay_ket_thuc, truong_dao_tao, chuyen_nganh, van_bang)
-                        VALUES ($1, $2, $3, $4, $5, $6)
-                    `, [
-                        id,
-                        tp.ngayBatDau || null,
-                        tp.ngayKetThuc || null,
-                        tp.truongDaoTao || null,
-                        tp.chuyenNganh || null,
-                        tp.vanBang || null
-                    ]);
+            try {
+                for (const tp of trainingProc) {
+                    if (tp.ngayBatDau || tp.ngayKetThuc || tp.truongDaoTao || tp.chuyenNganh || tp.vanBang) {
+                        await client.query(`
+                            INSERT INTO candidate_training_processes (candidate_id, ngay_bat_dau, ngay_ket_thuc, truong_dao_tao, chuyen_nganh, van_bang)
+                            VALUES ($1, $2, $3, $4, $5, $6)
+                        `, [
+                            id,
+                            tp.ngayBatDau || null,
+                            tp.ngayKetThuc || null,
+                            tp.truongDaoTao || null,
+                            tp.chuyenNganh || null,
+                            tp.vanBang || null
+                        ]);
+                    }
                 }
+            } catch (trainingInsertError) {
+                console.warn('[PUT /api/candidates/:id] Error inserting training processes (table may not exist):', trainingInsertError.message);
+                // Continue without inserting if table doesn't exist
             }
         }
 
-        // Thêm lại trình độ ngoại ngữ
+        // Thêm lại trình độ ngoại ngữ (với error handling)
         if (foreignLang && Array.isArray(foreignLang)) {
-            for (const fl of foreignLang) {
-                if (fl.ngoaiNgu || fl.chungChi || fl.diem || fl.khaNangSuDung) {
-                    await client.query(`
-                        INSERT INTO candidate_foreign_languages (candidate_id, ngoai_ngu, chung_chi, diem, kha_nang_su_dung)
-                        VALUES ($1, $2, $3, $4, $5)
-                    `, [
-                        id,
-                        fl.ngoaiNgu || null,
-                        fl.chungChi || null,
-                        fl.diem || null,
-                        fl.khaNangSuDung || 'A: Giỏi'
-                    ]);
+            try {
+                for (const fl of foreignLang) {
+                    if (fl.ngoaiNgu || fl.chungChi || fl.diem || fl.khaNangSuDung) {
+                        await client.query(`
+                            INSERT INTO candidate_foreign_languages (candidate_id, ngoai_ngu, chung_chi, diem, kha_nang_su_dung)
+                            VALUES ($1, $2, $3, $4, $5)
+                        `, [
+                            id,
+                            fl.ngoaiNgu || null,
+                            fl.chungChi || null,
+                            fl.diem || null,
+                            fl.khaNangSuDung || 'A: Giỏi'
+                        ]);
+                    }
                 }
+            } catch (langInsertError) {
+                console.warn('[PUT /api/candidates/:id] Error inserting foreign languages (table may not exist):', langInsertError.message);
+                // Continue without inserting if table doesn't exist
             }
         }
 
