@@ -176,12 +176,21 @@ const ensureRecruitmentRequestsTable = async () => {
                 rejected_at TIMESTAMP NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+            )
+        `);
 
-            CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_by ON recruitment_requests(created_by_employee_id);
-            CREATE INDEX IF NOT EXISTS idx_recruitment_requests_branch_director ON recruitment_requests(branch_director_id);
-            CREATE INDEX IF NOT EXISTS idx_recruitment_requests_status ON recruitment_requests(status);
-            CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_at ON recruitment_requests(created_at DESC);
+        // Tạo indexes riêng biệt
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_by ON recruitment_requests(created_by_employee_id)
+        `);
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_recruitment_requests_branch_director ON recruitment_requests(branch_director_id)
+        `);
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_recruitment_requests_status ON recruitment_requests(status)
+        `);
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_at ON recruitment_requests(created_at DESC)
         `);
     } catch (error) {
         console.error('Error ensuring recruitment_requests table:', error);
