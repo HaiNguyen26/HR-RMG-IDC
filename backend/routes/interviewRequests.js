@@ -230,26 +230,81 @@ router.get('/', async (req, res) => {
             params.push(status);
         }
 
+        // Đảm bảo các cột cần thiết đã tồn tại trước khi query
+        const recruitmentRequestIdCheck = await pool.query(`
+            SELECT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_name = 'interview_requests' 
+                AND column_name = 'recruitment_request_id'
+            )
+        `);
+        const hasRecruitmentRequestId = recruitmentRequestIdCheck.rows[0].exists;
+
+        const branchDirectorIdCheck = await pool.query(`
+            SELECT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_name = 'interview_requests' 
+                AND column_name = 'branch_director_id'
+            )
+        `);
+        const hasBranchDirectorId = branchDirectorIdCheck.rows[0].exists;
+
         const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-        const sql = `
+        
+        // Xây dựng query an toàn - chỉ JOIN nếu cột tồn tại
+        let sql = `
             SELECT ir.*,
                    c.ho_ten as candidate_name,
                    c.vi_tri_ung_tuyen,
                    c.phong_ban,
                    c.so_dien_thoai,
-                   c.trang_thai as candidate_status,
+                   c.trang_thai as candidate_status`;
+        
+        if (hasRecruitmentRequestId) {
+            sql += `,
                    rr.chuc_danh_can_tuyen,
-                   rr.phong_ban_bo_phan,
-                   m.ho_ten as manager_name,
-                   bd.ho_ten as branch_director_name
+                   rr.phong_ban_bo_phan`;
+        } else {
+            sql += `,
+                   NULL as chuc_danh_can_tuyen,
+                   NULL as phong_ban_bo_phan`;
+        }
+        
+        sql += `,
+                   m.ho_ten as manager_name`;
+        
+        if (hasBranchDirectorId) {
+            sql += `,
+                   bd.ho_ten as branch_director_name`;
+        } else {
+            sql += `,
+                   NULL as branch_director_name`;
+        }
+        
+        sql += `
             FROM interview_requests ir
-            LEFT JOIN candidates c ON ir.candidate_id = c.id
-            LEFT JOIN recruitment_requests rr ON ir.recruitment_request_id = rr.id
-            LEFT JOIN employees m ON ir.manager_id = m.id
-            LEFT JOIN employees bd ON ir.branch_director_id = bd.id
+            LEFT JOIN candidates c ON ir.candidate_id = c.id`;
+        
+        if (hasRecruitmentRequestId) {
+            sql += `
+            LEFT JOIN recruitment_requests rr ON ir.recruitment_request_id = rr.id`;
+        }
+        
+        sql += `
+            LEFT JOIN employees m ON ir.manager_id = m.id`;
+        
+        if (hasBranchDirectorId) {
+            sql += `
+            LEFT JOIN employees bd ON ir.branch_director_id = bd.id`;
+        }
+        
+        sql += `
             ${where}
             ORDER BY ir.created_at DESC
         `;
+        
         console.log('[GET /api/interview-requests] Query:', sql);
         console.log('[GET /api/interview-requests] Params:', params);
         const result = await pool.query(sql, params);
