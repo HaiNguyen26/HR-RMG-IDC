@@ -281,16 +281,42 @@ const ensureRecruitmentRequestsTable = async () => {
         `);
 
         // Kiểm tra và thêm các cột còn thiếu nếu bảng đã tồn tại
+        // Danh sách đầy đủ các cột có thể thiếu (không bao gồm id, created_at, updated_at vì chúng luôn có)
         const missingColumns = [
-            'yeu_cau_chi_tiet_cong_viec',
-            'yeu_cau_ngoai_ngu',
-            'yeu_cau_vi_tinh_ky_nang_khac',
-            'ky_nang_giao_tiep',
-            'thai_do_lam_viec',
-            'ky_nang_quan_ly'
+            // Các cột liên quan đến employee
+            { name: 'created_by_employee_id', type: 'INTEGER' },
+            { name: 'branch_director_id', type: 'INTEGER' },
+            // Các cột thông tin cơ bản
+            { name: 'chuc_danh_can_tuyen', type: 'VARCHAR(255)' },
+            { name: 'phong_ban_bo_phan', type: 'VARCHAR(255)' },
+            { name: 'nguoi_quan_ly_truc_tiep', type: 'VARCHAR(255)' },
+            { name: 'nguoi_quan_ly_gian_tiep', type: 'VARCHAR(255)' },
+            { name: 'mo_ta_cong_viec', type: 'VARCHAR(20)' },
+            { name: 'yeu_cau_chi_tiet_cong_viec', type: 'TEXT' },
+            { name: 'ly_do_khac_ghi_chu', type: 'TEXT' },
+            { name: 'so_luong_yeu_cau', type: 'INTEGER', defaultValue: 'DEFAULT 1' },
+            { name: 'loai_lao_dong', type: 'VARCHAR(20)' },
+            { name: 'ly_do_tuyen', type: 'VARCHAR(20)' },
+            // Các cột tiêu chuẩn tuyển dụng
+            { name: 'gioi_tinh', type: 'VARCHAR(20)', defaultValue: "DEFAULT 'bat_ky'" },
+            { name: 'do_tuoi', type: 'VARCHAR(50)' },
+            { name: 'trinh_do_hoc_van_yeu_cau', type: 'TEXT' },
+            { name: 'kinh_nghiem_chuyen_mon', type: 'VARCHAR(20)', defaultValue: "DEFAULT 'khong_yeu_cau'" },
+            { name: 'chi_tiet_kinh_nghiem', type: 'TEXT' },
+            { name: 'kien_thuc_chuyen_mon_khac', type: 'TEXT' },
+            { name: 'yeu_cau_ngoai_ngu', type: 'TEXT' },
+            { name: 'yeu_cau_vi_tinh_ky_nang_khac', type: 'TEXT' },
+            { name: 'ky_nang_giao_tiep', type: 'TEXT' },
+            { name: 'thai_do_lam_viec', type: 'TEXT' },
+            { name: 'ky_nang_quan_ly', type: 'TEXT' },
+            // Các cột trạng thái
+            { name: 'status', type: 'VARCHAR(20)', defaultValue: "DEFAULT 'PENDING'" },
+            { name: 'rejection_reason', type: 'TEXT' },
+            { name: 'approved_at', type: 'TIMESTAMP' },
+            { name: 'rejected_at', type: 'TIMESTAMP' }
         ];
 
-        for (const columnName of missingColumns) {
+        for (const column of missingColumns) {
             try {
                 const columnCheck = await pool.query(`
                     SELECT EXISTS (
@@ -299,18 +325,19 @@ const ensureRecruitmentRequestsTable = async () => {
                         WHERE table_name = 'recruitment_requests' 
                         AND column_name = $1
                     )
-                `, [columnName]);
+                `, [column.name]);
 
                 if (!columnCheck.rows[0].exists) {
-                    console.log(`[ensureRecruitmentRequestsTable] Bảng đã tồn tại nhưng thiếu cột ${columnName}, đang thêm cột...`);
-                    const columnType = columnName === 'yeu_cau_chi_tiet_cong_viec' ? 'TEXT' : 'TEXT';
+                    console.log(`[ensureRecruitmentRequestsTable] Bảng đã tồn tại nhưng thiếu cột ${column.name}, đang thêm cột...`);
+                    const defaultValue = column.defaultValue ? ` ${column.defaultValue}` : '';
                     await pool.query(`
                         ALTER TABLE recruitment_requests 
-                        ADD COLUMN ${columnName} ${columnType}
+                        ADD COLUMN ${column.name} ${column.type}${defaultValue}
                     `);
+                    console.log(`[ensureRecruitmentRequestsTable] Đã thêm cột ${column.name} thành công`);
                 }
             } catch (colError) {
-                console.warn(`[ensureRecruitmentRequestsTable] Không thể thêm cột ${columnName}:`, colError.message);
+                console.warn(`[ensureRecruitmentRequestsTable] Không thể thêm cột ${column.name}:`, colError.message);
                 // Không throw error, tiếp tục với các cột khác
             }
         }

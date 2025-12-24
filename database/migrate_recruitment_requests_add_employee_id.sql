@@ -131,79 +131,136 @@ BEGIN
     END IF;
 END $$;
 
--- Kiểm tra và thêm các cột còn thiếu khác
+-- Kiểm tra và thêm TẤT CẢ các cột còn thiếu một lần
 DO $$
 BEGIN
-    -- Thêm yeu_cau_chi_tiet_cong_viec nếu chưa có
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'recruitment_requests' 
-        AND column_name = 'yeu_cau_chi_tiet_cong_viec'
-    ) THEN
-        ALTER TABLE recruitment_requests 
-        ADD COLUMN yeu_cau_chi_tiet_cong_viec TEXT;
+    -- Các cột thông tin cơ bản
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'chuc_danh_can_tuyen') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN chuc_danh_can_tuyen VARCHAR(255);
+        RAISE NOTICE 'Đã thêm cột chuc_danh_can_tuyen';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'nguoi_quan_ly_truc_tiep') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN nguoi_quan_ly_truc_tiep VARCHAR(255);
+        RAISE NOTICE 'Đã thêm cột nguoi_quan_ly_truc_tiep';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'mo_ta_cong_viec') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN mo_ta_cong_viec VARCHAR(20);
+        RAISE NOTICE 'Đã thêm cột mo_ta_cong_viec';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'yeu_cau_chi_tiet_cong_viec') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN yeu_cau_chi_tiet_cong_viec TEXT;
         RAISE NOTICE 'Đã thêm cột yeu_cau_chi_tiet_cong_viec';
     END IF;
 
-    -- Thêm yeu_cau_ngoai_ngu nếu chưa có
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'recruitment_requests' 
-        AND column_name = 'yeu_cau_ngoai_ngu'
-    ) THEN
-        ALTER TABLE recruitment_requests 
-        ADD COLUMN yeu_cau_ngoai_ngu TEXT;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'ly_do_khac_ghi_chu') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN ly_do_khac_ghi_chu TEXT;
+        RAISE NOTICE 'Đã thêm cột ly_do_khac_ghi_chu';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'so_luong_yeu_cau') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN so_luong_yeu_cau INTEGER DEFAULT 1;
+        RAISE NOTICE 'Đã thêm cột so_luong_yeu_cau';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'loai_lao_dong') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN loai_lao_dong VARCHAR(20);
+        RAISE NOTICE 'Đã thêm cột loai_lao_dong';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'ly_do_tuyen') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN ly_do_tuyen VARCHAR(20);
+        RAISE NOTICE 'Đã thêm cột ly_do_tuyen';
+    END IF;
+
+    -- Các cột tiêu chuẩn tuyển dụng
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'gioi_tinh') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN gioi_tinh VARCHAR(20) DEFAULT 'bat_ky';
+        RAISE NOTICE 'Đã thêm cột gioi_tinh';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'do_tuoi') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN do_tuoi VARCHAR(50);
+        RAISE NOTICE 'Đã thêm cột do_tuoi';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'trinh_do_hoc_van_yeu_cau') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN trinh_do_hoc_van_yeu_cau TEXT;
+        RAISE NOTICE 'Đã thêm cột trinh_do_hoc_van_yeu_cau';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'kinh_nghiem_chuyen_mon') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN kinh_nghiem_chuyen_mon VARCHAR(20) DEFAULT 'khong_yeu_cau';
+        RAISE NOTICE 'Đã thêm cột kinh_nghiem_chuyen_mon';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'chi_tiet_kinh_nghiem') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN chi_tiet_kinh_nghiem TEXT;
+        RAISE NOTICE 'Đã thêm cột chi_tiet_kinh_nghiem';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'kien_thuc_chuyen_mon_khac') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN kien_thuc_chuyen_mon_khac TEXT;
+        RAISE NOTICE 'Đã thêm cột kien_thuc_chuyen_mon_khac';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'yeu_cau_ngoai_ngu') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN yeu_cau_ngoai_ngu TEXT;
         RAISE NOTICE 'Đã thêm cột yeu_cau_ngoai_ngu';
     END IF;
 
-    -- Thêm yeu_cau_vi_tinh_ky_nang_khac nếu chưa có
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'recruitment_requests' 
-        AND column_name = 'yeu_cau_vi_tinh_ky_nang_khac'
-    ) THEN
-        ALTER TABLE recruitment_requests 
-        ADD COLUMN yeu_cau_vi_tinh_ky_nang_khac TEXT;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'yeu_cau_vi_tinh_ky_nang_khac') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN yeu_cau_vi_tinh_ky_nang_khac TEXT;
         RAISE NOTICE 'Đã thêm cột yeu_cau_vi_tinh_ky_nang_khac';
     END IF;
 
-    -- Thêm ky_nang_giao_tiep nếu chưa có
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'recruitment_requests' 
-        AND column_name = 'ky_nang_giao_tiep'
-    ) THEN
-        ALTER TABLE recruitment_requests 
-        ADD COLUMN ky_nang_giao_tiep TEXT;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'ky_nang_giao_tiep') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN ky_nang_giao_tiep TEXT;
         RAISE NOTICE 'Đã thêm cột ky_nang_giao_tiep';
     END IF;
 
-    -- Thêm thai_do_lam_viec nếu chưa có
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'recruitment_requests' 
-        AND column_name = 'thai_do_lam_viec'
-    ) THEN
-        ALTER TABLE recruitment_requests 
-        ADD COLUMN thai_do_lam_viec TEXT;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'thai_do_lam_viec') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN thai_do_lam_viec TEXT;
         RAISE NOTICE 'Đã thêm cột thai_do_lam_viec';
     END IF;
 
-    -- Thêm ky_nang_quan_ly nếu chưa có
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'recruitment_requests' 
-        AND column_name = 'ky_nang_quan_ly'
-    ) THEN
-        ALTER TABLE recruitment_requests 
-        ADD COLUMN ky_nang_quan_ly TEXT;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'ky_nang_quan_ly') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN ky_nang_quan_ly TEXT;
         RAISE NOTICE 'Đã thêm cột ky_nang_quan_ly';
+    END IF;
+
+    -- Các cột trạng thái
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'status') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN status VARCHAR(20) DEFAULT 'PENDING';
+        RAISE NOTICE 'Đã thêm cột status';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'rejection_reason') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN rejection_reason TEXT;
+        RAISE NOTICE 'Đã thêm cột rejection_reason';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'approved_at') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN approved_at TIMESTAMP;
+        RAISE NOTICE 'Đã thêm cột approved_at';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'rejected_at') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN rejected_at TIMESTAMP;
+        RAISE NOTICE 'Đã thêm cột rejected_at';
+    END IF;
+
+    -- Các cột timestamp
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'created_at') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+        RAISE NOTICE 'Đã thêm cột created_at';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_requests' AND column_name = 'updated_at') THEN
+        ALTER TABLE recruitment_requests ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+        RAISE NOTICE 'Đã thêm cột updated_at';
     END IF;
 END $$;
 
