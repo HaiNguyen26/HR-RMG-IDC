@@ -96,6 +96,51 @@ const ensureInterviewRequestsTable = async () => {
         console.log('[ensureInterviewRequestsTable] Note about updated_at column:', error.message);
     }
 
+    // Kiểm tra và thêm cột branch_director_id nếu bảng đã tồn tại nhưng thiếu cột này
+    try {
+        const branchDirectorColumnCheck = await pool.query(`
+            SELECT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_name = 'interview_requests' 
+                AND column_name = 'branch_director_id'
+            )
+        `);
+
+        if (!branchDirectorColumnCheck.rows[0].exists) {
+            console.log('[ensureInterviewRequestsTable] Bảng đã tồn tại nhưng thiếu cột branch_director_id, đang thêm cột...');
+            await pool.query(`
+                ALTER TABLE interview_requests 
+                ADD COLUMN branch_director_id INTEGER
+            `);
+
+            // Thêm foreign key constraint nếu có
+            try {
+                await pool.query(`
+                    ALTER TABLE interview_requests
+                    ADD CONSTRAINT fk_interview_requests_branch_director 
+                    FOREIGN KEY (branch_director_id) 
+                    REFERENCES employees(id) 
+                    ON DELETE SET NULL
+                `);
+            } catch (fkError) {
+                console.warn('[ensureInterviewRequestsTable] Không thể thêm foreign key constraint cho branch_director_id:', fkError.message);
+            }
+
+            // Tạo index cho cột mới
+            try {
+                await pool.query(`
+                    CREATE INDEX IF NOT EXISTS idx_interview_requests_director ON interview_requests(branch_director_id)
+                `);
+            } catch (indexError) {
+                console.warn('[ensureInterviewRequestsTable] Không thể tạo index cho branch_director_id:', indexError.message);
+            }
+        }
+    } catch (error) {
+        console.warn('[ensureInterviewRequestsTable] Lỗi khi kiểm tra/thêm cột branch_director_id:', error.message);
+        // Không throw error, chỉ log để không block request
+    }
+
     // Đảm bảo candidates constraint có đầy đủ status
     await ensureCandidatesStatusConstraint();
 };
