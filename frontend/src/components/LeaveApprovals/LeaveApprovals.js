@@ -147,14 +147,14 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [selectedStatus, setSelectedStatus] = useState('PENDING');
     const [stats, setStats] = useState({ total: 0, overdueCount: 0 });
     const [refreshToken, setRefreshToken] = useState(0);
-    const [activeModule, setActiveModule] = useState('overtime');
+    const [activeModule, setActiveModule] = useState('leave');
     const [managerOverride, setManagerOverride] = useState(null);
     const [managerResolved, setManagerResolved] = useState(false);
     const [isBranchDirector, setIsBranchDirector] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
 
-    // activeModule mặc định là 'overtime' (không còn 'all')
+    // activeModule mặc định là 'leave' (Đơn xin nghỉ)
 
     // Statistics for badge counts - overall (tính từ requests hiện tại)
     const statistics = useMemo(() => {
@@ -524,6 +524,13 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             return () => clearInterval(interval);
         }
     }, [fetchModuleStatistics, fetchModuleStatusStatistics, viewerMode]);
+
+    // Fetch statistics ngay khi activeModule hoặc selectedStatus thay đổi (để badge cập nhật nhanh)
+    useEffect(() => {
+        if (viewerMode && activeModule) {
+            fetchModuleStatusStatistics();
+        }
+    }, [activeModule, selectedStatus, fetchModuleStatusStatistics, viewerMode]);
 
     const statusFilters = useMemo(() => {
         if (isTeamLead) {

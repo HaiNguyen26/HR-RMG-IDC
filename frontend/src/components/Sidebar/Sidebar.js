@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { employeesAPI, leaveRequestsAPI, overtimeRequestsAPI, attendanceAdjustmentsAPI, recruitmentRequestsAPI, customerEntertainmentExpensesAPI, travelExpensesAPI } from '../../services/api';
 import './Sidebar.css';
 
-const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout, isOpen = false, onClose }) => {
+const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout, onChangePassword, isOpen = false, onClose }) => {
     const [managerAccessResolved, setManagerAccessResolved] = useState(false);
     const [canApproveFromManagerLookup, setCanApproveFromManagerLookup] = useState(false);
     const [pendingLeaveApprovalsCount, setPendingLeaveApprovalsCount] = useState(0);
@@ -1404,15 +1404,25 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                     </div>
                 </div>
 
-                {/* Logout Button */}
-                <button onClick={onLogout} className="sidebar-logout-btn">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
-                        </path>
-                    </svg>
-                    <span>Đăng xuất</span>
-                </button>
+                {/* Change Password and Logout Buttons */}
+                <div className="sidebar-user-actions">
+                    <button onClick={onChangePassword} className="sidebar-change-password-btn">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+                            </path>
+                        </svg>
+                        <span>Đổi mật khẩu</span>
+                    </button>
+                    <button onClick={onLogout} className="sidebar-logout-btn">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                            </path>
+                        </svg>
+                        <span>Đăng xuất</span>
+                    </button>
+                </div>
             </div>
         </div>
     );

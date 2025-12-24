@@ -12,17 +12,19 @@ Tài liệu này mô tả đầy đủ quy trình công tác phí từ khởi t�
 
 ### **TỔNG QUAN FLOW**
 
-Quy trình công tác phí được chia thành 2 giai đoạn chính:
+Quy trình công tác phí được chia thành **2 flow riêng biệt** tùy thuộc vào loại địa điểm:
+
+#### **🛫 FLOW CÔNG TÁC NGOÀI NƯỚC (INTERNATIONAL)**
 
 **GIAI ĐOẠN 1: KHỞI TẠO VÀ PHÊ DUYỆT** (Bước 1-4)
-1. Nhân viên tạo yêu cầu công tác
+1. Nhân viên tạo yêu cầu công tác (chọn "Ngoài nước")
 2. Quản lý trực tiếp phê duyệt (Cấp 1)
 3. Giám đốc Chi nhánh phê duyệt (Cấp 2)
-4. Tổng Giám đốc phê duyệt (nếu công tác nước ngoài)
+4. **Tổng Giám đốc phê duyệt** (Bắt buộc cho công tác nước ngoài)
 5. HR xử lý tạm ứng
 6. Kế toán xác nhận chuyển khoản tạm ứng
 
-**GIAI ĐOẠN 2: HOÀN ỨNG VÀ QUYẾT TOÁN** (Bước 5-7)
+**GIAI ĐOẠN 2: HOÀN ỨNG VÀ QUYẾT TOÁN** (Bước 6-7)
 7. Nhân viên submit báo cáo hoàn ứng
 8. HR xác nhận báo cáo
 9. Kế toán kiểm tra, quyết toán và giải ngân (nếu đầy đủ chứng từ hợp lệ)
@@ -30,21 +32,61 @@ Quy trình công tác phí được chia thành 2 giai đoạn chính:
 
 ---
 
+#### **🏠 FLOW CÔNG TÁC TRONG NƯỚC (DOMESTIC)**
+
+**GIAI ĐOẠN 1: KHỞI TẠO VÀ PHÊ DUYỆT** (Bước 1-3)
+1. Nhân viên tạo yêu cầu công tác (chọn "Trong nước")
+2. Quản lý trực tiếp phê duyệt (Cấp 1)
+3. Giám đốc Chi nhánh phê duyệt (Cấp 2)
+4. **BỎ QUA bước CEO** → Chuyển thẳng đến xử lý tạm ứng
+5. HR xử lý tạm ứng
+6. Kế toán xác nhận chuyển khoản tạm ứng
+
+**GIAI ĐOẠN 2: HOÀN ỨNG VÀ QUYẾT TOÁN** (Bước 6-7) - Giống như flow ngoài nước
+7. Nhân viên submit báo cáo hoàn ứng
+8. HR xác nhận báo cáo
+9. Kế toán kiểm tra, quyết toán và giải ngân (nếu đầy đủ chứng từ hợp lệ)
+10. CEO/Admin phê duyệt ngoại lệ (nếu vượt ngân sách, sau đó kế toán giải ngân)
+
+---
+
+#### **📋 ĐIỂM KHÁC BIỆT CHÍNH**
+
+| Đặc điểm | Trong nước (DOMESTIC) | Ngoài nước (INTERNATIONAL) |
+|----------|----------------------|---------------------------|
+| **Phê duyệt CEO** | ❌ Không cần (bỏ qua) | ✅ Bắt buộc (Bước 4) |
+| **Phụ cấp sinh hoạt** | 230,000 VND/ngày (nếu qua đêm) | EU: 60 USD/ngày<br>Asian: 40 USD/ngày |
+| **Số bước phê duyệt** | 2 bước (Cấp 1 + Cấp 2) | 3 bước (Cấp 1 + Cấp 2 + CEO) |
+| **Status sau phê duyệt** | `PENDING_FINANCE` (từ Cấp 2) | `PENDING_FINANCE` (từ CEO) |
+
+**Các bước còn lại (tạm ứng, hoàn ứng, quyết toán) là CHUNG cho cả 2 flow.**
+
+---
+
 ### **CHI TIẾT FLOW**
+
+#### **PHÂN NHÁNH THEO LOẠI CÔNG TÁC**
+
+Quy trình công tác phí được phân thành 2 flow riêng biệt tùy thuộc vào loại địa điểm:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    QUY TRÌNH CÔNG TÁC PHÍ                       │
+│              (Phân nhánh: Trong nước / Ngoài nước)             │
 └─────────────────────────────────────────────────────────────────┘
 
 [1] KHỞI TẠO YÊU CẦU (Nhân viên)
     ├─ Nhập: Mục đích, Công ty, Địa điểm, Thời gian
+    ├─ Chọn: Loại địa điểm (Trong nước / Ngoài nước)
     ├─ Tự nhập: Số tiền cần tạm ứng (requested_advance_amount)
-    ├─ Tự động: Kiểm tra qua đêm, Kiểm tra nước ngoài
-    └─ Tự động: Cấp phí sinh hoạt (EU: 60 USD, Asian: 40 USD)
+    ├─ Tự động: Kiểm tra qua đêm (is_overnight)
+    └─ Tự động: Cấp phí sinh hoạt:
+          ├─ Ngoài nước: EU = 60 USD, Asian = 40 USD
+          └─ Trong nước + qua đêm: 230,000 VND/ngày
           │
           ↓
     Status: PENDING_LEVEL_1
+    location_type: DOMESTIC hoặc INTERNATIONAL
 
 [2] PHÊ DUYỆT CẤP 1 (Quản lý Trực tiếp)
     ├─ Xem xét tính cần thiết
@@ -52,6 +94,17 @@ Quy trình công tác phí được chia thành 2 giai đoạn chính:
     └─ Nếu Duyệt:
           │
           ↓
+    ┌─────┴─────────────────────────────────────────────┐
+    │                                                   │
+    │  [TRƯỜNG HỢP ĐẶC BIỆT:                           │
+    │   Quản lý trực tiếp = Giám đốc Chi nhánh]        │
+    │                                                   │
+    │         ├─ Ngoài nước → PENDING_CEO              │
+    │         └─ Trong nước → PENDING_FINANCE          │
+    │                                                   │
+    └───────────────────────────────────────────────────┘
+          │
+          ↓ (Trường hợp thông thường)
     Status: PENDING_LEVEL_2
 
 [3] PHÊ DUYỆT CẤP 2 (Giám đốc Chi nhánh)
@@ -63,97 +116,157 @@ Quy trình công tác phí được chia thành 2 giai đoạn chính:
     ┌─────┴─────┐
     │           │
     ↓           ↓
-[Nước ngoài] [Trong nước]
+[NGOÀI NƯỚC]  [TRONG NƯỚC]
+(INTERNATIONAL) (DOMESTIC)
     │           │
     ↓           ↓
+```
 
-[4] PHÊ DUYỆT CEO (Tổng Giám đốc) - CHỈ CÔNG TÁC NƯỚC NGOÀI
-    ├─ Xem xét yêu cầu nước ngoài
+#### **🛫 FLOW CÔNG TÁC NGOÀI NƯỚC (INTERNATIONAL)**
+
+```
+[4A] PHÊ DUYỆT CEO (Tổng Giám đốc) - BẮT BUỘC
+    ├─ Điều kiện: location_type = 'INTERNATIONAL'
+    ├─ Xem xét yêu cầu công tác nước ngoài
     ├─ Duyệt/Từ chối với ghi chú
     └─ Nếu Duyệt:
           │
           ↓
     Status: PENDING_FINANCE
-          │
-          ↓ (hoặc từ Cấp 2 - Trong nước)
+    (Chuyển sang giai đoạn xử lý tạm ứng)
+```
 
+#### **🏠 FLOW CÔNG TÁC TRONG NƯỚC (DOMESTIC)**
+
+```
+[4B] BỎ QUA BƯỚC CEO - Chuyển thẳng sang xử lý tạm ứng
+    ├─ Điều kiện: location_type = 'DOMESTIC'
+    ├─ Sau khi Giám đốc Chi nhánh duyệt
+    └─ Chuyển trực tiếp:
+          │
+          ↓
+    Status: PENDING_FINANCE
+    (Chuyển sang giai đoạn xử lý tạm ứng)
+```
+
+#### **⚡ GIAI ĐOẠN XỬ LÝ TẠM ỨNG VÀ HOÀN ỨNG (CHUNG CHO CẢ 2 FLOW)**
+
+Các bước sau đây áp dụng CHUNG cho cả công tác trong nước và ngoài nước:
+
+```
 [5] XỬ LÝ TẠM ỨNG (HR)
-    ├─ Xem số tiền nhân viên yêu cầu
+    ├─ Điều kiện: Status = PENDING_FINANCE (đã qua phê duyệt)
+    ├─ Xem số tiền nhân viên yêu cầu (requested_advance_amount)
     ├─ Chọn: HR đặt dịch vụ HOẶC Nhân viên tự đặt
-    ├─ Xác nhận/Điều chỉnh số tiền tạm ứng
-    ├─ Chọn hình thức thanh toán
+    ├─ Xác nhận/Điều chỉnh số tiền tạm ứng thực tế (actual_advance_amount)
+    ├─ Chọn hình thức tạm ứng (advance_method)
     └─ Gửi yêu cầu cho Kế toán
           │
           ↓
     advance_status: PENDING_ACCOUNTANT
+    Status: PENDING_FINANCE (giữ nguyên)
 
 [6] XÁC NHẬN CHUYỂN KHOẢN TẠM ỨNG (Kế toán)
-    ├─ Xem thông tin tạm ứng
+    ├─ Xem thông tin tạm ứng từ HR
     ├─ Thực hiện chuyển khoản
     └─ Xác nhận đã chuyển khoản
           │
           ↓
     advance_status: TRANSFERRED
+    advance_transferred_at: Ghi nhận thời gian
     Status: PENDING_SETTLEMENT
 
 [7] BÁO CÁO HOÀN ỨNG (Nhân viên)
     ├─ Nhập chi phí thực tế (actual_expense)
-    ├─ Upload hóa đơn/chứng từ
-    ├─ Ghi chú chi tiết
+    ├─ Upload hóa đơn/chứng từ (multiple files)
+    ├─ Ghi chú chi tiết về các khoản chi
     └─ Submit báo cáo
           │
           ↓
     settlement_status: SUBMITTED
+    Status: PENDING_SETTLEMENT (giữ nguyên)
 
 [8] XÁC NHẬN BÁO CÁO (HR)
-    ├─ Xem báo cáo và chứng từ
-    ├─ Xác nhận tính hợp lệ
+    ├─ Xem báo cáo và chứng từ đã upload
+    ├─ Xác nhận tính hợp lệ của chứng từ
     └─ Xác nhận báo cáo
           │
           ↓
     settlement_status: HR_CONFIRMED
+    hr_confirmed_at: Ghi nhận thời gian
+    hr_confirmed_by: Ghi nhận người xác nhận
     Status: PENDING_ACCOUNTANT
 
 [9] KIỂM TRA, QUYẾT TOÁN & GIẢI NGÂN (Kế toán)
-    ├─ Xem hóa đơn/chứng từ
+    ├─ Xem hóa đơn/chứng từ đã upload
     ├─ Đối chiếu: Chi phí thực tế vs Số tiền tạm ứng
+    ├─ Kiểm tra tính hợp lệ của chứng từ
     └─ Logic quyết định:
           │
-          ├─ [Chi phí <= Tạm ứng + Đầy đủ chứng từ hợp lệ]
-          │     ├─ Hoàn ứng = Chi phí thực tế
-          │     ├─ Nếu Chi phí < Tạm ứng → Nhân viên hoàn trả phần dư
-          │     ├─ Chọn phương thức thanh toán (Chuyển khoản/Tiền mặt/Khác)
-          │     ├─ Nhập số tham chiếu giao dịch
+          ├─ [Trường hợp 1: Chi phí <= Tạm ứng + Đầy đủ chứng từ hợp lệ]
+          │     ├─ reimbursement_amount = actual_expense
+          │     ├─ Nếu Chi phí < Tạm ứng → refund_amount = Tạm ứng - Chi phí
+          │     ├─ Chọn phương thức thanh toán (payment_method)
+          │     ├─ Nhập số tham chiếu giao dịch (payment_reference)
           │     ├─ Xác nhận giải ngân ngay
+          │     ├─ payment_confirmed_at: Ghi nhận thời gian
+          │     ├─ final_reimbursement_amount = reimbursement_amount
+          │     ├─ final_status: SETTLED hoặc REFUND_REQUIRED
           │     └─ Status: SETTLED
           │           │
           │           └─→ [HOÀN THÀNH QUY TRÌNH]
           │
-          └─ [Chi phí > Tạm ứng]
-                ├─ Hoàn ứng = Số tiền tạm ứng
-                ├─ Phần vượt = Chi phí - Tạm ứng
+          └─ [Trường hợp 2: Chi phí > Tạm ứng]
+                ├─ reimbursement_amount = actual_advance_amount (tạm ứng)
+                ├─ excess_amount = actual_expense - actual_advance_amount
+                ├─ exceeds_budget = true
                 └─ Status: PENDING_EXCEPTION_APPROVAL
                       │
                       ↓
 
-[10] PHÊ DUYỆT NGOẠI LỆ (CEO/Admin)
-     ├─ Xem thông tin vượt ngân sách
+[10] PHÊ DUYỆT NGOẠI LỆ (CEO/Admin) - Nếu chi phí vượt ngân sách
+     ├─ Xem thông tin vượt ngân sách (excess_amount)
      ├─ Xem chứng từ liên quan
      ├─ Duyệt/Từ chối khoản vượt
      └─ Logic:
            │
-           ├─ [Duyệt]
-           │     ├─ Hoàn ứng = Tạm ứng + Khoản vượt được duyệt
+           ├─ [Nếu Duyệt]
+           │     ├─ exception_approval_status: APPROVED_EXCEPTION
+           │     ├─ approved_excess_amount: Khoản vượt được duyệt (toàn bộ hoặc một phần)
+           │     ├─ final_reimbursement_amount = Tạm ứng + approved_excess_amount
            │     └─ Status: SETTLED (chuyển lại cho Kế toán giải ngân)
            │
-           └─ [Từ chối]
-                 ├─ Hoàn ứng = Số tiền tạm ứng (không hoàn phần vượt)
+           └─ [Nếu Từ chối]
+                 ├─ exception_approval_status: REJECTED_EXCEPTION
+                 ├─ final_reimbursement_amount = actual_advance_amount (chỉ hoàn tạm ứng)
                  └─ Status: SETTLED (chuyển lại cho Kế toán giải ngân)
 
-     [Sau khi CEO duyệt/từ chối, Kế toán giải ngân tương tự như trường hợp Chi phí <= Tạm ứng]
-     
-     [HOÀN THÀNH QUY TRÌNH]
+     [Sau khi CEO duyệt/từ chối, Kế toán giải ngân tương tự như Trường hợp 1]
+     ├─ Chọn phương thức thanh toán (payment_method)
+     ├─ Nhập số tham chiếu giao dịch (payment_reference)
+     ├─ payment_confirmed_at: Ghi nhận thời gian
+     └─ Status: SETTLED
+           │
+           └─→ [HOÀN THÀNH QUY TRÌNH]
 ```
+
+---
+
+#### **📊 TÓM TẮT SO SÁNH 2 FLOW**
+
+| Bước | Công tác TRONG NƯỚC (DOMESTIC) | Công tác NGOÀI NƯỚC (INTERNATIONAL) |
+|------|-------------------------------|-------------------------------------|
+| **1. Khởi tạo** | Nhân viên tạo đơn<br>→ `PENDING_LEVEL_1` | Nhân viên tạo đơn<br>→ `PENDING_LEVEL_1` |
+| **2. Phê duyệt Cấp 1** | Quản lý trực tiếp duyệt<br>→ `PENDING_LEVEL_2` | Quản lý trực tiếp duyệt<br>→ `PENDING_LEVEL_2` |
+| **3. Phê duyệt Cấp 2** | Giám đốc Chi nhánh duyệt<br>→ `PENDING_FINANCE` ✅ | Giám đốc Chi nhánh duyệt<br>→ `PENDING_CEO` |
+| **4. Phê duyệt CEO** | ❌ **BỎ QUA** (không có) | Tổng Giám đốc duyệt<br>→ `PENDING_FINANCE` ✅ |
+| **5-10. Xử lý tạm ứng & hoàn ứng** | ✅ **CHUNG** cho cả 2 flow | ✅ **CHUNG** cho cả 2 flow |
+| **Phụ cấp sinh hoạt** | 230,000 VND/ngày (nếu qua đêm) | EU: 60 USD/ngày<br>Asian: 40 USD/ngày |
+
+**Lưu ý đặc biệt:**
+- Nếu quản lý trực tiếp **cũng là** Giám đốc Chi nhánh:
+  - Trong nước: Bỏ qua bước Cấp 2 → Chuyển thẳng `PENDING_FINANCE`
+  - Ngoài nước: Bỏ qua bước Cấp 2 → Chuyển thẳng `PENDING_CEO`
 
 ---
 
@@ -173,11 +286,16 @@ Quy trình công tác phí được chia thành 2 giai đoạn chính:
   - **Số tiền cần tạm ứng** (`requested_advance_amount`) - người tạo tự điền
 
 **Logic tự động:**
-- ✅ Kiểm tra qua đêm (`is_overnight`) - tính toán nếu > 24h
-- ✅ Kiểm tra nước ngoài (`location_type`, `requires_ceo`)
-- ✅ Tự động cấp phí sinh hoạt dựa trên châu lục:
-  - Châu Âu – EU: 60 USD (`living_allowance_amount = 60`, `living_allowance_currency = 'USD'`)
-  - Châu Á – Asian: 40 USD (`living_allowance_amount = 40`, `living_allowance_currency = 'USD'`)
+- ✅ Kiểm tra qua đêm (`is_overnight`) - tự động tính toán nếu khoảng thời gian > 24 giờ
+- ✅ Xác định loại địa điểm (`location_type`):
+  - `DOMESTIC` (Trong nước): Các địa điểm tại Việt Nam
+  - `INTERNATIONAL` (Ngoài nước): Các địa điểm ngoài Việt Nam
+- ✅ Tự động set `requires_ceo = true` nếu `location_type = 'INTERNATIONAL'`
+- ✅ Tự động cấp phí sinh hoạt (`living_allowance_amount`, `living_allowance_currency`):
+  - **Trong nước + qua đêm**: 230,000 VND/ngày (tính theo số ngày công tác)
+  - **Ngoài nước - Châu Âu (EU)**: 60 USD/ngày
+  - **Ngoài nước - Châu Á (Asian)**: 40 USD/ngày
+  - **Ngoài nước - Châu lục khác**: Không có phụ cấp mặc định
 
 **Status sau khi tạo:** `PENDING_LEVEL_1`
 
@@ -209,29 +327,44 @@ Quy trình công tác phí được chia thành 2 giai đoạn chính:
 
 ---
 
-### **BƯỚC 3: PHÊ DUYỆT CẤP ĐẶC BIỆT (Tổng Giám đốc) - 100%**
+### **BƯỚC 4: PHÊ DUYỆT CEO (Tổng Giám đốc) - CHỈ ÁP DỤNG CHO CÔNG TÁC NGOÀI NƯỚC - 100%**
 
-#### Module: `TravelExpenseApproval` (`travel-expense-approval`) - Dùng chung với Bước 2
+#### Module: `TravelExpenseApproval` (`travel-expense-approval`) - Dùng chung với Bước 2 & 3
 
 **Hoạt động:**
-- ✅ Chỉ xử lý công tác nước ngoài (`requires_ceo = true`)
+- ✅ Chỉ xử lý công tác nước ngoài (`location_type = 'INTERNATIONAL'`, `requires_ceo = true`)
 - ✅ Duyệt/Từ chối yêu cầu với ghi chú
-- ✅ Status: `PENDING_CEO` → Nếu duyệt: `PENDING_FINANCE`
+- ✅ Database fields: `ceo_id`, `ceo_decision`, `ceo_notes`, `ceo_decision_at`
 
-**Điều kiện:**
-- Phải là công tác nước ngoài (`location_type = 'INTERNATIONAL'`)
-- Đã được Cấp 1 (Quản lý Trực tiếp) duyệt
-- Đã được Cấp 2 (Giám đốc Chi nhánh) duyệt
+**Điều kiện bắt buộc:**
+- ✅ Phải là công tác nước ngoài (`location_type = 'INTERNATIONAL'`)
+- ✅ Đã được Cấp 1 (Quản lý Trực tiếp) duyệt
+- ✅ Đã được Cấp 2 (Giám đốc Chi nhánh) duyệt (trừ trường hợp quản lý = giám đốc chi nhánh)
+- ✅ Status hiện tại: `PENDING_CEO`
+
+**Status transition:**
+- `PENDING_CEO` → Nếu duyệt: `PENDING_FINANCE` ✅
+- `PENDING_CEO` → Nếu từ chối: `REJECTED`
+
+**Lưu ý quan trọng:**
+- ⚠️ **Công tác trong nước KHÔNG đi qua bước này** - chuyển thẳng từ Giám đốc Chi nhánh đến `PENDING_FINANCE`
+- ⚠️ Nếu yêu cầu là công tác trong nước nhưng status là `PENDING_CEO`, hệ thống sẽ từ chối xử lý
 
 **Sidebar Menu**: "Phê duyệt công tác" (CEO) - có badge đếm số yêu cầu chờ duyệt
 
+**→ Sau khi CEO duyệt (hoặc sau Giám đốc Chi nhánh duyệt - nếu trong nước), cả 2 flow đều chuyển đến `PENDING_FINANCE` để xử lý tạm ứng**
+
 ---
 
-### **BƯỚC 4: XỬ LÝ TẠM ỨNG (HR & Kế toán) - 90%**
+### **BƯỚC 5: XỬ LÝ TẠM ỨNG (HR & Kế toán) - 100%**
+
+**Điều kiện vào bước này:**
+- ✅ Status = `PENDING_FINANCE` (đã qua phê duyệt đầy đủ)
+- ✅ Áp dụng cho **CẢ 2 flow** (trong nước và ngoài nước)
 
 #### Module HR: `TravelExpenseAdvanceProcessing` (`travel-expense-advance-processing`)
 
-**BƯỚC 4.1: HR XỬ LÝ TẠM ỨNG**
+**BƯỚC 5.1: HR XỬ LÝ TẠM ỨNG**
 
 **Trường hợp 1: HR đặt dịch vụ**
 - ✅ HR nhập số tiền thực tế cần tạm ứng (`actual_advance_amount`)
@@ -257,17 +390,19 @@ Quy trình công tác phí được chia thành 2 giai đoạn chính:
 **Kết quả:**
 - `advance_status`: `TRANSFERRED`
 - `advance_transferred_at`, `advance_transferred_by`: Ghi nhận thời gian và người xác nhận
-- Status: `PENDING_SETTLEMENT` (chuyển sang Bước 5)
+- Status: `PENDING_SETTLEMENT` (chuyển sang Bước 6)
 
 **Sidebar Menu**: "Xử lý tạm ứng" (HR/Finance)
 
 ---
 
-### **BƯỚC 5: GHI NHẬN THỰC TẾ & HOÀN ỨNG (Nhân viên & HR) - 100%**
+### **BƯỚC 6: GHI NHẬN THỰC TẾ & HOÀN ỨNG (Nhân viên & HR) - 100%**
+
+**Áp dụng cho CẢ 2 flow** (trong nước và ngoài nước)
 
 #### Module: `TravelExpenseSettlement` (`travel-expense-settlement`)
 
-**BƯỚC 5.1: NHÂN VIÊN SUBMIT BÁO CÁO HOÀN ỨNG**
+**BƯỚC 6.1: NHÂN VIÊN SUBMIT BÁO CÁO HOÀN ỨNG**
 
 **Hoạt động:**
 - ✅ Nhập chi phí thực tế (`actual_expense`)
@@ -278,7 +413,7 @@ Quy trình công tác phí được chia thành 2 giai đoạn chính:
 - `settlement_status`: `SUBMITTED`
 - Status: `PENDING_SETTLEMENT` → Giữ nguyên (chờ HR xác nhận)
 
-**BƯỚC 5.2: HR XÁC NHẬN BÁO CÁO**
+**BƯỚC 6.2: HR XÁC NHẬN BÁO CÁO**
 
 **Hoạt động:**
 - ✅ Xem báo cáo và chứng từ đã upload
@@ -294,7 +429,9 @@ Quy trình công tác phí được chia thành 2 giai đoạn chính:
 
 ---
 
-### **BƯỚC 6: KIỂM TRA, QUYẾT TOÁN & GIẢI NGÂN (Kế toán) - 100%**
+### **BƯỚC 7: KIỂM TRA, QUYẾT TOÁN & GIẢI NGÂN (Kế toán) - 100%**
+
+**Áp dụng cho CẢ 2 flow** (trong nước và ngoài nước)
 
 #### Module: `TravelExpenseAccountant` (`travel-expense-accountant`) - Tab "Kiểm tra"
 
@@ -327,13 +464,15 @@ Quy trình công tác phí được chia thành 2 giai đoạn chính:
 - `excess_amount` = Chi phí - Tạm ứng
 - `exceeds_budget` = `true`
 - `reimbursement_amount` = Số tiền tạm ứng
-- Status: `PENDING_EXCEPTION_APPROVAL` → Chuyển sang Bước 6.1 (Phê duyệt ngoại lệ)
+- Status: `PENDING_EXCEPTION_APPROVAL` → Chuyển sang Bước 7.1 (Phê duyệt ngoại lệ)
 
 **Sidebar Menu**: "Kiểm tra quyết toán công tác" (Kế toán) - Tab "Kiểm tra"
 
 ---
 
-### **BƯỚC 6.1: PHÊ DUYỆT NGOẠI LỆ VƯỢT NGÂN SÁCH (Quản lý Cấp cao / TGĐ) - 100%**
+### **BƯỚC 7.1: PHÊ DUYỆT NGOẠI LỆ VƯỢT NGÂN SÁCH (CEO/Admin) - 100%**
+
+**Áp dụng cho CẢ 2 flow** (trong nước và ngoài nước) - chỉ khi chi phí thực tế > số tiền tạm ứng
 
 #### Module: Tích hợp vào `TravelExpenseApproval` (`travel-expense-approval`)
 

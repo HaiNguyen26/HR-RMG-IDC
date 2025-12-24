@@ -809,6 +809,14 @@
   color: var(--color-text-muted);
 }
 
+.sidebar-user-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.sidebar-change-password-btn,
 .sidebar-logout-btn {
   width: 100%;
   display: inline-flex;
@@ -817,12 +825,33 @@
   gap: 0.4rem;
   padding: 0.55rem 0.8rem;
   border-radius: 0.85rem;
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  background: rgba(255, 245, 245, 0.9);
-  color: #b91c1c;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid;
+}
+
+.sidebar-change-password-btn {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(239, 246, 255, 0.9);
+  color: #2563eb;
+}
+
+.sidebar-change-password-btn svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.sidebar-change-password-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px -18px rgba(59, 130, 246, 0.4);
+  background: rgba(219, 234, 254, 0.95);
+}
+
+.sidebar-logout-btn {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(255, 245, 245, 0.9);
+  color: #b91c1c;
 }
 
 .sidebar-logout-btn svg {

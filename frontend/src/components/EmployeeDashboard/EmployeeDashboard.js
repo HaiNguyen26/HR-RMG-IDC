@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { employeesAPI, equipmentAPI } from '../../services/api';
+import { employeesAPI, equipmentAPI, leaveRequestsAPI } from '../../services/api';
 import './EmployeeDashboard.css';
 
 const EmployeeDashboard = ({ currentUser, onNavigate }) => {
@@ -7,6 +7,22 @@ const EmployeeDashboard = ({ currentUser, onNavigate }) => {
     const [loading, setLoading] = useState(true);
     const [equipment, setEquipment] = useState([]);
     const [loadingEquipment, setLoadingEquipment] = useState(false);
+    const [remainingLeaveDays, setRemainingLeaveDays] = useState(null);
+
+    // Helper to get value from multiple sources
+    const getValue = (...keys) => {
+        const sources = [employeeProfile, currentUser];
+        for (const source of sources) {
+            if (!source) continue;
+            for (const key of keys) {
+                const value = source?.[key];
+                if (value !== undefined && value !== null && value !== '') {
+                    return value;
+                }
+            }
+        }
+        return null;
+    };
 
     useEffect(() => {
         const fetchEmployeeProfile = async () => {
@@ -130,20 +146,88 @@ const EmployeeDashboard = ({ currentUser, onNavigate }) => {
         fetchEquipment();
     }, [employeeProfile]);
 
-    // Helper to get value from multiple sources
-    const getValue = (...keys) => {
-        const sources = [employeeProfile, currentUser];
-        for (const source of sources) {
-            if (!source) continue;
-            for (const key of keys) {
-                const value = source?.[key];
-                if (value !== undefined && value !== null && value !== '') {
-                    return value;
-                }
+    // Fetch leave requests and calculate remaining leave days
+    useEffect(() => {
+        const calculateRemainingLeaveDays = async () => {
+            if (!employeeProfile?.id) {
+                setRemainingLeaveDays(null);
+                return;
             }
-        }
-        return null;
-    };
+
+            try {
+                // Get start date (ngay_gia_nhap)
+                const startDateStr = getValue('ngayGiaNhap', 'ngay_gia_nhap');
+                if (!startDateStr) {
+                    setRemainingLeaveDays(null);
+                    return;
+                }
+
+                // Parse start date
+                let startDate;
+                if (startDateStr.includes('T') || startDateStr.includes(' ')) {
+                    startDate = new Date(startDateStr);
+                } else {
+                    startDate = new Date(startDateStr + 'T00:00:00');
+                }
+                if (isNaN(startDate.getTime())) {
+                    setRemainingLeaveDays(null);
+                    return;
+                }
+
+                // Calculate years of service
+                const now = new Date();
+                const yearsOfService = (now.getFullYear() - startDate.getFullYear()) -
+                    (now.getMonth() < startDate.getMonth() ||
+                        (now.getMonth() === startDate.getMonth() && now.getDate() < startDate.getDate()) ? 1 : 0);
+
+                // Calculate total leave days based on years of service
+                let totalLeaveDays = 12; // Base 12 days
+                if (yearsOfService >= 10) {
+                    totalLeaveDays = 14; // 10+ years: 14 days
+                } else if (yearsOfService >= 5) {
+                    totalLeaveDays = 13; // 5-9 years: 13 days
+                }
+
+                // Get current year
+                const currentYear = now.getFullYear();
+                const yearStart = new Date(currentYear, 0, 1); // January 1st
+                const yearEnd = new Date(currentYear, 11, 31); // December 31st
+
+                // Fetch approved leave requests for current year
+                const response = await leaveRequestsAPI.getAll({
+                    employeeId: employeeProfile.id,
+                    status: 'APPROVED'
+                });
+
+                const approvedRequests = response.data?.data || [];
+                let usedDays = 0;
+
+                // Calculate used days from approved requests in current year
+                approvedRequests.forEach(request => {
+                    const requestStartDate = new Date(request.start_date || request.startDate);
+                    const requestEndDate = new Date(request.end_date || request.endDate || request.start_date || request.startDate);
+
+                    // Check if request is in current year
+                    if (requestStartDate >= yearStart && requestStartDate <= yearEnd) {
+                        // Calculate days (inclusive of both start and end date)
+                        const diffTime = requestEndDate.getTime() - requestStartDate.getTime();
+                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                        usedDays += diffDays >= 1 ? diffDays : 0;
+                    }
+                });
+
+                // Calculate remaining days
+                const remaining = Math.max(0, totalLeaveDays - usedDays);
+                setRemainingLeaveDays(remaining);
+            } catch (error) {
+                console.error('[EmployeeDashboard] Error calculating remaining leave days:', error);
+                setRemainingLeaveDays(null);
+            }
+        };
+
+        calculateRemainingLeaveDays();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [employeeProfile, currentUser]);
 
     const employeeName = getValue('hoTen', 'ho_ten') || currentUser?.username || 'Nhân viên';
     const chucDanh = getValue('chucDanh', 'chuc_danh');
@@ -191,6 +275,7 @@ const EmployeeDashboard = ({ currentUser, onNavigate }) => {
     // Prepare info cards data
     const infoCards = [
         { label: 'MÃ NHÂN VIÊN', value: maNhanVien || '-' },
+        remainingLeaveDays !== null ? { label: 'PHÉP NĂM CÒN LẠI', value: `${remainingLeaveDays} ngày` } : { label: 'PHÉP NĂM CÒN LẠI', value: 'Đang tính...' },
         { label: 'CHỨC DANH', value: chucDanh || '-' },
         { label: 'PHÒNG BAN', value: departmentLabel || '-' },
         { label: 'CHI NHÁNH', value: getValue('chiNhanh', 'chi_nhanh') || '-' },
@@ -201,7 +286,7 @@ const EmployeeDashboard = ({ currentUser, onNavigate }) => {
         { label: 'TRẠNG THÁI', value: getValue('trangThai', 'trang_thai') || '-' },
         { label: 'QUẢN LÝ TRỰC TIẾP', value: getValue('quanLyTrucTiep', 'quan_ly_truc_tiep') || 'Chưa cập nhật' },
         { label: 'QUẢN LÝ GIÁN TIẾP', value: getValue('quanLyGianTiep', 'quan_ly_gian_tiep') || 'Chưa cập nhật' },
-    ].filter(card => card.value !== '-'); // Only show cards with values
+    ].filter(card => card !== null && card.value !== '-'); // Only show cards with values
 
     if (loading) {
         return (
@@ -238,7 +323,7 @@ const EmployeeDashboard = ({ currentUser, onNavigate }) => {
                 {infoCards.length > 0 && (
                     <div className="employee-dashboard-info-cards">
                         {infoCards.map((card, index) => {
-                            const isImportant = card.label === 'MÃ NHÂN VIÊN' || card.label === 'NGÀY NHẬN VIỆC';
+                            const isImportant = card.label === 'MÃ NHÂN VIÊN' || card.label === 'NGÀY NHẬN VIỆC' || card.label === 'PHÉP NĂM CÒN LẠI';
                             return (
                                 <div
                                     key={index}

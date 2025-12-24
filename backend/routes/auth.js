@@ -106,4 +106,110 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// POST /api/auth/change-password
+router.post('/change-password', async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập đầy đủ thông tin'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mật khẩu mới phải có ít nhất 6 ký tự'
+      });
+    }
+
+    // Get user ID from header
+    const userId = req.headers['user-id'];
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không tìm thấy thông tin người dùng'
+      });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Try to find in users table first
+      let userQuery = `
+        SELECT id, password, 'users' as table_name
+        FROM users
+        WHERE id = $1 AND trang_thai = 'ACTIVE'
+      `;
+      let userResult = await client.query(userQuery, [userId]);
+
+      let userTable = 'users';
+      let user = null;
+
+      // If not found in users table, try employees table
+      if (userResult.rows.length === 0) {
+        userQuery = `
+          SELECT id, password, 'employees' as table_name
+          FROM employees
+          WHERE id = $1 AND trang_thai IN ('ACTIVE', 'PENDING')
+        `;
+        userResult = await client.query(userQuery, [userId]);
+        if (userResult.rows.length > 0) {
+          userTable = 'employees';
+          user = userResult.rows[0];
+        }
+      } else {
+        user = userResult.rows[0];
+      }
+
+      if (!user) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy tài khoản'
+        });
+      }
+
+      // Verify current password
+      const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isPasswordValid) {
+        await client.query('ROLLBACK');
+        return res.status(401).json({
+          success: false,
+          message: 'Mật khẩu hiện tại không đúng'
+        });
+      }
+
+      // Hash new password
+      const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password
+      const updateQuery = `UPDATE ${userTable} SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`;
+      await client.query(updateQuery, [hashedNewPassword, userId]);
+
+      await client.query('COMMIT');
+
+      res.json({
+        success: true,
+        message: 'Đổi mật khẩu thành công'
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error in change-password:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server: ' + error.message
+    });
+  }
+});
+
 module.exports = router;

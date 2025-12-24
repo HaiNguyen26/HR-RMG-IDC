@@ -574,6 +574,20 @@ PGPASSWORD=Hainguyen261097 pg_dump -h localhost -U hr_user -d HR_Management_Syst
 scp root@27.71.16.15:/tmp/backup_HR_Management_System_*.sql database/
 ```
 
+### Auto Update với Migration (KHUYẾN NGHỊ)
+```bash
+cd /var/www/hr-management
+bash scripts/pull-and-migrate-on-server.sh
+```
+
+Script này sẽ tự động:
+1. Dừng PM2
+2. Pull code mới từ git
+3. Install dependencies và build lại frontend
+4. Chạy tất cả migration SQL scripts (bao gồm Migration 11 & 12 cho travel expense)
+5. Tạo/cấp quyền thư mục uploads
+6. Khởi động lại PM2
+
 ### Manual Update (CHỈ khi script lỗi)
 ```bash
 cd /var/www/hr-management
@@ -583,6 +597,8 @@ cd frontend && REACT_APP_API_URL="/hr/api" npm run build && cd ..
 pm2 start hr-management-api
 pm2 save
 ```
+
+**LƯU Ý**: Manual update không chạy migration database. Nếu có thay đổi database schema, phải chạy migration thủ công hoặc dùng script tự động.
 
 ---
 

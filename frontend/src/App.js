@@ -28,6 +28,7 @@ import CustomerEntertainmentExpenseAccountant from './components/CustomerEnterta
 import CustomerEntertainmentExpenseCEO from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseCEO';
 import CustomerEntertainmentExpensePayment from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpensePayment';
 import Login from './components/Login/Login';
+import ChangePasswordModal from './components/Common/ChangePasswordModal';
 import ToastContainer from './components/Common/ToastContainer';
 import ConfirmModal from './components/Common/ConfirmModal';
 import IntroOverlay from './components/Common/IntroOverlay';
@@ -208,6 +209,24 @@ function App() {
       setEmployees([]);
       setShowIntroOverlay(false);
       setIntroUser(null);
+    }
+  };
+
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+
+  const handleChangePassword = async (data) => {
+    try {
+      const { authAPI } = await import('./services/api');
+      const response = await authAPI.changePassword(data);
+
+      if (response.data.success) {
+        showToast('Đổi mật khẩu thành công!', 'success');
+        setShowChangePasswordModal(false);
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || 'Không thể đổi mật khẩu. Vui lòng thử lại.';
+      showToast(errorMessage, 'error');
+      throw error; // Re-throw để modal có thể xử lý
     }
   };
 
@@ -562,9 +581,19 @@ function App() {
         onAddEmployee={handleAddEmployee}
         currentUser={currentUser}
         onLogout={handleLogout}
+        onChangePassword={() => setShowChangePasswordModal(true)}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+        onConfirm={handleChangePassword}
+        currentUser={currentUser}
+        showToast={showToast}
+      />
+
       {/* Mobile Hamburger Menu Button */}
       <button
         className="mobile-menu-toggle"
