@@ -25,6 +25,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
     const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
     const [selectedHrRequest, setSelectedHrRequest] = useState(null);
     const [showHrRequestDetail, setShowHrRequestDetail] = useState(false);
+    const [recruitmentRequestStatusFilter, setRecruitmentRequestStatusFilter] = useState('all');
     const [exportFilterMonth, setExportFilterMonth] = useState('');
     const [exportFilterYear, setExportFilterYear] = useState(new Date().getFullYear().toString());
     const [showTransferInterviewModal, setShowTransferInterviewModal] = useState(false);
@@ -4008,9 +4009,10 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                             </div>
                                             {/* HR chỉ xem, không duyệt/từ chối */}
                                         </div>
-                                    ))}
-                                </div>
-                            )}
+                                        ))}
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>

@@ -2118,6 +2118,133 @@
   line-height: 1.45;
 }
 
+/* CSS cho modal chi tiết yêu cầu tuyển dụng */
+.recruitment-request-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.recruitment-request-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+
+.recruitment-request-detail-item:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.recruitment-request-detail-item strong {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.recruitment-request-detail-item span {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #111827;
+  word-break: break-word;
+}
+
+.recruitment-requests-modal-footer {
+  padding: 1rem 2rem;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.recruitment-request-action-btn--close {
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+}
+
+.recruitment-request-action-btn--close:hover {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+/* Filter pills cho recruitment requests */
+.recruitment-requests-filter-pills {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.recruitment-request-filter-pill {
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.recruitment-request-filter-pill:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: #eff6ff;
+}
+
+.recruitment-request-filter-pill.pill-active {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+}
+
+.recruitment-request-filter-pill.pill-active:hover {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.recruitment-request-filter-pill.pill-inactive {
+  background: #fff;
+  color: #64748b;
+}
+
+@media (max-width: 768px) {
+  .recruitment-request-details-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .recruitment-requests-filter-pills {
+    flex-direction: column;
+  }
+  
+  .recruitment-request-filter-pill {
+    width: 100%;
+    text-align: center;
+  }
+}
+
 /* ===============================
    TRANSFER INTERVIEW MODAL
    =============================== */
