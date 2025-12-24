@@ -311,6 +311,21 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 13: $MIGRATION13${NC}"
 fi
 
+# Migration 14: migrate_interview_requests_add_branch_director_id.sql (Thêm cột branch_director_id cho interview_requests)
+MIGRATION14="$PROJECT_DIR/database/migrate_interview_requests_add_branch_director_id.sql"
+if [ -f "$MIGRATION14" ]; then
+    echo -e "${BLUE}→ Chạy migration: migrate_interview_requests_add_branch_director_id.sql (Thêm cột branch_director_id cho interview_requests)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION14"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 14 thành công - Đã thêm cột branch_director_id cho interview_requests${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 14${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 14: $MIGRATION14${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"
