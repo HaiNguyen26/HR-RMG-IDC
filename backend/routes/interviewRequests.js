@@ -156,6 +156,42 @@ const ensureInterviewRequestsTable = async () => {
         // Không throw error, chỉ log để không block request
     }
 
+    // Kiểm tra và thêm cột recruitment_request_id nếu bảng đã tồn tại nhưng thiếu cột này
+    try {
+        const recruitmentRequestIdColumnCheck = await pool.query(`
+            SELECT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_name = 'interview_requests' 
+                AND column_name = 'recruitment_request_id'
+            )
+        `);
+
+        if (!recruitmentRequestIdColumnCheck.rows[0].exists) {
+            console.log('[ensureInterviewRequestsTable] Bảng đã tồn tại nhưng thiếu cột recruitment_request_id, đang thêm cột...');
+            await pool.query(`
+                ALTER TABLE interview_requests 
+                ADD COLUMN recruitment_request_id INTEGER
+            `);
+
+            // Thêm foreign key constraint nếu có
+            try {
+                await pool.query(`
+                    ALTER TABLE interview_requests
+                    ADD CONSTRAINT fk_interview_requests_recruitment_request 
+                    FOREIGN KEY (recruitment_request_id) 
+                    REFERENCES recruitment_requests(id) 
+                    ON DELETE SET NULL
+                `);
+            } catch (fkError) {
+                console.warn('[ensureInterviewRequestsTable] Không thể thêm foreign key constraint cho recruitment_request_id:', fkError.message);
+            }
+        }
+    } catch (error) {
+        console.warn('[ensureInterviewRequestsTable] Lỗi khi kiểm tra/thêm cột recruitment_request_id:', error.message);
+        // Không throw error, chỉ log để không block request
+    }
+
     // Đảm bảo candidates constraint có đầy đủ status
     await ensureCandidatesStatusConstraint();
 };
