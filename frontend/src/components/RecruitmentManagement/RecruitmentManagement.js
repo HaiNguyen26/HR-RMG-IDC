@@ -3971,44 +3971,80 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                             </button>
                         </div>
                         <div className="recruitment-requests-modal-body">
-                            {recruitmentRequests.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-                                    <svg style={{ width: '4rem', height: '4rem', margin: '0 auto 1rem', opacity: 0.5 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                    </svg>
-                                    <p>Chưa có yêu cầu tuyển dụng nào</p>
-                                </div>
-                            ) : (
-                                <div className="recruitment-requests-list">
-                                    {recruitmentRequests.map((request) => (
-                                        <div
-                                            key={request.id}
-                                            className="recruitment-request-item"
-                                            onClick={() => {
-                                                setSelectedHrRequest(request);
-                                                setShowHrRequestDetail(true);
-                                            }}
-                                            style={{ cursor: 'pointer' }}
-                                        >
-                                            <div className="recruitment-request-header">
-                                                <h3 className="recruitment-request-title">
-                                                    Yêu cầu #{request.id} - {request.chucDanhCanTuyen || 'Chưa có tiêu đề'}
-                                                </h3>
-                                                <span className={`recruitment-request-status-badge status-${request.status?.toLowerCase()}`}>
-                                                    {request.status === 'PENDING_HR' ? 'Chờ HR xử lý' :
-                                                        request.status === 'APPROVED' ? 'Đã duyệt' :
-                                                            request.status === 'REJECTED' ? 'Đã từ chối' : request.status}
-                                                </span>
+                            {/* Status Filter Pills for Recruitment Requests */}
+                            <div className="recruitment-requests-filter-pills" style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <button
+                                    type="button"
+                                    className={`recruitment-request-filter-pill ${recruitmentRequestStatusFilter === 'all' ? 'pill-active' : 'pill-inactive'}`}
+                                    onClick={() => setRecruitmentRequestStatusFilter('all')}
+                                >
+                                    <span>Tất cả</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`recruitment-request-filter-pill ${recruitmentRequestStatusFilter === 'APPROVED' ? 'pill-active' : 'pill-inactive'}`}
+                                    onClick={() => setRecruitmentRequestStatusFilter('APPROVED')}
+                                >
+                                    <span>Đã duyệt</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`recruitment-request-filter-pill ${recruitmentRequestStatusFilter === 'PENDING' ? 'pill-active' : 'pill-inactive'}`}
+                                    onClick={() => setRecruitmentRequestStatusFilter('PENDING')}
+                                >
+                                    <span>Chờ duyệt</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`recruitment-request-filter-pill ${recruitmentRequestStatusFilter === 'REJECTED' ? 'pill-active' : 'pill-inactive'}`}
+                                    onClick={() => setRecruitmentRequestStatusFilter('REJECTED')}
+                                >
+                                    <span>Đã từ chối</span>
+                                </button>
+                            </div>
+                            {(() => {
+                                const filteredRequests = recruitmentRequestStatusFilter === 'all'
+                                    ? recruitmentRequests
+                                    : recruitmentRequests.filter(req => req.status === recruitmentRequestStatusFilter);
+
+                                return filteredRequests.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                                        <svg style={{ width: '4rem', height: '4rem', margin: '0 auto 1rem', opacity: 0.5 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                        <p>Chưa có yêu cầu tuyển dụng nào</p>
+                                    </div>
+                                ) : (
+                                    <div className="recruitment-requests-list">
+                                        {filteredRequests.map((request) => (
+                                            <div
+                                                key={request.id}
+                                                className="recruitment-request-item"
+                                                onClick={() => {
+                                                    setSelectedHrRequest(request);
+                                                    setShowHrRequestDetail(true);
+                                                }}
+                                                style={{ cursor: 'pointer' }}
+                                            >
+                                                <div className="recruitment-request-header">
+                                                    <h3 className="recruitment-request-title">
+                                                        Yêu cầu #{request.id} - {request.chucDanhCanTuyen || 'Chưa có tiêu đề'}
+                                                    </h3>
+                                                    <span className={`recruitment-request-status-badge status-${request.status?.toLowerCase()}`}>
+                                                        {request.status === 'PENDING_HR' ? 'Chờ HR xử lý' :
+                                                            request.status === 'APPROVED' ? 'Đã duyệt' :
+                                                                request.status === 'REJECTED' ? 'Đã từ chối' : request.status}
+                                                    </span>
+                                                </div>
+                                                <div className="recruitment-request-details">
+                                                    <p><strong>Phòng ban:</strong> {request.phongBanBoPhan || '---'}</p>
+                                                    <p><strong>Người gửi:</strong> {request.nguoiGui || '---'}</p>
+                                                    <p><strong>Ngày gửi:</strong> {request.ngayGui ? new Date(request.ngayGui).toLocaleDateString('vi-VN') : '---'}</p>
+                                                    <p><strong>Ngày duyệt:</strong> {request.approvedAt ? new Date(request.approvedAt).toLocaleDateString('vi-VN') : '---'}</p>
+                                                    <p><strong>Số lượng:</strong> {request.soLuongYeuCau || '---'}</p>
+                                                </div>
+                                                {/* HR chỉ xem, không duyệt/từ chối */}
                                             </div>
-                                            <div className="recruitment-request-details">
-                                                <p><strong>Phòng ban:</strong> {request.phongBanBoPhan || '---'}</p>
-                                                <p><strong>Người gửi:</strong> {request.nguoiGui || '---'}</p>
-                                                <p><strong>Ngày gửi:</strong> {request.ngayGui ? new Date(request.ngayGui).toLocaleDateString('vi-VN') : '---'}</p>
-                                                <p><strong>Ngày duyệt:</strong> {request.approvedAt ? new Date(request.approvedAt).toLocaleDateString('vi-VN') : '---'}</p>
-                                                <p><strong>Số lượng:</strong> {request.soLuongYeuCau || '---'}</p>
-                                            </div>
-                                            {/* HR chỉ xem, không duyệt/từ chối */}
-                                        </div>
                                         ))}
                                     </div>
                                 );

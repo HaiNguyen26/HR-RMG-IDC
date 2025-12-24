@@ -252,7 +252,7 @@ router.get('/', async (req, res) => {
         const hasBranchDirectorId = branchDirectorIdCheck.rows[0].exists;
 
         const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-        
+
         // Xây dựng query an toàn - chỉ JOIN nếu cột tồn tại
         let sql = `
             SELECT ir.*,
@@ -261,7 +261,7 @@ router.get('/', async (req, res) => {
                    c.phong_ban,
                    c.so_dien_thoai,
                    c.trang_thai as candidate_status`;
-        
+
         if (hasRecruitmentRequestId) {
             sql += `,
                    rr.chuc_danh_can_tuyen,
@@ -271,10 +271,10 @@ router.get('/', async (req, res) => {
                    NULL as chuc_danh_can_tuyen,
                    NULL as phong_ban_bo_phan`;
         }
-        
+
         sql += `,
                    m.ho_ten as manager_name`;
-        
+
         if (hasBranchDirectorId) {
             sql += `,
                    bd.ho_ten as branch_director_name`;
@@ -282,29 +282,29 @@ router.get('/', async (req, res) => {
             sql += `,
                    NULL as branch_director_name`;
         }
-        
+
         sql += `
             FROM interview_requests ir
             LEFT JOIN candidates c ON ir.candidate_id = c.id`;
-        
+
         if (hasRecruitmentRequestId) {
             sql += `
             LEFT JOIN recruitment_requests rr ON ir.recruitment_request_id = rr.id`;
         }
-        
+
         sql += `
             LEFT JOIN employees m ON ir.manager_id = m.id`;
-        
+
         if (hasBranchDirectorId) {
             sql += `
             LEFT JOIN employees bd ON ir.branch_director_id = bd.id`;
         }
-        
+
         sql += `
             ${where}
             ORDER BY ir.created_at DESC
         `;
-        
+
         console.log('[GET /api/interview-requests] Query:', sql);
         console.log('[GET /api/interview-requests] Params:', params);
         const result = await pool.query(sql, params);

@@ -2234,11 +2234,11 @@
   .recruitment-request-details-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .recruitment-requests-filter-pills {
     flex-direction: column;
   }
-  
+
   .recruitment-request-filter-pill {
     width: 100%;
     text-align: center;
