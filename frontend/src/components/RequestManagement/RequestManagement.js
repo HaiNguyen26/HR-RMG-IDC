@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import {
     attendanceAdjustmentsAPI,
     leaveRequestsAPI,
@@ -79,6 +80,8 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     const [activeModule, setActiveModule] = useState('all');
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
+    const [exportFilterMonth, setExportFilterMonth] = useState('');
+    const [exportFilterYear, setExportFilterYear] = useState(new Date().getFullYear().toString());
 
     // Statistics cho tất cả các status của module hiện tại
     const [moduleStatusStatistics, setModuleStatusStatistics] = useState({
@@ -335,6 +338,141 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         return;
     };
     /* eslint-enable no-unused-vars */
+
+    // Export approved requests to Excel
+    const handleExportRequests = async () => {
+        try {
+            setLoading(true);
+
+            // Lấy dữ liệu đã được duyệt (APPROVED)
+            let approvedRequests = requests.filter(req => req.status === 'APPROVED');
+
+            // Filter theo tháng/năm nếu có
+            if (exportFilterYear) {
+                const filterYear = parseInt(exportFilterYear, 10);
+                approvedRequests = approvedRequests.filter(req => {
+                    if (!req.approved_at && !req.updated_at) return false;
+                    const approvedDate = new Date(req.approved_at || req.updated_at);
+                    const requestYear = approvedDate.getFullYear();
+
+                    if (exportFilterMonth) {
+                        const filterMonth = parseInt(exportFilterMonth, 10);
+                        const requestMonth = approvedDate.getMonth() + 1; // getMonth() returns 0-11
+                        return requestYear === filterYear && requestMonth === filterMonth;
+                    }
+                    return requestYear === filterYear;
+                });
+            }
+
+            if (approvedRequests.length === 0) {
+                if (showToast) showToast('Không có đơn nào đã được duyệt trong khoảng thời gian đã chọn', 'warning');
+                setLoading(false);
+                return;
+            }
+
+            // Định nghĩa headers cho Excel
+            const headers = [
+                'Mã đơn',
+                'Loại đơn',
+                'Nhân viên',
+                'Ngày bắt đầu',
+                'Ngày kết thúc',
+                'Thời gian',
+                'Lý do',
+                'Trạng thái',
+                'Ngày tạo',
+                'Ngày duyệt'
+            ];
+
+            // Chuẩn hóa dữ liệu
+            const data = approvedRequests.map((req) => {
+                const formatDate = (dateString) => {
+                    if (!dateString) return '';
+                    try {
+                        const date = new Date(dateString);
+                        if (isNaN(date.getTime())) return '';
+                        return date.toLocaleDateString('vi-VN');
+                    } catch {
+                        return '';
+                    }
+                };
+
+                const formatDateTime = (dateString) => {
+                    if (!dateString) return '';
+                    try {
+                        const date = new Date(dateString);
+                        if (isNaN(date.getTime())) return '';
+                        return date.toLocaleString('vi-VN');
+                    } catch {
+                        return '';
+                    }
+                };
+
+                const getRequestTypeLabel = () => {
+                    if (req.requestType === 'leave') {
+                        return req.request_type === 'LEAVE' ? 'Xin nghỉ phép' : 'Xin nghỉ việc';
+                    } else if (req.requestType === 'overtime') {
+                        return 'Đơn tăng ca';
+                    } else if (req.requestType === 'attendance') {
+                        return 'Đơn bổ sung công';
+                    }
+                    return 'Không xác định';
+                };
+
+                const getTimeInfo = () => {
+                    if (req.requestType === 'overtime') {
+                        return `${req.start_time || ''} - ${req.end_time || ''}`;
+                    }
+                    return '';
+                };
+
+                return {
+                    'Mã đơn': req.id || '',
+                    'Loại đơn': getRequestTypeLabel(),
+                    'Nhân viên': req.employee_name || req.employee?.ho_ten || '',
+                    'Ngày bắt đầu': formatDate(req.start_date),
+                    'Ngày kết thúc': formatDate(req.end_date),
+                    'Thời gian': getTimeInfo(),
+                    'Lý do': req.reason || req.notes || '',
+                    'Trạng thái': 'Đã duyệt',
+                    'Ngày tạo': formatDateTime(req.created_at),
+                    'Ngày duyệt': formatDateTime(req.approved_at || req.updated_at)
+                };
+            });
+
+            // Tạo worksheet
+            const worksheet = XLSX.utils.json_to_sheet(data, { header: headers });
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'DonTuDaDuyet');
+
+            // Auto width
+            const colWidths = headers.map(() => ({ wch: 25 }));
+            worksheet['!cols'] = colWidths;
+
+            // Tạo tên file
+            let fileName = 'don_tu_da_duyet';
+            if (activeModule !== 'all') {
+                const moduleName = activeModule === 'leave' ? 'don_nghi' : activeModule === 'overtime' ? 'don_tang_ca' : 'don_bo_sung_cong';
+                fileName = `${moduleName}_da_duyet`;
+            }
+            if (exportFilterYear) {
+                fileName += `_${exportFilterYear}`;
+            }
+            if (exportFilterMonth) {
+                const monthNames = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+                fileName += `_${monthNames[parseInt(exportFilterMonth, 10) - 1]}`;
+            }
+            fileName += '.xlsx';
+
+            XLSX.writeFile(workbook, fileName);
+            if (showToast) showToast(`Đã xuất ${approvedRequests.length} đơn đã duyệt ra file Excel`, 'success');
+        } catch (err) {
+            console.error('Export Excel error:', err);
+            if (showToast) showToast('Lỗi khi xuất Excel', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const renderCardHeader = (request) => {
         const requestType = request.requestType || activeModule;
@@ -996,6 +1134,49 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                 </span>
                             </p>
                         </div>
+                    </div>
+                    {/* Export Actions */}
+                    <div className="request-management-header-actions">
+                        {/* Export Filter */}
+                        <div className="request-export-filters">
+                            <select
+                                className="request-export-filter-select"
+                                value={exportFilterYear}
+                                onChange={(e) => setExportFilterYear(e.target.value)}
+                            >
+                                <option value="">Tất cả năm</option>
+                                {Array.from({ length: 5 }, (_, i) => {
+                                    const year = new Date().getFullYear() - i;
+                                    return <option key={year} value={year.toString()}>{year}</option>;
+                                })}
+                            </select>
+                            <select
+                                className="request-export-filter-select"
+                                value={exportFilterMonth}
+                                onChange={(e) => setExportFilterMonth(e.target.value)}
+                                disabled={!exportFilterYear}
+                            >
+                                <option value="">Tất cả tháng</option>
+                                {Array.from({ length: 12 }, (_, i) => {
+                                    const month = i + 1;
+                                    const monthNames = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
+                                    return <option key={month} value={month.toString()}>{monthNames[i]}</option>;
+                                })}
+                            </select>
+                        </div>
+                        {/* Export Button */}
+                        <button
+                            type="button"
+                            className="request-export-excel-btn"
+                            onClick={handleExportRequests}
+                            disabled={loading || requests.filter(req => req.status === 'APPROVED').length === 0}
+                            title="Xuất các đơn đã duyệt ra Excel"
+                        >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span>Xuất Excel</span>
+                        </button>
                     </div>
                 </div>
             </div>

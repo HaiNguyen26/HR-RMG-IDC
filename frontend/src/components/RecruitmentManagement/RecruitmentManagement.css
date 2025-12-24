@@ -1833,6 +1833,10 @@
   padding: 1.5rem 2rem;
   border-bottom: 1px solid #e2e8f0;
   flex-shrink: 0;
+  gap: 1rem;
+  flex-wrap: wrap;
+  position: relative;
+  min-height: 4rem;
 }
 
 .recruitment-requests-modal-title {
@@ -1840,6 +1844,93 @@
   font-weight: 700;
   color: #1e293b;
   margin: 0;
+  flex: 0 0 auto;
+  min-width: 200px;
+  max-width: 300px;
+}
+
+.recruitment-requests-modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+  padding-right: 3rem;
+}
+
+.recruitment-export-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.recruitment-export-filter-select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  background: white;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 120px;
+}
+
+.recruitment-export-filter-select:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.recruitment-export-filter-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.recruitment-export-filter-select:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.recruitment-export-excel-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.recruitment-export-excel-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.recruitment-export-excel-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.recruitment-export-excel-btn:disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.recruitment-export-excel-btn svg {
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 .recruitment-requests-modal-close {
@@ -1854,6 +1945,10 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  flex-shrink: 0;
+  position: absolute;
+  top: 1.5rem;
+  right: 2rem;
 }
 
 .recruitment-requests-modal-close:hover {
@@ -2432,6 +2527,33 @@
 
   .recruitment-requests-modal-header {
     padding: 1.25rem 1.5rem;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .recruitment-requests-modal-title {
+    width: 100%;
+    margin-bottom: 1rem;
+  }
+
+  .recruitment-requests-modal-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .recruitment-export-filters {
+    flex-direction: column;
+    width: 100%;
+    gap: 0.75rem;
+  }
+
+  .recruitment-export-filter-select {
+    width: 100%;
+  }
+
+  .recruitment-export-excel-btn {
+    width: 100%;
+    justify-content: center;
   }
 
   .recruitment-requests-modal-body {

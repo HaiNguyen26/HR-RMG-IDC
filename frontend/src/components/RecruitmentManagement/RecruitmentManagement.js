@@ -25,6 +25,8 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
     const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
     const [selectedHrRequest, setSelectedHrRequest] = useState(null);
     const [showHrRequestDetail, setShowHrRequestDetail] = useState(false);
+    const [exportFilterMonth, setExportFilterMonth] = useState('');
+    const [exportFilterYear, setExportFilterYear] = useState(new Date().getFullYear().toString());
     const [showTransferInterviewModal, setShowTransferInterviewModal] = useState(false);
     const [selectedTransferRequestId, setSelectedTransferRequestId] = useState('');
     const [transferInterviewDate, setTransferInterviewDate] = useState('');
@@ -1506,6 +1508,122 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
 
             XLSX.writeFile(workbook, 'ung_vien_template.xlsx');
             if (showToast) showToast('Đã xuất file Excel', 'success');
+        } catch (err) {
+            console.error('Export Excel error:', err);
+            if (showToast) showToast('Lỗi khi xuất Excel', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Export approved recruitment requests to Excel
+    const handleExportRecruitmentRequests = async () => {
+        try {
+            setLoading(true);
+
+            // Lấy dữ liệu đã được duyệt (APPROVED)
+            let approvedRequests = recruitmentRequests.filter(req => req.status === 'APPROVED');
+
+            // Filter theo tháng/năm nếu có
+            if (exportFilterYear) {
+                const filterYear = parseInt(exportFilterYear, 10);
+                approvedRequests = approvedRequests.filter(req => {
+                    if (!req.approvedAt) return false;
+                    const approvedDate = new Date(req.approvedAt);
+                    const requestYear = approvedDate.getFullYear();
+
+                    if (exportFilterMonth) {
+                        const filterMonth = parseInt(exportFilterMonth, 10);
+                        const requestMonth = approvedDate.getMonth() + 1; // getMonth() returns 0-11
+                        return requestYear === filterYear && requestMonth === filterMonth;
+                    }
+                    return requestYear === filterYear;
+                });
+            }
+
+            if (approvedRequests.length === 0) {
+                if (showToast) showToast('Không có đơn nào đã được duyệt trong khoảng thời gian đã chọn', 'warning');
+                setLoading(false);
+                return;
+            }
+
+            // Định nghĩa headers cho Excel
+            const headers = [
+                'Mã đơn',
+                'Chức danh cần tuyển',
+                'Phòng ban/Bộ phận',
+                'Người gửi',
+                'Quản lý trực tiếp',
+                'Quản lý gián tiếp',
+                'Số lượng',
+                'Loại lao động',
+                'Lý do tuyển',
+                'Giới tính',
+                'Độ tuổi',
+                'Trình độ học vấn',
+                'Kinh nghiệm chuyên môn',
+                'Chi tiết kinh nghiệm',
+                'Ngày gửi',
+                'Ngày duyệt',
+                'Trạng thái'
+            ];
+
+            // Chuẩn hóa dữ liệu
+            const data = approvedRequests.map((req) => {
+                const formatDate = (dateString) => {
+                    if (!dateString) return '';
+                    try {
+                        const date = new Date(dateString);
+                        if (isNaN(date.getTime())) return '';
+                        return date.toLocaleDateString('vi-VN');
+                    } catch {
+                        return '';
+                    }
+                };
+
+                return {
+                    'Mã đơn': req.id || '',
+                    'Chức danh cần tuyển': req.chucDanhCanTuyen || '',
+                    'Phòng ban/Bộ phận': req.phongBanBoPhan || '',
+                    'Người gửi': req.nguoiGui || '',
+                    'Quản lý trực tiếp': req.nguoiQuanLyTrucTiep || '',
+                    'Quản lý gián tiếp': req.nguoiQuanLyGianTiep || '',
+                    'Số lượng': req.soLuongYeuCau || '',
+                    'Loại lao động': req.loaiLaoDong === 'toan_thoi_gian' ? 'Toàn thời gian' : req.loaiLaoDong === 'thoi_vu' ? 'Thời vụ' : req.loaiLaoDong || '',
+                    'Lý do tuyển': req.lyDoTuyen === 'thay_the' ? 'Thay thế' : req.lyDoTuyen === 'nhu_cau_tang' ? 'Nhu cầu tăng' : req.lyDoTuyen === 'vi_tri_moi' ? 'Vị trí mới' : req.lyDoTuyen || '',
+                    'Giới tính': req.gioiTinh === 'bat_ky' ? 'Bất kỳ' : req.gioiTinh === 'nam' ? 'Nam' : req.gioiTinh === 'nu' ? 'Nữ' : req.gioiTinh || '',
+                    'Độ tuổi': req.doTuoi || '',
+                    'Trình độ học vấn': req.trinhDoHocVanYeuCau || '',
+                    'Kinh nghiệm chuyên môn': req.kinhNghiemChuyenMon === 'khong_yeu_cau' ? 'Không yêu cầu' : req.kinhNghiemChuyenMon === 'co_yeu_cau' ? 'Có yêu cầu' : req.kinhNghiemChuyenMon || '',
+                    'Chi tiết kinh nghiệm': req.chiTietKinhNghiem || '',
+                    'Ngày gửi': formatDate(req.ngayGui),
+                    'Ngày duyệt': formatDate(req.approvedAt),
+                    'Trạng thái': req.status === 'APPROVED' ? 'Đã duyệt' : req.status || ''
+                };
+            });
+
+            // Tạo worksheet
+            const worksheet = XLSX.utils.json_to_sheet(data, { header: headers });
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'YeuCauTuyenDung');
+
+            // Auto width
+            const colWidths = headers.map(() => ({ wch: 25 }));
+            worksheet['!cols'] = colWidths;
+
+            // Tạo tên file
+            let fileName = 'yeu_cau_tuyen_dung_da_duyet';
+            if (exportFilterYear) {
+                fileName += `_${exportFilterYear}`;
+            }
+            if (exportFilterMonth) {
+                const monthNames = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+                fileName += `_${monthNames[parseInt(exportFilterMonth, 10) - 1]}`;
+            }
+            fileName += '.xlsx';
+
+            XLSX.writeFile(workbook, fileName);
+            if (showToast) showToast(`Đã xuất ${approvedRequests.length} đơn đã duyệt ra file Excel`, 'success');
         } catch (err) {
             console.error('Export Excel error:', err);
             if (showToast) showToast('Lỗi khi xuất Excel', 'error');
@@ -3799,6 +3917,48 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                     <div className="recruitment-requests-modal-container" onClick={(e) => e.stopPropagation()}>
                         <div className="recruitment-requests-modal-header">
                             <h2 className="recruitment-requests-modal-title">Yêu cầu Tuyển nhân sự</h2>
+                            <div className="recruitment-requests-modal-header-actions">
+                                {/* Export Filter */}
+                                <div className="recruitment-export-filters">
+                                    <select
+                                        className="recruitment-export-filter-select"
+                                        value={exportFilterYear}
+                                        onChange={(e) => setExportFilterYear(e.target.value)}
+                                    >
+                                        <option value="">Tất cả năm</option>
+                                        {Array.from({ length: 5 }, (_, i) => {
+                                            const year = new Date().getFullYear() - i;
+                                            return <option key={year} value={year.toString()}>{year}</option>;
+                                        })}
+                                    </select>
+                                    <select
+                                        className="recruitment-export-filter-select"
+                                        value={exportFilterMonth}
+                                        onChange={(e) => setExportFilterMonth(e.target.value)}
+                                        disabled={!exportFilterYear}
+                                    >
+                                        <option value="">Tất cả tháng</option>
+                                        {Array.from({ length: 12 }, (_, i) => {
+                                            const month = i + 1;
+                                            const monthNames = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
+                                            return <option key={month} value={month.toString()}>{monthNames[i]}</option>;
+                                        })}
+                                    </select>
+                                </div>
+                                {/* Export Button */}
+                                <button
+                                    type="button"
+                                    className="recruitment-export-excel-btn"
+                                    onClick={handleExportRecruitmentRequests}
+                                    disabled={loading || recruitmentRequests.filter(req => req.status === 'APPROVED').length === 0}
+                                    title="Xuất các đơn đã duyệt ra Excel"
+                                >
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    <span>Xuất Excel</span>
+                                </button>
+                            </div>
                             <button
                                 type="button"
                                 className="recruitment-requests-modal-close"
