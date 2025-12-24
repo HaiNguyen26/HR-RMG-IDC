@@ -41,6 +41,37 @@ BEGIN
     END IF;
 END $$;
 
+-- Kiểm tra và thêm cột branch_director_id nếu chưa tồn tại
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'recruitment_requests' 
+        AND column_name = 'branch_director_id'
+    ) THEN
+        -- Thêm cột branch_director_id
+        ALTER TABLE recruitment_requests 
+        ADD COLUMN branch_director_id INTEGER;
+        
+        -- Thêm foreign key constraint nếu bảng employees tồn tại
+        IF EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_name = 'employees'
+        ) THEN
+            ALTER TABLE recruitment_requests
+            ADD CONSTRAINT fk_recruitment_requests_branch_director 
+            FOREIGN KEY (branch_director_id) 
+            REFERENCES employees(id) 
+            ON DELETE SET NULL;
+        END IF;
+        
+        RAISE NOTICE 'Đã thêm cột branch_director_id vào bảng recruitment_requests';
+    ELSE
+        RAISE NOTICE 'Cột branch_director_id đã tồn tại';
+    END IF;
+END $$;
+
 -- Kiểm tra và thêm các cột khác còn thiếu
 DO $$
 BEGIN
@@ -100,8 +131,11 @@ BEGIN
     END IF;
 END $$;
 
--- Tạo index trên created_by_employee_id nếu chưa tồn tại
+-- Tạo indexes nếu chưa tồn tại
 CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_by 
 ON recruitment_requests(created_by_employee_id);
+
+CREATE INDEX IF NOT EXISTS idx_recruitment_requests_branch_director 
+ON recruitment_requests(branch_director_id);
 
 COMMIT;
