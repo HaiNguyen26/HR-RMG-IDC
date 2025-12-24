@@ -1059,7 +1059,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
         }
     };
 
-    // Fetch interview requests based on selected filter (all, approved, rejected)
+    // Fetch interview requests and recruitment requests based on selected filter (all, approved, rejected)
     useEffect(() => {
         const fetchInterviewRequestsForFilter = async () => {
             if (selectedFilter !== 'all' && selectedFilter !== 'approved' && selectedFilter !== 'rejected') {
@@ -1080,16 +1080,17 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 }
 
                 // Fetch interview requests với status filter
-                const response = await interviewRequestsAPI.getAll({
+                const interviewResponse = await interviewRequestsAPI.getAll({
                     ...params,
                     status: statusFilter || undefined
                 });
 
-                if (response.data?.success) {
-                    const requestsData = response.data.data || [];
+                let mappedCandidates = [];
+                if (interviewResponse.data?.success) {
+                    const requestsData = interviewResponse.data.data || [];
 
                     // Map interview requests data để có format phù hợp với table
-                    const mappedCandidates = requestsData
+                    mappedCandidates = requestsData
                         .filter(request => {
                             // Loại bỏ các ứng viên đang trong quá trình thử việc
                             const candidateStatus = request.candidate_status;
@@ -1103,13 +1104,41 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                             department: request.phong_ban || request.phongBan || request.phong_ban_bo_phan || '-',
                             date: request.created_at || request.createdAt || request.interview_time || '-',
                             status: request.status || 'PENDING_INTERVIEW',
-                            interviewRequest: request
+                            interviewRequest: request,
+                            type: 'interview'
                         }));
-
-                    setCandidates(mappedCandidates);
-                } else {
-                    setCandidates([]);
                 }
+
+                // Nếu filter là 'approved', cũng fetch recruitment requests đã duyệt
+                if (selectedFilter === 'approved' && isBranchDirector) {
+                    try {
+                        const recruitmentResponse = await recruitmentRequestsAPI.getAll({
+                            branchDirectorId: currentUser?.id,
+                            status: 'APPROVED'
+                        });
+
+                        if (recruitmentResponse.data?.success) {
+                            const recruitmentData = recruitmentResponse.data.data || [];
+                            const mappedRecruitmentRequests = recruitmentData.map(request => ({
+                                id: `recruitment-${request.id}`,
+                                requestId: request.id,
+                                name: request.created_by_name || request.nguoi_quan_ly_truc_tiep || '-',
+                                position: request.chuc_danh_can_tuyen || '-',
+                                department: request.phong_ban_bo_phan || '-',
+                                date: request.approved_at || request.created_at || '-',
+                                status: 'APPROVED',
+                                recruitmentRequest: request,
+                                type: 'recruitment'
+                            }));
+
+                            mappedCandidates = [...mappedCandidates, ...mappedRecruitmentRequests];
+                        }
+                    } catch (recruitmentError) {
+                        console.error('Error fetching approved recruitment requests:', recruitmentError);
+                    }
+                }
+
+                setCandidates(mappedCandidates);
             } catch (error) {
                 console.error('Error fetching interview requests:', error);
                 setCandidates([]);
@@ -1440,6 +1469,22 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                                     setShowInterviewRequestDetail(true);
                                                                 }}
                                                                 title="Xem chi tiết"
+                                                            >
+                                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                                </svg>
+                                                            </button>
+                                                        )}
+                                                        {candidate.recruitmentRequest && (
+                                                            <button
+                                                                type="button"
+                                                                className="interview-approvals-action-btn interview-approvals-action-btn--approve"
+                                                                onClick={() => {
+                                                                    setSelectedRequest(candidate.recruitmentRequest);
+                                                                    setShowRequestDetail(true);
+                                                                }}
+                                                                title="Xem chi tiết yêu cầu tuyển dụng"
                                                             >
                                                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
