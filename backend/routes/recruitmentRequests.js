@@ -424,6 +424,57 @@ const ensureRecruitmentRequestsTable = async () => {
         } catch (managerIdError) {
             console.warn('[ensureRecruitmentRequestsTable] Không thể sửa constraint manager_id:', managerIdError.message);
         }
+
+        // Kiểm tra và sửa constraint NOT NULL của manager_type nếu tồn tại (làm cho nullable)
+        try {
+            const managerTypeCheck = await pool.query(`
+                SELECT 
+                    c.column_name,
+                    c.is_nullable,
+                    c.column_default
+                FROM information_schema.columns c
+                WHERE c.table_name = 'recruitment_requests' 
+                AND c.column_name = 'manager_type'
+            `);
+
+            if (managerTypeCheck.rows.length > 0 && managerTypeCheck.rows[0].is_nullable === 'NO') {
+                console.log('[ensureRecruitmentRequestsTable] Phát hiện cột manager_type có NOT NULL constraint, đang chuyển sang nullable...');
+                await pool.query(`
+                    ALTER TABLE recruitment_requests 
+                    ALTER COLUMN manager_type DROP NOT NULL
+                `);
+                console.log('[ensureRecruitmentRequestsTable] Đã chuyển manager_type sang nullable thành công');
+            }
+        } catch (managerTypeError) {
+            console.warn('[ensureRecruitmentRequestsTable] Không thể sửa constraint manager_type:', managerTypeError.message);
+        }
+
+        // Kiểm tra và sửa constraint NOT NULL của các cột khác có thể có NOT NULL không mong muốn
+        // (danh sách các cột có thể có NOT NULL từ schema cũ nhưng không cần thiết)
+        const optionalNullableColumns = ['created_by', 'phong_ban'];
+        for (const colName of optionalNullableColumns) {
+            try {
+                const colCheck = await pool.query(`
+                    SELECT 
+                        c.column_name,
+                        c.is_nullable
+                    FROM information_schema.columns c
+                    WHERE c.table_name = 'recruitment_requests' 
+                    AND c.column_name = $1
+                `, [colName]);
+
+                if (colCheck.rows.length > 0 && colCheck.rows[0].is_nullable === 'NO') {
+                    console.log(`[ensureRecruitmentRequestsTable] Phát hiện cột ${colName} có NOT NULL constraint, đang chuyển sang nullable...`);
+                    await pool.query(`
+                        ALTER TABLE recruitment_requests 
+                        ALTER COLUMN ${colName} DROP NOT NULL
+                    `);
+                    console.log(`[ensureRecruitmentRequestsTable] Đã chuyển ${colName} sang nullable thành công`);
+                }
+            } catch (colError) {
+                console.warn(`[ensureRecruitmentRequestsTable] Không thể sửa constraint ${colName}:`, colError.message);
+            }
+        }
     } catch (error) {
         console.error('Error ensuring recruitment_requests table:', error);
         throw error;

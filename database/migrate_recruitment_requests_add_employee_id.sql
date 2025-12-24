@@ -324,6 +324,51 @@ BEGIN
     END IF;
 END $$;
 
+-- Sửa constraint NOT NULL của manager_type nếu tồn tại (làm cho nullable)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'recruitment_requests' 
+        AND column_name = 'manager_type'
+        AND is_nullable = 'NO'
+    ) THEN
+        ALTER TABLE recruitment_requests ALTER COLUMN manager_type DROP NOT NULL;
+        RAISE NOTICE 'Đã chuyển manager_type sang nullable';
+    END IF;
+END $$;
+
+-- Sửa constraint NOT NULL của các cột khác có thể có NOT NULL không mong muốn
+DO $$
+DECLARE
+    col_name TEXT;
+BEGIN
+    -- created_by (có thể có từ schema cũ)
+    IF EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'recruitment_requests' 
+        AND column_name = 'created_by'
+        AND is_nullable = 'NO'
+    ) THEN
+        ALTER TABLE recruitment_requests ALTER COLUMN created_by DROP NOT NULL;
+        RAISE NOTICE 'Đã chuyển created_by sang nullable';
+    END IF;
+
+    -- phong_ban (có thể có từ schema cũ, đã được thay bằng phong_ban_bo_phan)
+    IF EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'recruitment_requests' 
+        AND column_name = 'phong_ban'
+        AND is_nullable = 'NO'
+    ) THEN
+        ALTER TABLE recruitment_requests ALTER COLUMN phong_ban DROP NOT NULL;
+        RAISE NOTICE 'Đã chuyển phong_ban sang nullable';
+    END IF;
+END $$;
+
 -- Tạo indexes nếu chưa tồn tại
 CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_by 
 ON recruitment_requests(created_by_employee_id);
