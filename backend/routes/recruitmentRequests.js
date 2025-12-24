@@ -188,14 +188,14 @@ const ensureRecruitmentRequestsTable = async () => {
                 AND column_name = 'created_by_employee_id'
             )
         `);
-        
+
         if (!columnCheck.rows[0].exists) {
             console.log('[ensureRecruitmentRequestsTable] Bảng đã tồn tại nhưng thiếu cột created_by_employee_id, đang thêm cột...');
             await pool.query(`
                 ALTER TABLE recruitment_requests 
                 ADD COLUMN created_by_employee_id INTEGER
             `);
-            
+
             // Thêm foreign key constraint nếu có
             try {
                 await pool.query(`
@@ -219,15 +219,60 @@ const ensureRecruitmentRequestsTable = async () => {
                 AND column_name = 'created_by_employee_id'
             )
         `);
-        
+
         if (indexCheck.rows[0].exists) {
             await pool.query(`
                 CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_by ON recruitment_requests(created_by_employee_id)
             `);
         }
-        await pool.query(`
-            CREATE INDEX IF NOT EXISTS idx_recruitment_requests_branch_director ON recruitment_requests(branch_director_id)
+
+        // Kiểm tra và thêm cột branch_director_id nếu bảng đã tồn tại nhưng thiếu cột này
+        const branchDirectorColumnCheck = await pool.query(`
+            SELECT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_name = 'recruitment_requests' 
+                AND column_name = 'branch_director_id'
+            )
         `);
+
+        if (!branchDirectorColumnCheck.rows[0].exists) {
+            console.log('[ensureRecruitmentRequestsTable] Bảng đã tồn tại nhưng thiếu cột branch_director_id, đang thêm cột...');
+            await pool.query(`
+                ALTER TABLE recruitment_requests 
+                ADD COLUMN branch_director_id INTEGER
+            `);
+
+            // Thêm foreign key constraint nếu có
+            try {
+                await pool.query(`
+                    ALTER TABLE recruitment_requests
+                    ADD CONSTRAINT fk_recruitment_requests_branch_director 
+                    FOREIGN KEY (branch_director_id) 
+                    REFERENCES employees(id) 
+                    ON DELETE SET NULL
+                `);
+            } catch (fkError) {
+                console.warn('[ensureRecruitmentRequestsTable] Không thể thêm foreign key constraint cho branch_director_id:', fkError.message);
+            }
+        }
+
+        // Tạo indexes riêng biệt (chỉ tạo index nếu cột tồn tại)
+        const branchDirectorIndexCheck = await pool.query(`
+            SELECT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_name = 'recruitment_requests' 
+                AND column_name = 'branch_director_id'
+            )
+        `);
+
+        if (branchDirectorIndexCheck.rows[0].exists) {
+            await pool.query(`
+                CREATE INDEX IF NOT EXISTS idx_recruitment_requests_branch_director ON recruitment_requests(branch_director_id)
+            `);
+        }
+
         await pool.query(`
             CREATE INDEX IF NOT EXISTS idx_recruitment_requests_status ON recruitment_requests(status)
         `);
