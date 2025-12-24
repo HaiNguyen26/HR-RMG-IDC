@@ -131,6 +131,82 @@ BEGIN
     END IF;
 END $$;
 
+-- Kiểm tra và thêm các cột còn thiếu khác
+DO $$
+BEGIN
+    -- Thêm yeu_cau_chi_tiet_cong_viec nếu chưa có
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'recruitment_requests' 
+        AND column_name = 'yeu_cau_chi_tiet_cong_viec'
+    ) THEN
+        ALTER TABLE recruitment_requests 
+        ADD COLUMN yeu_cau_chi_tiet_cong_viec TEXT;
+        RAISE NOTICE 'Đã thêm cột yeu_cau_chi_tiet_cong_viec';
+    END IF;
+
+    -- Thêm yeu_cau_ngoai_ngu nếu chưa có
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'recruitment_requests' 
+        AND column_name = 'yeu_cau_ngoai_ngu'
+    ) THEN
+        ALTER TABLE recruitment_requests 
+        ADD COLUMN yeu_cau_ngoai_ngu TEXT;
+        RAISE NOTICE 'Đã thêm cột yeu_cau_ngoai_ngu';
+    END IF;
+
+    -- Thêm yeu_cau_vi_tinh_ky_nang_khac nếu chưa có
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'recruitment_requests' 
+        AND column_name = 'yeu_cau_vi_tinh_ky_nang_khac'
+    ) THEN
+        ALTER TABLE recruitment_requests 
+        ADD COLUMN yeu_cau_vi_tinh_ky_nang_khac TEXT;
+        RAISE NOTICE 'Đã thêm cột yeu_cau_vi_tinh_ky_nang_khac';
+    END IF;
+
+    -- Thêm ky_nang_giao_tiep nếu chưa có
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'recruitment_requests' 
+        AND column_name = 'ky_nang_giao_tiep'
+    ) THEN
+        ALTER TABLE recruitment_requests 
+        ADD COLUMN ky_nang_giao_tiep TEXT;
+        RAISE NOTICE 'Đã thêm cột ky_nang_giao_tiep';
+    END IF;
+
+    -- Thêm thai_do_lam_viec nếu chưa có
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'recruitment_requests' 
+        AND column_name = 'thai_do_lam_viec'
+    ) THEN
+        ALTER TABLE recruitment_requests 
+        ADD COLUMN thai_do_lam_viec TEXT;
+        RAISE NOTICE 'Đã thêm cột thai_do_lam_viec';
+    END IF;
+
+    -- Thêm ky_nang_quan_ly nếu chưa có
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'recruitment_requests' 
+        AND column_name = 'ky_nang_quan_ly'
+    ) THEN
+        ALTER TABLE recruitment_requests 
+        ADD COLUMN ky_nang_quan_ly TEXT;
+        RAISE NOTICE 'Đã thêm cột ky_nang_quan_ly';
+    END IF;
+END $$;
+
 -- Tạo indexes nếu chưa tồn tại
 CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_by 
 ON recruitment_requests(created_by_employee_id);

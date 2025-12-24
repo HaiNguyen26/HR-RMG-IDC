@@ -279,6 +279,41 @@ const ensureRecruitmentRequestsTable = async () => {
         await pool.query(`
             CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_at ON recruitment_requests(created_at DESC)
         `);
+
+        // Kiểm tra và thêm các cột còn thiếu nếu bảng đã tồn tại
+        const missingColumns = [
+            'yeu_cau_chi_tiet_cong_viec',
+            'yeu_cau_ngoai_ngu',
+            'yeu_cau_vi_tinh_ky_nang_khac',
+            'ky_nang_giao_tiep',
+            'thai_do_lam_viec',
+            'ky_nang_quan_ly'
+        ];
+
+        for (const columnName of missingColumns) {
+            try {
+                const columnCheck = await pool.query(`
+                    SELECT EXISTS (
+                        SELECT 1 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'recruitment_requests' 
+                        AND column_name = $1
+                    )
+                `, [columnName]);
+
+                if (!columnCheck.rows[0].exists) {
+                    console.log(`[ensureRecruitmentRequestsTable] Bảng đã tồn tại nhưng thiếu cột ${columnName}, đang thêm cột...`);
+                    const columnType = columnName === 'yeu_cau_chi_tiet_cong_viec' ? 'TEXT' : 'TEXT';
+                    await pool.query(`
+                        ALTER TABLE recruitment_requests 
+                        ADD COLUMN ${columnName} ${columnType}
+                    `);
+                }
+            } catch (colError) {
+                console.warn(`[ensureRecruitmentRequestsTable] Không thể thêm cột ${columnName}:`, colError.message);
+                // Không throw error, tiếp tục với các cột khác
+            }
+        }
     } catch (error) {
         console.error('Error ensuring recruitment_requests table:', error);
         throw error;
