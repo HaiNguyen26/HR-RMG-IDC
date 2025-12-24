@@ -264,6 +264,51 @@ BEGIN
     END IF;
 END $$;
 
+-- Kiểm tra và sửa kiểu dữ liệu của ly_do_tuyen nếu đang là JSONB (schema cũ)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'recruitment_requests' 
+        AND column_name = 'ly_do_tuyen'
+        AND data_type = 'jsonb'
+    ) THEN
+        -- Tạo cột tạm mới
+        ALTER TABLE recruitment_requests ADD COLUMN ly_do_tuyen_new VARCHAR(20);
+        
+        -- Copy dữ liệu từ JSONB sang VARCHAR
+        UPDATE recruitment_requests 
+        SET ly_do_tuyen_new = CASE 
+            WHEN ly_do_tuyen IS NULL THEN 'thay_the'
+            WHEN jsonb_typeof(ly_do_tuyen) = 'string' THEN ly_do_tuyen::text
+            WHEN jsonb_typeof(ly_do_tuyen) = 'array' AND jsonb_array_length(ly_do_tuyen) > 0 THEN (ly_do_tuyen->>0)::text
+            ELSE 'thay_the'
+        END
+        WHERE ly_do_tuyen_new IS NULL;
+        
+        -- Xóa cột cũ và đổi tên cột mới
+        ALTER TABLE recruitment_requests DROP COLUMN ly_do_tuyen;
+        ALTER TABLE recruitment_requests RENAME COLUMN ly_do_tuyen_new TO ly_do_tuyen;
+        
+        RAISE NOTICE 'Đã chuyển ly_do_tuyen từ JSONB sang VARCHAR(20)';
+    END IF;
+END $$;
+
+-- Xóa cột tieu_chuan_tuyen_chon nếu tồn tại (schema cũ, không còn dùng)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'recruitment_requests' 
+        AND column_name = 'tieu_chuan_tuyen_chon'
+    ) THEN
+        ALTER TABLE recruitment_requests DROP COLUMN tieu_chuan_tuyen_chon;
+        RAISE NOTICE 'Đã xóa cột tieu_chuan_tuyen_chon (schema cũ)';
+    END IF;
+END $$;
+
 -- Tạo indexes nếu chưa tồn tại
 CREATE INDEX IF NOT EXISTS idx_recruitment_requests_created_by 
 ON recruitment_requests(created_by_employee_id);

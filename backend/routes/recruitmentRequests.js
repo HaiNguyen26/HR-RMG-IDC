@@ -341,6 +341,62 @@ const ensureRecruitmentRequestsTable = async () => {
                 // Không throw error, tiếp tục với các cột khác
             }
         }
+
+        // Kiểm tra và sửa kiểu dữ liệu của ly_do_tuyen nếu đang là JSONB (schema cũ)
+        try {
+            const columnTypeCheck = await pool.query(`
+                SELECT data_type 
+                FROM information_schema.columns 
+                WHERE table_name = 'recruitment_requests' 
+                AND column_name = 'ly_do_tuyen'
+            `);
+
+            if (columnTypeCheck.rows.length > 0 && columnTypeCheck.rows[0].data_type === 'jsonb') {
+                console.log('[ensureRecruitmentRequestsTable] Cột ly_do_tuyen đang là JSONB (schema cũ), đang chuyển sang VARCHAR(20)...');
+                // Tạo cột tạm mới
+                await pool.query(`
+                    ALTER TABLE recruitment_requests 
+                    ADD COLUMN ly_do_tuyen_new VARCHAR(20)
+                `);
+                // Copy dữ liệu nếu có (chỉ lấy giá trị đầu tiên nếu là array)
+                await pool.query(`
+                    UPDATE recruitment_requests 
+                    SET ly_do_tuyen_new = CASE 
+                        WHEN ly_do_tuyen IS NULL THEN 'thay_the'
+                        WHEN jsonb_typeof(ly_do_tuyen) = 'string' THEN ly_do_tuyen::text
+                        WHEN jsonb_typeof(ly_do_tuyen) = 'array' THEN (ly_do_tuyen->>0)::text
+                        ELSE 'thay_the'
+                    END
+                    WHERE ly_do_tuyen_new IS NULL
+                `);
+                // Xóa cột cũ và đổi tên cột mới
+                await pool.query(`ALTER TABLE recruitment_requests DROP COLUMN ly_do_tuyen`);
+                await pool.query(`ALTER TABLE recruitment_requests RENAME COLUMN ly_do_tuyen_new TO ly_do_tuyen`);
+                console.log('[ensureRecruitmentRequestsTable] Đã chuyển ly_do_tuyen từ JSONB sang VARCHAR(20) thành công');
+            }
+        } catch (typeError) {
+            console.warn('[ensureRecruitmentRequestsTable] Không thể chuyển đổi kiểu dữ liệu ly_do_tuyen:', typeError.message);
+        }
+
+        // Xóa cột tieu_chuan_tuyen_chon nếu tồn tại (schema cũ, không còn dùng)
+        try {
+            const oldColumnCheck = await pool.query(`
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'recruitment_requests' 
+                    AND column_name = 'tieu_chuan_tuyen_chon'
+                )
+            `);
+
+            if (oldColumnCheck.rows[0].exists) {
+                console.log('[ensureRecruitmentRequestsTable] Phát hiện cột cũ tieu_chuan_tuyen_chon (JSONB), đang xóa...');
+                await pool.query(`ALTER TABLE recruitment_requests DROP COLUMN tieu_chuan_tuyen_chon`);
+                console.log('[ensureRecruitmentRequestsTable] Đã xóa cột tieu_chuan_tuyen_chon thành công');
+            }
+        } catch (dropError) {
+            console.warn('[ensureRecruitmentRequestsTable] Không thể xóa cột tieu_chuan_tuyen_chon:', dropError.message);
+        }
     } catch (error) {
         console.error('Error ensuring recruitment_requests table:', error);
         throw error;
