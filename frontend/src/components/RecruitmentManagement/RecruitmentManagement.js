@@ -3421,120 +3421,128 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                         </div>
                         <div className="recruitment-view-candidate-modal-body">
                             {/* Section: FILE ĐÍNH KÈM */}
-                            {(viewingCandidate.anh_dai_dien_path || viewingCandidate.cv_dinh_kem_path) && (
-                                <div className="recruitment-view-candidate-section">
-                                    <h3 className="recruitment-view-candidate-section-title">
-                                        <svg className="recruitment-view-candidate-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
-                                        </svg>
-                                        FILE ĐÍNH KÈM
-                                    </h3>
-                                    <div className="recruitment-view-candidate-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                                        {/* Ảnh đại diện */}
-                                        {viewingCandidate.anh_dai_dien_path && (
-                                            <div className="recruitment-view-candidate-field" style={{ gridColumn: 'span 1' }}>
-                                                <div className="recruitment-view-candidate-field-label">
-                                                    <svg className="recruitment-view-candidate-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                                    </svg>
-                                                    Ảnh đại diện
-                                                </div>
-                                                <div className="recruitment-view-candidate-field-value" style={{ padding: '1rem', textAlign: 'center' }}>
-                                                    <img
-                                                        src={`${process.env.REACT_APP_API_URL || 'http://localhost:3000/api'}${viewingCandidate.anh_dai_dien_path}`}
-                                                        alt="Ảnh đại diện"
-                                                        style={{
-                                                            maxWidth: '200px',
-                                                            maxHeight: '250px',
-                                                            borderRadius: '8px',
-                                                            border: '2px solid #e5e7eb',
-                                                            objectFit: 'cover',
-                                                            cursor: 'pointer'
-                                                        }}
-                                                        onClick={() => {
-                                                            const imgUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3000/api'}${viewingCandidate.anh_dai_dien_path}`;
-                                                            window.open(imgUrl, '_blank');
-                                                        }}
-                                                        onError={(e) => {
-                                                            e.target.style.display = 'none';
-                                                            const errorDiv = e.target.nextSibling;
-                                                            if (errorDiv) {
-                                                                errorDiv.style.display = 'block';
-                                                            }
-                                                        }}
-                                                    />
-                                                    <div style={{ display: 'none', color: '#9ca3af', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                                                        Không thể tải ảnh
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
+                            {(() => {
+                                // Hỗ trợ cả snake_case và camelCase
+                                const anhDaiDienPath = viewingCandidate.anh_dai_dien_path || viewingCandidate.anhDaiDienPath;
+                                const cvDinhKemPath = viewingCandidate.cv_dinh_kem_path || viewingCandidate.cvDinhKemPath;
 
-                                        {/* CV đính kèm */}
-                                        {viewingCandidate.cv_dinh_kem_path && (
-                                            <div className="recruitment-view-candidate-field" style={{ gridColumn: 'span 1' }}>
-                                                <div className="recruitment-view-candidate-field-label">
-                                                    <svg className="recruitment-view-candidate-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                                    </svg>
-                                                    CV đính kèm
-                                                </div>
-                                                <div className="recruitment-view-candidate-field-value" style={{ padding: '1rem' }}>
-                                                    <div style={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '1rem',
-                                                        padding: '1rem',
-                                                        backgroundColor: '#f3f4f6',
-                                                        borderRadius: '8px',
-                                                        border: '2px solid #e5e7eb'
-                                                    }}>
-                                                        <svg style={{ width: '48px', height: '48px', color: '#ef4444' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                if (!anhDaiDienPath && !cvDinhKemPath) return null;
+
+                                return (
+                                    <div className="recruitment-view-candidate-section">
+                                        <h3 className="recruitment-view-candidate-section-title">
+                                            <svg className="recruitment-view-candidate-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
+                                            </svg>
+                                            FILE ĐÍNH KÈM
+                                        </h3>
+                                        <div className="recruitment-view-candidate-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                                            {/* Ảnh đại diện */}
+                                            {anhDaiDienPath && (
+                                                <div className="recruitment-view-candidate-field" style={{ gridColumn: 'span 1' }}>
+                                                    <div className="recruitment-view-candidate-field-label">
+                                                        <svg className="recruitment-view-candidate-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                                         </svg>
-                                                        <div style={{ flex: 1 }}>
-                                                            <div style={{ fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                                                CV đính kèm
-                                                            </div>
-                                                            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                                                                CV đính kèm
-                                                            </div>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                const cvUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3000/api'}${viewingCandidate.cv_dinh_kem_path}`;
-                                                                window.open(cvUrl, '_blank');
-                                                            }}
+                                                        Ảnh đại diện
+                                                    </div>
+                                                    <div className="recruitment-view-candidate-field-value" style={{ padding: '1rem', textAlign: 'center' }}>
+                                                        <img
+                                                            src={`${process.env.REACT_APP_API_URL || 'http://localhost:3000/api'}${anhDaiDienPath}`}
+                                                            alt="Ảnh đại diện"
                                                             style={{
-                                                                padding: '0.5rem 1rem',
-                                                                backgroundColor: '#3b82f6',
-                                                                color: 'white',
-                                                                border: 'none',
-                                                                borderRadius: '6px',
-                                                                cursor: 'pointer',
-                                                                fontSize: '0.875rem',
-                                                                fontWeight: '500',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '0.5rem',
-                                                                transition: 'background-color 0.2s'
+                                                                maxWidth: '200px',
+                                                                maxHeight: '250px',
+                                                                borderRadius: '8px',
+                                                                border: '2px solid #e5e7eb',
+                                                                objectFit: 'cover',
+                                                                cursor: 'pointer'
                                                             }}
-                                                            onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
-                                                            onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
-                                                        >
-                                                            <svg style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                                                            </svg>
-                                                            Xem CV
-                                                        </button>
+                                                            onClick={() => {
+                                                                const imgUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3000/api'}${anhDaiDienPath}`;
+                                                                window.open(imgUrl, '_blank');
+                                                            }}
+                                                            onError={(e) => {
+                                                                e.target.style.display = 'none';
+                                                                const errorDiv = e.target.nextSibling;
+                                                                if (errorDiv) {
+                                                                    errorDiv.style.display = 'block';
+                                                                }
+                                                            }}
+                                                        />
+                                                        <div style={{ display: 'none', color: '#9ca3af', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                                                            Không thể tải ảnh
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        )}
+                                            )}
+
+                                            {/* CV đính kèm */}
+                                            {cvDinhKemPath && (
+                                                <div className="recruitment-view-candidate-field" style={{ gridColumn: 'span 1' }}>
+                                                    <div className="recruitment-view-candidate-field-label">
+                                                        <svg className="recruitment-view-candidate-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                        </svg>
+                                                        CV đính kèm
+                                                    </div>
+                                                    <div className="recruitment-view-candidate-field-value" style={{ padding: '1rem' }}>
+                                                        <div style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '1rem',
+                                                            padding: '1rem',
+                                                            backgroundColor: '#f3f4f6',
+                                                            borderRadius: '8px',
+                                                            border: '2px solid #e5e7eb'
+                                                        }}>
+                                                            <svg style={{ width: '48px', height: '48px', color: '#ef4444' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                                            </svg>
+                                                            <div style={{ flex: 1 }}>
+                                                                <div style={{ fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                                                    CV đính kèm
+                                                                </div>
+                                                                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                                                    CV đính kèm
+                                                                </div>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const cvUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3000/api'}${cvDinhKemPath}`;
+                                                                    window.open(cvUrl, '_blank');
+                                                                }}
+                                                                style={{
+                                                                    padding: '0.5rem 1rem',
+                                                                    backgroundColor: '#3b82f6',
+                                                                    color: 'white',
+                                                                    border: 'none',
+                                                                    borderRadius: '6px',
+                                                                    cursor: 'pointer',
+                                                                    fontSize: '0.875rem',
+                                                                    fontWeight: '500',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '0.5rem',
+                                                                    transition: 'background-color 0.2s'
+                                                                }}
+                                                                onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                                                                onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                                                            >
+                                                                <svg style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                                                </svg>
+                                                                Xem CV
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
 
                             {/* Section I: THÔNG TIN CÁ NHÂN */}
                             <div className="recruitment-view-candidate-section">
