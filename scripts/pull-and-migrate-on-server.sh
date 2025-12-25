@@ -386,6 +386,21 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 18: $MIGRATION18${NC}"
 fi
 
+# Migration 19: fix_interview_requests_interview_time_type.sql (Sửa type interview_time từ TIME sang TIMESTAMP)
+MIGRATION19="$PROJECT_DIR/database/fix_interview_requests_interview_time_type.sql"
+if [ -f "$MIGRATION19" ]; then
+    echo -e "${BLUE}→ Chạy migration: fix_interview_requests_interview_time_type.sql (Sửa type interview_time từ TIME sang TIMESTAMP)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION19"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 19 thành công - Đã sửa type interview_time${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 19${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 19: $MIGRATION19${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"

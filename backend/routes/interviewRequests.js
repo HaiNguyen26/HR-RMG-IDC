@@ -404,6 +404,29 @@ router.post('/', async (req, res) => {
             interviewTime
         });
 
+        // Parse interviewTime đúng cách - đảm bảo là TIMESTAMP, không phải TIME
+        let interviewTimeValue = null;
+        if (interviewTime) {
+            try {
+                // Nếu là string ISO format, parse thành Date object
+                const dateObj = new Date(interviewTime);
+                if (!isNaN(dateObj.getTime())) {
+                    // Sử dụng Date object trực tiếp, PostgreSQL sẽ tự động convert
+                    // Nhưng đảm bảo cast rõ ràng thành TIMESTAMP trong query
+                    interviewTimeValue = dateObj;
+                    console.log('[POST /api/interview-requests] Parsed interviewTime:', {
+                        original: interviewTime,
+                        parsed: dateObj.toISOString(),
+                        localString: dateObj.toLocaleString('vi-VN')
+                    });
+                } else {
+                    console.warn('[POST /api/interview-requests] Invalid interviewTime format:', interviewTime);
+                }
+            } catch (error) {
+                console.error('[POST /api/interview-requests] Error parsing interviewTime:', error);
+            }
+        }
+
         const insert = await client.query(
             `INSERT INTO interview_requests (
                 candidate_id, recruitment_request_id, manager_id, branch_director_id, interview_time, status, note
@@ -413,7 +436,7 @@ router.post('/', async (req, res) => {
                 recruitmentRequestIdInt,
                 managerIdInt,
                 branchDirectorIdInt,
-                interviewTime ? new Date(interviewTime) : null,
+                interviewTimeValue, // PostgreSQL sẽ tự động convert Date object thành TIMESTAMP
                 STATUSES.PENDING,
                 note || null
             ]
