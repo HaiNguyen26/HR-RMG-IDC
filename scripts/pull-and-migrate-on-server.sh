@@ -356,6 +356,21 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 16: $MIGRATION16${NC}"
 fi
 
+# Migration 17: grant_permissions_candidate_tables.sql (Cấp quyền cho database user - QUAN TRỌNG)
+MIGRATION17="$PROJECT_DIR/database/grant_permissions_candidate_tables.sql"
+if [ -f "$MIGRATION17" ]; then
+    echo -e "${BLUE}→ Chạy migration: grant_permissions_candidate_tables.sql (Cấp quyền SELECT, INSERT, UPDATE, DELETE cho hr_user trên các bảng candidate_work_experiences, candidate_training_processes, candidate_foreign_languages)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION17"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 17 thành công - Đã cấp quyền cho database user${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 17${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 17: $MIGRATION17${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"
