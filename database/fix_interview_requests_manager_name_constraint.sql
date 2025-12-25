@@ -8,7 +8,7 @@
 
 DO $$
 DECLARE
-    is_nullable TEXT;
+    nullable_status TEXT;
 BEGIN
     -- Kiểm tra xem bảng interview_requests có tồn tại không
     IF EXISTS (
@@ -23,13 +23,13 @@ BEGIN
             AND column_name = 'manager_name'
         ) THEN
             -- Kiểm tra xem cột có NOT NULL constraint không
-            SELECT is_nullable INTO is_nullable
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-            AND table_name = 'interview_requests'
-            AND column_name = 'manager_name';
+            SELECT c.is_nullable INTO nullable_status
+            FROM information_schema.columns c
+            WHERE c.table_schema = 'public'
+            AND c.table_name = 'interview_requests'
+            AND c.column_name = 'manager_name';
 
-            IF is_nullable = 'NO' THEN
+            IF nullable_status = 'NO' THEN
                 -- Drop NOT NULL constraint
                 RAISE NOTICE 'Phát hiện cột manager_name có NOT NULL constraint, đang xóa constraint...';
                 ALTER TABLE interview_requests ALTER COLUMN manager_name DROP NOT NULL;
@@ -48,13 +48,13 @@ BEGIN
             AND table_name = 'interview_requests' 
             AND column_name = 'branch_director_name'
         ) THEN
-            SELECT is_nullable INTO is_nullable
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-            AND table_name = 'interview_requests'
-            AND column_name = 'branch_director_name';
+            SELECT c.is_nullable INTO nullable_status
+            FROM information_schema.columns c
+            WHERE c.table_schema = 'public'
+            AND c.table_name = 'interview_requests'
+            AND c.column_name = 'branch_director_name';
 
-            IF is_nullable = 'NO' THEN
+            IF nullable_status = 'NO' THEN
                 RAISE NOTICE 'Phát hiện cột branch_director_name có NOT NULL constraint, đang xóa constraint...';
                 ALTER TABLE interview_requests ALTER COLUMN branch_director_name DROP NOT NULL;
                 RAISE NOTICE '✓ Đã xóa NOT NULL constraint từ cột branch_director_name';
