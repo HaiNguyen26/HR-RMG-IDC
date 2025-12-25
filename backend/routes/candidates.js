@@ -804,6 +804,7 @@ router.put('/:id', upload.fields([
         console.log('[PUT /api/candidates/:id] Total update fields built:', updateFields.length);
         console.log('[PUT /api/candidates/:id] Update fields list:', updateFields);
         
+        let hasMainTableUpdate = false;
         if (updateFields.length > 0) {
             updateFields.push(`updated_at = NOW()`);
             updateValues.push(id);
@@ -819,6 +820,7 @@ router.put('/:id', upload.fields([
                 throw new Error('Không tìm thấy ứng viên để cập nhật');
             }
             
+            hasMainTableUpdate = true;
             console.log('[PUT /api/candidates/:id] Update successful, affected rows:', updateResult.rows.length);
             console.log('[PUT /api/candidates/:id] Updated candidate data (sample):', {
                 id: updateResult.rows[0].id,
@@ -829,10 +831,9 @@ router.put('/:id', upload.fields([
                 updated_at: updateResult.rows[0].updated_at
             });
         } else {
-            console.warn('[PUT /api/candidates/:id] ⚠️ WARNING: No fields to update! This might indicate a problem with the request data.');
+            console.warn('[PUT /api/candidates/:id] ⚠️ WARNING: No fields to update in main table!');
             console.warn('[PUT /api/candidates/:id] Request body keys:', Object.keys(req.body));
-            // Vẫn commit transaction nhưng không có gì được update
-            // Điều này có thể xảy ra nếu chỉ gửi file mà không gửi field nào khác
+            console.warn('[PUT /api/candidates/:id] Will still proceed to update related tables if needed');
         }
 
         // Xóa các bản ghi cũ trong các bảng con (với error handling)
@@ -927,23 +928,50 @@ router.put('/:id', upload.fields([
             }
         }
 
+        // Kiểm tra xem có ít nhất một thay đổi nào không (main table hoặc related tables)
+        const hasRelatedTableUpdates = (workExp && workExp.length > 0) || 
+                                      (trainingProc && trainingProc.length > 0) || 
+                                      (foreignLang && foreignLang.length > 0);
+        
+        if (!hasMainTableUpdate && !hasRelatedTableUpdates) {
+            await client.query('ROLLBACK');
+            console.error('[PUT /api/candidates/:id] ⚠️ ERROR: No fields to update in main table and no related table updates!');
+            return res.status(400).json({
+                success: false,
+                message: 'Không có dữ liệu nào để cập nhật'
+            });
+        }
+        
         await client.query('COMMIT');
         
         console.log('[PUT /api/candidates/:id] ========== UPDATE REQUEST SUCCESS ==========');
+        console.log('[PUT /api/candidates/:id] Transaction committed successfully');
+        console.log('[PUT /api/candidates/:id] Main table updated:', hasMainTableUpdate);
+        console.log('[PUT /api/candidates/:id] Related tables updated:', hasRelatedTableUpdates);
 
-        // Fetch lại dữ liệu đã cập nhật để trả về
+        // Fetch lại dữ liệu đã cập nhật để trả về (sử dụng pool.query để đảm bảo đọc dữ liệu sau khi commit)
+        // Đợi một chút để đảm bảo transaction đã được commit hoàn toàn
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
         const updatedCandidateResult = await pool.query('SELECT * FROM candidates WHERE id = $1', [id]);
         const updatedCandidate = updatedCandidateResult.rows[0] || null;
         
-        if (updatedCandidate) {
-            console.log('[PUT /api/candidates/:id] Updated candidate data (sample):', {
-                id: updatedCandidate.id,
-                ho_ten: updatedCandidate.ho_ten,
-                gioi_tinh: updatedCandidate.gioi_tinh,
-                noi_sinh: updatedCandidate.noi_sinh,
-                email: updatedCandidate.email
+        if (!updatedCandidate) {
+            console.error('[PUT /api/candidates/:id] ⚠️ WARNING: Could not fetch updated candidate after commit!');
+            return res.status(500).json({
+                success: false,
+                message: 'Đã cập nhật nhưng không thể lấy lại dữ liệu'
             });
         }
+        
+        console.log('[PUT /api/candidates/:id] Updated candidate data (sample):', {
+            id: updatedCandidate.id,
+            ho_ten: updatedCandidate.ho_ten,
+            gioi_tinh: updatedCandidate.gioi_tinh,
+            noi_sinh: updatedCandidate.noi_sinh,
+            email: updatedCandidate.email,
+            updated_at: updatedCandidate.updated_at
+        });
 
         res.json({
             success: true,
