@@ -565,7 +565,7 @@ router.put('/:id', upload.fields([
             ngayGuiCV, nguonCV,
             workExperiences, trainingProcesses, foreignLanguages
         } = req.body;
-        
+
         console.log('[PUT /api/candidates/:id] Parsed fields:', {
             hoTen: hoTen ? hoTen.substring(0, 50) : undefined,
             gioiTinh,
@@ -664,12 +664,24 @@ router.put('/:id', upload.fields([
         const updateFields = [];
         const updateValues = [];
         let paramIndex = 1;
-        
+
         console.log('[PUT /api/candidates/:id] Starting to build update fields...');
+        console.log('[PUT /api/candidates/:id] Field values check:', {
+            'hoTen !== undefined': hoTen !== undefined,
+            'hoTen value': hoTen,
+            'hoTen type': typeof hoTen,
+            'gioiTinh !== undefined': gioiTinh !== undefined,
+            'noiSinh !== undefined': noiSinh !== undefined,
+            'noiSinh value': noiSinh
+        });
 
         if (hoTen !== undefined) {
+            const hoTenValue = (hoTen && typeof hoTen === 'string' ? hoTen.trim() : hoTen) || null;
             updateFields.push(`ho_ten = $${paramIndex++}`);
-            updateValues.push((hoTen && typeof hoTen === 'string' ? hoTen.trim() : hoTen) || null);
+            updateValues.push(hoTenValue);
+            console.log('[PUT /api/candidates/:id] ✓ Added ho_ten to updateFields:', hoTenValue);
+        } else {
+            console.log('[PUT /api/candidates/:id] ✗ hoTen is undefined, skipping');
         }
         if (gioiTinh !== undefined) {
             updateFields.push(`gioi_tinh = $${paramIndex++}`);
@@ -801,29 +813,46 @@ router.put('/:id', upload.fields([
         }
 
         // Cập nhật bảng candidates
+        console.log('[PUT /api/candidates/:id] ========== BUILD UPDATE FIELDS SUMMARY ==========');
         console.log('[PUT /api/candidates/:id] Total update fields built:', updateFields.length);
         console.log('[PUT /api/candidates/:id] Update fields list:', updateFields);
-        
+        console.log('[PUT /api/candidates/:id] Update values count:', updateValues.length);
+        if (updateFields.length === 0) {
+            console.error('[PUT /api/candidates/:id] ⚠️ CRITICAL: No update fields built!');
+            console.error('[PUT /api/candidates/:id] Request body analysis:', {
+                hasHoTen: 'hoTen' in req.body,
+                hoTenValue: req.body.hoTen,
+                hoTenType: typeof req.body.hoTen,
+                allKeys: Object.keys(req.body),
+                sampleValues: Object.keys(req.body).slice(0, 10).reduce((acc, key) => {
+                    const val = req.body[key];
+                    acc[key] = typeof val === 'string' && val.length > 50 ? val.substring(0, 50) + '...' : val;
+                    return acc;
+                }, {})
+            });
+        }
+        console.log('[PUT /api/candidates/:id] ================================================');
+
         let hasMainTableUpdate = false;
         let updateResult = null; // Lưu updateResult để so sánh sau
         if (updateFields.length > 0) {
             updateFields.push(`updated_at = NOW()`);
             updateValues.push(id);
             const updateQuery = `UPDATE candidates SET ${updateFields.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
-            
+
             console.log('[PUT /api/candidates/:id] Update query:', updateQuery);
             console.log('[PUT /api/candidates/:id] Update values count:', updateValues.length);
             console.log('[PUT /api/candidates/:id] Update values (sample):', updateValues.slice(0, 5));
-            
+
             updateResult = await client.query(updateQuery, updateValues);
-            
+
             if (updateResult.rows.length === 0) {
                 throw new Error('Không tìm thấy ứng viên để cập nhật');
             }
-            
+
             hasMainTableUpdate = true;
             console.log('[PUT /api/candidates/:id] Update successful, affected rows:', updateResult.rows.length);
-            
+
             // Log dữ liệu từ RETURNING để verify update thực sự xảy ra
             const returnedData = updateResult.rows[0];
             console.log('[PUT /api/candidates/:id] Data returned from UPDATE query (RETURNING *):', {
@@ -838,7 +867,7 @@ router.put('/:id', upload.fields([
                 dan_toc: returnedData.dan_toc,
                 quoc_tich: returnedData.quoc_tich
             });
-            
+
             // Verify rằng dữ liệu đã được update bằng cách so sánh với dữ liệu gửi lên
             if (hoTen !== undefined) {
                 const sentValue = (hoTen && typeof hoTen === 'string' ? hoTen.trim() : hoTen) || null;
@@ -961,10 +990,10 @@ router.put('/:id', upload.fields([
         }
 
         // Kiểm tra xem có ít nhất một thay đổi nào không (main table hoặc related tables)
-        const hasRelatedTableUpdates = (workExp && workExp.length > 0) || 
-                                      (trainingProc && trainingProc.length > 0) || 
-                                      (foreignLang && foreignLang.length > 0);
-        
+        const hasRelatedTableUpdates = (workExp && workExp.length > 0) ||
+            (trainingProc && trainingProc.length > 0) ||
+            (foreignLang && foreignLang.length > 0);
+
         if (!hasMainTableUpdate && !hasRelatedTableUpdates) {
             await client.query('ROLLBACK');
             console.error('[PUT /api/candidates/:id] ⚠️ ERROR: No fields to update in main table and no related table updates!');
@@ -973,9 +1002,9 @@ router.put('/:id', upload.fields([
                 message: 'Không có dữ liệu nào để cập nhật'
             });
         }
-        
+
         await client.query('COMMIT');
-        
+
         console.log('[PUT /api/candidates/:id] ========== UPDATE REQUEST SUCCESS ==========');
         console.log('[PUT /api/candidates/:id] Transaction committed successfully');
         console.log('[PUT /api/candidates/:id] Main table updated:', hasMainTableUpdate);
@@ -984,11 +1013,11 @@ router.put('/:id', upload.fields([
         // Fetch lại dữ liệu đã cập nhật để trả về (sử dụng pool.query để đảm bảo đọc dữ liệu sau khi commit)
         // Đợi một chút để đảm bảo transaction đã được commit hoàn toàn
         await new Promise(resolve => setTimeout(resolve, 100)); // Tăng thời gian đợi lên 100ms
-        
+
         console.log('[PUT /api/candidates/:id] Fetching updated candidate from database after commit...');
         const updatedCandidateResult = await pool.query('SELECT * FROM candidates WHERE id = $1', [id]);
         const updatedCandidate = updatedCandidateResult.rows[0] || null;
-        
+
         if (!updatedCandidate) {
             console.error('[PUT /api/candidates/:id] ⚠️ WARNING: Could not fetch updated candidate after commit!');
             return res.status(500).json({
@@ -996,7 +1025,7 @@ router.put('/:id', upload.fields([
                 message: 'Đã cập nhật nhưng không thể lấy lại dữ liệu'
             });
         }
-        
+
         console.log('[PUT /api/candidates/:id] Fetched candidate data from database after commit:', {
             id: updatedCandidate.id,
             ho_ten: updatedCandidate.ho_ten,
@@ -1005,7 +1034,7 @@ router.put('/:id', upload.fields([
             email: updatedCandidate.email,
             updated_at: updatedCandidate.updated_at
         });
-        
+
         // So sánh với dữ liệu từ RETURNING để đảm bảo consistency
         if (hasMainTableUpdate && updateResult && updateResult.rows && updateResult.rows[0]) {
             const returnedData = updateResult.rows[0];
@@ -1034,7 +1063,7 @@ router.put('/:id', upload.fields([
         console.error('[PUT /api/candidates/:id] Error constraint:', error.constraint);
         console.error('[PUT /api/candidates/:id] Error stack:', error.stack);
         console.error('[PUT /api/candidates/:id] ========== UPDATE REQUEST ERROR END ==========');
-        
+
         res.status(500).json({
             success: false,
             message: 'Lỗi khi cập nhật ứng viên: ' + error.message,
