@@ -371,6 +371,21 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 17: $MIGRATION17${NC}"
 fi
 
+# Migration 18: add_note_to_interview_requests.sql (Thêm cột note vào bảng interview_requests)
+MIGRATION18="$PROJECT_DIR/database/add_note_to_interview_requests.sql"
+if [ -f "$MIGRATION18" ]; then
+    echo -e "${BLUE}→ Chạy migration: add_note_to_interview_requests.sql (Thêm cột note vào bảng interview_requests)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION18"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 18 thành công - Đã thêm cột note vào interview_requests${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 18${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 18: $MIGRATION18${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"

@@ -192,6 +192,30 @@ const ensureInterviewRequestsTable = async () => {
         // Không throw error, chỉ log để không block request
     }
 
+    // Kiểm tra và thêm cột note nếu bảng đã tồn tại nhưng thiếu cột này
+    try {
+        const noteColumnCheck = await pool.query(`
+            SELECT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_name = 'interview_requests' 
+                AND column_name = 'note'
+            )
+        `);
+
+        if (!noteColumnCheck.rows[0].exists) {
+            console.log('[ensureInterviewRequestsTable] Bảng đã tồn tại nhưng thiếu cột note, đang thêm cột...');
+            await pool.query(`
+                ALTER TABLE interview_requests 
+                ADD COLUMN note TEXT
+            `);
+            console.log('[ensureInterviewRequestsTable] Đã thêm cột note thành công');
+        }
+    } catch (error) {
+        console.warn('[ensureInterviewRequestsTable] Lỗi khi kiểm tra/thêm cột note:', error.message);
+        // Không throw error, chỉ log để không block request
+    }
+
     // Đảm bảo candidates constraint có đầy đủ status
     await ensureCandidatesStatusConstraint();
 };
