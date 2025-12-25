@@ -1019,31 +1019,51 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
             let response;
             if (editingCandidateId) {
                 // Update existing candidate
-                response = await candidatesAPI.update(editingCandidateId, submitData);
+                const candidateIdToUpdate = editingCandidateId; // Lưu ID trước khi bị reset
+                response = await candidatesAPI.update(candidateIdToUpdate, submitData);
                 if (response.data.success) {
                     if (showToast) {
                         showToast('Đã cập nhật ứng viên thành công!', 'success');
                     }
 
-                    // Nếu modal "Thông tin Ứng viên" đang mở và đang hiển thị ứng viên vừa cập nhật, refresh dữ liệu TRƯỚC KHI đóng modal chỉnh sửa
-                    const shouldRefreshViewModal = showViewCandidateModal && viewingCandidate && viewingCandidate.id === editingCandidateId;
+                    // Nếu modal "Thông tin Ứng viên" đang mở và đang hiển thị ứng viên vừa cập nhật, refresh dữ liệu
+                    const shouldRefreshViewModal = showViewCandidateModal && viewingCandidate && viewingCandidate.id === candidateIdToUpdate;
+                    const wasViewingThisCandidate = shouldRefreshViewModal;
+
+                    console.log('[handleSubmit] Update successful, refreshing data...', {
+                        candidateIdToUpdate,
+                        shouldRefreshViewModal,
+                        showViewCandidateModal,
+                        viewingCandidateId: viewingCandidate?.id
+                    });
 
                     handleCloseModal();
                     fetchCandidates(false); // Refresh danh sách
 
-                    // Refresh dữ liệu trong modal "Thông tin Ứng viên" nếu đang mở
-                    if (shouldRefreshViewModal) {
+                    // Refresh dữ liệu trong modal "Thông tin Ứng viên" nếu đang mở và đang xem ứng viên vừa cập nhật
+                    if (wasViewingThisCandidate) {
                         try {
-                            const updatedResponse = await candidatesAPI.getById(editingCandidateId);
+                            console.log('[handleSubmit] Fetching updated candidate data for modal...', candidateIdToUpdate);
+                            const updatedResponse = await candidatesAPI.getById(candidateIdToUpdate);
                             if (updatedResponse.data.success && updatedResponse.data.data) {
-                                setViewingCandidate(updatedResponse.data.data);
+                                const updatedCandidate = updatedResponse.data.data;
+                                console.log('[handleSubmit] Updated candidate data received:', {
+                                    id: updatedCandidate.id,
+                                    hoTen: updatedCandidate.ho_ten || updatedCandidate.hoTen,
+                                    noiSinh: updatedCandidate.noi_sinh || updatedCandidate.noiSinh,
+                                    gioiTinh: updatedCandidate.gioi_tinh || updatedCandidate.gioiTinh
+                                });
+                                setViewingCandidate(updatedCandidate);
                                 // Cập nhật candidate trong list để đồng bộ
                                 setCandidates(prevCandidates =>
-                                    prevCandidates.map(c => c.id === editingCandidateId ? updatedResponse.data.data : c)
+                                    prevCandidates.map(c => c.id === candidateIdToUpdate ? updatedCandidate : c)
                                 );
+                                console.log('[handleSubmit] Candidate detail modal refreshed successfully');
+                            } else {
+                                console.warn('[handleSubmit] Failed to get updated candidate data:', updatedResponse.data);
                             }
                         } catch (err) {
-                            console.error('Error refreshing candidate detail:', err);
+                            console.error('[handleSubmit] Error refreshing candidate detail:', err);
                         }
                     }
                 } else {
