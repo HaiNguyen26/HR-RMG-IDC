@@ -401,6 +401,21 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 19: $MIGRATION19${NC}"
 fi
 
+# Migration 20: fix_interview_requests_manager_name_constraint.sql (Xóa NOT NULL constraint từ manager_name và branch_director_name)
+MIGRATION20="$PROJECT_DIR/database/fix_interview_requests_manager_name_constraint.sql"
+if [ -f "$MIGRATION20" ]; then
+    echo -e "${BLUE}→ Chạy migration: fix_interview_requests_manager_name_constraint.sql (Xóa NOT NULL constraint từ manager_name và branch_director_name)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION20"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 20 thành công - Đã xóa NOT NULL constraint từ manager_name và branch_director_name${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 20${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 20: $MIGRATION20${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"

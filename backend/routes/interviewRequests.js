@@ -218,6 +218,47 @@ const ensureInterviewRequestsTable = async () => {
 
     // Đảm bảo candidates constraint có đầy đủ status
     await ensureCandidatesStatusConstraint();
+
+    // Kiểm tra và sửa NOT NULL constraint của manager_name và branch_director_name nếu có
+    try {
+        const managerNameCheck = await pool.query(`
+            SELECT is_nullable
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+            AND table_name = 'interview_requests'
+            AND column_name = 'manager_name'
+        `);
+
+        if (managerNameCheck.rows.length > 0 && managerNameCheck.rows[0].is_nullable === 'NO') {
+            console.log('[ensureInterviewRequestsTable] Phát hiện cột manager_name có NOT NULL constraint, đang xóa constraint...');
+            await pool.query(`
+                ALTER TABLE interview_requests ALTER COLUMN manager_name DROP NOT NULL
+            `);
+            console.log('[ensureInterviewRequestsTable] Đã xóa NOT NULL constraint từ manager_name');
+        }
+    } catch (error) {
+        console.warn('[ensureInterviewRequestsTable] Lỗi khi kiểm tra/sửa manager_name constraint:', error.message);
+    }
+
+    try {
+        const branchDirectorNameCheck = await pool.query(`
+            SELECT is_nullable
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+            AND table_name = 'interview_requests'
+            AND column_name = 'branch_director_name'
+        `);
+
+        if (branchDirectorNameCheck.rows.length > 0 && branchDirectorNameCheck.rows[0].is_nullable === 'NO') {
+            console.log('[ensureInterviewRequestsTable] Phát hiện cột branch_director_name có NOT NULL constraint, đang xóa constraint...');
+            await pool.query(`
+                ALTER TABLE interview_requests ALTER COLUMN branch_director_name DROP NOT NULL
+            `);
+            console.log('[ensureInterviewRequestsTable] Đã xóa NOT NULL constraint từ branch_director_name');
+        }
+    } catch (error) {
+        console.warn('[ensureInterviewRequestsTable] Lỗi khi kiểm tra/sửa branch_director_name constraint:', error.message);
+    }
 };
 
 // GET /api/interview-requests?managerId=&branchDirectorId=&status=&candidateId=
