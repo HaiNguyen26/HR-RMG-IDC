@@ -52,7 +52,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
         baoCaoGianTiep: '',
         diaDiemLamViec: '',
         ngayBatDauLamViec: '',
-        thoiGianThuViec: '45 ngày (kể từ ngày bắt đầu làm việc)',
+        thoiGianThuViec: '60 ngày (kể từ ngày bắt đầu làm việc)',
         thoiGianLamViec: '08:00 – 12:00 (Thứ Bảy- Nếu cần)',
         lyDoTuyenDung: '',
         soLuongCanTuyen: '',
@@ -62,7 +62,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
         kyNang: '',
         luongThuViec: '',
         luongSauThuViec: '',
-        hoTroComTrua: '',
+        hoTroComTrua: 'Theo chính sách công ty',
         hoTroDiLai: '',
         phuCapTienCom: '',
         phuCapDienThoai: ''
@@ -443,10 +443,10 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                 canEvaluate: false
             };
         } else {
-            // Đã bắt đầu thử việc, đếm 45 ngày từ ngày bắt đầu
+            // Đã bắt đầu thử việc, đếm 60 ngày từ ngày bắt đầu
             const daysSince = Math.floor((currentTime.getTime() - startDateStart.getTime()) / (1000 * 60 * 60 * 24));
             const endDate = new Date(startDateStart);
-            endDate.setDate(endDate.getDate() + 45);
+            endDate.setDate(endDate.getDate() + 60);
             endDate.setHours(23, 59, 59, 999);
 
             const diffTime = endDate.getTime() - currentTime.getTime();
@@ -1736,8 +1736,10 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
             }
 
             const hoTroComTrua = recruitmentInfoForm.hoTroComTrua
-                ? formatCurrency(recruitmentInfoForm.hoTroComTrua)
-                : '30.000 VNĐ';
+                ? (recruitmentInfoForm.hoTroComTrua === 'Theo chính sách công ty' 
+                    ? 'Theo chính sách công ty' 
+                    : formatCurrency(recruitmentInfoForm.hoTroComTrua))
+                : 'Theo chính sách công ty';
 
             // Get logo path
             const logoPath = `${window.location.origin}${process.env.PUBLIC_URL || ''}/RMG-logo.jpg`;
@@ -1789,7 +1791,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                     <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>10. Thuế thu nhập cá nhân và bảo hiểm bắt buộc:</strong> Hàng tháng nhân viên có nghĩa vụ nộp thuế thu nhập cá nhân theo Luật định. Nếu đạt yêu cầu qua thử việc và được ký Hợp đồng lao động, Anh/Chị có nghĩa vụ tham gia BHXH, BHYT, BH thất nghiệp được trích từ tiền lương theo Luật định.</p>
                     
                     <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>11. Chính sách phụ cấp</strong></p>
-                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">a. Hỗ trợ cơm trưa : 30.000 VNĐ/ngày làm việc</p>
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">a. Hỗ trợ cơm trưa : ${hoTroComTrua}</p>
                     <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">b. Hỗ trợ đi lại : <span style="color: #ff0000;">${formatCurrency(recruitmentInfoForm.hoTroDiLai)}/ngày làm việc</span></p>
                     <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">c. Phụ cấp tiền cơm : <span style="color: #ff0000;">${formatCurrency(recruitmentInfoForm.phuCapTienCom)}/ngày làm việc</span></p>
                     <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">d. Phụ cấp điện thoại : <span style="color: #ff0000;">${formatCurrency(recruitmentInfoForm.phuCapDienThoai)}/tháng (thẻ điện thoại).</span></p>
@@ -4597,6 +4599,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                 type="button"
                                                 className="interview-timeline-modal-btn interview-timeline-modal-btn-send"
                                                 onClick={() => {
+                                                    setShowInterviewTimelineModal(false); // Đóng timeline modal khi mở send recruitment modal
                                                     setShowSendRecruitmentInfoModal(true);
                                                 }}
                                             >
@@ -4782,7 +4785,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                     <div className="send-recruitment-info-modal-container" onClick={(e) => e.stopPropagation()}>
                         <div className="send-recruitment-info-modal-header">
                             <div>
-                                <h2 className="send-recruitment-info-modal-title">Tạo Yêu Cầu Tuyển Dụng Chi Tiết (RRF)</h2>
+                                <h2 className="send-recruitment-info-modal-title">Thư tuyển dụng</h2>
                                 <p className="send-recruitment-info-modal-subtitle">Điền thông tin chi tiết để gửi yêu cầu tuyển dụng</p>
                             </div>
                             <button
@@ -5212,30 +5215,6 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     </div>
                                                     <div className="send-recruitment-info-allowance-item">
                                                         <label className="send-recruitment-info-allowance-label">
-                                                            Phụ cấp tiền cơm:
-                                                        </label>
-                                                        <div className="send-recruitment-info-allowance-input-wrapper">
-                                                            <input
-                                                                type="number"
-                                                                className="send-recruitment-info-input"
-                                                                value={recruitmentInfoForm.phuCapTienCom}
-                                                                onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, phuCapTienCom: e.target.value })}
-                                                                placeholder="0"
-                                                                min="0"
-                                                            />
-                                                            <span className="send-recruitment-info-currency">VNĐ/ngày làm việc</span>
-                                                        </div>
-                                                        {recruitmentInfoForm.phuCapTienCom && (
-                                                            <div className="send-recruitment-info-vnd-block">
-                                                                <span className="send-recruitment-info-vnd-value">
-                                                                    {parseInt(recruitmentInfoForm.phuCapTienCom).toLocaleString('vi-VN')}
-                                                                </span>
-                                                                <span className="send-recruitment-info-vnd-unit">VNĐ/ngày làm việc</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="send-recruitment-info-allowance-item">
-                                                        <label className="send-recruitment-info-allowance-label">
                                                             Phụ cấp điện thoại:
                                                         </label>
                                                         <div className="send-recruitment-info-allowance-input-wrapper">
@@ -5452,27 +5431,24 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                     <div className="recruitment-info-preview-allowance-grid">
                                         <div className="recruitment-info-preview-allowance-item">
                                             <label className="recruitment-info-preview-allowance-label">Hỗ trợ cơm trưa:</label>
-                                            <div className="recruitment-info-preview-vnd-block">
-                                                <span className="recruitment-info-preview-vnd-value">
-                                                    {recruitmentInfoForm.hoTroComTrua ? parseInt(recruitmentInfoForm.hoTroComTrua).toLocaleString('vi-VN') : '---'}
-                                                </span>
-                                                <span className="recruitment-info-preview-vnd-unit">VNĐ/ngày làm việc</span>
-                                            </div>
+                                            {recruitmentInfoForm.hoTroComTrua && recruitmentInfoForm.hoTroComTrua !== 'Theo chính sách công ty' && !isNaN(parseInt(recruitmentInfoForm.hoTroComTrua)) ? (
+                                                <div className="recruitment-info-preview-vnd-block">
+                                                    <span className="recruitment-info-preview-vnd-value">
+                                                        {parseInt(recruitmentInfoForm.hoTroComTrua).toLocaleString('vi-VN')}
+                                                    </span>
+                                                    <span className="recruitment-info-preview-vnd-unit">VNĐ/ngày làm việc</span>
+                                                </div>
+                                            ) : (
+                                                <div className="recruitment-info-preview-value">
+                                                    {recruitmentInfoForm.hoTroComTrua || 'Theo chính sách công ty'}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="recruitment-info-preview-allowance-item">
                                             <label className="recruitment-info-preview-allowance-label">Hỗ trợ đi lại:</label>
                                             <div className="recruitment-info-preview-vnd-block">
                                                 <span className="recruitment-info-preview-vnd-value">
                                                     {recruitmentInfoForm.hoTroDiLai ? parseInt(recruitmentInfoForm.hoTroDiLai).toLocaleString('vi-VN') : '---'}
-                                                </span>
-                                                <span className="recruitment-info-preview-vnd-unit">VNĐ/ngày làm việc</span>
-                                            </div>
-                                        </div>
-                                        <div className="recruitment-info-preview-allowance-item">
-                                            <label className="recruitment-info-preview-allowance-label">Phụ cấp tiền cơm:</label>
-                                            <div className="recruitment-info-preview-vnd-block">
-                                                <span className="recruitment-info-preview-vnd-value">
-                                                    {recruitmentInfoForm.phuCapTienCom ? parseInt(recruitmentInfoForm.phuCapTienCom).toLocaleString('vi-VN') : '---'}
                                                 </span>
                                                 <span className="recruitment-info-preview-vnd-unit">VNĐ/ngày làm việc</span>
                                             </div>
@@ -5541,7 +5517,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                     required
                                 />
                                 <p className="start-probation-note">
-                                    Thời gian thử việc: 45 ngày (kể từ ngày bắt đầu)
+                                    Thời gian thử việc: 60 ngày (kể từ ngày bắt đầu)
                                 </p>
                             </div>
                             {viewingCandidate && (
@@ -5664,7 +5640,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
 
                                 // Tính phần trăm tiến độ
                                 const progressPercent = countdownData.hasStarted
-                                    ? Math.min(100, Math.max(0, (countdownData.daysSince / 45) * 100))
+                                    ? Math.min(100, Math.max(0, (countdownData.daysSince / 60) * 100))
                                     : 0;
 
                                 return (
@@ -5702,7 +5678,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                             <div className="probation-status-progress-labels">
                                                                 <span>0 Ngày</span>
                                                                 <span>0%</span>
-                                                                <span>45 Ngày</span>
+                                                                <span>60 Ngày</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -5739,7 +5715,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                             <div className="probation-status-progress-labels">
                                                                 <span>{countdownData.daysSince} Ngày</span>
                                                                 <span>{Math.round(progressPercent)}%</span>
-                                                                <span>45 Ngày</span>
+                                                                <span>60 Ngày</span>
                                                             </div>
                                                         </div>
                                                     </div>
