@@ -1041,7 +1041,8 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                     handleCloseModal();
                     fetchCandidates(false); // Refresh danh sách
 
-                    // Refresh dữ liệu trong modal "Thông tin Ứng viên" nếu đang xem ứng viên vừa cập nhật
+                    // Refresh dữ liệu trong modal "Thông tin Ứng viên" nếu đang mở và đang xem ứng viên vừa cập nhật
+                    // KHÔNG tự động mở modal nếu đang đóng
                     if (isViewingThisCandidate) {
                         try {
                             console.log('[handleSubmit] Fetching updated candidate data for modal...', candidateIdToUpdate);
@@ -1054,13 +1055,13 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                     noiSinh: updatedCandidate.noi_sinh || updatedCandidate.noiSinh,
                                     gioiTinh: updatedCandidate.gioi_tinh || updatedCandidate.gioiTinh
                                 });
-                                
-                                // Cập nhật viewingCandidate để modal hiển thị dữ liệu mới
+
+                                // Cập nhật viewingCandidate để modal hiển thị dữ liệu mới (chỉ nếu modal đang mở)
                                 setViewingCandidate(updatedCandidate);
-                                
-                                // Đảm bảo modal vẫn mở
-                                setShowViewCandidateModal(true);
-                                
+
+                                // KHÔNG tự động mở modal - chỉ refresh dữ liệu nếu modal đang mở
+                                // setShowViewCandidateModal(true); // Đã xóa - không tự động mở modal
+
                                 // Cập nhật candidate trong list để đồng bộ
                                 setCandidates(prevCandidates =>
                                     prevCandidates.map(c => c.id === candidateIdToUpdate ? updatedCandidate : c)
@@ -1073,7 +1074,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                             console.error('[handleSubmit] Error refreshing candidate detail:', err);
                         }
                     } else {
-                        console.log('[handleSubmit] Not viewing this candidate, skipping modal refresh');
+                        console.log('[handleSubmit] Not viewing this candidate or modal is closed, skipping modal refresh');
                     }
                 } else {
                     throw new Error(response.data.message || 'Lỗi khi cập nhật ứng viên');
