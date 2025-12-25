@@ -114,29 +114,44 @@ BEGIN
         RAISE NOTICE '✓ Đã tạo/kiểm tra function update_updated_at_column';
 
         -- ============================================================
-        -- Tạo triggers cho các bảng (chỉ tạo nếu chưa có)
+        -- Tạo triggers cho các bảng (chỉ tạo nếu bảng tồn tại)
         -- ============================================================
         
         -- Trigger cho candidate_work_experiences
-        DROP TRIGGER IF EXISTS update_work_experiences_updated_at ON candidate_work_experiences;
-        CREATE TRIGGER update_work_experiences_updated_at 
-            BEFORE UPDATE ON candidate_work_experiences
-            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-        RAISE NOTICE '✓ Đã tạo trigger update_work_experiences_updated_at';
+        IF EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_schema = 'public' AND table_name = 'candidate_work_experiences'
+        ) THEN
+            DROP TRIGGER IF EXISTS update_work_experiences_updated_at ON candidate_work_experiences;
+            CREATE TRIGGER update_work_experiences_updated_at 
+                BEFORE UPDATE ON candidate_work_experiences
+                FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+            RAISE NOTICE '✓ Đã tạo trigger update_work_experiences_updated_at';
+        END IF;
 
         -- Trigger cho candidate_training_processes
-        DROP TRIGGER IF EXISTS update_training_processes_updated_at ON candidate_training_processes;
-        CREATE TRIGGER update_training_processes_updated_at 
-            BEFORE UPDATE ON candidate_training_processes
-            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-        RAISE NOTICE '✓ Đã tạo trigger update_training_processes_updated_at';
+        IF EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_schema = 'public' AND table_name = 'candidate_training_processes'
+        ) THEN
+            DROP TRIGGER IF EXISTS update_training_processes_updated_at ON candidate_training_processes;
+            CREATE TRIGGER update_training_processes_updated_at 
+                BEFORE UPDATE ON candidate_training_processes
+                FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+            RAISE NOTICE '✓ Đã tạo trigger update_training_processes_updated_at';
+        END IF;
 
         -- Trigger cho candidate_foreign_languages
-        DROP TRIGGER IF EXISTS update_foreign_languages_updated_at ON candidate_foreign_languages;
-        CREATE TRIGGER update_foreign_languages_updated_at 
-            BEFORE UPDATE ON candidate_foreign_languages
-            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-        RAISE NOTICE '✓ Đã tạo trigger update_foreign_languages_updated_at';
+        IF EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_schema = 'public' AND table_name = 'candidate_foreign_languages'
+        ) THEN
+            DROP TRIGGER IF EXISTS update_foreign_languages_updated_at ON candidate_foreign_languages;
+            CREATE TRIGGER update_foreign_languages_updated_at 
+                BEFORE UPDATE ON candidate_foreign_languages
+                FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+            RAISE NOTICE '✓ Đã tạo trigger update_foreign_languages_updated_at';
+        END IF;
 
         RAISE NOTICE '========================================';
         RAISE NOTICE '✅ Hoàn thành tạo các bảng liên quan đến candidates';
