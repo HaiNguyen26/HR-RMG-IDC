@@ -431,6 +431,21 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 21: $MIGRATION21${NC}"
 fi
 
+# Migration 22: add_approval_columns_to_interview_requests.sql (Thêm các cột approval)
+MIGRATION22="$PROJECT_DIR/database/add_approval_columns_to_interview_requests.sql"
+if [ -f "$MIGRATION22" ]; then
+    echo -e "${BLUE}→ Chạy migration: add_approval_columns_to_interview_requests.sql (Thêm các cột manager_approved, branch_director_approved, manager_approved_at, branch_director_approved_at)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION22"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 22 thành công - Đã thêm các cột approval${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 22${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 22: $MIGRATION22${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"

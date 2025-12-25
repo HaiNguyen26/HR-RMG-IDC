@@ -244,7 +244,7 @@ const ensureInterviewRequestsTable = async () => {
         // Nếu thiếu các status cần thiết, cập nhật constraint
         if (!hasPendingInterview || !hasWaitingForOther || !hasReadyForInterview || !hasApproved || !hasRejected) {
             console.log('[ensureInterviewRequestsTable] Updating status constraint to include all required values');
-            
+
             // Drop constraint cũ
             await pool.query(`
                 ALTER TABLE interview_requests DROP CONSTRAINT IF EXISTS interview_requests_status_check
