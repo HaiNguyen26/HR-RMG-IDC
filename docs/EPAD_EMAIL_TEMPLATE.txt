@@ -1,0 +1,74 @@
+Subject: Yêu cầu Tích hợp Hệ thống Chấm công EPAD - HR Management System
+
+Kính gửi Anh/Chị THS,
+
+Tinh Hoa Software hiện đang phát triển Hệ thống Quản lý Nhân sự (HR Management System) và muốn tích hợp với hệ thống chấm công EPAD của quý công ty.
+
+Để đảm bảo việc tích hợp diễn ra suôn sẻ, chúng tôi cần một số thông tin và tài liệu kỹ thuật từ phía EPAD. Dưới đây là các yêu cầu chính:
+
+1. API Documentation
+   - Tài liệu API chi tiết (Swagger/OpenAPI nếu có)
+   - Postman Collection (nếu có)
+   - Danh sách tất cả API endpoints cần thiết
+   - Cấu trúc dữ liệu request/response cho từng API
+
+2. Thông tin Xác thực
+   - Token test cho API log chấm công (THS gửi cho Tinh Hoa)
+   - Token test cho API thông tin khác: nhân viên, phòng ban, chức vụ, thiết bị (Tinh Hoa gửi cho THS)
+   - Format sử dụng token (Authorization header, API Key, etc.)
+   - URL test endpoint
+
+3. API Endpoints Cần Thiết:
+   - API Lấy Log Chấm Công (theo khoảng thời gian)
+   - API Lấy Danh sách Nhân viên (cần có mã nhân viên để mapping)
+   - API Lấy Danh sách Phòng ban
+   - API Lấy Danh sách Chức vụ
+   - API Lấy Danh sách Thiết bị Chấm công
+
+4. Định dạng và Chuẩn Dữ liệu:
+   - Date format: YYYY-MM-DD (đã xác nhận)
+   - DateTime format: ISO 8601 với timezone GMT+7 (cần xác nhận format chính xác)
+   - VerifyMode mapping: 1=Finger, 2=Pin, 3=Password, 4=Card, 15=FaceTemplate
+   - Cách phân biệt check-in và check-out trong log chấm công
+
+5. Mapping Dữ liệu:
+   - Cần field "employeeCode" (mã nhân viên) trong API để mapping với hệ thống HR
+   - Nếu không có employeeCode, cần thống nhất cách mapping khác
+
+6. Đồng bộ Dữ liệu:
+   - Tần suất tối đa được phép gọi API
+   - Cơ chế pagination (nếu có)
+   - Cách xử lý duplicate data
+
+7. Dữ liệu Test:
+   - Dữ liệu test nhân viên (ít nhất 5-10 nhân viên)
+   - Dữ liệu test log chấm công (ít nhất 100 records)
+   - Dữ liệu test thiết bị (ít nhất 2-3 thiết bị)
+   - Dữ liệu test phòng ban và chức vụ
+
+Đính kèm là tài liệu chi tiết về các yêu cầu kỹ thuật (EPAD_INTEGRATION_REQUIREMENTS.md).
+
+Câu hỏi cần làm rõ:
+1. Cấu trúc Response của các API có đúng như trong tài liệu đính kèm không?
+2. Làm thế nào để map employeeCode từ EPAD với mã chấm công trong hệ thống HR?
+3. Làm sao phân biệt check-in và check-out trong log chấm công?
+4. Tần suất tối đa được phép gọi API là bao nhiêu?
+5. Nếu không dùng API, có thể xuất file tự động không? Format và cấu trúc như thế nào?
+
+Timeline dự kiến:
+- Giai đoạn 1 (1-2 tuần): Nhận tài liệu và test API
+- Giai đoạn 2 (2-3 tuần): Phát triển module tích hợp
+- Giai đoạn 3 (1 tuần): Testing
+- Giai đoạn 4 (1 tuần): Production deployment
+
+Nếu có bất kỳ câu hỏi nào, xin vui lòng liên hệ:
+- Người phụ trách: [Tên người phụ trách]
+- Email: [Email]
+- Số điện thoại: [Số điện thoại]
+
+Chúng tôi mong nhận được phản hồi sớm từ quý công ty để có thể bắt đầu triển khai tích hợp.
+
+Trân trọng cảm ơn!
+
+Tinh Hoa Software
+

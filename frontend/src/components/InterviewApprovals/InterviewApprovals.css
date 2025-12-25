@@ -2286,6 +2286,7 @@
     flex-direction: column;
     overflow: hidden;
     animation: slideUp 0.3s ease-out;
+    margin: 1rem;
 }
 
 @keyframes fadeIn {
@@ -2528,25 +2529,104 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+    .preview-modal-overlay {
+        padding: 0.5rem;
+        align-items: flex-start;
+        padding-top: 1rem;
+    }
+
     .preview-modal-container {
         max-width: 100%;
-        max-height: 95vh;
-        margin: 0.5rem;
+        max-height: calc(100vh - 2rem);
+        margin: 0;
+        display: flex;
+        flex-direction: column;
     }
 
     .preview-modal-header {
-        padding: 1.25rem 1.5rem;
+        padding: 1rem 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .preview-modal-header-content {
+        gap: 0.75rem;
+    }
+
+    .preview-modal-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    .preview-modal-icon svg {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+
+    .preview-modal-title {
+        font-size: 1.125rem;
+        line-height: 1.4;
+    }
+
+    .preview-modal-subtitle {
+        font-size: 0.8125rem;
+    }
+
+    .preview-modal-close {
+        width: 2rem;
+        height: 2rem;
+    }
+
+    .preview-modal-close svg {
+        width: 1rem;
+        height: 1rem;
     }
 
     .preview-modal-body {
-        padding: 1.5rem;
+        padding: 1rem;
+        overflow-y: auto;
+        flex: 1;
+        min-height: 0;
+        /* Cho phép shrink */
+    }
+
+    .preview-modal-footer {
+        padding: 1rem 1.25rem;
+        flex-shrink: 0;
+        border-top: 1px solid #e5e7eb;
     }
 
     .preview-grid {
         grid-template-columns: 1fr;
     }
 
-    .preview-modal-title {
-        font-size: 1.25rem;
+    .preview-section {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .preview-section-header {
+        margin-bottom: 1rem;
+    }
+
+    .preview-section-title {
+        font-size: 1rem;
+    }
+}
+
+@media (max-height: 600px) {
+    .preview-modal-container {
+        max-height: calc(100vh - 1rem);
+    }
+
+    .preview-modal-header {
+        padding: 0.75rem 1rem;
+    }
+
+    .preview-modal-body {
+        padding: 0.75rem;
+    }
+
+    .preview-modal-footer {
+        padding: 0.75rem 1rem;
     }
 }

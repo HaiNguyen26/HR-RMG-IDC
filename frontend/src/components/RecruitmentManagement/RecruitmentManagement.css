@@ -3839,7 +3839,8 @@
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  z-index: 1800;
+  z-index: 17000;
+  /* Cao hơn tất cả các modal khác (15000, 16000) để luôn nổi lên trên cùng */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3867,8 +3868,13 @@
   justify-content: space-between;
   padding: 1.5rem 2rem;
   background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-  border-bottom: none;
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  background: #ffffff;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .send-recruitment-info-modal-title {
@@ -3908,12 +3914,12 @@
 }
 
 .send-recruitment-info-modal-body {
-  padding: 2rem;
-  overflow-y: auto;
   flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2rem;
+  min-height: 0;
   background: #f8fafc;
-  min-height: 600px;
-  max-height: calc(95vh - 200px);
 }
 
 .send-recruitment-info-modal-body::-webkit-scrollbar {
@@ -3956,6 +3962,9 @@
   justify-content: flex-end;
   background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+  /* Cố định footer, không cho phép shrink */
+  /* Đảm bảo footer luôn ở cuối container và hiển thị đầy đủ */
 }
 
 .send-recruitment-info-modal-btn {
@@ -4018,7 +4027,8 @@
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  z-index: 1800;
+  z-index: 18000;
+  /* Cao hơn send-recruitment-info-modal (17000) để luôn nổi lên trên cùng */
   display: flex;
   align-items: center;
   justify-content: center;

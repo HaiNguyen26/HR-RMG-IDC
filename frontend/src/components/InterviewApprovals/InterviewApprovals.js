@@ -1945,7 +1945,10 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                             <button
                                 type="button"
                                 className="interview-approvals-modal-btn interview-approvals-modal-btn--preview"
-                                onClick={() => setIsPreviewModalOpen(true)}
+                                onClick={() => {
+                                    setIsRecruitmentModalOpen(false); // Đóng modal recruitment khi mở preview
+                                    setIsPreviewModalOpen(true);
+                                }}
                             >
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -2748,7 +2751,7 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                     </svg>
                                 </div>
                                 <div>
-                                    <h2 className="preview-modal-title">Xem Trước Yêu Cầu Tuyển Dụng</h2>
+                                    <h2 className="preview-modal-title">Thư tuyển dụng</h2>
                                     <p className="preview-modal-subtitle">Kiểm tra thông tin trước khi gửi</p>
                                 </div>
                             </div>

@@ -64,7 +64,6 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
         luongSauThuViec: '',
         hoTroComTrua: 'Theo chính sách công ty',
         hoTroDiLai: '',
-        phuCapTienCom: '',
         phuCapDienThoai: ''
     });
     const [managers, setManagers] = useState([]);
@@ -437,7 +436,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
             return {
                 daysUntilStart: diffDays,
                 daysSince: 0,
-                daysRemaining: 45,
+                daysRemaining: 60,
                 totalSeconds: Math.max(0, Math.floor(diffTime / 1000)),
                 hasStarted: false,
                 canEvaluate: false
@@ -1736,8 +1735,8 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
             }
 
             const hoTroComTrua = recruitmentInfoForm.hoTroComTrua
-                ? (recruitmentInfoForm.hoTroComTrua === 'Theo chính sách công ty' 
-                    ? 'Theo chính sách công ty' 
+                ? (recruitmentInfoForm.hoTroComTrua === 'Theo chính sách công ty'
+                    ? 'Theo chính sách công ty'
                     : formatCurrency(recruitmentInfoForm.hoTroComTrua))
                 : 'Theo chính sách công ty';
 
@@ -1791,10 +1790,9 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                     <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>10. Thuế thu nhập cá nhân và bảo hiểm bắt buộc:</strong> Hàng tháng nhân viên có nghĩa vụ nộp thuế thu nhập cá nhân theo Luật định. Nếu đạt yêu cầu qua thử việc và được ký Hợp đồng lao động, Anh/Chị có nghĩa vụ tham gia BHXH, BHYT, BH thất nghiệp được trích từ tiền lương theo Luật định.</p>
                     
                     <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>11. Chính sách phụ cấp</strong></p>
-                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">a. Hỗ trợ cơm trưa : ${hoTroComTrua}</p>
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">a. Hỗ trợ cơm trưa : <span style="color: #ff0000;">${hoTroComTrua}/ngày làm việc</span></p>
                     <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">b. Hỗ trợ đi lại : <span style="color: #ff0000;">${formatCurrency(recruitmentInfoForm.hoTroDiLai)}/ngày làm việc</span></p>
-                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">c. Phụ cấp tiền cơm : <span style="color: #ff0000;">${formatCurrency(recruitmentInfoForm.phuCapTienCom)}/ngày làm việc</span></p>
-                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">d. Phụ cấp điện thoại : <span style="color: #ff0000;">${formatCurrency(recruitmentInfoForm.phuCapDienThoai)}/tháng (thẻ điện thoại).</span></p>
+                    <p style="margin: 4px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;">c. Phụ cấp điện thoại : <span style="color: #ff0000;">${formatCurrency(recruitmentInfoForm.phuCapDienThoai)}/tháng (thẻ điện thoại).</span></p>
                     
                     <p style="margin: 6px 0; text-align: left !important; margin-left: 0 !important; padding-left: 0 !important; page-break-inside: avoid;"><strong>12. Bảo hiểm Tai nạn:</strong></p>
                     <p style="margin: 3px 0; margin-left: 0 !important; padding-left: 0 !important; text-align: left !important; page-break-inside: avoid;">theo chính sách công ty</p>
@@ -5171,16 +5169,14 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                                         </label>
                                                         <div className="send-recruitment-info-allowance-input-wrapper">
                                                             <input
-                                                                type="number"
+                                                                type="text"
                                                                 className="send-recruitment-info-input"
                                                                 value={recruitmentInfoForm.hoTroComTrua}
                                                                 onChange={(e) => setRecruitmentInfoForm({ ...recruitmentInfoForm, hoTroComTrua: e.target.value })}
-                                                                placeholder="0"
-                                                                min="0"
+                                                                placeholder="Theo chính sách công ty"
                                                             />
-                                                            <span className="send-recruitment-info-currency">VNĐ/ngày làm việc</span>
                                                         </div>
-                                                        {recruitmentInfoForm.hoTroComTrua && (
+                                                        {recruitmentInfoForm.hoTroComTrua && recruitmentInfoForm.hoTroComTrua !== 'Theo chính sách công ty' && !isNaN(parseInt(recruitmentInfoForm.hoTroComTrua)) && (
                                                             <div className="send-recruitment-info-vnd-block">
                                                                 <span className="send-recruitment-info-vnd-value">
                                                                     {parseInt(recruitmentInfoForm.hoTroComTrua).toLocaleString('vi-VN')}
@@ -5600,7 +5596,7 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
                                 <div>
-                                    <h2 className="probation-status-modal-title">Trạng Thái Thử Việc (45 Ngày)</h2>
+                                    <h2 className="probation-status-modal-title">Trạng Thái Thử Việc (60 Ngày)</h2>
                                     <p className="probation-status-modal-subtitle">
                                         Ứng viên: <strong>{selectedProbationCandidate.ho_ten || selectedProbationCandidate.hoTen}</strong>
                                     </p>
