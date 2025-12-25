@@ -223,6 +223,35 @@ const ensureInterviewRequestsTable = async () => {
         // Không throw error, chỉ log để không block request
     }
 
+    // Kiểm tra và thêm các cột approval nếu thiếu
+    const approvalColumns = [
+        { name: 'manager_approved', type: 'BOOLEAN DEFAULT FALSE' },
+        { name: 'branch_director_approved', type: 'BOOLEAN DEFAULT FALSE' },
+        { name: 'manager_approved_at', type: 'TIMESTAMP' },
+        { name: 'branch_director_approved_at', type: 'TIMESTAMP' }
+    ];
+
+    for (const col of approvalColumns) {
+        try {
+            const columnCheck = await pool.query(`
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_schema = 'public' 
+                    AND table_name = 'interview_requests' 
+                    AND column_name = $1
+                )
+            `, [col.name]);
+            if (!columnCheck.rows[0].exists) {
+                console.log(`[ensureInterviewRequestsTable] Bảng đã tồn tại nhưng thiếu cột ${col.name}, đang thêm cột...`);
+                await pool.query(`ALTER TABLE interview_requests ADD COLUMN ${col.name} ${col.type}`);
+                console.log(`[ensureInterviewRequestsTable] Đã thêm cột ${col.name} thành công`);
+            }
+        } catch (error) {
+            console.warn(`[ensureInterviewRequestsTable] Lỗi khi kiểm tra/thêm cột ${col.name}:`, error.message);
+            // Không throw error, chỉ log để không block request
+        }
+    }
+
     // Đảm bảo candidates constraint có đầy đủ status
     await ensureCandidatesStatusConstraint();
 
