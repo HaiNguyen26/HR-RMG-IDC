@@ -78,7 +78,14 @@ const ensureInterviewRequestsTable = async () => {
             manager_approved_at TIMESTAMP,
             branch_director_approved_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT interview_requests_status_check CHECK (status IN (
+                'PENDING_INTERVIEW',
+                'WAITING_FOR_OTHER_APPROVAL',
+                'READY_FOR_INTERVIEW',
+                'APPROVED',
+                'REJECTED'
+            ))
         )
     `);
 
@@ -218,6 +225,49 @@ const ensureInterviewRequestsTable = async () => {
 
     // Đảm bảo candidates constraint có đầy đủ status
     await ensureCandidatesStatusConstraint();
+
+    // Kiểm tra và cập nhật status constraint cho interview_requests
+    try {
+        const constraintCheck = await pool.query(`
+            SELECT constraint_name, check_clause
+            FROM information_schema.check_constraints
+            WHERE constraint_name = 'interview_requests_status_check'
+        `);
+
+        const constraintClause = constraintCheck.rows[0]?.check_clause || '';
+        const hasPendingInterview = constraintClause.includes('PENDING_INTERVIEW');
+        const hasWaitingForOther = constraintClause.includes('WAITING_FOR_OTHER_APPROVAL');
+        const hasReadyForInterview = constraintClause.includes('READY_FOR_INTERVIEW');
+        const hasApproved = constraintClause.includes('APPROVED');
+        const hasRejected = constraintClause.includes('REJECTED');
+
+        // Nếu thiếu các status cần thiết, cập nhật constraint
+        if (!hasPendingInterview || !hasWaitingForOther || !hasReadyForInterview || !hasApproved || !hasRejected) {
+            console.log('[ensureInterviewRequestsTable] Updating status constraint to include all required values');
+            
+            // Drop constraint cũ
+            await pool.query(`
+                ALTER TABLE interview_requests DROP CONSTRAINT IF EXISTS interview_requests_status_check
+            `);
+
+            // Thêm constraint mới với đầy đủ các status
+            await pool.query(`
+                ALTER TABLE interview_requests
+                ADD CONSTRAINT interview_requests_status_check
+                CHECK (status IN (
+                    'PENDING_INTERVIEW',
+                    'WAITING_FOR_OTHER_APPROVAL',
+                    'READY_FOR_INTERVIEW',
+                    'APPROVED',
+                    'REJECTED'
+                ))
+            `);
+            console.log('[ensureInterviewRequestsTable] Đã cập nhật status constraint thành công');
+        }
+    } catch (error) {
+        console.warn('[ensureInterviewRequestsTable] Lỗi khi kiểm tra/cập nhật status constraint:', error.message);
+        // Không throw error, chỉ log để không block request
+    }
 
     // Kiểm tra và sửa NOT NULL constraint của manager_name và branch_director_name nếu có
     try {

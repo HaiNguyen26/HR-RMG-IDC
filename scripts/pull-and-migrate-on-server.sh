@@ -416,6 +416,21 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 20: $MIGRATION20${NC}"
 fi
 
+# Migration 21: fix_interview_requests_status_constraint.sql (Cập nhật check constraint cho status)
+MIGRATION21="$PROJECT_DIR/database/fix_interview_requests_status_constraint.sql"
+if [ -f "$MIGRATION21" ]; then
+    echo -e "${BLUE}→ Chạy migration: fix_interview_requests_status_constraint.sql (Cập nhật check constraint cho status để cho phép PENDING_INTERVIEW, WAITING_FOR_OTHER_APPROVAL, READY_FOR_INTERVIEW, APPROVED, REJECTED)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION21"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 21 thành công - Đã cập nhật status constraint${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 21${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 21: $MIGRATION21${NC}"
+fi
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"
