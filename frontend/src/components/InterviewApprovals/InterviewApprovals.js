@@ -568,8 +568,36 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 setReadyInterviewRequests(readyRequests);
                 setReadyInterviewRequestsCount(readyRequests.length);
 
-                setShowInterviewRequestDetail(false);
-                setSelectedInterviewRequest(null);
+                // Nếu modal đang mở và đang xem request vừa duyệt, refresh dữ liệu
+                const isViewingThisRequest = showInterviewRequestDetail && selectedInterviewRequest && selectedInterviewRequest.id === requestId;
+                if (isViewingThisRequest) {
+                    // Tìm request đã được cập nhật trong danh sách mới
+                    const updatedRequest = allRequests.find(req => req.id === requestId);
+                    if (updatedRequest) {
+                        setSelectedInterviewRequest(updatedRequest);
+                        // Nếu status là READY_FOR_INTERVIEW (cả 2 đã duyệt), đóng modal vì đã chuyển sang tag "Sẵn sàng PV"
+                        // Nếu status vẫn là PENDING_INTERVIEW hoặc WAITING_FOR_OTHER_APPROVAL, giữ modal mở nhưng nút sẽ tự động ẩn
+                        if (updatedRequest.status === 'READY_FOR_INTERVIEW') {
+                            setShowInterviewRequestDetail(false);
+                            setSelectedInterviewRequest(null);
+                        }
+                        // Nếu status là APPROVED hoặc REJECTED, đóng modal
+                        if (updatedRequest.status === 'APPROVED' || updatedRequest.status === 'REJECTED') {
+                            setShowInterviewRequestDetail(false);
+                            setSelectedInterviewRequest(null);
+                        }
+                    } else {
+                        // Request không còn trong danh sách pending, đóng modal
+                        setShowInterviewRequestDetail(false);
+                        setSelectedInterviewRequest(null);
+                    }
+                } else {
+                    // Nếu không đang xem request này, không đóng modal (có thể đang xem request khác)
+                    // Chỉ đóng nếu không có request nào đang được chọn
+                    if (!selectedInterviewRequest) {
+                        setShowInterviewRequestDetail(false);
+                    }
+                }
             }
         } catch (error) {
             console.error('Error approving interview request:', error);
@@ -2646,26 +2674,52 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                                 </svg>
                                 Xem CV đính kèm
                             </button>
-                            <button
-                                type="button"
-                                className="interview-approvals-modal-btn interview-approvals-modal-btn--approve"
-                                onClick={() => handleApproveInterviewRequest(selectedInterviewRequest.id)}
-                            >
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px', marginRight: '8px' }}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                                </svg>
-                                Duyệt
-                            </button>
-                            <button
-                                type="button"
-                                className="interview-approvals-modal-btn interview-approvals-modal-btn--reject"
-                                onClick={() => handleRejectInterviewRequest(selectedInterviewRequest.id)}
-                            >
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px', marginRight: '8px' }}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
-                                Từ chối
-                            </button>
+                            {/* Chỉ hiển thị nút Duyệt và Từ chối nếu:
+                                1. Status là PENDING_INTERVIEW hoặc WAITING_FOR_OTHER_APPROVAL
+                                2. Người dùng hiện tại chưa duyệt:
+                                   - Nếu là manager (manager_id === currentUser.id) thì manager_approved phải false
+                                   - Nếu là branch director (branch_director_id === currentUser.id) thì branch_director_approved phải false
+                                3. Người dùng hiện tại có quyền duyệt (manager_id hoặc branch_director_id khớp với currentUser.id)
+                            */}
+                            {selectedInterviewRequest &&
+                                (selectedInterviewRequest.status === 'PENDING_INTERVIEW' || selectedInterviewRequest.status === 'WAITING_FOR_OTHER_APPROVAL') &&
+                                (() => {
+                                    // Kiểm tra xem người dùng hiện tại có phải là manager không
+                                    const isCurrentUserManager = selectedInterviewRequest.manager_id === currentUser?.id;
+                                    // Kiểm tra xem người dùng hiện tại có phải là branch director không
+                                    const isCurrentUserBranchDirector = selectedInterviewRequest.branch_director_id === currentUser?.id;
+
+                                    // Chỉ hiển thị nút nếu:
+                                    // 1. Người dùng là manager và chưa duyệt (manager_approved === false)
+                                    // 2. HOẶC người dùng là branch director và chưa duyệt (branch_director_approved === false)
+                                    const canShowButtons = (isCurrentUserManager && !selectedInterviewRequest.manager_approved) ||
+                                        (isCurrentUserBranchDirector && !selectedInterviewRequest.branch_director_approved);
+
+                                    return canShowButtons;
+                                })() && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            className="interview-approvals-modal-btn interview-approvals-modal-btn--approve"
+                                            onClick={() => handleApproveInterviewRequest(selectedInterviewRequest.id)}
+                                        >
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px', marginRight: '8px' }}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            Duyệt
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="interview-approvals-modal-btn interview-approvals-modal-btn--reject"
+                                            onClick={() => handleRejectInterviewRequest(selectedInterviewRequest.id)}
+                                        >
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '18px', height: '18px', marginRight: '8px' }}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
+                                            Từ chối
+                                        </button>
+                                    </>
+                                )}
                             <button
                                 type="button"
                                 className="interview-approvals-modal-btn interview-approvals-modal-btn--cancel"
