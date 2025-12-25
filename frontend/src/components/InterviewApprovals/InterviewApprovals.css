@@ -2266,8 +2266,8 @@
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(4px);
-    z-index: 11000;
-    /* Higher than recruitment modal (10000) */
+    z-index: 12000;
+    /* Higher than recruitment modal (10000) and candidate modal (11000) */
     display: flex;
     align-items: center;
     justify-content: center;
