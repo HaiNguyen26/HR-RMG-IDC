@@ -805,6 +805,7 @@ router.put('/:id', upload.fields([
         console.log('[PUT /api/candidates/:id] Update fields list:', updateFields);
         
         let hasMainTableUpdate = false;
+        let updateResult = null; // Lưu updateResult để so sánh sau
         if (updateFields.length > 0) {
             updateFields.push(`updated_at = NOW()`);
             updateValues.push(id);
@@ -814,7 +815,7 @@ router.put('/:id', upload.fields([
             console.log('[PUT /api/candidates/:id] Update values count:', updateValues.length);
             console.log('[PUT /api/candidates/:id] Update values (sample):', updateValues.slice(0, 5));
             
-            const updateResult = await client.query(updateQuery, updateValues);
+            updateResult = await client.query(updateQuery, updateValues);
             
             if (updateResult.rows.length === 0) {
                 throw new Error('Không tìm thấy ứng viên để cập nhật');
@@ -822,14 +823,45 @@ router.put('/:id', upload.fields([
             
             hasMainTableUpdate = true;
             console.log('[PUT /api/candidates/:id] Update successful, affected rows:', updateResult.rows.length);
-            console.log('[PUT /api/candidates/:id] Updated candidate data (sample):', {
-                id: updateResult.rows[0].id,
-                ho_ten: updateResult.rows[0].ho_ten,
-                gioi_tinh: updateResult.rows[0].gioi_tinh,
-                noi_sinh: updateResult.rows[0].noi_sinh,
-                email: updateResult.rows[0].email,
-                updated_at: updateResult.rows[0].updated_at
+            
+            // Log dữ liệu từ RETURNING để verify update thực sự xảy ra
+            const returnedData = updateResult.rows[0];
+            console.log('[PUT /api/candidates/:id] Data returned from UPDATE query (RETURNING *):', {
+                id: returnedData.id,
+                ho_ten: returnedData.ho_ten,
+                gioi_tinh: returnedData.gioi_tinh,
+                noi_sinh: returnedData.noi_sinh,
+                email: returnedData.email,
+                updated_at: returnedData.updated_at,
+                // Log thêm một số field quan trọng khác
+                so_dien_thoai: returnedData.so_dien_thoai,
+                dan_toc: returnedData.dan_toc,
+                quoc_tich: returnedData.quoc_tich
             });
+            
+            // Verify rằng dữ liệu đã được update bằng cách so sánh với dữ liệu gửi lên
+            if (hoTen !== undefined) {
+                const sentValue = (hoTen && typeof hoTen === 'string' ? hoTen.trim() : hoTen) || null;
+                if (returnedData.ho_ten !== sentValue) {
+                    console.warn('[PUT /api/candidates/:id] ⚠️ WARNING: ho_ten mismatch!', {
+                        sent: sentValue,
+                        saved: returnedData.ho_ten
+                    });
+                } else {
+                    console.log('[PUT /api/candidates/:id] ✓ ho_ten verified: matches sent value');
+                }
+            }
+            if (noiSinh !== undefined) {
+                const sentValue = (noiSinh && typeof noiSinh === 'string' ? noiSinh.trim() : noiSinh) || null;
+                if (returnedData.noi_sinh !== sentValue) {
+                    console.warn('[PUT /api/candidates/:id] ⚠️ WARNING: noi_sinh mismatch!', {
+                        sent: sentValue,
+                        saved: returnedData.noi_sinh
+                    });
+                } else {
+                    console.log('[PUT /api/candidates/:id] ✓ noi_sinh verified: matches sent value');
+                }
+            }
         } else {
             console.warn('[PUT /api/candidates/:id] ⚠️ WARNING: No fields to update in main table!');
             console.warn('[PUT /api/candidates/:id] Request body keys:', Object.keys(req.body));
@@ -951,8 +983,9 @@ router.put('/:id', upload.fields([
 
         // Fetch lại dữ liệu đã cập nhật để trả về (sử dụng pool.query để đảm bảo đọc dữ liệu sau khi commit)
         // Đợi một chút để đảm bảo transaction đã được commit hoàn toàn
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 100)); // Tăng thời gian đợi lên 100ms
         
+        console.log('[PUT /api/candidates/:id] Fetching updated candidate from database after commit...');
         const updatedCandidateResult = await pool.query('SELECT * FROM candidates WHERE id = $1', [id]);
         const updatedCandidate = updatedCandidateResult.rows[0] || null;
         
@@ -964,7 +997,7 @@ router.put('/:id', upload.fields([
             });
         }
         
-        console.log('[PUT /api/candidates/:id] Updated candidate data (sample):', {
+        console.log('[PUT /api/candidates/:id] Fetched candidate data from database after commit:', {
             id: updatedCandidate.id,
             ho_ten: updatedCandidate.ho_ten,
             gioi_tinh: updatedCandidate.gioi_tinh,
@@ -972,6 +1005,17 @@ router.put('/:id', upload.fields([
             email: updatedCandidate.email,
             updated_at: updatedCandidate.updated_at
         });
+        
+        // So sánh với dữ liệu từ RETURNING để đảm bảo consistency
+        if (hasMainTableUpdate && updateResult && updateResult.rows && updateResult.rows[0]) {
+            const returnedData = updateResult.rows[0];
+            if (returnedData.ho_ten !== updatedCandidate.ho_ten) {
+                console.error('[PUT /api/candidates/:id] ⚠️ ERROR: Data mismatch between RETURNING and SELECT!', {
+                    returned: returnedData.ho_ten,
+                    fetched: updatedCandidate.ho_ten
+                });
+            }
+        }
 
         res.json({
             success: true,
