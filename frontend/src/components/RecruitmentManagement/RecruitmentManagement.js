@@ -1026,22 +1026,23 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                         showToast('Đã cập nhật ứng viên thành công!', 'success');
                     }
 
-                    // Nếu modal "Thông tin Ứng viên" đang mở và đang hiển thị ứng viên vừa cập nhật, refresh dữ liệu
-                    const shouldRefreshViewModal = showViewCandidateModal && viewingCandidate && viewingCandidate.id === candidateIdToUpdate;
-                    const wasViewingThisCandidate = shouldRefreshViewModal;
+                    // Kiểm tra xem có đang xem ứng viên này trong modal "Thông tin Ứng viên" không
+                    // Không phụ thuộc vào showViewCandidateModal vì state có thể không đồng bộ
+                    const isViewingThisCandidate = viewingCandidate && viewingCandidate.id === candidateIdToUpdate;
 
-                    console.log('[handleSubmit] Update successful, refreshing data...', {
+                    console.log('[handleSubmit] Update successful, checking if need to refresh modal...', {
                         candidateIdToUpdate,
-                        shouldRefreshViewModal,
+                        isViewingThisCandidate,
                         showViewCandidateModal,
-                        viewingCandidateId: viewingCandidate?.id
+                        viewingCandidateId: viewingCandidate?.id,
+                        viewingCandidateExists: !!viewingCandidate
                     });
 
                     handleCloseModal();
                     fetchCandidates(false); // Refresh danh sách
 
-                    // Refresh dữ liệu trong modal "Thông tin Ứng viên" nếu đang mở và đang xem ứng viên vừa cập nhật
-                    if (wasViewingThisCandidate) {
+                    // Refresh dữ liệu trong modal "Thông tin Ứng viên" nếu đang xem ứng viên vừa cập nhật
+                    if (isViewingThisCandidate) {
                         try {
                             console.log('[handleSubmit] Fetching updated candidate data for modal...', candidateIdToUpdate);
                             const updatedResponse = await candidatesAPI.getById(candidateIdToUpdate);
@@ -1053,7 +1054,13 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                                     noiSinh: updatedCandidate.noi_sinh || updatedCandidate.noiSinh,
                                     gioiTinh: updatedCandidate.gioi_tinh || updatedCandidate.gioiTinh
                                 });
+                                
+                                // Cập nhật viewingCandidate để modal hiển thị dữ liệu mới
                                 setViewingCandidate(updatedCandidate);
+                                
+                                // Đảm bảo modal vẫn mở
+                                setShowViewCandidateModal(true);
+                                
                                 // Cập nhật candidate trong list để đồng bộ
                                 setCandidates(prevCandidates =>
                                     prevCandidates.map(c => c.id === candidateIdToUpdate ? updatedCandidate : c)
@@ -1065,6 +1072,8 @@ const RecruitmentManagement = ({ currentUser, showToast, showConfirm }) => {
                         } catch (err) {
                             console.error('[handleSubmit] Error refreshing candidate detail:', err);
                         }
+                    } else {
+                        console.log('[handleSubmit] Not viewing this candidate, skipping modal refresh');
                     }
                 } else {
                     throw new Error(response.data.message || 'Lỗi khi cập nhật ứng viên');
