@@ -532,9 +532,23 @@ router.put('/:id', upload.fields([
         const { id } = req.params;
         const updateData = req.body;
 
+        console.log('[PUT /api/candidates/:id] ========== UPDATE REQUEST START ==========');
+        console.log('[PUT /api/candidates/:id] Candidate ID:', id);
+        console.log('[PUT /api/candidates/:id] Request body keys:', Object.keys(req.body));
+        console.log('[PUT /api/candidates/:id] Request body (first level):', JSON.stringify(Object.keys(req.body).reduce((acc, key) => {
+            const value = req.body[key];
+            if (typeof value === 'string' && value.length > 100) {
+                acc[key] = value.substring(0, 100) + '... (truncated)';
+            } else {
+                acc[key] = value;
+            }
+            return acc;
+        }, {}), null, 2));
+
         // Kiểm tra ứng viên có tồn tại không
         const checkCandidate = await client.query('SELECT id FROM candidates WHERE id = $1', [id]);
         if (checkCandidate.rows.length === 0) {
+            console.error('[PUT /api/candidates/:id] Candidate not found:', id);
             return res.status(404).json({
                 success: false,
                 message: 'Không tìm thấy ứng viên'
@@ -551,6 +565,22 @@ router.put('/:id', upload.fields([
             ngayGuiCV, nguonCV,
             workExperiences, trainingProcesses, foreignLanguages
         } = req.body;
+        
+        console.log('[PUT /api/candidates/:id] Parsed fields:', {
+            hoTen: hoTen ? hoTen.substring(0, 50) : undefined,
+            gioiTinh,
+            ngaySinh,
+            noiSinh: noiSinh ? noiSinh.substring(0, 50) : undefined,
+            tinhTrangHonNhan,
+            danToc,
+            quocTich,
+            tonGiao,
+            soCCCD,
+            email,
+            chiNhanh,
+            viTriUngTuyen,
+            phongBan
+        });
 
         // Parse JSON strings nếu có
         let diaChiTamTruObj = null;
@@ -634,6 +664,8 @@ router.put('/:id', upload.fields([
         const updateFields = [];
         const updateValues = [];
         let paramIndex = 1;
+        
+        console.log('[PUT /api/candidates/:id] Starting to build update fields...');
 
         if (hoTen !== undefined) {
             updateFields.push(`ho_ten = $${paramIndex++}`);
@@ -769,11 +801,38 @@ router.put('/:id', upload.fields([
         }
 
         // Cập nhật bảng candidates
+        console.log('[PUT /api/candidates/:id] Total update fields built:', updateFields.length);
+        console.log('[PUT /api/candidates/:id] Update fields list:', updateFields);
+        
         if (updateFields.length > 0) {
             updateFields.push(`updated_at = NOW()`);
             updateValues.push(id);
-            const updateQuery = `UPDATE candidates SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`;
-            await client.query(updateQuery, updateValues);
+            const updateQuery = `UPDATE candidates SET ${updateFields.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
+            
+            console.log('[PUT /api/candidates/:id] Update query:', updateQuery);
+            console.log('[PUT /api/candidates/:id] Update values count:', updateValues.length);
+            console.log('[PUT /api/candidates/:id] Update values (sample):', updateValues.slice(0, 5));
+            
+            const updateResult = await client.query(updateQuery, updateValues);
+            
+            if (updateResult.rows.length === 0) {
+                throw new Error('Không tìm thấy ứng viên để cập nhật');
+            }
+            
+            console.log('[PUT /api/candidates/:id] Update successful, affected rows:', updateResult.rows.length);
+            console.log('[PUT /api/candidates/:id] Updated candidate data (sample):', {
+                id: updateResult.rows[0].id,
+                ho_ten: updateResult.rows[0].ho_ten,
+                gioi_tinh: updateResult.rows[0].gioi_tinh,
+                noi_sinh: updateResult.rows[0].noi_sinh,
+                email: updateResult.rows[0].email,
+                updated_at: updateResult.rows[0].updated_at
+            });
+        } else {
+            console.warn('[PUT /api/candidates/:id] ⚠️ WARNING: No fields to update! This might indicate a problem with the request data.');
+            console.warn('[PUT /api/candidates/:id] Request body keys:', Object.keys(req.body));
+            // Vẫn commit transaction nhưng không có gì được update
+            // Điều này có thể xảy ra nếu chỉ gửi file mà không gửi field nào khác
         }
 
         // Xóa các bản ghi cũ trong các bảng con (với error handling)
@@ -869,17 +928,46 @@ router.put('/:id', upload.fields([
         }
 
         await client.query('COMMIT');
+        
+        console.log('[PUT /api/candidates/:id] ========== UPDATE REQUEST SUCCESS ==========');
+
+        // Fetch lại dữ liệu đã cập nhật để trả về
+        const updatedCandidateResult = await pool.query('SELECT * FROM candidates WHERE id = $1', [id]);
+        const updatedCandidate = updatedCandidateResult.rows[0] || null;
+        
+        if (updatedCandidate) {
+            console.log('[PUT /api/candidates/:id] Updated candidate data (sample):', {
+                id: updatedCandidate.id,
+                ho_ten: updatedCandidate.ho_ten,
+                gioi_tinh: updatedCandidate.gioi_tinh,
+                noi_sinh: updatedCandidate.noi_sinh,
+                email: updatedCandidate.email
+            });
+        }
 
         res.json({
             success: true,
-            message: 'Đã cập nhật ứng viên thành công'
+            message: 'Đã cập nhật ứng viên thành công',
+            data: updatedCandidate
         });
     } catch (error) {
-        await client.query('ROLLBACK');
-        console.error('Error updating candidate:', error);
+        await client.query('ROLLBACK').catch(rollbackErr => {
+            console.error('[PUT /api/candidates/:id] Rollback error:', rollbackErr);
+        });
+        console.error('[PUT /api/candidates/:id] ========== UPDATE REQUEST ERROR ==========');
+        console.error('[PUT /api/candidates/:id] Error name:', error.name);
+        console.error('[PUT /api/candidates/:id] Error message:', error.message);
+        console.error('[PUT /api/candidates/:id] Error code:', error.code);
+        console.error('[PUT /api/candidates/:id] Error detail:', error.detail);
+        console.error('[PUT /api/candidates/:id] Error constraint:', error.constraint);
+        console.error('[PUT /api/candidates/:id] Error stack:', error.stack);
+        console.error('[PUT /api/candidates/:id] ========== UPDATE REQUEST ERROR END ==========');
+        
         res.status(500).json({
             success: false,
-            message: 'Lỗi khi cập nhật ứng viên: ' + error.message
+            message: 'Lỗi khi cập nhật ứng viên: ' + error.message,
+            errorCode: error.code,
+            errorDetail: error.detail
         });
     } finally {
         client.release();
