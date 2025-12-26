@@ -227,31 +227,93 @@ const InterviewApprovals = ({ currentUser, showToast, showConfirm }) => {
                 // Kiểm tra xem có nhân viên nào có quan_ly_gian_tiep trùng với tên user hiện tại không
                 // Hoặc kiểm tra xem user có phải là giám đốc chi nhánh không (dựa trên chức danh hoặc tên)
                 const branchDirectorNames = ['Châu Quang Hải', 'Nguyễn Ngọc Luyễn', 'Nguyễn Văn Khải'];
-                const isBranchDir = employeesData.some(emp => {
+                const currentUserChiNhanh = (currentUser.chiNhanh || currentUser.chi_nhanh || '').trim();
+
+                // Normalize chi_nhanh của currentUser
+                const normalizeChiNhanh = (chiNhanh) => {
+                    if (!chiNhanh) return null;
+                    return removeVietnameseAccents(chiNhanh.trim().toLowerCase());
+                };
+                const normalizedCurrentUserChiNhanh = currentUserChiNhanh ? normalizeChiNhanh(currentUserChiNhanh) : null;
+
+                // Helper function để check match chi_nhanh
+                const chiNhanhMatches = (empChiNhanh) => {
+                    if (!normalizedCurrentUserChiNhanh) return true; // Backward compatibility
+                    const normalized = normalizeChiNhanh(empChiNhanh);
+                    if (!normalized) return false;
+
+                    // Exact match
+                    if (normalized === normalizedCurrentUserChiNhanh) return true;
+
+                    // Partial match
+                    if (normalized.includes(normalizedCurrentUserChiNhanh) || normalizedCurrentUserChiNhanh.includes(normalized)) {
+                        const words1 = normalized.split(/\s+/).filter(w => w.length > 1);
+                        const words2 = normalizedCurrentUserChiNhanh.split(/\s+/).filter(w => w.length > 1);
+                        if (words1.length > 0 && words2.length > 0) {
+                            const hasCommonWord = words1.some(w1 => words2.some(w2 => w1 === w2));
+                            return hasCommonWord;
+                        }
+                    }
+
+                    return false;
+                };
+
+                // Tìm tất cả employees có quan_ly_gian_tiep trùng tên với user hiện tại
+                const matchingBranchDirectors = [];
+                employeesData.forEach(emp => {
                     const managerName = (emp.quan_ly_gian_tiep || '').trim();
+                    if (!managerName) return;
+
                     const normalizedManagerName = managerName.toLowerCase().replace(/\s+/g, ' ').trim();
                     const normalizedCurrentName = currentUserName.toLowerCase().replace(/\s+/g, ' ').trim();
                     const normalizedManagerNameNoAccents = removeVietnameseAccents(normalizedManagerName);
                     const normalizedCurrentNameNoAccents = removeVietnameseAccents(normalizedCurrentName);
 
                     // Kiểm tra theo quan_ly_gian_tiep
+                    let nameMatches = false;
                     if (normalizedManagerName === normalizedCurrentName ||
                         normalizedManagerNameNoAccents === normalizedCurrentNameNoAccents ||
                         normalizedManagerName.includes(normalizedCurrentName) ||
                         normalizedCurrentName.includes(normalizedManagerName)) {
-                        return true;
+                        nameMatches = true;
                     }
 
-                    // Kiểm tra xem user có phải là giám đốc chi nhánh không
-                    return branchDirectorNames.some(dirName => {
-                        const normalizedDirName = dirName.toLowerCase().replace(/\s+/g, ' ').trim();
-                        const normalizedDirNameNoAccents = removeVietnameseAccents(normalizedDirName);
-                        return normalizedDirName === normalizedCurrentName ||
-                            normalizedDirNameNoAccents === normalizedCurrentNameNoAccents ||
-                            normalizedDirName.includes(normalizedCurrentName) ||
-                            normalizedCurrentName.includes(normalizedDirName);
-                    });
+                    // Kiểm tra xem user có phải là giám đốc chi nhánh không (theo hardcoded list)
+                    if (!nameMatches) {
+                        nameMatches = branchDirectorNames.some(dirName => {
+                            const normalizedDirName = dirName.toLowerCase().replace(/\s+/g, ' ').trim();
+                            const normalizedDirNameNoAccents = removeVietnameseAccents(normalizedDirName);
+                            return normalizedDirName === normalizedCurrentName ||
+                                normalizedDirNameNoAccents === normalizedCurrentNameNoAccents ||
+                                normalizedDirName.includes(normalizedCurrentName) ||
+                                normalizedCurrentName.includes(normalizedDirName);
+                        });
+                    }
+
+                    if (nameMatches) {
+                        matchingBranchDirectors.push({ emp, managerName });
+                    }
                 });
+
+                // Kiểm tra match theo chi_nhanh
+                let isBranchDir = false;
+                if (matchingBranchDirectors.length === 0) {
+                    isBranchDir = false;
+                } else if (matchingBranchDirectors.length === 1) {
+                    if (normalizedCurrentUserChiNhanh) {
+                        isBranchDir = chiNhanhMatches(matchingBranchDirectors[0].emp.chi_nhanh);
+                    } else {
+                        isBranchDir = true; // Backward compatibility
+                    }
+                } else {
+                    // Có nhiều nhân viên cùng tên giám đốc
+                    if (normalizedCurrentUserChiNhanh) {
+                        const matchingByBranch = matchingBranchDirectors.find(({ emp }) => chiNhanhMatches(emp.chi_nhanh));
+                        isBranchDir = !!matchingByBranch;
+                    } else {
+                        isBranchDir = false; // Không cho phép để tránh nhầm lẫn
+                    }
+                }
 
                 setIsBranchDirector(isBranchDir);
             } catch (error) {

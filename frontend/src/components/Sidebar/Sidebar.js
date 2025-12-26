@@ -46,35 +46,96 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                 const currentUserName = (currentUser.hoTen || currentUser.username || '').trim();
                 const normalizedCurrentName = currentUserName.toLowerCase().replace(/\s+/g, ' ').trim();
                 const normalizedCurrentNameNoAccents = removeVietnameseAccents(normalizedCurrentName);
+                const currentUserChiNhanh = (currentUser.chiNhanh || currentUser.chi_nhanh || '').trim();
+
+                // Normalize chi_nhanh của currentUser
+                const normalizeChiNhanh = (chiNhanh) => {
+                    if (!chiNhanh) return null;
+                    return removeVietnameseAccents(chiNhanh.trim().toLowerCase());
+                };
+                const normalizedCurrentUserChiNhanh = currentUserChiNhanh ? normalizeChiNhanh(currentUserChiNhanh) : null;
+
+                // Helper function để check match chi_nhanh
+                const chiNhanhMatches = (empChiNhanh) => {
+                    if (!normalizedCurrentUserChiNhanh) return true; // Nếu user không có chi_nhanh, match tất cả (backward compatibility)
+                    const normalized = normalizeChiNhanh(empChiNhanh);
+                    if (!normalized) return false;
+
+                    // Exact match
+                    if (normalized === normalizedCurrentUserChiNhanh) return true;
+
+                    // Partial match: nếu một trong hai chứa phần còn lại
+                    if (normalized.includes(normalizedCurrentUserChiNhanh) || normalizedCurrentUserChiNhanh.includes(normalized)) {
+                        const words1 = normalized.split(/\s+/).filter(w => w.length > 1);
+                        const words2 = normalizedCurrentUserChiNhanh.split(/\s+/).filter(w => w.length > 1);
+                        if (words1.length > 0 && words2.length > 0) {
+                            const hasCommonWord = words1.some(w1 => words2.some(w2 => w1 === w2));
+                            return hasCommonWord;
+                        }
+                    }
+
+                    return false;
+                };
 
                 // Kiểm tra xem có nhân viên nào có quan_ly_truc_tiep trùng với tên user hiện tại không
-                const isTeamLead = employees.some((emp) => {
-                    if (!emp.quan_ly_truc_tiep) return false;
+                // QUAN TRỌNG: Phải match cả tên VÀ chi_nhanh để tránh nhầm lẫn khi có nhiều người cùng tên
+                const matchingEmployees = [];
+                employees.forEach((emp) => {
+                    if (!emp.quan_ly_truc_tiep) return;
                     const managerName = (emp.quan_ly_truc_tiep || '').trim();
                     const normalizedManagerName = managerName.toLowerCase().replace(/\s+/g, ' ').trim();
                     const normalizedManagerNameNoAccents = removeVietnameseAccents(normalizedManagerName);
 
                     // Match exact (có dấu)
                     if (normalizedManagerName === normalizedCurrentName) {
-                        return true;
+                        matchingEmployees.push({ emp, managerName });
+                        return;
                     }
 
                     // Match exact (không dấu)
                     if (normalizedManagerNameNoAccents === normalizedCurrentNameNoAccents) {
-                        return true;
+                        matchingEmployees.push({ emp, managerName });
+                        return;
                     }
 
                     // Fuzzy match (contains)
                     if (normalizedManagerName.includes(normalizedCurrentName) || normalizedCurrentName.includes(normalizedManagerName)) {
-                        return true;
+                        matchingEmployees.push({ emp, managerName });
+                        return;
                     }
 
                     if (normalizedManagerNameNoAccents.includes(normalizedCurrentNameNoAccents) || normalizedCurrentNameNoAccents.includes(normalizedManagerNameNoAccents)) {
-                        return true;
+                        matchingEmployees.push({ emp, managerName });
+                        return;
                     }
-
-                    return false;
                 });
+
+                // Nếu có nhiều nhân viên có quan_ly_truc_tiep trùng tên với user hiện tại, 
+                // PHẢI check chi_nhanh để đảm bảo đúng người
+                let isTeamLead = false;
+                if (matchingEmployees.length === 0) {
+                    isTeamLead = false;
+                } else if (matchingEmployees.length === 1) {
+                    // Chỉ có 1 nhân viên match tên, và có chi_nhanh của nhân viên đó
+                    // Nếu user có chi_nhanh, phải match; nếu không, cho phép (backward compatibility)
+                    if (normalizedCurrentUserChiNhanh) {
+                        isTeamLead = chiNhanhMatches(matchingEmployees[0].emp.chi_nhanh);
+                    } else {
+                        isTeamLead = true; // Backward compatibility: nếu user không có chi_nhanh, cho phép
+                    }
+                } else {
+                    // Có nhiều nhân viên cùng tên quan lý
+                    // CHỈ match nếu chi_nhanh của nhân viên KHỚP với chi_nhanh của user hiện tại
+                    if (normalizedCurrentUserChiNhanh) {
+                        // Tìm nhân viên có chi_nhanh match
+                        const matchingByBranch = matchingEmployees.find(({ emp }) => chiNhanhMatches(emp.chi_nhanh));
+                        isTeamLead = !!matchingByBranch;
+                    } else {
+                        // Nếu user không có chi_nhanh nhưng có nhiều nhân viên cùng tên, không cho phép để tránh nhầm lẫn
+                        console.warn(`[Sidebar] ⚠️ User "${currentUserName}" matches ${matchingEmployees.length} employees as manager but user has no chi_nhanh. Denying access to avoid confusion.`);
+                        isTeamLead = false;
+                    }
+                }
 
                 if (isMounted) {
                     setCanApproveFromManagerLookup(Boolean(isTeamLead));

@@ -236,62 +236,118 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 const currentUserName = (currentUser.hoTen || currentUser.username || '').trim();
                 const normalizedCurrentName = currentUserName.toLowerCase().replace(/\s+/g, ' ').trim();
                 const normalizedCurrentNameNoAccents = removeVietnameseAccents(normalizedCurrentName);
+                const currentUserChiNhanh = (currentUser.chiNhanh || currentUser.chi_nhanh || '').trim();
+
+                // Normalize chi_nhanh của currentUser
+                const normalizeChiNhanh = (chiNhanh) => {
+                    if (!chiNhanh) return null;
+                    return removeVietnameseAccents(chiNhanh.trim().toLowerCase());
+                };
+                const normalizedCurrentUserChiNhanh = currentUserChiNhanh ? normalizeChiNhanh(currentUserChiNhanh) : null;
+
+                // Helper function để check match chi_nhanh
+                const chiNhanhMatches = (empChiNhanh) => {
+                    if (!normalizedCurrentUserChiNhanh) return true; // Nếu user không có chi_nhanh, match tất cả (backward compatibility)
+                    const normalized = normalizeChiNhanh(empChiNhanh);
+                    if (!normalized) return false;
+
+                    // Exact match
+                    if (normalized === normalizedCurrentUserChiNhanh) return true;
+
+                    // Partial match
+                    if (normalized.includes(normalizedCurrentUserChiNhanh) || normalizedCurrentUserChiNhanh.includes(normalized)) {
+                        const words1 = normalized.split(/\s+/).filter(w => w.length > 1);
+                        const words2 = normalizedCurrentUserChiNhanh.split(/\s+/).filter(w => w.length > 1);
+                        if (words1.length > 0 && words2.length > 0) {
+                            const hasCommonWord = words1.some(w1 => words2.some(w2 => w1 === w2));
+                            return hasCommonWord;
+                        }
+                    }
+
+                    return false;
+                };
 
                 console.log('[LeaveApprovals] Checking manager role from employees list:', {
                     currentUser: {
                         id: currentUser.id,
                         hoTen: currentUser.hoTen,
                         username: currentUser.username,
+                        chiNhanh: currentUserChiNhanh,
                         normalizedName: normalizedCurrentName,
-                        normalizedNameNoAccents: normalizedCurrentNameNoAccents
+                        normalizedNameNoAccents: normalizedCurrentNameNoAccents,
+                        normalizedChiNhanh: normalizedCurrentUserChiNhanh
                     },
                     totalEmployees: employees.length
                 });
 
-                // Log tất cả các quan_ly_truc_tiep để debug
-                const allManagers = employees
-                    .filter(emp => emp.quan_ly_truc_tiep)
-                    .map(emp => ({
-                        employee: emp.ho_ten,
-                        manager: emp.quan_ly_truc_tiep,
-                        normalized: (emp.quan_ly_truc_tiep || '').toLowerCase().replace(/\s+/g, ' ').trim(),
-                        normalizedNoAccents: removeVietnameseAccents((emp.quan_ly_truc_tiep || '').toLowerCase().replace(/\s+/g, ' ').trim())
-                    }));
-
-                console.log('[LeaveApprovals] All managers found in employees:', allManagers);
-
-                // Kiểm tra xem có nhân viên nào có quan_ly_truc_tiep trùng với tên user hiện tại không
-                const isTeamLead = employees.some((emp) => {
-                    if (!emp.quan_ly_truc_tiep) return false;
+                // Tìm tất cả employees có quan_ly_truc_tiep trùng tên với user hiện tại
+                const matchingEmployees = [];
+                employees.forEach((emp) => {
+                    if (!emp.quan_ly_truc_tiep) return;
                     const managerName = (emp.quan_ly_truc_tiep || '').trim();
                     const normalizedManagerName = managerName.toLowerCase().replace(/\s+/g, ' ').trim();
                     const normalizedManagerNameNoAccents = removeVietnameseAccents(normalizedManagerName);
 
+                    let nameMatches = false;
                     // Match exact (có dấu)
                     if (normalizedManagerName === normalizedCurrentName) {
-                        console.log('[LeaveApprovals] Found teamLead by exact match (with accents):', managerName);
-                        return true;
+                        nameMatches = true;
                     }
-
                     // Match exact (không dấu)
-                    if (normalizedManagerNameNoAccents === normalizedCurrentNameNoAccents) {
-                        console.log('[LeaveApprovals] Found teamLead by exact match (no accents):', managerName);
-                        return true;
+                    else if (normalizedManagerNameNoAccents === normalizedCurrentNameNoAccents) {
+                        nameMatches = true;
                     }
-
                     // Fuzzy match (contains)
-                    if (normalizedManagerName.includes(normalizedCurrentName) || normalizedCurrentName.includes(normalizedManagerName)) {
-                        console.log('[LeaveApprovals] Found teamLead by fuzzy match (contains):', managerName);
-                        return true;
+                    else if (normalizedManagerName.includes(normalizedCurrentName) || normalizedCurrentName.includes(normalizedManagerName)) {
+                        nameMatches = true;
+                    }
+                    else if (normalizedManagerNameNoAccents.includes(normalizedCurrentNameNoAccents) || normalizedCurrentNameNoAccents.includes(normalizedManagerNameNoAccents)) {
+                        nameMatches = true;
                     }
 
-                    if (normalizedManagerNameNoAccents.includes(normalizedCurrentNameNoAccents) || normalizedCurrentNameNoAccents.includes(normalizedManagerNameNoAccents)) {
-                        console.log('[LeaveApprovals] Found teamLead by fuzzy match (no accents, contains):', managerName);
-                        return true;
+                    if (nameMatches) {
+                        matchingEmployees.push({ emp, managerName });
                     }
-
-                    return false;
                 });
+
+                console.log('[LeaveApprovals] Found employees with matching manager name:', matchingEmployees.map(m => ({
+                    employee: m.emp.ho_ten,
+                    chi_nhanh: m.emp.chi_nhanh,
+                    manager: m.managerName
+                })));
+
+                // Kiểm tra match theo chi_nhanh
+                let isTeamLead = false;
+                if (matchingEmployees.length === 0) {
+                    isTeamLead = false;
+                } else if (matchingEmployees.length === 1) {
+                    // Chỉ có 1 nhân viên match tên
+                    if (normalizedCurrentUserChiNhanh) {
+                        isTeamLead = chiNhanhMatches(matchingEmployees[0].emp.chi_nhanh);
+                        if (isTeamLead) {
+                            console.log('[LeaveApprovals] Found teamLead by exact match with chi_nhanh:', matchingEmployees[0].managerName);
+                        }
+                    } else {
+                        isTeamLead = true; // Backward compatibility
+                        console.log('[LeaveApprovals] Found teamLead by exact match (no chi_nhanh check):', matchingEmployees[0].managerName);
+                    }
+                } else {
+                    // Có nhiều nhân viên cùng tên quan lý
+                    if (normalizedCurrentUserChiNhanh) {
+                        // Tìm nhân viên có chi_nhanh match
+                        const matchingByBranch = matchingEmployees.find(({ emp }) => chiNhanhMatches(emp.chi_nhanh));
+                        isTeamLead = !!matchingByBranch;
+                        if (isTeamLead) {
+                            console.log('[LeaveApprovals] Found teamLead by chi_nhanh match:', matchingByBranch.managerName, matchingByBranch.emp.chi_nhanh);
+                        } else {
+                            console.warn(`[LeaveApprovals] ⚠️ User "${currentUserName}" matches ${matchingEmployees.length} employees as manager but none matches chi_nhanh "${normalizedCurrentUserChiNhanh}". Denying access.`);
+                        }
+                    } else {
+                        // Nếu user không có chi_nhanh nhưng có nhiều nhân viên cùng tên, không cho phép để tránh nhầm lẫn
+                        console.warn(`[LeaveApprovals] ⚠️ User "${currentUserName}" matches ${matchingEmployees.length} employees as manager but user has no chi_nhanh. Denying access to avoid confusion.`);
+                        isTeamLead = false;
+                    }
+                }
 
                 if (isTeamLead) {
                     console.log('[LeaveApprovals] Setting managerOverride to teamLead');
@@ -303,37 +359,67 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 }
 
                 // Kiểm tra xem có nhân viên nào có quan_ly_gian_tiep (giám đốc chi nhánh) trùng với tên user hiện tại không
-                const isBranchDir = employees.some((emp) => {
-                    if (!emp.quan_ly_gian_tiep) return false;
+                const matchingBranchDirectors = [];
+                employees.forEach((emp) => {
+                    if (!emp.quan_ly_gian_tiep) return;
                     const directorName = (emp.quan_ly_gian_tiep || '').trim();
                     const normalizedDirectorName = directorName.toLowerCase().replace(/\s+/g, ' ').trim();
                     const normalizedDirectorNameNoAccents = removeVietnameseAccents(normalizedDirectorName);
 
+                    let nameMatches = false;
                     // Match exact (có dấu)
                     if (normalizedDirectorName === normalizedCurrentName) {
-                        console.log('[LeaveApprovals] Found branch director by exact match (with accents):', directorName);
-                        return true;
+                        nameMatches = true;
                     }
-
                     // Match exact (không dấu)
-                    if (normalizedDirectorNameNoAccents === normalizedCurrentNameNoAccents) {
-                        console.log('[LeaveApprovals] Found branch director by exact match (no accents):', directorName);
-                        return true;
+                    else if (normalizedDirectorNameNoAccents === normalizedCurrentNameNoAccents) {
+                        nameMatches = true;
                     }
-
                     // Fuzzy match (contains)
-                    if (normalizedDirectorName.includes(normalizedCurrentName) || normalizedCurrentName.includes(normalizedDirectorName)) {
-                        console.log('[LeaveApprovals] Found branch director by fuzzy match (contains):', directorName);
-                        return true;
+                    else if (normalizedDirectorName.includes(normalizedCurrentName) || normalizedCurrentName.includes(normalizedDirectorName)) {
+                        nameMatches = true;
+                    }
+                    else if (normalizedDirectorNameNoAccents.includes(normalizedCurrentNameNoAccents) || normalizedCurrentNameNoAccents.includes(normalizedDirectorNameNoAccents)) {
+                        nameMatches = true;
                     }
 
-                    if (normalizedDirectorNameNoAccents.includes(normalizedCurrentNameNoAccents) || normalizedCurrentNameNoAccents.includes(normalizedDirectorNameNoAccents)) {
-                        console.log('[LeaveApprovals] Found branch director by fuzzy match (no accents, contains):', directorName);
-                        return true;
+                    if (nameMatches) {
+                        matchingBranchDirectors.push({ emp, directorName });
                     }
-
-                    return false;
                 });
+
+                // Kiểm tra match theo chi_nhanh
+                let isBranchDir = false;
+                if (matchingBranchDirectors.length === 0) {
+                    isBranchDir = false;
+                } else if (matchingBranchDirectors.length === 1) {
+                    // Chỉ có 1 nhân viên match tên
+                    if (normalizedCurrentUserChiNhanh) {
+                        isBranchDir = chiNhanhMatches(matchingBranchDirectors[0].emp.chi_nhanh);
+                        if (isBranchDir) {
+                            console.log('[LeaveApprovals] Found branch director by exact match with chi_nhanh:', matchingBranchDirectors[0].directorName);
+                        }
+                    } else {
+                        isBranchDir = true; // Backward compatibility
+                        console.log('[LeaveApprovals] Found branch director by exact match (no chi_nhanh check):', matchingBranchDirectors[0].directorName);
+                    }
+                } else {
+                    // Có nhiều nhân viên cùng tên giám đốc
+                    if (normalizedCurrentUserChiNhanh) {
+                        // Tìm nhân viên có chi_nhanh match
+                        const matchingByBranch = matchingBranchDirectors.find(({ emp }) => chiNhanhMatches(emp.chi_nhanh));
+                        isBranchDir = !!matchingByBranch;
+                        if (isBranchDir) {
+                            console.log('[LeaveApprovals] Found branch director by chi_nhanh match:', matchingByBranch.directorName, matchingByBranch.emp.chi_nhanh);
+                        } else {
+                            console.warn(`[LeaveApprovals] ⚠️ User "${currentUserName}" matches ${matchingBranchDirectors.length} employees as branch director but none matches chi_nhanh "${normalizedCurrentUserChiNhanh}". Denying access.`);
+                        }
+                    } else {
+                        // Nếu user không có chi_nhanh nhưng có nhiều nhân viên cùng tên, không cho phép để tránh nhầm lẫn
+                        console.warn(`[LeaveApprovals] ⚠️ User "${currentUserName}" matches ${matchingBranchDirectors.length} employees as branch director but user has no chi_nhanh. Denying access to avoid confusion.`);
+                        isBranchDir = false;
+                    }
+                }
 
                 if (isBranchDir) {
                     console.log('[LeaveApprovals] Setting isBranchDirector to true');

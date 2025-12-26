@@ -54,6 +54,7 @@ const ProbationList = ({ currentUser, showToast }) => {
             const employeesResponse = await employeesAPI.getAll();
             const employees = employeesResponse.data?.data || [];
             const currentUserName = (currentUser.hoTen || currentUser.username || '').trim();
+            const currentUserChiNhanh = (currentUser.chiNhanh || currentUser.chi_nhanh || '').trim();
 
             const normalizeText = (text) => {
                 if (!text) return '';
@@ -68,22 +69,89 @@ const ProbationList = ({ currentUser, showToast }) => {
             };
 
             const normalizedCurrentName = normalizeText(currentUserName);
+            const normalizedCurrentUserChiNhanh = currentUserChiNhanh ? normalizeText(currentUserChiNhanh) : null;
+
+            // Helper function để check match chi_nhanh
+            const chiNhanhMatches = (empChiNhanh) => {
+                if (!normalizedCurrentUserChiNhanh) return true; // Backward compatibility
+                const normalized = normalizeText(empChiNhanh);
+                if (!normalized) return false;
+
+                // Exact match
+                if (normalized === normalizedCurrentUserChiNhanh) return true;
+
+                // Partial match
+                if (normalized.includes(normalizedCurrentUserChiNhanh) || normalizedCurrentUserChiNhanh.includes(normalized)) {
+                    const words1 = normalized.split(/\s+/).filter(w => w.length > 1);
+                    const words2 = normalizedCurrentUserChiNhanh.split(/\s+/).filter(w => w.length > 1);
+                    if (words1.length > 0 && words2.length > 0) {
+                        const hasCommonWord = words1.some(w1 => words2.some(w2 => w1 === w2));
+                        return hasCommonWord;
+                    }
+                }
+
+                return false;
+            };
 
             // Kiểm tra quản lý trực tiếp
-            const isDirectManager = employees.some((emp) => {
-                if (!emp.quan_ly_truc_tiep) return false;
+            const matchingDirectManagers = [];
+            employees.forEach((emp) => {
+                if (!emp.quan_ly_truc_tiep) return;
                 const managerName = (emp.quan_ly_truc_tiep || '').trim();
                 const normalizedManagerName = normalizeText(managerName);
-                return normalizedManagerName === normalizedCurrentName;
+                if (normalizedManagerName === normalizedCurrentName) {
+                    matchingDirectManagers.push({ emp, managerName });
+                }
             });
 
+            let isDirectManager = false;
+            if (matchingDirectManagers.length === 0) {
+                isDirectManager = false;
+            } else if (matchingDirectManagers.length === 1) {
+                if (normalizedCurrentUserChiNhanh) {
+                    isDirectManager = chiNhanhMatches(matchingDirectManagers[0].emp.chi_nhanh);
+                } else {
+                    isDirectManager = true; // Backward compatibility
+                }
+            } else {
+                // Có nhiều nhân viên cùng tên quan lý
+                if (normalizedCurrentUserChiNhanh) {
+                    const matchingByBranch = matchingDirectManagers.find(({ emp }) => chiNhanhMatches(emp.chi_nhanh));
+                    isDirectManager = !!matchingByBranch;
+                } else {
+                    isDirectManager = false; // Không cho phép để tránh nhầm lẫn
+                }
+            }
+
             // Kiểm tra giám đốc chi nhánh
-            const isBranchDirector = employees.some((emp) => {
-                if (!emp.quan_ly_gian_tiep) return false;
+            const matchingBranchDirectors = [];
+            employees.forEach((emp) => {
+                if (!emp.quan_ly_gian_tiep) return;
                 const directorName = (emp.quan_ly_gian_tiep || '').trim();
                 const normalizedDirectorName = normalizeText(directorName);
-                return normalizedDirectorName === normalizedCurrentName;
+                if (normalizedDirectorName === normalizedCurrentName) {
+                    matchingBranchDirectors.push({ emp, directorName });
+                }
             });
+
+            let isBranchDirector = false;
+            if (matchingBranchDirectors.length === 0) {
+                isBranchDirector = false;
+            } else if (matchingBranchDirectors.length === 1) {
+                if (normalizedCurrentUserChiNhanh) {
+                    isBranchDirector = chiNhanhMatches(matchingBranchDirectors[0].emp.chi_nhanh);
+                } else {
+                    isBranchDirector = true; // Backward compatibility
+                }
+            } else {
+                // Có nhiều nhân viên cùng tên giám đốc
+                if (normalizedCurrentUserChiNhanh) {
+                    const matchingByBranch = matchingBranchDirectors.find(({ emp }) => chiNhanhMatches(emp.chi_nhanh));
+                    isBranchDirector = !!matchingByBranch;
+                } else {
+                    isBranchDirector = false; // Không cho phép để tránh nhầm lẫn
+                }
+            }
 
             setIsManager(isDirectManager || isBranchDirector);
         } catch (error) {
@@ -109,7 +177,7 @@ const ProbationList = ({ currentUser, showToast }) => {
             // Get current user info
             const currentUserName = (currentUser.hoTen || currentUser.username || '').trim();
             console.log(`[ProbationList] Current user name: "${currentUserName}"`);
-            
+
             const normalizeText = (text) => {
                 if (!text) return '';
                 return text
@@ -127,7 +195,7 @@ const ProbationList = ({ currentUser, showToast }) => {
             const employeesResponse = await employeesAPI.getAll();
             const employees = employeesResponse.data?.data || [];
             console.log(`[ProbationList] Found ${employees.length} employees`);
-            
+
             // Find current user's employee ID
             const currentEmployee = employees.find(emp => {
                 const empName = normalizeText(emp.ho_ten || emp.hoTen || '');
@@ -182,7 +250,7 @@ const ProbationList = ({ currentUser, showToast }) => {
                 const isBranchDirector = branchDirectorId === currentEmployeeId;
 
                 const hasAccess = isDirectManager || isBranchDirector;
-                
+
                 if (!hasAccess) {
                     console.log(`[ProbationList] Candidate ${candidateId} filtered out - Manager: ${managerId}, Director: ${branchDirectorId}, Current: ${currentEmployeeId}`);
                 }
@@ -230,7 +298,7 @@ const ProbationList = ({ currentUser, showToast }) => {
             // Đếm ngược đến ngày bắt đầu
             const diffTime = startDateStart.getTime() - currentTime.getTime();
             const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            
+
             return {
                 daysUntilStart: diffDays,
                 daysSince: 0,
@@ -427,7 +495,7 @@ const ProbationList = ({ currentUser, showToast }) => {
                                     }
 
                                     return (
-                                        <tr 
+                                        <tr
                                             key={candidate.id}
                                             onClick={(e) => {
                                                 // Chỉ mở modal khi là HR và không click vào button
@@ -436,8 +504,8 @@ const ProbationList = ({ currentUser, showToast }) => {
                                                     setShowProbationStatusModal(true);
                                                 }
                                             }}
-                                            style={{ 
-                                                cursor: currentUser?.role === 'HR' ? 'pointer' : 'default' 
+                                            style={{
+                                                cursor: currentUser?.role === 'HR' ? 'pointer' : 'default'
                                             }}
                                         >
                                             <td>{index + 1}</td>
@@ -654,10 +722,10 @@ const ProbationList = ({ currentUser, showToast }) => {
                         <div className="probation-status-modal-body">
                             {(() => {
                                 const countdownData = calculateProbationCountdown(selectedProbationCandidate.probation_start_date);
-                                const startDate = selectedProbationCandidate.probation_start_date 
+                                const startDate = selectedProbationCandidate.probation_start_date
                                     ? new Date(selectedProbationCandidate.probation_start_date)
                                     : null;
-                                const formattedStartDate = startDate 
+                                const formattedStartDate = startDate
                                     ? startDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
                                     : '-';
 
@@ -677,7 +745,7 @@ const ProbationList = ({ currentUser, showToast }) => {
                                 }
 
                                 // Tính phần trăm tiến độ
-                                const progressPercent = countdownData.hasStarted 
+                                const progressPercent = countdownData.hasStarted
                                     ? Math.min(100, Math.max(0, (countdownData.daysSince / 45) * 100))
                                     : 0;
 

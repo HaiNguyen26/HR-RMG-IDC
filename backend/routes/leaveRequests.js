@@ -28,7 +28,7 @@ const getEmployeesCache = async () => {
     }
 
     const result = await pool.query(
-        `SELECT id, ho_ten, email, quan_ly_truc_tiep, chuc_danh, trang_thai
+        `SELECT id, ho_ten, email, quan_ly_truc_tiep, chuc_danh, trang_thai, chi_nhanh
          FROM employees 
          WHERE (trang_thai = 'ACTIVE' OR trang_thai = 'PENDING' OR trang_thai IS NULL)
          ORDER BY ho_ten`
@@ -65,57 +65,315 @@ const removeVietnameseAccents = (str) => {
 };
 
 // Tìm quản lý trực tiếp từ cache
-const findManagerFromCache = async (managerName) => {
+// employeeChiNhanh: chi nhánh của nhân viên (để phân biệt khi có nhiều người cùng tên)
+const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
     const cache = await getEmployeesCache();
     const normalizedName = (managerName || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
     const normalizedWithoutAccents = removeVietnameseAccents(normalizedName);
+
+    // Normalize chi_nhanh ngay từ đầu (bỏ dấu, lowercase, trim)
+    const normalizeChiNhanhValue = (chiNhanh) => {
+        if (!chiNhanh) return null;
+        return removeVietnameseAccents(chiNhanh.trim().toLowerCase());
+    };
+    const normalizedEmployeeChiNhanh = employeeChiNhanh ? normalizeChiNhanhValue(employeeChiNhanh) : null;
 
     if (!normalizedName) {
         console.log('[findManagerFromCache] Manager name is empty');
         return null;
     }
 
-    console.log(`[findManagerFromCache] Looking for manager: "${managerName}" (normalized: "${normalizedName}")`);
+    console.log(`[findManagerFromCache] Looking for manager: "${managerName}" (normalized: "${normalizedName}")${normalizedEmployeeChiNhanh ? `, chi_nhanh: "${normalizedEmployeeChiNhanh}"` : ''}`);
 
-    // Exact match (có dấu)
+    // Helper function để normalize chi_nhanh (bỏ dấu, lowercase, trim)
+    const normalizeChiNhanh = (chiNhanh) => {
+        if (!chiNhanh) return null;
+        return removeVietnameseAccents(chiNhanh.trim().toLowerCase());
+    };
+
+    // Helper function để check match chi_nhanh
+    // So sánh chính xác hoặc một phần (nếu một trong hai chứa phần còn lại)
+    const chiNhanhMatches = (empChiNhanh) => {
+        if (!normalizedEmployeeChiNhanh) return true; // Nếu không có chi_nhanh context, match tất cả
+        const normalized = normalizeChiNhanh(empChiNhanh);
+        if (!normalized) return false;
+
+        // Exact match
+        if (normalized === normalizedEmployeeChiNhanh) return true;
+
+        // Partial match: nếu một trong hai chứa phần còn lại (ví dụ: "ha noi" và "ha noi - van phong")
+        // Chỉ áp dụng nếu cả hai đều có giá trị
+        if (normalized.includes(normalizedEmployeeChiNhanh) || normalizedEmployeeChiNhanh.includes(normalized)) {
+            // Kiểm tra xem có phải là match thực sự không (không phải false positive)
+            // Ví dụ: "ha noi" không nên match với "ho chi minh" dù có chứa "h"
+            const words1 = normalized.split(/\s+/).filter(w => w.length > 1);
+            const words2 = normalizedEmployeeChiNhanh.split(/\s+/).filter(w => w.length > 1);
+            if (words1.length > 0 && words2.length > 0) {
+                // Nếu có ít nhất một từ khớp hoàn toàn
+                const hasCommonWord = words1.some(w1 => words2.some(w2 => w1 === w2));
+                return hasCommonWord;
+            }
+        }
+
+        return false;
+    };
+
+    // Exact match (có dấu) - ưu tiên match theo chi_nhanh nếu có nhiều kết quả
     if (cache.map.has(normalizedName)) {
-        const match = cache.map.get(normalizedName)[0];
-        console.log(`[findManagerFromCache] Exact match found: "${match.ho_ten}"`);
+        const matches = cache.map.get(normalizedName);
+
+        // Nếu có nhiều người cùng tên, BẮT BUỘC phải match chi_nhanh để tránh nhầm lẫn
+        if (matches.length > 1 && normalizedEmployeeChiNhanh) {
+            // Ưu tiên 1: Tìm manager có chi_nhanh match với employee
+            const branchMatch = matches.find(emp => chiNhanhMatches(emp.chi_nhanh));
+            if (branchMatch) {
+                console.log(`[findManagerFromCache] Exact match found (with chi_nhanh, multiple matches): "${branchMatch.ho_ten}" (${branchMatch.chi_nhanh || 'N/A'})`);
+                return branchMatch;
+            }
+
+            // Ưu tiên 2: Tìm manager có NHIỀU cấp dưới nhất trong cùng chi_nhanh với employee
+            // QUAN TRỌNG: Chỉ đếm cấp dưới nếu manager có chi_nhanh match với chi_nhanh của employee đang tạo đơn
+            // Điều này đảm bảo manager được chọn là manager ĐÚNG (cùng chi_nhanh)
+            let bestMatch = null;
+            let maxSubordinates = 0;
+
+            for (const match of matches) {
+                // QUAN TRỌNG: Chỉ xem xét manager có chi_nhanh match với employee đang tạo đơn
+                // Nếu manager không có chi_nhanh match, bỏ qua (vì đó không phải manager đúng)
+                if (!chiNhanhMatches(match.chi_nhanh)) {
+                    continue; // Bỏ qua manager này
+                }
+
+                // Tìm tất cả employees có quan_ly_truc_tiep trùng tên với manager này và có chi_nhanh match với employee đang tạo đơn
+                const managerEmployees = cache.all.filter(e => {
+                    if (!e.quan_ly_truc_tiep) return false;
+                    const empManagerName = (e.quan_ly_truc_tiep || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                    const matchNormalizedName = (match.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                    const nameMatches = empManagerName === matchNormalizedName ||
+                        removeVietnameseAccents(empManagerName) === removeVietnameseAccents(matchNormalizedName);
+                    // QUAN TRỌNG: chiNhanhMatches(e.chi_nhanh) kiểm tra xem chi_nhanh của cấp dưới (e.chi_nhanh) có match với chi_nhanh của employee đang tạo đơn không
+                    return nameMatches && chiNhanhMatches(e.chi_nhanh);
+                });
+
+                // Log chi tiết để debug
+                if (managerEmployees.length > 0) {
+                    const subordinatesChiNhanh = managerEmployees.map(e => e.chi_nhanh || 'N/A');
+                    console.log(`[findManagerFromCache] Manager "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) has ${managerEmployees.length} subordinates. Their chi_nhanh: ${[...new Set(subordinatesChiNhanh)].join(', ')}. Looking for chi_nhanh: "${normalizedEmployeeChiNhanh}"`);
+                }
+
+                // Chọn manager có nhiều cấp dưới nhất trong cùng chi_nhanh với employee đang tạo đơn
+                if (managerEmployees.length > maxSubordinates) {
+                    maxSubordinates = managerEmployees.length;
+                    bestMatch = match;
+                }
+            }
+
+            if (bestMatch && maxSubordinates > 0) {
+                console.log(`[findManagerFromCache] Exact match found (multiple matches, selected manager "${bestMatch.ho_ten}" (${bestMatch.chi_nhanh || 'N/A'}) with ${maxSubordinates} subordinates in chi_nhanh "${normalizedEmployeeChiNhanh}")`);
+                return bestMatch;
+            }
+
+            // QUAN TRỌNG: Nếu không có manager nào match chi_nhanh, KHÔNG trả về manager nào để tránh nhầm lẫn
+            // Thay vì trả về matches[0] (có thể là ID 882), trả về null để người dùng biết cần kiểm tra lại
+            console.error(`[findManagerFromCache] ❌ ERROR: Found ${matches.length} employees with name "${managerName}" but NONE matches chi_nhanh "${normalizedEmployeeChiNhanh}". Returning NULL to avoid incorrect assignment. Available managers: ${matches.map(m => `${m.ho_ten} (ID: ${m.id}, chi_nhanh: ${m.chi_nhanh || 'N/A'})`).join(', ')}`);
+            return null;
+        }
+
+        // Nếu chỉ có 1 kết quả, vẫn nên kiểm tra chi_nhanh nếu có context
+        // (vì có thể cache chưa đầy đủ hoặc có nhiều người cùng tên nhưng chưa được load)
+        if (matches.length === 1) {
+            const match = matches[0];
+            // Nếu có chi_nhanh context, kiểm tra xem manager có cấp dưới trong cùng chi_nhanh không
+            if (normalizedEmployeeChiNhanh) {
+                // QUAN TRỌNG: Chỉ xem xét manager có chi_nhanh match với employee đang tạo đơn
+                // Nếu manager không có chi_nhanh match, không phải manager đúng
+                const managerChiNhanhMatches = chiNhanhMatches(match.chi_nhanh);
+
+                if (managerChiNhanhMatches) {
+                    // Kiểm tra xem manager này có cấp dưới trong cùng chi_nhanh với employee đang tạo đơn không
+                    const managerEmployees = cache.all.filter(e => {
+                        if (!e.quan_ly_truc_tiep) return false;
+                        const empManagerName = (e.quan_ly_truc_tiep || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                        const matchNormalizedName = (match.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                        const nameMatches = empManagerName === matchNormalizedName ||
+                            removeVietnameseAccents(empManagerName) === removeVietnameseAccents(matchNormalizedName);
+                        // QUAN TRỌNG: Kiểm tra chi_nhanh của employee (e.chi_nhanh) match với chi_nhanh của employee đang tạo đơn (normalizedEmployeeChiNhanh)
+                        return nameMatches && chiNhanhMatches(e.chi_nhanh);
+                    });
+
+                    if (managerEmployees.length > 0) {
+                        // Log chi tiết để debug
+                        const subordinatesChiNhanh = managerEmployees.map(e => e.chi_nhanh || 'N/A');
+                        console.log(`[findManagerFromCache] Manager "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) has ${managerEmployees.length} subordinates. Their chi_nhanh: ${[...new Set(subordinatesChiNhanh)].join(', ')}. Looking for chi_nhanh: "${normalizedEmployeeChiNhanh}"`);
+                        console.log(`[findManagerFromCache] Exact match found (single match with ${managerEmployees.length} subordinates in chi_nhanh "${normalizedEmployeeChiNhanh}"): "${match.ho_ten}" (${match.chi_nhanh || 'N/A'})`);
+                        return match;
+                    }
+                } else {
+                    // Manager này không có chi_nhanh match, không phải manager đúng
+                    console.log(`[findManagerFromCache] Manager "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) does not match employee chi_nhanh "${normalizedEmployeeChiNhanh}". Searching for other managers...`);
+
+                    // Nếu manager này không có chi_nhanh match, tìm xem có manager nào khác có chi_nhanh match và có cấp dưới trong cùng chi_nhanh không
+                    const allMatchesByName = cache.all.filter(e => {
+                        const empNormalizedName = (e.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                        return empNormalizedName === normalizedName;
+                    });
+
+                    if (allMatchesByName.length > 1) {
+                        // Có nhiều người cùng tên, tìm người có nhiều cấp dưới nhất trong cùng chi_nhanh
+                        let bestOtherMatch = null;
+                        let maxOtherSubordinates = 0;
+
+                        for (const otherMatch of allMatchesByName) {
+                            if (otherMatch.id === match.id) continue; // Bỏ qua match hiện tại
+
+                            // QUAN TRỌNG: Chỉ xem xét manager có chi_nhanh match với employee đang tạo đơn
+                            if (!chiNhanhMatches(otherMatch.chi_nhanh)) {
+                                continue; // Bỏ qua manager này
+                            }
+
+                            const otherManagerEmployees = cache.all.filter(e => {
+                                if (!e.quan_ly_truc_tiep) return false;
+                                const empManagerName = (e.quan_ly_truc_tiep || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                                const otherMatchNormalizedName = (otherMatch.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                                const nameMatches = empManagerName === otherMatchNormalizedName ||
+                                    removeVietnameseAccents(empManagerName) === removeVietnameseAccents(otherMatchNormalizedName);
+                                // QUAN TRỌNG: Kiểm tra chi_nhanh của employee (e.chi_nhanh) match với chi_nhanh của employee đang tạo đơn (normalizedEmployeeChiNhanh)
+                                return nameMatches && chiNhanhMatches(e.chi_nhanh);
+                            });
+
+                            if (otherManagerEmployees.length > maxOtherSubordinates) {
+                                maxOtherSubordinates = otherManagerEmployees.length;
+                                bestOtherMatch = otherMatch;
+                            }
+                        }
+
+                        if (bestOtherMatch && maxOtherSubordinates > 0) {
+                            console.log(`[findManagerFromCache] Exact match found (found better match with ${maxOtherSubordinates} subordinates in chi_nhanh "${normalizedEmployeeChiNhanh}"): "${bestOtherMatch.ho_ten}" (${bestOtherMatch.chi_nhanh || 'N/A'}) instead of "${match.ho_ten}" (${match.chi_nhanh || 'N/A'})`);
+                            return bestOtherMatch;
+                        }
+                    }
+
+                    // QUAN TRỌNG: Nếu manager không có chi_nhanh match, KHÔNG được trả về để tránh nhầm lẫn
+                    // Tìm lại trong toàn bộ cache xem có manager nào khác cùng tên và match chi_nhanh không
+                    const allManagersWithSameName = cache.all.filter(e => {
+                        const empNormalizedName = (e.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                        return empNormalizedName === normalizedName ||
+                            removeVietnameseAccents(empNormalizedName) === removeVietnameseAccents(normalizedName);
+                    });
+
+                    // Tìm manager có chi_nhanh match trong danh sách tất cả managers cùng tên
+                    for (const otherManager of allManagersWithSameName) {
+                        if (chiNhanhMatches(otherManager.chi_nhanh)) {
+                            console.log(`[findManagerFromCache] Found correct manager "${otherManager.ho_ten}" (ID: ${otherManager.id}, ${otherManager.chi_nhanh || 'N/A'}) after searching all managers with same name`);
+                            return otherManager;
+                        }
+                    }
+
+                    // Nếu vẫn không tìm thấy manager có chi_nhanh match, trả về NULL để tránh nhầm lẫn
+                    console.error(`[findManagerFromCache] ❌ ERROR: Single match found in cache map but manager "${match.ho_ten}" (ID: ${match.id}, ${match.chi_nhanh || 'N/A'}) does NOT match employee chi_nhanh "${normalizedEmployeeChiNhanh}". Searched ${allManagersWithSameName.length} managers with same name. Returning NULL to avoid incorrect assignment.`);
+                    return null;
+                }
+            }
+
+            console.log(`[findManagerFromCache] Exact match found (single match, no chi_nhanh check): "${match.ho_ten}"${match.chi_nhanh ? ` (${match.chi_nhanh})` : ''}`);
+            return match;
+        }
+
+        // Nếu có nhiều kết quả nhưng không có chi_nhanh context, cảnh báo và KHÔNG trả về để tránh nhầm lẫn
+        if (matches.length > 1 && !normalizedEmployeeChiNhanh) {
+            console.error(`[findManagerFromCache] ❌ ERROR: Found ${matches.length} employees with name "${managerName}" but no chi_nhanh context provided. Cannot safely determine correct manager. Available: ${matches.map(m => `${m.ho_ten} (ID: ${m.id}, ${m.chi_nhanh || 'N/A'})`).join(', ')}. Returning NULL.`);
+            return null;
+        }
+
+        // Fallback: chỉ trả về người đầu tiên nếu chỉ có 1 kết quả
+        const match = matches[0];
+        console.log(`[findManagerFromCache] Exact match found (single match, fallback): "${match.ho_ten}" (ID: ${match.id}${match.chi_nhanh ? `, ${match.chi_nhanh}` : ''})`);
         return match;
     }
 
-    // Exact match (không dấu)
+    // Exact match (không dấu) - ưu tiên match theo chi_nhanh nếu có nhiều kết quả
+    const matchesNoAccents = [];
     for (const [normalizedEmpName, employees] of cache.map.entries()) {
         const empNameWithoutAccents = removeVietnameseAccents(normalizedEmpName);
         if (empNameWithoutAccents === normalizedWithoutAccents) {
-            const match = employees[0];
-            console.log(`[findManagerFromCache] Exact match (no accents) found: "${match.ho_ten}"`);
-            return match;
+            matchesNoAccents.push(...employees);
         }
+    }
+
+    if (matchesNoAccents.length > 0) {
+        // Nếu có nhiều người cùng tên, BẮT BUỘC phải match chi_nhanh để tránh nhầm lẫn
+        if (matchesNoAccents.length > 1 && normalizedEmployeeChiNhanh) {
+            const branchMatch = matchesNoAccents.find(emp => chiNhanhMatches(emp.chi_nhanh));
+            if (branchMatch) {
+                console.log(`[findManagerFromCache] Exact match (no accents, with chi_nhanh, multiple matches) found: "${branchMatch.ho_ten}" (${branchMatch.chi_nhanh || 'N/A'})`);
+                return branchMatch;
+            }
+            // Nếu có nhiều người cùng tên nhưng không match chi_nhanh, không trả về để tránh nhầm lẫn
+            console.warn(`[findManagerFromCache] ⚠️ Found ${matchesNoAccents.length} employees with name "${managerName}" (no accents) but none matches chi_nhanh "${normalizedEmployeeChiNhanh}". Available: ${matchesNoAccents.map(m => `${m.ho_ten} (${m.chi_nhanh || 'N/A'})`).join(', ')}`);
+            return null;
+        }
+
+        // Nếu chỉ có 1 kết quả hoặc không có chi_nhanh context, trả về người đầu tiên
+        const match = matchesNoAccents[0];
+        console.log(`[findManagerFromCache] Exact match (no accents) found: "${match.ho_ten}"${match.chi_nhanh ? ` (${match.chi_nhanh})` : ''}`);
+        return match;
     }
 
     // Fuzzy match (có dấu)
+    const fuzzyMatches = [];
     for (const [normalizedEmpName, employees] of cache.map.entries()) {
         if (normalizedEmpName === normalizedName) {
-            const match = employees[0];
-            console.log(`[findManagerFromCache] Fuzzy match found: "${match.ho_ten}"`);
-            return match;
-        }
-        if (normalizedEmpName.includes(normalizedName) || normalizedName.includes(normalizedEmpName)) {
-            const match = employees[0];
-            console.log(`[findManagerFromCache] Fuzzy match (contains) found: "${match.ho_ten}"`);
-            return match;
+            fuzzyMatches.push(...employees);
+        } else if (normalizedEmpName.includes(normalizedName) || normalizedName.includes(normalizedEmpName)) {
+            fuzzyMatches.push(...employees);
         }
     }
 
+    if (fuzzyMatches.length > 0) {
+        // Nếu có nhiều người cùng tên, BẮT BUỘC phải match chi_nhanh để tránh nhầm lẫn
+        if (fuzzyMatches.length > 1 && normalizedEmployeeChiNhanh) {
+            const branchMatch = fuzzyMatches.find(emp => chiNhanhMatches(emp.chi_nhanh));
+            if (branchMatch) {
+                console.log(`[findManagerFromCache] Fuzzy match (with chi_nhanh, multiple matches) found: "${branchMatch.ho_ten}" (${branchMatch.chi_nhanh || 'N/A'})`);
+                return branchMatch;
+            }
+            // Nếu có nhiều người cùng tên nhưng không match chi_nhanh, không trả về để tránh nhầm lẫn
+            console.warn(`[findManagerFromCache] ⚠️ Found ${fuzzyMatches.length} fuzzy matches with name "${managerName}" but none matches chi_nhanh "${normalizedEmployeeChiNhanh}". Available: ${fuzzyMatches.map(m => `${m.ho_ten} (${m.chi_nhanh || 'N/A'})`).join(', ')}`);
+            return null;
+        }
+
+        // Nếu chỉ có 1 kết quả hoặc không có chi_nhanh context, trả về người đầu tiên
+        const match = fuzzyMatches[0];
+        console.log(`[findManagerFromCache] Fuzzy match found: "${match.ho_ten}"${match.chi_nhanh ? ` (${match.chi_nhanh})` : ''}`);
+        return match;
+    }
+
     // Fuzzy match (không dấu)
+    const fuzzyMatchesNoAccents = [];
     for (const [normalizedEmpName, employees] of cache.map.entries()) {
         const empNameWithoutAccents = removeVietnameseAccents(normalizedEmpName);
         if (empNameWithoutAccents.includes(normalizedWithoutAccents) || normalizedWithoutAccents.includes(empNameWithoutAccents)) {
-            const match = employees[0];
-            console.log(`[findManagerFromCache] Fuzzy match (no accents) found: "${match.ho_ten}"`);
-            return match;
+            fuzzyMatchesNoAccents.push(...employees);
         }
+    }
+
+    if (fuzzyMatchesNoAccents.length > 0) {
+        // Nếu có nhiều người cùng tên, BẮT BUỘC phải match chi_nhanh để tránh nhầm lẫn
+        if (fuzzyMatchesNoAccents.length > 1 && normalizedEmployeeChiNhanh) {
+            const branchMatch = fuzzyMatchesNoAccents.find(emp => chiNhanhMatches(emp.chi_nhanh));
+            if (branchMatch) {
+                console.log(`[findManagerFromCache] Fuzzy match (no accents, with chi_nhanh, multiple matches) found: "${branchMatch.ho_ten}" (${branchMatch.chi_nhanh || 'N/A'})`);
+                return branchMatch;
+            }
+            // Nếu có nhiều người cùng tên nhưng không match chi_nhanh, không trả về để tránh nhầm lẫn
+            console.warn(`[findManagerFromCache] ⚠️ Found ${fuzzyMatchesNoAccents.length} fuzzy matches (no accents) with name "${managerName}" but none matches chi_nhanh "${normalizedEmployeeChiNhanh}". Available: ${fuzzyMatchesNoAccents.map(m => `${m.ho_ten} (${m.chi_nhanh || 'N/A'})`).join(', ')}`);
+            return null;
+        }
+
+        // Nếu chỉ có 1 kết quả hoặc không có chi_nhanh context, trả về người đầu tiên
+        const match = fuzzyMatchesNoAccents[0];
+        console.log(`[findManagerFromCache] Fuzzy match (no accents) found: "${match.ho_ten}"${match.chi_nhanh ? ` (${match.chi_nhanh})` : ''}`);
+        return match;
     }
 
     // Word-by-word matching
@@ -123,6 +381,7 @@ const findManagerFromCache = async (managerName) => {
     if (words.length > 0) {
         let bestMatch = null;
         let bestScore = 0;
+        const wordMatches = [];
 
         for (const [normalizedEmpName, employees] of cache.map.entries()) {
             const empWords = normalizedEmpName.split(/\s+/).filter(w => w.length > 1);
@@ -138,14 +397,28 @@ const findManagerFromCache = async (managerName) => {
             }
 
             if (matchCount === words.length && matchCount > bestScore) {
-                bestMatch = employees[0];
+                wordMatches.push(...employees);
                 bestScore = matchCount;
             }
         }
 
-        if (bestMatch) {
-            console.log(`[findManagerFromCache] Word-by-word match found: "${bestMatch.ho_ten}"`);
-            return bestMatch;
+        if (wordMatches.length > 0) {
+            // Nếu có nhiều người cùng tên, BẮT BUỘC phải match chi_nhanh để tránh nhầm lẫn
+            if (wordMatches.length > 1 && normalizedEmployeeChiNhanh) {
+                const branchMatch = wordMatches.find(emp => chiNhanhMatches(emp.chi_nhanh));
+                if (branchMatch) {
+                    console.log(`[findManagerFromCache] Word-by-word match (with chi_nhanh, multiple matches) found: "${branchMatch.ho_ten}" (${branchMatch.chi_nhanh || 'N/A'})`);
+                    return branchMatch;
+                }
+                // Nếu có nhiều người cùng tên nhưng không match chi_nhanh, không trả về để tránh nhầm lẫn
+                console.warn(`[findManagerFromCache] ⚠️ Found ${wordMatches.length} word-by-word matches with name "${managerName}" but none matches chi_nhanh "${normalizedEmployeeChiNhanh}". Available: ${wordMatches.map(m => `${m.ho_ten} (${m.chi_nhanh || 'N/A'})`).join(', ')}`);
+                return null;
+            }
+
+            // Nếu chỉ có 1 kết quả hoặc không có chi_nhanh context, trả về người đầu tiên
+            const match = wordMatches[0];
+            console.log(`[findManagerFromCache] Word-by-word match found: "${match.ho_ten}"${match.chi_nhanh ? ` (${match.chi_nhanh})` : ''}`);
+            return match;
         }
     }
 
@@ -222,6 +495,10 @@ router.get('/', async (req, res) => {
         const result = await pool.query(query, params);
         const requests = result.rows;
 
+        if (teamLeadId) {
+            console.log(`[LeaveRequest] Query với teamLeadId=${teamLeadId} trả về ${requests.length} đơn. Các team_lead_id trong kết quả: ${requests.map(r => r.team_lead_id).join(', ')}`);
+        }
+
         res.json({
             success: true,
             message: 'Danh sách đơn xin nghỉ phép',
@@ -261,7 +538,7 @@ router.post('/', async (req, res) => {
 
         // Tìm nhân viên
         const employeeResult = await pool.query(
-            `SELECT id, ho_ten, quan_ly_truc_tiep FROM employees WHERE id = $1`,
+            `SELECT id, ho_ten, quan_ly_truc_tiep, chi_nhanh FROM employees WHERE id = $1`,
             [parseInt(employeeId, 10)]
         );
 
@@ -281,18 +558,18 @@ router.post('/', async (req, res) => {
             });
         }
 
-        // Tìm quản lý trực tiếp
-        const teamLead = await findManagerFromCache(employee.quan_ly_truc_tiep);
+        // Tìm quản lý trực tiếp (truyền chi_nhanh để phân biệt khi có nhiều người cùng tên)
+        const teamLead = await findManagerFromCache(employee.quan_ly_truc_tiep, employee.chi_nhanh);
 
         if (!teamLead) {
-            console.error(`[LeaveRequest] Không tìm thấy quản lý trực tiếp. Nhân viên: ${employee.ho_ten}, quan_ly_truc_tiep: "${employee.quan_ly_truc_tiep}"`);
+            console.error(`[LeaveRequest] Không tìm thấy quản lý trực tiếp. Nhân viên: ${employee.ho_ten} (chi_nhanh: ${employee.chi_nhanh || 'N/A'}), quan_ly_truc_tiep: "${employee.quan_ly_truc_tiep}"`);
             return res.status(404).json({
                 success: false,
-                message: `Không tìm thấy quản lý trực tiếp "${employee.quan_ly_truc_tiep}" trong hệ thống. Vui lòng kiểm tra lại tên quản lý trực tiếp của nhân viên "${employee.ho_ten || 'N/A'}" trong module Quản lý nhân viên.`
+                message: `Không tìm thấy quản lý trực tiếp "${employee.quan_ly_truc_tiep}"${employee.chi_nhanh ? ` (chi_nhanh: ${employee.chi_nhanh})` : ''} trong hệ thống. Có thể có nhiều người cùng tên nhưng không khớp chi nhánh. Vui lòng kiểm tra lại thông tin quản lý trực tiếp và chi nhánh của nhân viên "${employee.ho_ten || 'N/A'}" trong module Quản lý nhân viên.`
             });
         }
 
-        console.log(`[LeaveRequest] Tạo đơn cho nhân viên "${employee.ho_ten}", quản lý trực tiếp: "${teamLead.ho_ten}"`);
+        console.log(`[LeaveRequest] Tạo đơn cho nhân viên "${employee.ho_ten}" (ID: ${employee.id}, chi_nhanh: ${employee.chi_nhanh || 'N/A'}), quản lý trực tiếp: "${teamLead.ho_ten}" (ID: ${teamLead.id}, chi_nhanh: ${teamLead.chi_nhanh || 'N/A'})`);
 
         // Kiểm tra và thêm cột leave_type nếu chưa có
         try {
