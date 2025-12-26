@@ -37,6 +37,13 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
 
                 const formattedRequests = (response.data.data || [])
                     .filter(req => {
+                        // QUAN TRỌNG: Chỉ hiển thị requests của chính user hiện tại
+                        const employeeId = req.employee_id || req.employeeId;
+                        const currentUserId = currentUser?.id || currentUser?.employeeId;
+                        if (employeeId !== currentUserId) {
+                            return false; // Bỏ qua requests của người khác
+                        }
+
                         // Only show requests that have advance (TRANSFERRED) and are ready for settlement
                         const hasAdvance = req.advance?.status === 'TRANSFERRED' || req.advance_status === 'TRANSFERRED';
                         const settlementStatus = req.settlement?.status || req.settlement_status;
