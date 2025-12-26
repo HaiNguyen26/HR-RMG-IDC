@@ -147,6 +147,44 @@ const TravelExpenseAccountant = ({ currentUser, showToast }) => {
         }
     }, [requests, selectedRequestId]);
 
+    // Fetch attachments when request is selected (backup - in case onClick doesn't work)
+    useEffect(() => {
+        const fetchAttachments = async () => {
+            if (!selectedRequestId) {
+                return;
+            }
+
+            try {
+                const response = await travelExpensesAPI.getAttachments(selectedRequestId);
+                if (response.data && response.data.success) {
+                    const attachments = response.data.data || [];
+                    console.log('[TravelExpenseAccountant] Fetched attachments in useEffect for request', selectedRequestId, attachments);
+                    
+                    // Update attachments in the selected request from list
+                    setRequests(prevRequests => 
+                        prevRequests.map(req => 
+                            req.id === selectedRequestId 
+                                ? { ...req, attachments } 
+                                : req
+                        )
+                    );
+                    
+                    // Also update selectedRequestDetails if it exists
+                    if (selectedRequestDetails && selectedRequestDetails.id === selectedRequestId) {
+                        setSelectedRequestDetails(prev => ({
+                            ...prev,
+                            attachments: attachments
+                        }));
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching attachments:', error);
+            }
+        };
+
+        fetchAttachments();
+    }, [selectedRequestId]);
+
     const selectedRequestFromList = requests.find(req => req.id === selectedRequestId) || null;
 
     // Normalize selectedRequest to handle both list format and detail format from API
@@ -159,14 +197,21 @@ const TravelExpenseAccountant = ({ currentUser, showToast }) => {
             const startDate = request.startTime ? new Date(request.startTime) : (request.start_time ? new Date(request.start_time) : null);
             const endDate = request.endTime ? new Date(request.endTime) : (request.end_time ? new Date(request.end_time) : null);
             const createdAt = request.createdAt ? new Date(request.createdAt) : (request.created_at ? new Date(request.created_at) : null);
+            const locationType = request.locationType || request.location_type;
+            const location = request.location || '';
 
             return {
                 ...request,
                 id: request.id,
                 code: request.code || `CTX-${request.id}`,
                 employeeName: request.employee_name || request.employeeName || 'N/A',
-                location: request.location || '',
-                locationType: request.locationType || request.location_type,
+                location: location,
+                locationType: locationType,
+                locationFull: locationType === 'INTERNATIONAL'
+                    ? `${location} (Nước ngoài)`
+                    : `${location} (Trong nước)`,
+                companyName: request.companyName || request.company_name || null,
+                companyAddress: request.companyAddress || request.company_address || null,
                 purpose: request.purpose || '',
                 startDate: startDate && !isNaN(startDate.getTime()) ? startDate.toLocaleDateString('vi-VN') : '',
                 endDate: endDate && !isNaN(endDate.getTime()) ? endDate.toLocaleDateString('vi-VN') : '',
@@ -176,16 +221,32 @@ const TravelExpenseAccountant = ({ currentUser, showToast }) => {
                 actualExpense: request.settlement?.actualExpense || request.actual_expense || null,
                 settlementNotes: request.settlement?.notes || request.settlement_notes || null,
                 attachments: request.attachments || [],
+                livingAllowance: request.livingAllowance || (request.living_allowance_amount && request.living_allowance_currency ? {
+                    amount: request.living_allowance_amount,
+                    currency: request.living_allowance_currency
+                } : null),
                 reimbursementAmount: request.accountant?.reimbursementAmount || request.reimbursement_amount || null,
                 status: request.status || ''
             };
         }
 
-        // If it's from selectedRequestFromList, it's already in the correct format
-        return request;
+        // If it's from selectedRequestFromList, ensure attachments are included
+        // Attachments should already be in the request from the list, but double-check
+        return {
+            ...request,
+            attachments: request.attachments || []
+        };
     };
 
     const selectedRequest = normalizeSelectedRequest();
+    
+    // Debug: Log selectedRequest attachments
+    useEffect(() => {
+        if (selectedRequest) {
+            console.log('[TravelExpenseAccountant] Selected request attachments:', selectedRequest.attachments);
+            console.log('[TravelExpenseAccountant] Selected request:', selectedRequest);
+        }
+    }, [selectedRequest]);
 
     // Calculate comparison - Đối chiếu chi phí thực tế với số tiền tạm ứng
     const calculateComparison = () => {
@@ -315,21 +376,33 @@ const TravelExpenseAccountant = ({ currentUser, showToast }) => {
                     const formattedRequests = requestsWithAttachments.map(req => {
                         const startDate = req.start_time ? new Date(req.start_time) : null;
                         const endDate = req.end_time ? new Date(req.end_time) : null;
+                        const locationType = req.locationType || req.location_type;
+                        const location = req.location || '';
 
                         return {
                             id: req.id,
                             code: `CTX-${req.id}`,
                             employeeName: req.employee_name || 'N/A',
-                            location: req.location || '',
-                            locationType: req.locationType || req.location_type,
+                            location: location,
+                            locationType: locationType,
+                            locationFull: locationType === 'INTERNATIONAL'
+                                ? `${location} (Nước ngoài)`
+                                : `${location} (Trong nước)`,
+                            companyName: req.companyName || req.company_name || null,
+                            companyAddress: req.companyAddress || req.company_address || null,
                             purpose: req.purpose || '',
                             startDate: startDate ? startDate.toLocaleDateString('vi-VN') : '',
                             endDate: endDate ? endDate.toLocaleDateString('vi-VN') : '',
+                            requestDate: req.created_at ? new Date(req.created_at).toLocaleDateString('vi-VN') : '',
                             advanceAmount: req.advance?.amount || req.actual_advance_amount || 0,
                             requestedAdvanceAmount: req.requestedAdvanceAmount || req.requested_advance_amount || 0,
                             actualExpense: req.settlement?.actualExpense || req.actual_expense || null,
                             settlementNotes: req.settlement?.notes || req.settlement_notes || null,
                             attachments: req.attachments || [],
+                            livingAllowance: req.livingAllowance || (req.living_allowance_amount && req.living_allowance_currency ? {
+                                amount: req.living_allowance_amount,
+                                currency: req.living_allowance_currency
+                            } : null),
                             reimbursementAmount: req.accountant?.reimbursementAmount || req.reimbursement_amount || null,
                             status: req.status || '',
                             payment: req.payment || null,
@@ -468,17 +541,29 @@ const TravelExpenseAccountant = ({ currentUser, showToast }) => {
                                                 setFormData({ notes: '' });
                                                 setPaymentFormData({ paymentMethod: 'BANK_TRANSFER', paymentReference: '' }); // Reset payment form
 
-                                                // Fetch full request details for advance tab
-                                                if (activeTab === 'advance') {
-                                                    try {
-                                                        const detailResponse = await travelExpensesAPI.getById(request.id);
-                                                        if (detailResponse.data && detailResponse.data.success) {
-                                                            setSelectedRequestDetails(detailResponse.data.data);
+                                                // Fetch full request details and attachments
+                                                try {
+                                                    const detailResponse = await travelExpensesAPI.getById(request.id);
+                                                    if (detailResponse.data && detailResponse.data.success) {
+                                                        const requestData = detailResponse.data.data;
+                                                        
+                                                        // Fetch attachments
+                                                        try {
+                                                            const attachmentsResponse = await travelExpensesAPI.getAttachments(request.id);
+                                                            if (attachmentsResponse.data && attachmentsResponse.data.success) {
+                                                                requestData.attachments = attachmentsResponse.data.data || [];
+                                                                console.log('[TravelExpenseAccountant] Fetched attachments on click:', requestData.attachments);
+                                                            }
+                                                        } catch (error) {
+                                                            console.error('Error fetching attachments:', error);
+                                                            requestData.attachments = [];
                                                         }
-                                                    } catch (error) {
-                                                        console.error('Error fetching request details:', error);
-                                                        setSelectedRequestDetails(null);
+                                                        
+                                                        setSelectedRequestDetails(requestData);
                                                     }
+                                                } catch (error) {
+                                                    console.error('Error fetching request details:', error);
+                                                    setSelectedRequestDetails(null);
                                                 }
                                             }}
                                         >
@@ -720,6 +805,22 @@ const TravelExpenseAccountant = ({ currentUser, showToast }) => {
                                                         <span className="travel-expense-accountant-info-value">{selectedRequest.employeeName}</span>
                                                     </div>
                                                     <div className="travel-expense-accountant-info-item">
+                                                        <span className="travel-expense-accountant-info-label">Địa điểm:</span>
+                                                        <span className="travel-expense-accountant-info-value">{selectedRequest.locationFull || selectedRequest.location}</span>
+                                                    </div>
+                                                    {selectedRequest.companyName && (
+                                                        <div className="travel-expense-accountant-info-item">
+                                                            <span className="travel-expense-accountant-info-label">Công ty/Đối tác:</span>
+                                                            <span className="travel-expense-accountant-info-value">{selectedRequest.companyName}</span>
+                                                        </div>
+                                                    )}
+                                                    {selectedRequest.companyAddress && (
+                                                        <div className="travel-expense-accountant-info-item">
+                                                            <span className="travel-expense-accountant-info-label">Địa chỉ công ty:</span>
+                                                            <span className="travel-expense-accountant-info-value">{selectedRequest.companyAddress}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="travel-expense-accountant-info-item">
                                                         <span className="travel-expense-accountant-info-label">Thời Gian Công Tác:</span>
                                                         <span className="travel-expense-accountant-info-value">{selectedRequest.startDate} - {selectedRequest.endDate}</span>
                                                     </div>
@@ -727,10 +828,20 @@ const TravelExpenseAccountant = ({ currentUser, showToast }) => {
                                                         <span className="travel-expense-accountant-info-label">Ngày Đề Nghị:</span>
                                                         <span className="travel-expense-accountant-info-value">{selectedRequest.requestDate || '-'}</span>
                                                     </div>
-                                                    <div className="travel-expense-accountant-info-item">
+                                                    <div className="travel-expense-accountant-info-item" style={{ gridColumn: '1 / -1' }}>
                                                         <span className="travel-expense-accountant-info-label">Mục Đích Chi Phí:</span>
                                                         <span className="travel-expense-accountant-info-value">{selectedRequest.purpose}</span>
                                                     </div>
+                                                    {selectedRequest.livingAllowance && (
+                                                        <div className="travel-expense-accountant-info-item">
+                                                            <span className="travel-expense-accountant-info-label">Phụ cấp/Phí sinh hoạt:</span>
+                                                            <span className="travel-expense-accountant-info-value">
+                                                                {selectedRequest.livingAllowance.currency === 'VND'
+                                                                    ? selectedRequest.livingAllowance.amount.toLocaleString('vi-VN')
+                                                                    : selectedRequest.livingAllowance.amount} {selectedRequest.livingAllowance.currency}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -810,6 +921,114 @@ const TravelExpenseAccountant = ({ currentUser, showToast }) => {
                                                 III. GHI CHÚ VÀ XỬ LÝ
                                             </h3>
                                             <div className="travel-expense-accountant-section-content">
+                                                {/* Attachments Section */}
+                                                {(() => {
+                                                    const attachments = selectedRequest?.attachments || [];
+                                                    const employeeAttachments = attachments.filter(att => {
+                                                        const role = att.uploadedByRole || att.uploaded_by_role || '';
+                                                        return role !== 'HR' && role !== 'hr';
+                                                    });
+                                                    const hrAttachments = attachments.filter(att => {
+                                                        const role = att.uploadedByRole || att.uploaded_by_role || '';
+                                                        return role === 'HR' || role === 'hr';
+                                                    });
+                                                    
+                                                    if (attachments.length === 0) {
+                                                        return (
+                                                            <div className="travel-expense-accountant-attachments-card">
+                                                                <div className="travel-expense-accountant-attachments-title">
+                                                                    📎 Tổng Hợp File Đính Kèm
+                                                                </div>
+                                                                <div style={{ padding: '1rem', color: '#6b7280', fontStyle: 'italic' }}>
+                                                                    Chưa có file đính kèm nào
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    
+                                                    return (
+                                                        <div className="travel-expense-accountant-attachments-card">
+                                                            <div className="travel-expense-accountant-attachments-title">
+                                                                📎 Tổng Hợp File Đính Kèm ({attachments.length} file)
+                                                            </div>
+                                                            <div className="travel-expense-accountant-attachments-list">
+                                                                {/* Files from Employee */}
+                                                                {employeeAttachments.length > 0 && (
+                                                                    <div className="travel-expense-accountant-attachments-group">
+                                                                        <div className="travel-expense-accountant-attachments-group-title">
+                                                                            📄 Hóa đơn/Chứng từ từ Nhân viên ({employeeAttachments.length} file)
+                                                                        </div>
+                                                                        <div className="travel-expense-accountant-attachments-items">
+                                                                            {employeeAttachments.map((att, idx) => {
+                                                                                const fileName = att.fileName || att.file_name || 'Unknown';
+                                                                                const filePath = att.filePath || att.file_path || '';
+                                                                                const fileSize = att.fileSize || att.file_size || 0;
+                                                                                const fileNameOnly = filePath ? filePath.split(/[/\\]/).pop() : fileName;
+                                                                                
+                                                                                return (
+                                                                                    <a
+                                                                                        key={idx}
+                                                                                        href={`${process.env.REACT_APP_API_URL || ''}/uploads/travel-expenses/${fileNameOnly}`}
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer"
+                                                                                        className="travel-expense-accountant-attachment-link"
+                                                                                    >
+                                                                                        <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                                        </svg>
+                                                                                        <span className="travel-expense-accountant-attachment-name">{fileName}</span>
+                                                                                        {fileSize > 0 && (
+                                                                                            <span className="travel-expense-accountant-attachment-size">
+                                                                                                ({(fileSize / 1024).toFixed(1)} KB)
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </a>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {/* Files from HR */}
+                                                                {hrAttachments.length > 0 && (
+                                                                    <div className="travel-expense-accountant-attachments-group">
+                                                                        <div className="travel-expense-accountant-attachments-group-title">
+                                                                            📎 File bổ sung từ HR ({hrAttachments.length} file)
+                                                                        </div>
+                                                                        <div className="travel-expense-accountant-attachments-items">
+                                                                            {hrAttachments.map((att, idx) => {
+                                                                                const fileName = att.fileName || att.file_name || 'Unknown';
+                                                                                const filePath = att.filePath || att.file_path || '';
+                                                                                const fileSize = att.fileSize || att.file_size || 0;
+                                                                                const fileNameOnly = filePath ? filePath.split(/[/\\]/).pop() : fileName;
+                                                                                
+                                                                                return (
+                                                                                    <a
+                                                                                        key={idx}
+                                                                                        href={`${process.env.REACT_APP_API_URL || ''}/uploads/travel-expenses/${fileNameOnly}`}
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer"
+                                                                                        className="travel-expense-accountant-attachment-link"
+                                                                                    >
+                                                                                        <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                                        </svg>
+                                                                                        <span className="travel-expense-accountant-attachment-name">{fileName}</span>
+                                                                                        {fileSize > 0 && (
+                                                                                            <span className="travel-expense-accountant-attachment-size">
+                                                                                                ({(fileSize / 1024).toFixed(1)} KB)
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </a>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+
                                                 {/* Employee's Note Section */}
                                                 {selectedRequest.settlementNotes && (
                                                     <div className="travel-expense-accountant-employee-note-card">

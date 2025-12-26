@@ -752,6 +752,15 @@
     justify-content: center;
 }
 
+.customer-entertainment-expense-approval-actions .customer-entertainment-expense-approval-btn:hover:not(:disabled),
+.customer-entertainment-expense-approval-actions .customer-entertainment-expense-approval-btn:hover:not(:disabled) *,
+.customer-entertainment-expense-approval-actions .customer-entertainment-expense-approval-btn:hover:not(:disabled) span,
+.customer-entertainment-expense-approval-actions .customer-entertainment-expense-approval-btn:hover:not(:disabled) .customer-entertainment-expense-approval-btn-icon,
+.customer-entertainment-expense-approval-actions .customer-entertainment-expense-approval-btn:hover:not(:disabled) .customer-entertainment-expense-approval-btn-text,
+.customer-entertainment-expense-approval-actions .customer-entertainment-expense-approval-btn:hover:not(:disabled)::first-letter {
+    color: #ffffff !important;
+}
+
 .customer-entertainment-expense-approval-btn {
     flex: 0 1 auto;
     /* Thu nhỏ lại, không chiếm toàn bộ width */
@@ -763,17 +772,24 @@
     font-size: 0.8125rem;
     /* Giảm từ 0.9375rem */
     font-weight: 600;
-    color: #ffffff;
+    color: #ffffff !important;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.375rem;
     /* Giảm từ 0.5rem */
-    transition: all 0.3s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     position: relative;
     overflow: hidden;
+    z-index: 1;
+}
+
+.customer-entertainment-expense-approval-btn *,
+.customer-entertainment-expense-approval-btn span,
+.customer-entertainment-expense-approval-btn .customer-entertainment-expense-approval-btn-icon {
+    color: #ffffff !important;
 }
 
 .customer-entertainment-expense-approval-btn::before {
@@ -782,19 +798,70 @@
     inset: 0;
     opacity: 0;
     transition: opacity 0.3s ease;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: 6px;
+}
+
+.customer-entertainment-expense-approval-btn>* {
+    position: relative;
+    z-index: 1;
+    color: #ffffff !important;
+}
+
+/* Đảm bảo text node trực tiếp trong button không bị ẩn */
+.customer-entertainment-expense-approval-btn {
+    color: #ffffff !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    position: relative;
+    z-index: 1;
 }
 
 .customer-entertainment-expense-approval-btn:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    color: #ffffff !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    text-shadow: none;
+    z-index: 1;
+    border-radius: 6px;
+}
+
+.customer-entertainment-expense-approval-btn:hover:not(:disabled) * {
+    opacity: 1 !important;
+    visibility: visible !important;
+    color: #ffffff !important;
+    z-index: 1;
+}
+
+.customer-entertainment-expense-approval-btn:hover:not(:disabled) *,
+.customer-entertainment-expense-approval-btn:hover:not(:disabled) span,
+.customer-entertainment-expense-approval-btn:hover:not(:disabled) .customer-entertainment-expense-approval-btn-icon,
+.customer-entertainment-expense-approval-btn:hover:not(:disabled) .customer-entertainment-expense-approval-btn-text {
+    color: #ffffff !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    z-index: 1;
 }
 
 .customer-entertainment-expense-approval-btn:hover:not(:disabled)::before {
     opacity: 1;
+    z-index: 0;
+    border-radius: 6px;
 }
 
 .customer-entertainment-expense-approval-btn:active:not(:disabled) {
     transform: translateY(0);
+    color: #ffffff !important;
+}
+
+.customer-entertainment-expense-approval-btn:active:not(:disabled) *,
+.customer-entertainment-expense-approval-btn:active:not(:disabled) span,
+.customer-entertainment-expense-approval-btn:active:not(:disabled) .customer-entertainment-expense-approval-btn-icon,
+.customer-entertainment-expense-approval-btn:active:not(:disabled) .customer-entertainment-expense-approval-btn-text {
+    color: #ffffff !important;
 }
 
 .customer-entertainment-expense-approval-btn:disabled {
@@ -806,30 +873,74 @@
     background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
 }
 
+.customer-entertainment-expense-approval-btn.approve:hover:not(:disabled),
+.customer-entertainment-expense-approval-btn.approve:hover:not(:disabled) *,
+.customer-entertainment-expense-approval-btn.approve:hover:not(:disabled) span,
+.customer-entertainment-expense-approval-btn.approve:hover:not(:disabled) .customer-entertainment-expense-approval-btn-icon,
+.customer-entertainment-expense-approval-btn.approve:hover:not(:disabled) .customer-entertainment-expense-approval-btn-text,
+.customer-entertainment-expense-approval-btn.approve:hover:not(:disabled)::first-letter,
+.customer-entertainment-expense-approval-btn.approve:hover:not(:disabled)::after,
+.customer-entertainment-expense-approval-btn.approve:hover:not(:disabled)::before {
+    color: #ffffff !important;
+}
+
 .customer-entertainment-expense-approval-btn.approve::before {
     background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+    border-radius: 6px;
 }
 
 .customer-entertainment-expense-approval-btn.request-correction {
     background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
 }
 
+.customer-entertainment-expense-approval-btn.request-correction:hover:not(:disabled),
+.customer-entertainment-expense-approval-btn.request-correction:hover:not(:disabled) *,
+.customer-entertainment-expense-approval-btn.request-correction:hover:not(:disabled) span,
+.customer-entertainment-expense-approval-btn.request-correction:hover:not(:disabled) .customer-entertainment-expense-approval-btn-icon,
+.customer-entertainment-expense-approval-btn.request-correction:hover:not(:disabled) .customer-entertainment-expense-approval-btn-text,
+.customer-entertainment-expense-approval-btn.request-correction:hover:not(:disabled)::first-letter,
+.customer-entertainment-expense-approval-btn.request-correction:hover:not(:disabled)::after,
+.customer-entertainment-expense-approval-btn.request-correction:hover:not(:disabled)::before {
+    color: #ffffff !important;
+}
+
 .customer-entertainment-expense-approval-btn.request-correction::before {
     background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    border-radius: 6px;
 }
 
 .customer-entertainment-expense-approval-btn.reject {
     background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
 }
 
+.customer-entertainment-expense-approval-btn.reject:hover:not(:disabled),
+.customer-entertainment-expense-approval-btn.reject:hover:not(:disabled) *,
+.customer-entertainment-expense-approval-btn.reject:hover:not(:disabled) span,
+.customer-entertainment-expense-approval-btn.reject:hover:not(:disabled) .customer-entertainment-expense-approval-btn-icon,
+.customer-entertainment-expense-approval-btn.reject:hover:not(:disabled) .customer-entertainment-expense-approval-btn-text,
+.customer-entertainment-expense-approval-btn.reject:hover:not(:disabled)::first-letter,
+.customer-entertainment-expense-approval-btn.reject:hover:not(:disabled)::after,
+.customer-entertainment-expense-approval-btn.reject:hover:not(:disabled)::before {
+    color: #ffffff !important;
+}
+
 .customer-entertainment-expense-approval-btn.reject::before {
     background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    border-radius: 6px;
 }
 
 .customer-entertainment-expense-approval-btn-icon {
     font-size: 1rem;
     /* Giảm từ 1.125rem */
     font-weight: 700;
+}
+
+.customer-entertainment-expense-approval-btn-text {
+    position: relative;
+    z-index: 1;
+    color: #ffffff !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
 .customer-entertainment-expense-approval-action-description {

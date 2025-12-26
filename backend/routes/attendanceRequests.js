@@ -257,14 +257,14 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
                     const empNameWithoutAccents = removeVietnameseAccents(empNormalizedName);
                     return empNameWithoutAccents === normalizedWithoutAccents;
                 });
-                
+
                 for (const otherManager of allManagersWithSameName) {
                     if (chiNhanhMatches(otherManager.chi_nhanh)) {
                         console.log(`[findManagerFromCache] Found correct manager "${otherManager.ho_ten}" (ID: ${otherManager.id}, ${otherManager.chi_nhanh || 'N/A'}) after searching all managers with same name (no accents)`);
                         return otherManager;
                     }
                 }
-                
+
                 console.error(`[findManagerFromCache] ❌ ERROR: Single match (no accents) found but manager "${match.ho_ten}" (ID: ${match.id}, ${match.chi_nhanh || 'N/A'}) does NOT match employee chi_nhanh "${normalizedEmployeeChiNhanh}". Returning NULL.`);
                 return null;
             }

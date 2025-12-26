@@ -680,6 +680,91 @@
     font-weight: 600;
 }
 
+/* Section III: Attachments Card */
+.travel-expense-accountant-attachments-card {
+    background: #f9fafb;
+    /* Background - Gray-50 */
+    border: 1px solid #e5e7eb;
+    /* Card Border - Gray-200 */
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.travel-expense-accountant-attachments-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #1f2937;
+    /* Text Dark - Gray-800/900 */
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+}
+
+.travel-expense-accountant-attachments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.travel-expense-accountant-attachments-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.travel-expense-accountant-attachments-group-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #4338ca;
+    /* Accent Main - Indigo-700 */
+    margin-bottom: 0.5rem;
+}
+
+.travel-expense-accountant-attachments-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-left: 1rem;
+}
+
+.travel-expense-accountant-attachment-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    color: #2563eb;
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.travel-expense-accountant-attachment-link:hover {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    color: #1d4ed8;
+    transform: translateX(2px);
+}
+
+.travel-expense-accountant-attachment-link svg {
+    flex-shrink: 0;
+    color: #2563eb;
+}
+
+.travel-expense-accountant-attachment-name {
+    flex: 1;
+    font-weight: 500;
+}
+
+.travel-expense-accountant-attachment-size {
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-weight: 400;
+}
+
 /* Section III: Employee Note Card */
 .travel-expense-accountant-employee-note-card {
     background: #f9fafb;

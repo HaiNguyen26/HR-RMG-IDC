@@ -807,10 +807,7 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
                         type="button"
                         className="travel-expense-approval-btn-approve"
                         onClick={async () => {
-                          if (!approvalNote.trim()) {
-                            showToast && showToast('Vui lòng nhập ghi chú trước khi duyệt.', 'warning');
-                            return;
-                          }
+                          // Ghi chú không bắt buộc khi duyệt
                           if (!selectedRequestId) {
                             showToast && showToast('Vui lòng chọn yêu cầu cần duyệt.', 'warning');
                             return;

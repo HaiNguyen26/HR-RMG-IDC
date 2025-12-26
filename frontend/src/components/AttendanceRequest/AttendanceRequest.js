@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import { employeesAPI, attendanceAdjustmentsAPI } from '../../services/api';
-import { formatDateToISO, parseISODateString, today } from '../../utils/dateUtils';
+import { formatDateToISO, parseISODateString } from '../../utils/dateUtils';
 import { DATE_PICKER_LOCALE } from '../../utils/datepickerLocale';
 import TimePicker24h from '../TimePicker24h/TimePicker24h';
 import './AttendanceRequest.css';
@@ -34,7 +34,7 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
   const [error, setError] = useState('');
   const [employeeProfile, setEmployeeProfile] = useState(null);
   const [selectedAttendanceItem, setSelectedAttendanceItem] = useState(null);
-  
+
   // State cho từng mục chi tiết
   const [itemDetails, setItemDetails] = useState({
     item1: { checkInTime: '', checkOutTime: '' }, // Quên Chấm Công
@@ -122,7 +122,7 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
   };
 
   const directManagerName = getValue('quanLyTrucTiep', 'quan_ly_truc_tiep', 'team_lead_name') || 'Chưa cập nhật';
-  
+
   // Get employee basic info for read-only fields
   const employeeCode = getValue('maNhanVien', 'ma_nhan_vien', 'employeeCode') || '';
   const employeeName = getValue('hoTen', 'ho_ten', 'fullName', 'name') || '';
@@ -190,12 +190,12 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
       // Quên Chấm Công: cần ít nhất một trong hai (giờ vào hoặc giờ ra)
       const hasCheckIn = selectedItem.details?.checkInTime && selectedItem.details.checkInTime.trim() !== '';
       const hasCheckOut = selectedItem.details?.checkOutTime && selectedItem.details.checkOutTime.trim() !== '';
-      
+
       if (!hasCheckIn && !hasCheckOut) {
         setError('Vui lòng nhập ít nhất giờ vào hoặc giờ ra cho mục "Quên Chấm Công".');
         return;
       }
-      
+
       // Tự động xác định label dựa trên dữ liệu nhập vào
       let label = 'Quên Chấm Công';
       if (hasCheckIn && !hasCheckOut) {
@@ -205,14 +205,14 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
       } else if (hasCheckIn && hasCheckOut) {
         label = 'Quên chấm công vào và ra';
       }
-      
+
       // Cập nhật label trong attendanceItems
       selectedItem.label = label;
-      
+
       // Cập nhật lại formData với label mới
       setFormData(prev => ({
         ...prev,
-        attendanceItems: prev.attendanceItems.map(item => 
+        attendanceItems: prev.attendanceItems.map(item =>
           item.id === selectedItem.id ? { ...item, label } : item
         )
       }));
@@ -387,7 +387,6 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                         <DatePicker
                           selected={formData.date ? parseISODateString(formData.date) : null}
                           onChange={handleDateChange}
-                          minDate={today()}
                           dateFormat="dd/MM/yyyy"
                           locale={DATE_PICKER_LOCALE}
                           placeholderText="dd/mm/yyyy"
@@ -488,7 +487,7 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                     if (value.includes(':')) {
                       const [hours, minutes] = value.split(':');
                       const hours24 = parseInt(hours, 10);
-                      
+
                       // Ensure hours are in 24h format (0-23)
                       if (hours24 >= 0 && hours24 <= 23) {
                         // Format as HH:mm (2 digits for hours and minutes)
@@ -516,7 +515,7 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                   if (selectedAttendanceItem === 1) {
                     const hasCheckIn = updatedDetails.checkInTime && updatedDetails.checkInTime.trim() !== '';
                     const hasCheckOut = updatedDetails.checkOutTime && updatedDetails.checkOutTime.trim() !== '';
-                    
+
                     if (hasCheckIn && !hasCheckOut) {
                       label = 'Quên giờ vào';
                     } else if (!hasCheckIn && hasCheckOut) {
@@ -549,7 +548,7 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                 if (selectedAttendanceItem === 1) {
                   const hasCheckIn = displayDetails.checkInTime && displayDetails.checkInTime.trim() !== '';
                   const hasCheckOut = displayDetails.checkOutTime && displayDetails.checkOutTime.trim() !== '';
-                  
+
                   if (hasCheckIn && !hasCheckOut) {
                     displayTitle = 'Quên giờ vào';
                   } else if (!hasCheckIn && hasCheckOut) {
@@ -690,7 +689,7 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                           </div>
                         </div>
                       )}
-                      
+
                       {/* Lý do bổ sung - Hiển thị cho tất cả các loại */}
                       <div className="attendance-item-form-group" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
                         <label className="attendance-item-form-label">

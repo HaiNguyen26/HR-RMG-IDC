@@ -788,7 +788,7 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
                                                         disabled={isProcessing}
                                                     >
                                                         <span className="customer-entertainment-expense-approval-btn-icon">✓</span>
-                                                        DUYỆT (Chuyển Kế toán)
+                                                        <span className="customer-entertainment-expense-approval-btn-text">DUYỆT (Chuyển Kế toán)</span>
                                                     </button>
                                                     <button
                                                         className="customer-entertainment-expense-approval-btn request-correction"
@@ -796,7 +796,7 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
                                                         disabled={isProcessing}
                                                     >
                                                         <span className="customer-entertainment-expense-approval-btn-icon">↶</span>
-                                                        YÊU CẦU CHỈNH SỬA
+                                                        <span className="customer-entertainment-expense-approval-btn-text">YÊU CẦU CHỈNH SỬA</span>
                                                     </button>
                                                     <button
                                                         className="customer-entertainment-expense-approval-btn reject"
@@ -804,7 +804,7 @@ const CustomerEntertainmentExpenseApproval = ({ currentUser, showToast, showConf
                                                         disabled={isProcessing}
                                                     >
                                                         <span className="customer-entertainment-expense-approval-btn-icon">✕</span>
-                                                        TỪ CHỐI
+                                                        <span className="customer-entertainment-expense-approval-btn-text">TỪ CHỐI</span>
                                                     </button>
                                                 </div>
                                                 <div className="customer-entertainment-expense-approval-action-description">

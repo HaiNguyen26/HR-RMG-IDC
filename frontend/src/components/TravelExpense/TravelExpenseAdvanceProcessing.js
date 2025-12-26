@@ -13,7 +13,6 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
         actualAmount: '',
         notes: ''
     });
-    const [advanceCase, setAdvanceCase] = useState('employee_self'); // 'hr_booked' or 'employee_self'
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Fetch travel expense requests from API
@@ -106,21 +105,13 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
     // Reset form when selecting a request
     useEffect(() => {
         if (selectedRequest) {
-            if (advanceCase === 'employee_self') {
-                // Trường hợp 2: Nhân viên tự đặt - mặc định = số tiền nhân viên yêu cầu
-                setFormData({
-                    actualAmount: selectedRequest.requestedAdvanceAmount ? selectedRequest.requestedAdvanceAmount.toString() : '',
-                    notes: ''
-                });
-            } else {
-                // Trường hợp 1: HR đặt dịch vụ - để trống để HR nhập
-                setFormData({
-                    actualAmount: '',
-                    notes: ''
-                });
-            }
+            // Mặc định = số tiền nhân viên yêu cầu (nhân viên tự đặt)
+            setFormData({
+                actualAmount: selectedRequest.requestedAdvanceAmount ? selectedRequest.requestedAdvanceAmount.toString() : '',
+                notes: ''
+            });
         }
-    }, [selectedRequestId, advanceCase]);
+    }, [selectedRequestId]);
 
     // Format currency input
     const handleAmountChange = (e) => {
@@ -137,7 +128,7 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
     // Validate form
     const validateForm = () => {
         if (!formData.actualAmount) return 'Vui lòng nhập số tiền tạm ứng.';
-        if (!formData.notes.trim()) return 'Vui lòng nhập ghi chú.';
+        // Ghi chú không bắt buộc
 
         const amount = parseInt(formData.actualAmount);
         if (isNaN(amount) || amount <= 0) return 'Số tiền phải lớn hơn 0.';
@@ -162,10 +153,9 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
         try {
             const response = await travelExpensesAPI.processAdvance(selectedRequestId, {
                 actualAmount: formData.actualAmount,
-                bankAccount: selectedRequest.bankAccount,
-                notes: formData.notes,
+                notes: formData.notes || '',
                 processedBy: currentUser?.id || null,
-                advanceCase: advanceCase
+                advanceCase: 'employee_self' // Mặc định là nhân viên tự đặt
             });
 
             if (response.data && response.data.success) {
@@ -365,35 +355,6 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                                         </div>
                                     </div>
 
-                                    {/* Advance Case Selection */}
-                                    <div className="travel-expense-form-group">
-                                        <label className="travel-expense-form-label">
-                                            Trường hợp Tạm ứng <span className="required">*</span>
-                                        </label>
-                                        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                                <input
-                                                    type="radio"
-                                                    name="advanceCase"
-                                                    value="hr_booked"
-                                                    checked={advanceCase === 'hr_booked'}
-                                                    onChange={(e) => setAdvanceCase(e.target.value)}
-                                                />
-                                                <span>HR đặt dịch vụ</span>
-                                            </label>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                                <input
-                                                    type="radio"
-                                                    name="advanceCase"
-                                                    value="employee_self"
-                                                    checked={advanceCase === 'employee_self'}
-                                                    onChange={(e) => setAdvanceCase(e.target.value)}
-                                                />
-                                                <span>Nhân viên tự đặt</span>
-                                            </label>
-                                        </div>
-                                    </div>
-
                                     {/* Info Alert */}
                                     {selectedRequest.requestedAdvanceAmount && (
                                         <div className="travel-expense-indigo-alert">
@@ -407,11 +368,9 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                                                 <p className="travel-expense-indigo-alert-message">
                                                     Nhân viên đã yêu cầu tạm ứng: <strong>{selectedRequest.requestedAdvanceAmount.toLocaleString('vi-VN')} VND</strong>
                                                 </p>
-                                                {advanceCase === 'employee_self' && (
-                                                    <p className="travel-expense-indigo-alert-warning">
-                                                        Số tiền mặc định = số tiền nhân viên yêu cầu. Bạn có thể điều chỉnh nếu cần.
-                                                    </p>
-                                                )}
+                                                <p className="travel-expense-indigo-alert-warning">
+                                                    Số tiền mặc định = số tiền nhân viên yêu cầu. Bạn có thể điều chỉnh nếu cần.
+                                                </p>
                                             </div>
                                         </div>
                                     )}
@@ -441,35 +400,14 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                                                     <span className="travel-expense-currency-suffix">VND</span>
                                                 </div>
                                                 <p className="travel-expense-input-hint">
-                                                    {advanceCase === 'hr_booked'
-                                                        ? 'Nhập số tiền thực tế HR đã đặt dịch vụ và cần tạm ứng cho nhân viên.'
-                                                        : 'Số tiền mặc định = số tiền nhân viên yêu cầu. Có thể điều chỉnh nếu cần.'}
-                                                </p>
-                                            </div>
-
-                                            {/* Bank Account (Readonly) */}
-                                            <div className="travel-expense-form-group">
-                                                <label htmlFor="bankAccount" className="travel-expense-form-label">
-                                                    2. Tài khoản Ngân hàng nhận
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    id="bankAccount"
-                                                    className="travel-expense-form-input travel-expense-form-input-readonly"
-                                                    value={selectedRequest.bankAccount || ''}
-                                                    readOnly
-                                                    disabled
-                                                    placeholder="Thông tin tài khoản từ hồ sơ nhân viên"
-                                                />
-                                                <p className="travel-expense-input-hint">
-                                                    Thông tin tài khoản tự động lấy từ hồ sơ nhân viên.
+                                                    Số tiền mặc định = số tiền nhân viên yêu cầu. Có thể điều chỉnh nếu cần.
                                                 </p>
                                             </div>
 
                                             {/* Notes */}
                                             <div className="travel-expense-form-group">
                                                 <label htmlFor="notes" className="travel-expense-form-label">
-                                                    3. Ghi chú <span className="required">*</span>
+                                                    2. Ghi chú
                                                 </label>
                                                 <textarea
                                                     id="notes"
@@ -477,15 +415,10 @@ const TravelExpenseAdvanceProcessing = ({ currentUser, showToast, showConfirm })
                                                     rows="4"
                                                     value={formData.notes}
                                                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                                                    placeholder={advanceCase === 'hr_booked'
-                                                        ? 'Nhập ghi chú về dịch vụ đã đặt (ví dụ: Đã đặt vé máy bay, khách sạn...)'
-                                                        : 'Nhập ghi chú xác nhận (ví dụ: Xác nhận số tiền nhân viên tự đặt...)'}
-                                                    required
+                                                    placeholder="Nhập ghi chú xác nhận (tùy chọn)"
                                                 />
                                                 <p className="travel-expense-input-hint">
-                                                    {advanceCase === 'hr_booked'
-                                                        ? 'Mô tả chi tiết về dịch vụ HR đã đặt và cần tạm ứng.'
-                                                        : 'Ghi chú xác nhận số tiền tạm ứng cho nhân viên tự đặt.'}
+                                                    Ghi chú xác nhận số tiền tạm ứng (không bắt buộc).
                                                 </p>
                                             </div>
 

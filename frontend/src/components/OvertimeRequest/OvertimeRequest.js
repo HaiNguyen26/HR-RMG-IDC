@@ -255,26 +255,6 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
 
         // Format as HH:mm (2 digits for hours and minutes)
         value = `${hours24.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}`;
-
-        // Kiểm tra không cho phép chọn từ 17:00-17:30
-        if (hours24 === 17 && finalMinutes <= 30) {
-          // Hiển thị modal cảnh báo và không cho phép chọn
-          if (showConfirm) {
-            showConfirm({
-              title: 'Không được chọn giờ từ 17:00-17:30',
-              message: 'Thời gian từ 17:00 đến 17:30 không được phép chọn cho đơn tăng ca. Vui lòng chọn từ 17:45 trở đi.',
-              type: 'warning',
-              confirmText: 'Đã hiểu',
-              cancelText: 'Đóng'
-            }).then(() => {
-              // Modal đã đóng, không cần làm gì
-            });
-          } else if (showToast) {
-            showToast('Không được chọn giờ từ 17:00-17:30. Vui lòng chọn từ 17:45 trở đi.', 'warning');
-          }
-          // Không cập nhật giá trị, giữ nguyên giá trị cũ
-          return;
-        }
       }
     }
 

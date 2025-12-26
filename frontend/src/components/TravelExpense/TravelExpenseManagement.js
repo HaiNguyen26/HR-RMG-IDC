@@ -7,6 +7,7 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
     const [selectedRequestId, setSelectedRequestId] = useState(null);
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [hrAttachments, setHrAttachments] = useState([]);
 
     // Fetch travel expense requests from API
     useEffect(() => {
@@ -75,6 +76,11 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
 
     const selectedRequest = requests.find(req => req.id === selectedRequestId) || null;
 
+    // Reset HR attachments when selecting a different request
+    useEffect(() => {
+        setHrAttachments([]);
+    }, [selectedRequestId]);
+
     // Thêm thông tin đầy đủ cho selectedRequest để hiển thị trong tab content
     const selectedRequestFull = selectedRequest ? {
         ...selectedRequest,
@@ -92,7 +98,8 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
 
         try {
             const response = await travelExpensesAPI.confirmSettlement(selectedRequestId, {
-                confirmedBy: currentUser?.id || null
+                confirmedBy: currentUser?.id || null,
+                attachments: hrAttachments
             });
 
             if (response.data && response.data.success) {
@@ -140,12 +147,19 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                     }));
                     setRequests(formattedRequests);
                     setSelectedRequestId(null);
+                    setHrAttachments([]); // Reset HR attachments after successful confirmation
                 }
             }
         } catch (error) {
             console.error('Error confirming settlement:', error);
             showToast?.('Lỗi khi xác nhận hoàn ứng: ' + (error.response?.data?.message || error.message), 'error');
         }
+    };
+
+    // Handle HR file upload
+    const handleHrFileChange = (e) => {
+        const files = Array.from(e.target.files);
+        setHrAttachments(files);
     };
 
     return (
@@ -337,6 +351,72 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                     </a>
                                                                 ))}
                                                             </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* HR File Upload Section */}
+                                                <div className="travel-expense-hr-upload-section">
+                                                    <label htmlFor="hrAttachments" className="travel-expense-form-label" style={{ marginBottom: '0.5rem', color: '#92400e', fontWeight: '700' }}>
+                                                        📎 Đính kèm thêm file cần thiết (tùy chọn)
+                                                    </label>
+                                                    <div className="travel-expense-file-input-wrapper">
+                                                        <input
+                                                            type="file"
+                                                            id="hrAttachments"
+                                                            multiple
+                                                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                            onChange={handleHrFileChange}
+                                                        />
+                                                        <label htmlFor="hrAttachments" className="travel-expense-file-input-label">
+                                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                            </svg>
+                                                            Chọn File
+                                                        </label>
+                                                    </div>
+                                                    <span className="travel-expense-file-input-info">
+                                                        📄 Các file này sẽ được đính kèm cùng với hóa đơn/chứng từ của nhân viên<br />
+                                                        <strong>Định dạng:</strong> PDF, DOC, DOCX, JPG, PNG | <strong>Giới hạn:</strong> Tối đa 10MB/file, 10 files
+                                                    </span>
+                                                    {hrAttachments.length > 0 && (
+                                                        <div className="travel-expense-hr-files-list">
+                                                            <div className="travel-expense-hr-files-header">
+                                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                </svg>
+                                                                File đã chọn ({hrAttachments.length})
+                                                            </div>
+                                                            {hrAttachments.map((file, idx) => (
+                                                                <div key={idx} className="travel-expense-hr-file-item">
+                                                                    <div className="travel-expense-hr-file-icon">
+                                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                        </svg>
+                                                                    </div>
+                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                        <div className="travel-expense-hr-file-name">{file.name}</div>
+                                                                        {file.size && (
+                                                                            <div className="travel-expense-hr-file-size">
+                                                                                {(file.size / 1024 / 1024).toFixed(2)} MB
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            const newFiles = hrAttachments.filter((_, i) => i !== idx);
+                                                                            setHrAttachments(newFiles);
+                                                                        }}
+                                                                        className="travel-expense-hr-file-remove"
+                                                                        title="Xóa file"
+                                                                    >
+                                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                        </svg>
+                                                                    </button>
+                                                                </div>
+                                                            ))}
                                                         </div>
                                                     )}
                                                 </div>

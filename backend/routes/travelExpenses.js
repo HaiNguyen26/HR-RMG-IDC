@@ -201,9 +201,14 @@ const ensureTable = async () => {
             uploaded_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             description TEXT
         );
-        CREATE INDEX IF NOT EXISTS idx_travel_expense_attachments_request ON travel_expense_attachments(travel_expense_request_id);
     `;
     await pool.query(createAttachmentsTable);
+    
+    // Create index separately
+    const createAttachmentsIndex = `
+        CREATE INDEX IF NOT EXISTS idx_travel_expense_attachments_request ON travel_expense_attachments(travel_expense_request_id);
+    `;
+    await pool.query(createAttachmentsIndex);
 
     // Add accountant fields if they don't exist (for existing databases)
     const addAccountantFields = `
@@ -777,10 +782,10 @@ router.post('/', async (req, res) => {
                 livingAllowanceCurrency = allowance.currency;
             }
         } else if (normalizedLocationType === 'DOMESTIC' && isOvernight) {
-            // Công tác trong nước và qua đêm: phụ cấp 230k/ngày
+            // Công tác trong nước và qua đêm: phụ cấp 250k/ngày
             const diffMs = end.getTime() - start.getTime();
-            const diffDays = Math.ceil(diffMs / (24 * 60 * 60 * 1000)); // Số ngày (làm tròn lên)
-            livingAllowanceAmount = diffDays * 230000; // 230k VND mỗi ngày
+            const diffDays = Math.ceil(diffMs / (24 * 60 * 60 * 1000)); // Số ngày (làm tròn lên), nếu tính là 24h thì vẫn tính là 250k/ngày
+            livingAllowanceAmount = diffDays * 250000; // 250k VND mỗi ngày
             livingAllowanceCurrency = 'VND';
         }
 
@@ -1302,10 +1307,10 @@ router.post('/:id/advance/process', async (req, res) => {
         const { id } = req.params;
         const { actualAmount, bankAccount, notes, processedBy, advanceCase } = req.body;
 
-        if (!actualAmount || !notes) {
+        if (!actualAmount) {
             return res.status(400).json({
                 success: false,
-                message: 'Thiếu thông tin bắt buộc (actualAmount, notes)',
+                message: 'Thiếu thông tin bắt buộc (actualAmount)',
             });
         }
 
@@ -1364,7 +1369,7 @@ router.post('/:id/advance/process', async (req, res) => {
         const updateResult = await client.query(updateQuery, [
             actualAmountNum,
             bankAccount || null,
-            notes,
+            notes || null,
             timestamp,
             processedBy || null,
             id
@@ -1661,8 +1666,22 @@ router.post('/:id/settlement', upload.array('attachments', 10), async (req, res)
 router.get('/:id/attachments', async (req, res) => {
     try {
         const { id } = req.params;
+        
+        // Ensure attachments table exists
+        await ensureTable();
+        
+        // Simplified query - get attachments with user info
+        // If no attachments exist, return empty array (not an error)
+        // Note: employees table uses ho_ten (not name) and phong_ban (not role)
         const result = await pool.query(
-            'SELECT * FROM travel_expense_attachments WHERE travel_expense_request_id = $1 ORDER BY uploaded_at DESC',
+            `SELECT 
+                tea.*,
+                e.ho_ten as uploader_name,
+                e.phong_ban as uploader_role
+            FROM travel_expense_attachments tea
+            LEFT JOIN employees e ON tea.uploaded_by = e.id
+            WHERE tea.travel_expense_request_id = $1 
+            ORDER BY tea.uploaded_at DESC`,
             [id]
         );
 
@@ -1676,24 +1695,31 @@ router.get('/:id/attachments', async (req, res) => {
                 fileSize: row.file_size,
                 fileType: row.file_type,
                 uploadedAt: row.uploaded_at,
+                uploadedBy: row.uploaded_by,
+                uploadedByName: row.uploader_name || 'N/A',
+                uploadedByRole: row.uploader_role || 'N/A',
                 description: row.description
             })),
         });
     } catch (error) {
         console.error('Error fetching attachments:', error);
+        console.error('Error stack:', error.stack);
+        console.error('Request ID:', req.params.id);
         res.status(500).json({
             success: false,
             message: 'Lỗi khi lấy danh sách file đính kèm: ' + error.message,
+            error: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });
 
 // POST /api/travel-expenses/:id/settlement/confirm - HR xác nhận settlement
-router.post('/:id/settlement/confirm', async (req, res) => {
+router.post('/:id/settlement/confirm', upload.array('attachments', 10), async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
         const { confirmedBy } = req.body;
+        const files = req.files || [];
 
         await client.query('BEGIN');
 
@@ -1704,6 +1730,12 @@ router.post('/:id/settlement/confirm', async (req, res) => {
 
         if (!requestResult.rows.length) {
             await client.query('ROLLBACK');
+            // Clean up uploaded files if request not found
+            files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
             return res.status(404).json({
                 success: false,
                 message: 'Không tìm thấy yêu cầu chi phí công tác',
@@ -1714,6 +1746,12 @@ router.post('/:id/settlement/confirm', async (req, res) => {
 
         if (request.settlement_status !== 'SUBMITTED') {
             await client.query('ROLLBACK');
+            // Clean up uploaded files if status is invalid
+            files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
             return res.status(400).json({
                 success: false,
                 message: 'Báo cáo hoàn ứng chưa được nhân viên gửi',
@@ -1740,6 +1778,27 @@ router.post('/:id/settlement/confirm', async (req, res) => {
             id
         ]);
 
+        // Save HR uploaded files
+        const attachmentIds = [];
+        for (const file of files) {
+            const attachmentResult = await client.query(
+                `INSERT INTO travel_expense_attachments 
+                 (travel_expense_request_id, file_name, file_path, file_size, file_type, uploaded_by, description)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)
+                 RETURNING id`,
+                [
+                    id,
+                    file.originalname,
+                    file.path,
+                    file.size,
+                    file.mimetype,
+                    confirmedBy || null,
+                    'File đính kèm từ HR khi xác nhận báo cáo hoàn ứng'
+                ]
+            );
+            attachmentIds.push(attachmentResult.rows[0].id);
+        }
+
         await client.query('COMMIT');
 
         res.json({
@@ -1749,6 +1808,14 @@ router.post('/:id/settlement/confirm', async (req, res) => {
         });
     } catch (error) {
         await client.query('ROLLBACK');
+        // Clean up uploaded files on error
+        if (req.files) {
+            req.files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
+        }
         console.error('Error confirming settlement:', error);
         res.status(500).json({
             success: false,

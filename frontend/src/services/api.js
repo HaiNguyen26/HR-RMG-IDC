@@ -278,7 +278,20 @@ export const travelExpensesAPI = {
     });
   },
   getAttachments: (id) => api.get(`/travel-expenses/${id}/attachments`),
-  confirmSettlement: (id, data) => api.post(`/travel-expenses/${id}/settlement/confirm`, data),
+  confirmSettlement: (id, data) => {
+    const formData = new FormData();
+    if (data.confirmedBy) formData.append('confirmedBy', data.confirmedBy);
+    if (data.attachments && data.attachments.length > 0) {
+      data.attachments.forEach((file) => {
+        formData.append('attachments', file);
+      });
+    }
+    return api.post(`/travel-expenses/${id}/settlement/confirm`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
   accountantCheck: (id, data) => api.post(`/travel-expenses/${id}/accountant/check`, data),
   processAdvance: (id, data) => api.post(`/travel-expenses/${id}/advance/process`, data),
   confirmAdvanceTransfer: (id, data) => api.post(`/travel-expenses/${id}/advance`, data),

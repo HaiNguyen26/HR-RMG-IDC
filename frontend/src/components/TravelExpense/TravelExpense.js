@@ -157,12 +157,12 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
             setContinent(detectedContinent);
             setLivingAllowance(allowance);
         } else if (travelScope === 'domestic' && travelTiming.ready && travelTiming.isOvernight) {
-            // Trong nước và qua đêm: phụ cấp 230k/ngày
+            // Trong nước và qua đêm: phụ cấp 250k/ngày
             const start = new Date(formData.startDateTime);
             const end = new Date(formData.endDateTime);
             const diffMs = end - start;
-            const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24)); // Số ngày (làm tròn lên)
-            const allowanceAmount = diffDays * 230000; // 230k VND mỗi ngày
+            const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24)); // Số ngày (làm tròn lên), nếu tính là 24h thì vẫn tính là 250k/ngày
+            const allowanceAmount = diffDays * 250000; // 250k VND mỗi ngày
 
             setContinent(null);
             setLivingAllowance({ amount: allowanceAmount, currency: 'VND' });
@@ -235,7 +235,7 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
             value: `${livingAllowance.currency === 'VND' ? livingAllowance.amount.toLocaleString('vi-VN') : livingAllowance.amount} ${livingAllowance.currency}`,
             tone: 'indigo',
             note: travelScope === 'domestic' && travelTiming.isOvernight
-                ? `Hệ thống tự động cấp phụ cấp lưu trú 230,000 VND/ngày cho công tác trong nước qua đêm`
+                ? `Hệ thống tự động cấp phụ cấp lưu trú 250,000 VND/ngày cho công tác trong nước qua đêm`
                 : `Hệ thống tự động cấp phí sinh hoạt cho công tác ${travelScope === 'international' ? (continent === 'EU' ? 'Châu Âu' : continent === 'ASIAN' ? 'Châu Á' : 'nước ngoài') : 'trong nước'}`
         }] : [])
     ], [travelScope, travelTiming, livingAllowance, continent]);
