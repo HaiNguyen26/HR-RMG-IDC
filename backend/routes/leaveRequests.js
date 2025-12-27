@@ -173,8 +173,31 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
                 return bestMatch;
             }
 
-            // QUAN TRỌNG: Nếu không có manager nào match chi_nhanh, KHÔNG trả về manager nào để tránh nhầm lẫn
-            // Thay vì trả về matches[0] (có thể là ID 882), trả về null để người dùng biết cần kiểm tra lại
+            // Ưu tiên 3: Nếu không có manager nào match chi_nhanh, kiểm tra xem có manager ở "Head Office" 
+            // và manager đó có cấp dưới ở chi_nhanh của employee không (cho phép Head Office quản lý các chi nhánh)
+            const headOfficeMatch = matches.find(emp => {
+                const normalizedChiNhanh = normalizeChiNhanh(emp.chi_nhanh);
+                return normalizedChiNhanh === 'head office' || normalizedChiNhanh === 'ho';
+            });
+
+            if (headOfficeMatch && normalizedEmployeeChiNhanh) {
+                // Kiểm tra xem manager ở Head Office có cấp dưới ở chi_nhanh của employee không
+                const headOfficeSubordinates = cache.all.filter(e => {
+                    if (!e.quan_ly_truc_tiep) return false;
+                    const empManagerName = (e.quan_ly_truc_tiep || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                    const matchNormalizedName = (headOfficeMatch.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                    const nameMatches = empManagerName === matchNormalizedName ||
+                        removeVietnameseAccents(empManagerName) === removeVietnameseAccents(matchNormalizedName);
+                    return nameMatches && chiNhanhMatches(e.chi_nhanh);
+                });
+
+                if (headOfficeSubordinates.length > 0) {
+                    console.log(`[findManagerFromCache] Found Head Office manager "${headOfficeMatch.ho_ten}" with ${headOfficeSubordinates.length} subordinates in chi_nhanh "${normalizedEmployeeChiNhanh}". Allowing Head Office to manage this branch.`);
+                    return headOfficeMatch;
+                }
+            }
+
+            // Nếu vẫn không tìm thấy, trả về null để người dùng biết cần kiểm tra lại
             console.error(`[findManagerFromCache] ❌ ERROR: Found ${matches.length} employees with name "${managerName}" but NONE matches chi_nhanh "${normalizedEmployeeChiNhanh}". Returning NULL to avoid incorrect assignment. Available managers: ${matches.map(m => `${m.ho_ten} (ID: ${m.id}, chi_nhanh: ${m.chi_nhanh || 'N/A'})`).join(', ')}`);
             return null;
         }
@@ -209,6 +232,27 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
                         return match;
                     }
                 } else {
+                    // Manager này không có chi_nhanh match, kiểm tra xem có phải Head Office không
+                    const normalizedMatchChiNhanh = normalizeChiNhanh(match.chi_nhanh);
+                    const isHeadOffice = normalizedMatchChiNhanh === 'head office' || normalizedMatchChiNhanh === 'ho';
+
+                    if (isHeadOffice) {
+                        // Kiểm tra xem manager ở Head Office có cấp dưới ở chi_nhanh của employee không
+                        const headOfficeSubordinates = cache.all.filter(e => {
+                            if (!e.quan_ly_truc_tiep) return false;
+                            const empManagerName = (e.quan_ly_truc_tiep || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                            const matchNormalizedName = (match.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                            const nameMatches = empManagerName === matchNormalizedName ||
+                                removeVietnameseAccents(empManagerName) === removeVietnameseAccents(matchNormalizedName);
+                            return nameMatches && chiNhanhMatches(e.chi_nhanh);
+                        });
+
+                        if (headOfficeSubordinates.length > 0) {
+                            console.log(`[findManagerFromCache] Found Head Office manager "${match.ho_ten}" (single match) with ${headOfficeSubordinates.length} subordinates in chi_nhanh "${normalizedEmployeeChiNhanh}". Allowing Head Office to manage this branch.`);
+                            return match;
+                        }
+                    }
+
                     // Manager này không có chi_nhanh match, không phải manager đúng
                     console.log(`[findManagerFromCache] Manager "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) does not match employee chi_nhanh "${normalizedEmployeeChiNhanh}". Searching for other managers...`);
 
