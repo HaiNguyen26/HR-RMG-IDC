@@ -8,6 +8,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: 2rem;
+  position: relative;
   /* Gradient Calm Integrity: Nền nhẹ nhàng từ xanh dương nhạt sang xanh lá nhạt - Cải thiện với gradient mượt mà hơn */
   background: linear-gradient(135deg,
       #e0f2fe 0%,
@@ -102,16 +103,32 @@
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+  position: relative;
+  z-index: 100;
 }
 
 .request-export-filters {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
-.request-export-filter-select {
-  padding: 0.5rem 0.75rem;
+.request-export-date-separator {
+  color: #64748b;
+  font-weight: 600;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.request-export-date-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  z-index: 100;
+}
+
+.request-export-date-picker {
+  padding: 0.5rem 3.5rem 0.5rem 0.75rem;
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   font-size: 0.875rem;
@@ -119,24 +136,101 @@
   color: #1e293b;
   cursor: pointer;
   transition: all 0.2s;
-  min-width: 120px;
+  min-width: 160px;
+  width: 100%;
 }
 
-.request-export-filter-select:hover {
+.request-export-date-picker:hover {
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.request-export-filter-select:focus {
+.request-export-date-picker:focus {
   outline: none;
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.request-export-filter-select:disabled {
-  background: #f1f5f9;
-  color: #94a3b8;
-  cursor: not-allowed;
+.request-export-date-icon {
+  position: absolute;
+  right: 2.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #64748b;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Clear button (X) styling */
+.request-export-date-wrapper .react-datepicker__close-icon {
+  right: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  z-index: 2;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.request-export-date-wrapper .react-datepicker__close-icon::after {
+  font-size: 1rem !important;
+  color: #64748b !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* DatePicker Popper - Ensure it appears above other elements */
+.react-datepicker__popper {
+  z-index: 99999 !important;
+}
+
+.react-datepicker-popper {
+  z-index: 99999 !important;
+}
+
+.request-export-datepicker-popper {
+  z-index: 99999 !important;
+}
+
+.request-export-datepicker-popper .react-datepicker {
+  z-index: 99999 !important;
+}
+
+.request-export-datepicker-popper .react-datepicker__triangle {
+  z-index: 99999 !important;
+}
+
+/* Portal container for datepicker */
+#datepicker-portal {
+  z-index: 99999 !important;
+}
+
+#datepicker-portal .react-datepicker {
+  z-index: 99999 !important;
+}
+
+#datepicker-portal .react-datepicker__popper {
+  z-index: 99999 !important;
+}
+
+/* Ensure datepicker wrapper has proper stacking context */
+.request-export-date-wrapper {
+  position: relative;
+  z-index: 10000;
+}
+
+.request-export-filters {
+  position: relative;
+  z-index: 10000;
 }
 
 .request-export-excel-btn {
@@ -259,6 +353,11 @@
   border-bottom: 1px solid rgba(226, 232, 240, 0.6);
   overflow: visible;
   /* Cho phép hiệu ứng hover không bị cắt */
+  position: relative;
+  z-index: 1;
+}
+
+.request-type-filter-chip {
   position: relative;
   z-index: 1;
 }
@@ -445,6 +544,54 @@
   /* shadow-lg */
 }
 
+/* Tab Active (Đơn xin đi trễ về sớm) - Accent Purple */
+.request-type-filter-chip.late-early.active {
+  background: #8b5cf6;
+  /* bg-purple-500 - Accent Purple */
+  color: #ffffff;
+  /* text-white */
+  border-color: #8b5cf6;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  /* shadow-md */
+}
+
+.request-type-filter-chip.late-early:hover:not(.active) {
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #8b5cf6;
+  /* text-purple-500 */
+}
+
+.request-type-filter-chip.late-early.active:hover {
+  background: #7c3aed;
+  /* bg-purple-600 */
+  box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.12), 0 3px 5px -1px rgba(0, 0, 0, 0.08);
+  /* shadow-lg */
+}
+
+/* Tab Active (Đơn xin phụ cấp công trình) - Accent Orange */
+.request-type-filter-chip.meal-allowance.active {
+  background: #f59e0b;
+  /* bg-amber-500 - Accent Orange */
+  color: #ffffff;
+  /* text-white */
+  border-color: #f59e0b;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  /* shadow-md */
+}
+
+.request-type-filter-chip.meal-allowance:hover:not(.active) {
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+  /* text-amber-500 */
+}
+
+.request-type-filter-chip.meal-allowance.active:hover {
+  background: #d97706;
+  /* bg-amber-600 */
+  box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.12), 0 3px 5px -1px rgba(0, 0, 0, 0.08);
+  /* shadow-lg */
+}
+
 /* Tab Active (Tất cả đơn) - Accent Blue */
 .request-type-filter-chip.all.active {
   background: linear-gradient(135deg, #3b82f6, #10b981);
@@ -497,6 +644,18 @@
   background: linear-gradient(135deg, #d1fae5, #a7f3d0);
   color: #065f46;
   border: 1px solid #6ee7b7;
+}
+
+.request-type-badge.late-early {
+  background: linear-gradient(135deg, #e9d5ff, #ddd6fe);
+  color: #6b21a8;
+  border: 1px solid #c084fc;
+}
+
+.request-type-badge.meal-allowance {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border: 1px solid #fcd34d;
 }
 
 /* Summary Cards - Gradient Glass Style */
@@ -702,6 +861,23 @@
   font-weight: 500;
   padding-left: 0.5rem;
   border-left: 2px solid rgba(14, 165, 233, 0.3);
+}
+
+.request-dates-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.request-dates-info .time-info {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.request-dates-info .date-separator {
+  margin: 0 0.25rem;
+  color: #94a3b8;
 }
 
 .status-badge {
