@@ -7,6 +7,8 @@ import EmployeeForm from './components/EmployeeForm/EmployeeForm';
 import EquipmentAssignmentModal from './components/EquipmentAssignment/EquipmentAssignmentModal';
 import RequestsManagementModal from './components/RequestsManagement/RequestsManagementModal';
 import LeaveRequest from './components/LeaveRequest/LeaveRequest';
+import LateEarlyRequest from './components/LateEarlyRequest/LateEarlyRequest';
+import MealAllowanceRequest from './components/MealAllowanceRequest/MealAllowanceRequest';
 import ResignRequest from './components/ResignRequest/ResignRequest';
 import LeaveApprovals from './components/LeaveApprovals/LeaveApprovals';
 import RequestManagement from './components/RequestManagement/RequestManagement';
@@ -26,6 +28,7 @@ import CustomerEntertainmentExpenseRequest from './components/CustomerEntertainm
 import CustomerEntertainmentExpenseApproval from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseApproval';
 import CustomerEntertainmentExpenseAccountant from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseAccountant';
 import CustomerEntertainmentExpenseCEO from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseCEO';
+import CustomerEntertainmentExpenseCEOApproval from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseCEOApproval';
 import CustomerEntertainmentExpensePayment from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpensePayment';
 import Login from './components/Login/Login';
 import ChangePasswordModal from './components/Common/ChangePasswordModal';
@@ -288,6 +291,20 @@ function App() {
               showToast={showToast}
             />
           );
+        case 'late-early-request':
+          return (
+            <LateEarlyRequest
+              currentUser={currentUser}
+              showToast={showToast}
+            />
+          );
+        case 'meal-allowance-request':
+          return (
+            <MealAllowanceRequest
+              currentUser={currentUser}
+              showToast={showToast}
+            />
+          );
         case 'resign-request':
           return (
             <ResignRequest
@@ -409,6 +426,25 @@ function App() {
           }
           return (
             <CustomerEntertainmentExpenseCEO
+              currentUser={currentUser}
+              showToast={showToast}
+              showConfirm={showConfirm}
+            />
+          );
+        case 'customer-entertainment-expense-ceo-approval':
+          // Chỉ Lê Thanh Tùng mới được phép truy cập module này
+          if (!isLeThanhTung(currentUser)) {
+            showToast('Bạn không có quyền truy cập module này. Chỉ Tổng Giám đốc Lê Thanh Tùng mới được phép.', 'error');
+            setCurrentView('dashboard');
+            return (
+              <EmployeeDashboard
+                currentUser={currentUser}
+                showToast={showToast}
+              />
+            );
+          }
+          return (
+            <CustomerEntertainmentExpenseCEOApproval
               currentUser={currentUser}
               showToast={showToast}
               showConfirm={showConfirm}

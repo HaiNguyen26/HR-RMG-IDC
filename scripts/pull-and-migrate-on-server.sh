@@ -446,6 +446,67 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 22: $MIGRATION22${NC}"
 fi
 
+# Migration 23: create_late_early_requests_schema.sql (Tạo schema cho đơn xin đi trễ về sớm)
+MIGRATION23="$PROJECT_DIR/database/create_late_early_requests_schema.sql"
+if [ -f "$MIGRATION23" ]; then
+    echo -e "${BLUE}→ Chạy migration: create_late_early_requests_schema.sql (Tạo bảng late_early_requests cho đơn xin đi trễ về sớm)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION23"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 23 thành công - Đã tạo schema cho đơn xin đi trễ về sớm${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 23${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 23: $MIGRATION23${NC}"
+fi
+
+# Migration 24: create_meal_allowance_requests_schema.sql (Tạo schema cho đơn xin phụ cấp cơm công trình)
+MIGRATION24="$PROJECT_DIR/database/create_meal_allowance_requests_schema.sql"
+if [ -f "$MIGRATION24" ]; then
+    echo -e "${BLUE}→ Chạy migration: create_meal_allowance_requests_schema.sql (Tạo bảng meal_allowance_requests và meal_allowance_items cho đơn xin phụ cấp cơm công trình)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION24"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 24 thành công - Đã tạo schema cho đơn xin phụ cấp cơm công trình${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 24${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 24: $MIGRATION24${NC}"
+fi
+
+# Migration 25: add_manager_fields_customer_entertainment_expenses.sql (Thêm các trường manager cho customer_entertainment_expense_requests)
+MIGRATION25="$PROJECT_DIR/database/add_manager_fields_customer_entertainment_expenses.sql"
+if [ -f "$MIGRATION25" ]; then
+    echo -e "${BLUE}→ Chạy migration: add_manager_fields_customer_entertainment_expenses.sql (Thêm các trường manager cho customer_entertainment_expense_requests)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION25"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 25 thành công - Đã thêm các trường manager${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 25${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 25: $MIGRATION25${NC}"
+fi
+
+# Migration 26: add_ceo_fields_customer_entertainment_expenses.sql (Thêm các trường CEO cho customer_entertainment_expense_requests)
+MIGRATION26="$PROJECT_DIR/database/add_ceo_fields_customer_entertainment_expenses.sql"
+if [ -f "$MIGRATION26" ]; then
+    echo -e "${BLUE}→ Chạy migration: add_ceo_fields_customer_entertainment_expenses.sql (Thêm các trường CEO cho customer_entertainment_expense_requests)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION26"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 26 thành công - Đã thêm các trường CEO${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 26${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 26: $MIGRATION26${NC}"
+fi
+
+
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"

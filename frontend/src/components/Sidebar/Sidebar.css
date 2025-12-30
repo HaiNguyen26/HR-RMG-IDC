@@ -377,73 +377,286 @@
   filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5));
 }
 
-/* Màu chủ đạo cho nhóm module duyệt và lịch sử đơn từ - Blue/Indigo Gradient */
-.nav-item-approval {
+/* Nhóm 1: Xin đơn - Blue */
+.nav-item-request {
   background: rgba(239, 246, 255, 0.6) !important;
-  /* bg-blue-50/60 */
-  border-color: rgba(99, 102, 241, 0.15) !important;
-  /* border-indigo-500/15 */
+  border-color: rgba(59, 130, 246, 0.15) !important;
+}
+
+.nav-item-request .nav-icon-wrapper {
+  background: rgba(59, 130, 246, 0.1) !important;
+  color: rgba(59, 130, 246, 0.85) !important;
+}
+
+.nav-item-request .nav-label {
+  color: rgba(37, 99, 235, 0.9) !important;
+  font-weight: 600;
+}
+
+.nav-item-request:hover {
+  background: rgba(219, 234, 254, 0.7) !important;
+  border-color: rgba(59, 130, 246, 0.25) !important;
+  box-shadow: 0 12px 28px -20px rgba(59, 130, 246, 0.3) !important;
+}
+
+.nav-item-request:hover::before {
+  background: rgba(59, 130, 246, 0.45) !important;
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.45) !important;
+}
+
+.nav-item-request:hover .nav-icon-wrapper {
+  background: rgba(59, 130, 246, 0.18) !important;
+  color: rgba(37, 99, 235, 1) !important;
+}
+
+.nav-item-request.active {
+  background: rgba(59, 130, 246, 0.12) !important;
+  border-color: rgba(59, 130, 246, 0.25) !important;
+  color: rgba(37, 99, 235, 1) !important;
+}
+
+.nav-item-request.active::before {
+  background: rgba(59, 130, 246, 0.6) !important;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4) !important;
+}
+
+.nav-item-request.active .nav-icon-wrapper,
+.nav-item-request.active .nav-label {
+  color: rgba(37, 99, 235, 1) !important;
+  font-weight: 700;
+}
+
+.nav-item-request.active .nav-icon-wrapper {
+  background: rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Nhóm 2: Chi phí - Green */
+.nav-item-expense {
+  background: rgba(240, 253, 244, 0.6) !important;
+  border-color: rgba(34, 197, 94, 0.15) !important;
+}
+
+.nav-item-expense .nav-icon-wrapper {
+  background: rgba(34, 197, 94, 0.1) !important;
+  color: rgba(34, 197, 94, 0.85) !important;
+}
+
+.nav-item-expense .nav-label {
+  color: rgba(22, 163, 74, 0.9) !important;
+  font-weight: 600;
+}
+
+.nav-item-expense:hover {
+  background: rgba(220, 252, 231, 0.7) !important;
+  border-color: rgba(34, 197, 94, 0.25) !important;
+  box-shadow: 0 12px 28px -20px rgba(34, 197, 94, 0.3) !important;
+}
+
+.nav-item-expense:hover::before {
+  background: rgba(34, 197, 94, 0.45) !important;
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.45) !important;
+}
+
+.nav-item-expense:hover .nav-icon-wrapper {
+  background: rgba(34, 197, 94, 0.18) !important;
+  color: rgba(22, 163, 74, 1) !important;
+}
+
+.nav-item-expense.active {
+  background: rgba(34, 197, 94, 0.12) !important;
+  border-color: rgba(34, 197, 94, 0.25) !important;
+  color: rgba(22, 163, 74, 1) !important;
+}
+
+.nav-item-expense.active::before {
+  background: rgba(34, 197, 94, 0.6) !important;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.4) !important;
+}
+
+.nav-item-expense.active .nav-icon-wrapper,
+.nav-item-expense.active .nav-label {
+  color: rgba(22, 163, 74, 1) !important;
+  font-weight: 700;
+}
+
+.nav-item-expense.active .nav-icon-wrapper {
+  background: rgba(34, 197, 94, 0.2) !important;
+}
+
+/* Nhóm 3: Duyệt - Orange */
+.nav-item-approval {
+  background: rgba(255, 247, 237, 0.6) !important;
+  border-color: rgba(249, 115, 22, 0.15) !important;
 }
 
 .nav-item-approval .nav-icon-wrapper {
-  background: rgba(99, 102, 241, 0.1) !important;
-  /* bg-indigo-500/10 */
-  color: rgba(99, 102, 241, 0.85) !important;
-  /* text-indigo-600 */
+  background: rgba(249, 115, 22, 0.1) !important;
+  color: rgba(249, 115, 22, 0.85) !important;
 }
 
 .nav-item-approval .nav-label {
-  color: rgba(67, 56, 202, 0.9) !important;
-  /* text-indigo-700 */
+  color: rgba(234, 88, 12, 0.9) !important;
   font-weight: 600;
 }
 
 .nav-item-approval:hover {
-  background: rgba(224, 231, 255, 0.7) !important;
-  /* bg-indigo-50/70 */
-  border-color: rgba(99, 102, 241, 0.25) !important;
-  /* border-indigo-500/25 */
-  box-shadow: 0 12px 28px -20px rgba(99, 102, 241, 0.3) !important;
+  background: rgba(255, 237, 213, 0.7) !important;
+  border-color: rgba(249, 115, 22, 0.25) !important;
+  box-shadow: 0 12px 28px -20px rgba(249, 115, 22, 0.3) !important;
 }
 
 .nav-item-approval:hover::before {
-  background: rgba(99, 102, 241, 0.45) !important;
-  /* indigo-500/45 */
-  box-shadow: 0 0 14px rgba(99, 102, 241, 0.45) !important;
+  background: rgba(249, 115, 22, 0.45) !important;
+  box-shadow: 0 0 14px rgba(249, 115, 22, 0.45) !important;
 }
 
 .nav-item-approval:hover .nav-icon-wrapper {
-  background: rgba(99, 102, 241, 0.18) !important;
-  /* bg-indigo-500/18 */
-  color: rgba(79, 70, 229, 1) !important;
-  /* text-indigo-600 */
+  background: rgba(249, 115, 22, 0.18) !important;
+  color: rgba(234, 88, 12, 1) !important;
 }
 
 .nav-item-approval.active {
-  background: rgba(99, 102, 241, 0.12) !important;
-  /* bg-indigo-500/12 */
-  border-color: rgba(99, 102, 241, 0.25) !important;
-  /* border-indigo-500/25 */
-  color: rgba(67, 56, 202, 1) !important;
-  /* text-indigo-700 */
+  background: rgba(249, 115, 22, 0.12) !important;
+  border-color: rgba(249, 115, 22, 0.25) !important;
+  color: rgba(234, 88, 12, 1) !important;
 }
 
 .nav-item-approval.active::before {
-  background: rgba(99, 102, 241, 0.6) !important;
-  /* indigo-500/60 */
-  box-shadow: 0 0 12px rgba(99, 102, 241, 0.4) !important;
+  background: rgba(249, 115, 22, 0.6) !important;
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.4) !important;
 }
 
 .nav-item-approval.active .nav-icon-wrapper,
 .nav-item-approval.active .nav-label {
-  color: rgba(67, 56, 202, 1) !important;
-  /* text-indigo-700 */
+  color: rgba(234, 88, 12, 1) !important;
   font-weight: 700;
 }
 
 .nav-item-approval.active .nav-icon-wrapper {
-  background: rgba(99, 102, 241, 0.2) !important;
-  /* bg-indigo-500/20 */
+  background: rgba(249, 115, 22, 0.2) !important;
+}
+
+/* Nhóm 4: Thử việc - Purple */
+.nav-item-probation {
+  background: rgba(250, 245, 255, 0.6) !important;
+  border-color: rgba(168, 85, 247, 0.15) !important;
+}
+
+.nav-item-probation .nav-icon-wrapper {
+  background: rgba(168, 85, 247, 0.1) !important;
+  color: rgba(168, 85, 247, 0.85) !important;
+}
+
+.nav-item-probation .nav-label {
+  color: rgba(147, 51, 234, 0.9) !important;
+  font-weight: 600;
+}
+
+.nav-item-probation:hover {
+  background: rgba(243, 232, 255, 0.7) !important;
+  border-color: rgba(168, 85, 247, 0.25) !important;
+  box-shadow: 0 12px 28px -20px rgba(168, 85, 247, 0.3) !important;
+}
+
+.nav-item-probation:hover::before {
+  background: rgba(168, 85, 247, 0.45) !important;
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.45) !important;
+}
+
+.nav-item-probation:hover .nav-icon-wrapper {
+  background: rgba(168, 85, 247, 0.18) !important;
+  color: rgba(147, 51, 234, 1) !important;
+}
+
+.nav-item-probation.active {
+  background: rgba(168, 85, 247, 0.12) !important;
+  border-color: rgba(168, 85, 247, 0.25) !important;
+  color: rgba(147, 51, 234, 1) !important;
+}
+
+.nav-item-probation.active::before {
+  background: rgba(168, 85, 247, 0.6) !important;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.4) !important;
+}
+
+.nav-item-probation.active .nav-icon-wrapper,
+.nav-item-probation.active .nav-label {
+  color: rgba(147, 51, 234, 1) !important;
+  font-weight: 700;
+}
+
+.nav-item-probation.active .nav-icon-wrapper {
+  background: rgba(168, 85, 247, 0.2) !important;
+}
+
+/* Nhóm 5: Nghỉ việc - Red */
+.nav-item-resign {
+  background: rgba(254, 242, 242, 0.6) !important;
+  border-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+.nav-item-resign .nav-icon-wrapper {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: rgba(239, 68, 68, 0.85) !important;
+}
+
+.nav-item-resign .nav-label {
+  color: rgba(220, 38, 38, 0.9) !important;
+  font-weight: 600;
+}
+
+.nav-item-resign:hover {
+  background: rgba(254, 226, 226, 0.7) !important;
+  border-color: rgba(239, 68, 68, 0.25) !important;
+  box-shadow: 0 12px 28px -20px rgba(239, 68, 68, 0.3) !important;
+}
+
+.nav-item-resign:hover::before {
+  background: rgba(239, 68, 68, 0.45) !important;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.45) !important;
+}
+
+.nav-item-resign:hover .nav-icon-wrapper {
+  background: rgba(239, 68, 68, 0.18) !important;
+  color: rgba(220, 38, 38, 1) !important;
+}
+
+.nav-item-resign.active {
+  background: rgba(239, 68, 68, 0.12) !important;
+  border-color: rgba(239, 68, 68, 0.25) !important;
+  color: rgba(220, 38, 38, 1) !important;
+}
+
+.nav-item-resign.active::before {
+  background: rgba(239, 68, 68, 0.6) !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4) !important;
+}
+
+.nav-item-resign.active .nav-icon-wrapper,
+.nav-item-resign.active .nav-label {
+  color: rgba(220, 38, 38, 1) !important;
+  font-weight: 700;
+}
+
+.nav-item-resign.active .nav-icon-wrapper {
+  background: rgba(239, 68, 68, 0.2) !important;
+}
+
+/* Section Label */
+.nav-section-label {
+  padding: 0.75rem 1rem 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(107, 114, 128, 0.8);
+  border-top: 1px solid rgba(209, 213, 219, 0.3);
+}
+
+.nav-section-label:first-child {
+  border-top: none;
+  margin-top: 0;
 }
 
 .quick-stats-card {

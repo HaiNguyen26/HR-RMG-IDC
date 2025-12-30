@@ -1,10 +1,16 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
+import DatePicker from 'react-datepicker';
 import {
     attendanceAdjustmentsAPI,
     leaveRequestsAPI,
     overtimeRequestsAPI,
+    lateEarlyRequestsAPI,
+    mealAllowanceRequestsAPI,
 } from '../../services/api';
+import { parseISODateString, formatDateToISO } from '../../utils/dateUtils';
+import { DATE_PICKER_LOCALE } from '../../utils/datepickerLocale';
+import 'react-datepicker/dist/react-datepicker.css';
 import './RequestManagement.css';
 
 const STATUS_LABELS = {
@@ -51,6 +57,18 @@ const MODULE_OPTIONS = [
         label: 'Đơn bổ sung công',
         header: 'Quản lý đơn bổ sung công',
         description: 'Theo dõi tiến độ phê duyệt đơn bổ sung công.'
+    },
+    {
+        key: 'late-early',
+        label: 'Đơn xin đi trễ về sớm',
+        header: 'Quản lý đơn đi trễ về sớm',
+        description: 'Theo dõi tiến độ phê duyệt đơn xin đi trễ/về sớm.'
+    },
+    {
+        key: 'meal-allowance',
+        label: 'Đơn xin phụ cấp công trình',
+        header: 'Quản lý đơn xin phụ cấp công trình',
+        description: 'Theo dõi tiến độ phê duyệt đơn xin phụ cấp cơm công trình.'
     }
 ];
 
@@ -80,8 +98,8 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     const [activeModule, setActiveModule] = useState('all');
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
-    const [exportFilterMonth, setExportFilterMonth] = useState('');
-    const [exportFilterYear, setExportFilterYear] = useState(new Date().getFullYear().toString());
+    const [exportFilterStartDate, setExportFilterStartDate] = useState(null);
+    const [exportFilterEndDate, setExportFilterEndDate] = useState(null);
 
     // Statistics cho tất cả các status của module hiện tại
     const [moduleStatusStatistics, setModuleStatusStatistics] = useState({
@@ -96,7 +114,8 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         all: { pending: 0, total: 0 },
         leave: { pending: 0, total: 0 },
         overtime: { pending: 0, total: 0 },
-        attendance: { pending: 0, total: 0 }
+        attendance: { pending: 0, total: 0 },
+        'late-early': { pending: 0, total: 0 }
     });
 
     // Refs để track previous values và tránh setState không cần thiết
@@ -138,10 +157,12 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             // Không thêm employeeId - lấy toàn bộ đơn trong hệ thống
             const baseParams = {};
 
-            const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
+            const [leaveResponse, overtimeResponse, attendanceResponse, lateEarlyResponse, mealAllowanceResponse] = await Promise.all([
                 Promise.all(statuses.map(status => leaveRequestsAPI.getAll({ ...baseParams, status }))),
                 Promise.all(statuses.map(status => overtimeRequestsAPI.getAll({ ...baseParams, status }))),
-                Promise.all(statuses.map(status => attendanceAdjustmentsAPI.getAll({ ...baseParams, status })))
+                Promise.all(statuses.map(status => attendanceAdjustmentsAPI.getAll({ ...baseParams, status }))),
+                Promise.all(statuses.map(status => lateEarlyRequestsAPI.getAll({ ...baseParams, status }))),
+                Promise.all(statuses.map(status => mealAllowanceRequestsAPI.getAll({ ...baseParams, status })))
             ]);
 
             const leaveStats = {
@@ -174,26 +195,50 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             // Không tính CANCELLED vào total
             attendanceStats.total = attendanceStats.pending + attendanceStats.approved + attendanceStats.rejected;
 
+            const lateEarlyStats = {
+                pending: lateEarlyResponse[0].data.success ? (lateEarlyResponse[0].data.data || []).length : 0,
+                approved: lateEarlyResponse[1].data.success ? (lateEarlyResponse[1].data.data || []).length : 0,
+                rejected: lateEarlyResponse[2].data.success ? (lateEarlyResponse[2].data.data || []).length : 0,
+                cancelled: lateEarlyResponse[3].data.success ? (lateEarlyResponse[3].data.data || []).length : 0,
+                total: 0
+            };
+            // Không tính CANCELLED vào total
+            lateEarlyStats.total = lateEarlyStats.pending + lateEarlyStats.approved + lateEarlyStats.rejected;
+
+            const mealAllowanceStats = {
+                pending: mealAllowanceResponse[0].data.success ? (mealAllowanceResponse[0].data.data || []).length : 0,
+                approved: mealAllowanceResponse[1].data.success ? (mealAllowanceResponse[1].data.data || []).length : 0,
+                rejected: mealAllowanceResponse[2].data.success ? (mealAllowanceResponse[2].data.data || []).length : 0,
+                cancelled: mealAllowanceResponse[3].data.success ? (mealAllowanceResponse[3].data.data || []).length : 0,
+                total: 0
+            };
+            // Không tính CANCELLED vào total
+            mealAllowanceStats.total = mealAllowanceStats.pending + mealAllowanceStats.approved + mealAllowanceStats.rejected;
+
             const allStats = {
-                pending: leaveStats.pending + overtimeStats.pending + attendanceStats.pending,
-                approved: leaveStats.approved + overtimeStats.approved + attendanceStats.approved,
-                rejected: leaveStats.rejected + overtimeStats.rejected + attendanceStats.rejected,
-                cancelled: leaveStats.cancelled + overtimeStats.cancelled + attendanceStats.cancelled,
-                total: leaveStats.total + overtimeStats.total + attendanceStats.total // Đã loại bỏ CANCELLED
+                pending: leaveStats.pending + overtimeStats.pending + attendanceStats.pending + lateEarlyStats.pending + mealAllowanceStats.pending,
+                approved: leaveStats.approved + overtimeStats.approved + attendanceStats.approved + lateEarlyStats.approved + mealAllowanceStats.approved,
+                rejected: leaveStats.rejected + overtimeStats.rejected + attendanceStats.rejected + lateEarlyStats.rejected + mealAllowanceStats.rejected,
+                cancelled: leaveStats.cancelled + overtimeStats.cancelled + attendanceStats.cancelled + lateEarlyStats.cancelled + mealAllowanceStats.cancelled,
+                total: leaveStats.total + overtimeStats.total + attendanceStats.total + lateEarlyStats.total + mealAllowanceStats.total // Đã loại bỏ CANCELLED
             };
 
             const newModuleStats = {
                 all: { pending: allStats.pending, total: allStats.total },
                 leave: { pending: leaveStats.pending, total: leaveStats.total },
                 overtime: { pending: overtimeStats.pending, total: overtimeStats.total },
-                attendance: { pending: attendanceStats.pending, total: attendanceStats.total }
+                attendance: { pending: attendanceStats.pending, total: attendanceStats.total },
+                'late-early': { pending: lateEarlyStats.pending, total: lateEarlyStats.total },
+                'meal-allowance': { pending: mealAllowanceStats.pending, total: mealAllowanceStats.total }
             };
 
             // Chỉ update state nếu data thực sự thay đổi
             if (!prevModuleStatsRef.current || !shallowEqual(prevModuleStatsRef.current.all, newModuleStats.all) ||
                 !shallowEqual(prevModuleStatsRef.current.leave, newModuleStats.leave) ||
                 !shallowEqual(prevModuleStatsRef.current.overtime, newModuleStats.overtime) ||
-                !shallowEqual(prevModuleStatsRef.current.attendance, newModuleStats.attendance)) {
+                !shallowEqual(prevModuleStatsRef.current.attendance, newModuleStats.attendance) ||
+                !shallowEqual(prevModuleStatsRef.current['late-early'], newModuleStats['late-early']) ||
+                !shallowEqual(prevModuleStatsRef.current['meal-allowance'], newModuleStats['meal-allowance'])) {
                 setModuleStatistics(newModuleStats);
                 prevModuleStatsRef.current = newModuleStats;
             }
@@ -208,6 +253,10 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 newStatusStats = overtimeStats;
             } else if (activeModule === 'attendance') {
                 newStatusStats = attendanceStats;
+            } else if (activeModule === 'late-early') {
+                newStatusStats = lateEarlyStats;
+            } else if (activeModule === 'meal-allowance') {
+                newStatusStats = mealAllowanceStats;
             } else {
                 newStatusStats = allStats;
             }
@@ -258,16 +307,20 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             let newRequests = [];
 
             if (activeModule === 'all') {
-                const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
+                const [leaveResponse, overtimeResponse, attendanceResponse, lateEarlyResponse, mealAllowanceResponse] = await Promise.all([
                     leaveRequestsAPI.getAll(params),
                     overtimeRequestsAPI.getAll(params),
-                    attendanceAdjustmentsAPI.getAll(params)
+                    attendanceAdjustmentsAPI.getAll(params),
+                    lateEarlyRequestsAPI.getAll(params),
+                    mealAllowanceRequestsAPI.getAll(params)
                 ]);
 
                 newRequests = [
                     ...(leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: 'leave' })) : []),
                     ...(overtimeResponse.data.success ? (overtimeResponse.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
-                    ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : [])
+                    ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : []),
+                    ...(lateEarlyResponse.data.success ? (lateEarlyResponse.data.data || []).map(r => ({ ...r, requestType: 'late-early' })) : []),
+                    ...(mealAllowanceResponse.data.success ? (mealAllowanceResponse.data.data || []).map(r => ({ ...r, requestType: 'meal-allowance' })) : [])
                 ];
 
                 // Sắp xếp theo thời gian tạo mới nhất
@@ -286,6 +339,16 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 const response = await attendanceAdjustmentsAPI.getAll(params);
                 if (response.data.success) {
                     newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'attendance' }));
+                }
+            } else if (activeModule === 'late-early') {
+                const response = await lateEarlyRequestsAPI.getAll(params);
+                if (response.data.success) {
+                    newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'late-early' }));
+                }
+            } else if (activeModule === 'meal-allowance') {
+                const response = await mealAllowanceRequestsAPI.getAll(params);
+                if (response.data.success) {
+                    newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'meal-allowance' }));
                 }
             }
 
@@ -313,6 +376,83 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         return () => clearInterval(interval);
     }, [fetchRequests]);
 
+    const handleDelete = async (request) => {
+        if (!showConfirm) {
+            if (!window.confirm('Bạn có chắc chắn muốn xóa đơn này? Hành động này không thể hoàn tác.')) {
+                return;
+            }
+        } else {
+            const confirmed = await showConfirm({
+                title: 'Xác nhận xóa đơn',
+                message: 'Bạn có chắc chắn muốn xóa đơn này? Hành động này không thể hoàn tác.',
+                confirmText: 'Xóa',
+                cancelText: 'Hủy',
+                type: 'warning'
+            });
+
+            if (!confirmed) {
+                return;
+            }
+        }
+
+        try {
+            setLoading(true);
+            let api;
+            
+            // Xác định API dựa trên requestType
+            const requestType = request.requestType || activeModule;
+            if (requestType === 'leave') {
+                api = leaveRequestsAPI;
+            } else if (requestType === 'overtime') {
+                api = overtimeRequestsAPI;
+            } else if (requestType === 'attendance') {
+                api = attendanceAdjustmentsAPI;
+            } else if (requestType === 'late-early') {
+                api = lateEarlyRequestsAPI;
+            } else if (requestType === 'meal-allowance') {
+                api = mealAllowanceRequestsAPI;
+            } else {
+                throw new Error(`Không xác định được loại đơn: ${requestType}`);
+            }
+
+            // Kiểm tra API có tồn tại và có method remove không
+            if (!api || typeof api.remove !== 'function') {
+                throw new Error(`API không hợp lệ cho loại đơn này. Request type: ${requestType}`);
+            }
+
+            await api.remove(request.id, {
+                employeeId: currentUser.id,
+                role: currentUser.role
+            });
+
+            if (showToast) {
+                // Ưu tiên dùng requestType từ request, nếu không có thì dùng activeModule (nhưng bỏ qua 'all')
+                let moduleLabel = 'đơn';
+                if (requestType && requestType !== 'all') {
+                    const module = MODULE_OPTIONS.find(m => m.key === requestType);
+                    moduleLabel = module?.label || 'đơn';
+                } else if (activeModule && activeModule !== 'all') {
+                    const module = MODULE_OPTIONS.find(m => m.key === activeModule);
+                    moduleLabel = module?.label || 'đơn';
+                }
+                showToast(`Đã xóa ${moduleLabel} thành công`, 'success');
+            }
+
+            // Refresh danh sách
+            await fetchRequests(false);
+            await fetchModuleStatistics(false);
+        } catch (error) {
+            console.error('Error deleting request:', error);
+            if (showToast) {
+                const message =
+                    error.response?.data?.message || 'Không thể xóa đơn. Vui lòng thử lại.';
+                showToast(message, 'error');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const getStatusLabel = (status) => {
         return STATUS_LABELS[status] || status;
     };
@@ -330,15 +470,6 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         setShowDetailModal(true);
     }, []);
 
-    // HR không có quyền xóa đơn - Function này đã bị vô hiệu hóa
-    /* eslint-disable no-unused-vars */
-    const handleDelete = async (request) => {
-        // Function disabled - HR không có quyền xóa đơn
-        console.warn('HR không có quyền xóa đơn');
-        return;
-    };
-    /* eslint-enable no-unused-vars */
-
     // Export approved requests to Excel
     const handleExportRequests = async () => {
         try {
@@ -347,20 +478,34 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             // Lấy dữ liệu đã được duyệt (APPROVED)
             let approvedRequests = requests.filter(req => req.status === 'APPROVED');
 
-            // Filter theo tháng/năm nếu có
-            if (exportFilterYear) {
-                const filterYear = parseInt(exportFilterYear, 10);
+            // Filter theo khoảng ngày nếu có
+            if (exportFilterStartDate || exportFilterEndDate) {
+                let startDate = null;
+                let endDate = null;
+
+                if (exportFilterStartDate) {
+                    startDate = new Date(exportFilterStartDate);
+                    startDate.setHours(0, 0, 0, 0);
+                }
+
+                if (exportFilterEndDate) {
+                    endDate = new Date(exportFilterEndDate);
+                    endDate.setHours(23, 59, 59, 999);
+                }
+
                 approvedRequests = approvedRequests.filter(req => {
                     if (!req.approved_at && !req.updated_at) return false;
                     const approvedDate = new Date(req.approved_at || req.updated_at);
-                    const requestYear = approvedDate.getFullYear();
+                    approvedDate.setHours(0, 0, 0, 0);
 
-                    if (exportFilterMonth) {
-                        const filterMonth = parseInt(exportFilterMonth, 10);
-                        const requestMonth = approvedDate.getMonth() + 1; // getMonth() returns 0-11
-                        return requestYear === filterYear && requestMonth === filterMonth;
+                    if (startDate && endDate) {
+                        return approvedDate >= startDate && approvedDate <= endDate;
+                    } else if (startDate) {
+                        return approvedDate >= startDate;
+                    } else if (endDate) {
+                        return approvedDate <= endDate;
                     }
-                    return requestYear === filterYear;
+                    return true;
                 });
             }
 
@@ -415,6 +560,10 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         return 'Đơn tăng ca';
                     } else if (req.requestType === 'attendance') {
                         return 'Đơn bổ sung công';
+                    } else if (req.requestType === 'late-early') {
+                        return req.request_type === 'LATE' ? 'Đơn xin đi trễ' : 'Đơn xin về sớm';
+                    } else if (req.requestType === 'meal-allowance') {
+                        return 'Đơn xin phụ cấp cơm công trình';
                     }
                     return 'Không xác định';
                 };
@@ -422,16 +571,32 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 const getTimeInfo = () => {
                     if (req.requestType === 'overtime') {
                         return `${req.start_time || ''} - ${req.end_time || ''}`;
+                    } else if (req.requestType === 'late-early') {
+                        return req.time_value || '';
                     }
                     return '';
+                };
+
+                const getStartDate = () => {
+                    if (req.requestType === 'late-early') {
+                        return formatDate(req.request_date);
+                    }
+                    return formatDate(req.start_date);
+                };
+
+                const getEndDate = () => {
+                    if (req.requestType === 'late-early') {
+                        return '-';
+                    }
+                    return formatDate(req.end_date);
                 };
 
                 return {
                     'Mã đơn': req.id || '',
                     'Loại đơn': getRequestTypeLabel(),
                     'Nhân viên': req.employee_name || req.employee?.ho_ten || '',
-                    'Ngày bắt đầu': formatDate(req.start_date),
-                    'Ngày kết thúc': formatDate(req.end_date),
+                    'Ngày bắt đầu': getStartDate(),
+                    'Ngày kết thúc': getEndDate(),
                     'Thời gian': getTimeInfo(),
                     'Lý do': req.reason || req.notes || '',
                     'Trạng thái': 'Đã duyệt',
@@ -452,15 +617,19 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             // Tạo tên file
             let fileName = 'don_tu_da_duyet';
             if (activeModule !== 'all') {
-                const moduleName = activeModule === 'leave' ? 'don_nghi' : activeModule === 'overtime' ? 'don_tang_ca' : 'don_bo_sung_cong';
+                const moduleName = activeModule === 'leave' ? 'don_nghi' : activeModule === 'overtime' ? 'don_tang_ca' : activeModule === 'late-early' ? 'don_di_tre_ve_som' : activeModule === 'meal-allowance' ? 'don_phu_cap_com' : 'don_bo_sung_cong';
                 fileName = `${moduleName}_da_duyet`;
             }
-            if (exportFilterYear) {
-                fileName += `_${exportFilterYear}`;
-            }
-            if (exportFilterMonth) {
-                const monthNames = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
-                fileName += `_${monthNames[parseInt(exportFilterMonth, 10) - 1]}`;
+            if (exportFilterStartDate && exportFilterEndDate) {
+                const startStr = formatDateToISO(exportFilterStartDate).replace(/-/g, '');
+                const endStr = formatDateToISO(exportFilterEndDate).replace(/-/g, '');
+                fileName += `_${startStr}_${endStr}`;
+            } else if (exportFilterStartDate) {
+                const startStr = formatDateToISO(exportFilterStartDate).replace(/-/g, '');
+                fileName += `_tu_${startStr}`;
+            } else if (exportFilterEndDate) {
+                const endStr = formatDateToISO(exportFilterEndDate).replace(/-/g, '');
+                fileName += `_den_${endStr}`;
             }
             fileName += '.xlsx';
 
@@ -1046,6 +1215,194 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             );
         }
 
+        if (requestType === 'late-early' || activeModule === 'late-early') {
+            const formatTimeDisplay = (timeValue) => {
+                if (!timeValue) return '-';
+                if (typeof timeValue === 'string' && timeValue.includes(':')) {
+                    const [hours, minutes] = timeValue.split(':');
+                    return `${hours}:${minutes}`;
+                }
+                return timeValue;
+            };
+
+            const getRequestTypeLabel = (requestType) => {
+                if (requestType === 'LATE') return 'Đi trễ';
+                if (requestType === 'EARLY') return 'Về sớm';
+                return 'N/A';
+            };
+
+            return (
+                <>
+                    {/* Thông tin đơn */}
+                    <div className="request-management-modal-section">
+                        <h3 className="request-management-modal-section-title">
+                            <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Thông tin đơn
+                        </h3>
+                        <div className="request-management-modal-info-grid">
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                    </svg>
+                                    Tên nhân viên
+                                </span>
+                                <span className="info-value">{request.employee_name || request.ho_ten || '-'}</span>
+                            </div>
+                            {request.ma_nhan_vien && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path>
+                                        </svg>
+                                        Mã nhân viên
+                                    </span>
+                                    <span className="info-value">{request.ma_nhan_vien}</span>
+                                </div>
+                            )}
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    Mã đơn
+                                </span>
+                                <span className="info-value">ĐDTVS{String(request.id).padStart(6, '0')}</span>
+                            </div>
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    Trạng thái
+                                </span>
+                                <span className={`leave-status-tag ${request.status?.toLowerCase() || 'pending'}`}>
+                                    {getStatusLabel(request.status)}
+                                </span>
+                            </div>
+                            {request.created_at && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Ngày tạo
+                                    </span>
+                                    <span className="info-value">{formatDateDisplay(request.created_at, true)}</span>
+                                </div>
+                            )}
+                            {request.team_lead_action_at && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Ngày quản lý xử lý
+                                    </span>
+                                    <span className="info-value">{formatDateDisplay(request.team_lead_action_at, true)}</span>
+                                </div>
+                            )}
+                            {request.updated_at && request.updated_at !== request.created_at && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                        Ngày cập nhật
+                                    </span>
+                                    <span className="info-value">{formatDateDisplay(request.updated_at, true)}</span>
+                                </div>
+                            )}
+                            {request.team_lead_name && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                                        </svg>
+                                        Quản lý duyệt
+                                    </span>
+                                    <span className="info-value">{request.team_lead_name}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Chi tiết đơn xin đi trễ về sớm */}
+                    <div className="request-management-modal-section">
+                        <h3 className="request-management-modal-section-title">
+                            <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Chi tiết đơn xin đi trễ về sớm
+                        </h3>
+                        <div className="request-management-modal-info-grid">
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                                    </svg>
+                                    Loại đơn
+                                </span>
+                                <span className="info-value">{getRequestTypeLabel(request.request_type)}</span>
+                            </div>
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Ngày
+                                </span>
+                                <span className="info-value">{formatDateDisplay(request.request_date) || '-'}</span>
+                            </div>
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    Thời gian
+                                </span>
+                                <span className="info-value">{formatTimeDisplay(request.time_value) || '-'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Lý do và Ghi chú */}
+                    {(request.reason || request.notes || request.team_lead_comment) && (
+                        <div className="request-management-modal-section">
+                            <h3 className="request-management-modal-section-title">
+                                <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Lý do và Ghi chú
+                            </h3>
+                            {request.reason && (
+                                <div className="request-management-reason-text">
+                                    <strong>Lý do:</strong> {request.reason}
+                                </div>
+                            )}
+                            {request.notes && (
+                                <div className="request-management-notes-text">
+                                    <strong>Ghi chú:</strong> {request.notes}
+                                </div>
+                            )}
+                            {request.team_lead_comment && (
+                                <div className="request-management-manager-comment-text">
+                                    <strong>Nhận xét của quản lý:</strong> {request.team_lead_comment}
+                                    {request.team_lead_action_at && (
+                                        <span style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                                            ({formatDateDisplay(request.team_lead_action_at, true)})
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
+            );
+        }
+
         return null;
     };
 
@@ -1096,6 +1453,26 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     <th>Hành động</th>
                 </>
             );
+        } else if (activeModule === 'late-early') {
+            return (
+                <>
+                    <th>Loại đơn</th>
+                    <th>Ngày</th>
+                    <th>Thời gian</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                </>
+            );
+        } else if (activeModule === 'meal-allowance') {
+            return (
+                <>
+                    <th>Số mục</th>
+                    <th>Tổng tiền</th>
+                    <th>Khoảng ngày</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                </>
+            );
         }
         return null;
     }, [activeModule]);
@@ -1139,30 +1516,46 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     <div className="request-management-header-actions">
                         {/* Export Filter */}
                         <div className="request-export-filters">
-                            <select
-                                className="request-export-filter-select"
-                                value={exportFilterYear}
-                                onChange={(e) => setExportFilterYear(e.target.value)}
-                            >
-                                <option value="">Tất cả năm</option>
-                                {Array.from({ length: 5 }, (_, i) => {
-                                    const year = new Date().getFullYear() - i;
-                                    return <option key={year} value={year.toString()}>{year}</option>;
-                                })}
-                            </select>
-                            <select
-                                className="request-export-filter-select"
-                                value={exportFilterMonth}
-                                onChange={(e) => setExportFilterMonth(e.target.value)}
-                                disabled={!exportFilterYear}
-                            >
-                                <option value="">Tất cả tháng</option>
-                                {Array.from({ length: 12 }, (_, i) => {
-                                    const month = i + 1;
-                                    const monthNames = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
-                                    return <option key={month} value={month.toString()}>{monthNames[i]}</option>;
-                                })}
-                            </select>
+                            <div className="request-export-date-wrapper">
+                                <DatePicker
+                                    selected={exportFilterStartDate}
+                                    onChange={(date) => setExportFilterStartDate(date)}
+                                    dateFormat="dd/MM/yyyy"
+                                    placeholderText="Từ ngày"
+                                    locale={DATE_PICKER_LOCALE}
+                                    className="request-export-date-picker"
+                                    isClearable
+                                    maxDate={exportFilterEndDate || new Date()}
+                                    popperClassName="request-export-datepicker-popper"
+                                    popperPlacement="bottom-start"
+                                    withPortal
+                                    portalId="datepicker-portal"
+                                />
+                                <svg className="request-export-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            <span className="request-export-date-separator">→</span>
+                            <div className="request-export-date-wrapper">
+                                <DatePicker
+                                    selected={exportFilterEndDate}
+                                    onChange={(date) => setExportFilterEndDate(date)}
+                                    dateFormat="dd/MM/yyyy"
+                                    placeholderText="Đến ngày"
+                                    locale={DATE_PICKER_LOCALE}
+                                    className="request-export-date-picker"
+                                    isClearable
+                                    minDate={exportFilterStartDate}
+                                    maxDate={new Date()}
+                                    popperClassName="request-export-datepicker-popper"
+                                    popperPlacement="bottom-start"
+                                    withPortal
+                                    portalId="datepicker-portal"
+                                />
+                                <svg className="request-export-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
                         </div>
                         {/* Export Button */}
                         <button
@@ -1301,7 +1694,9 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                         <span className={`request-type-badge ${request.requestType || 'leave'}`}>
                                                             {request.requestType === 'leave' ? 'Đơn xin nghỉ' :
                                                                 request.requestType === 'overtime' ? 'Đơn tăng ca' :
-                                                                    request.requestType === 'attendance' ? 'Đơn bổ sung công' : 'Đơn xin nghỉ'}
+                                                                    request.requestType === 'attendance' ? 'Đơn bổ sung công' :
+                                                                        request.requestType === 'late-early' ? 'Đơn xin đi trễ về sớm' :
+                                                                            request.requestType === 'meal-allowance' ? 'Đơn xin phụ cấp cơm công trình' : 'Đơn xin nghỉ'}
                                                         </span>
                                                     </td>
                                                     <td className="request-info-cell">
@@ -1329,6 +1724,14 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                         if (attendanceType === 'OUTSIDE_WORK' || attendanceType === '3') return 'Làm việc bên ngoài';
                                                                         return 'Quên Chấm Công';
                                                                     })()}
+                                                                </p>
+                                                            </>
+                                                        )}
+                                                        {request.requestType === 'late-early' && (
+                                                            <>
+                                                                <strong>Đơn xin đi trễ về sớm</strong>
+                                                                <p className="request-management-period">
+                                                                    {request.request_type === 'LATE' ? 'Đi trễ' : request.request_type === 'EARLY' ? 'Về sớm' : 'N/A'}
                                                                 </p>
                                                             </>
                                                         )}
@@ -1371,6 +1774,31 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                     )}
                                                                 </>
                                                             )}
+                                                            {request.requestType === 'late-early' && (
+                                                                <>
+                                                                    <span>{formatDateDisplay(request.request_date)}</span>
+                                                                    {request.time_value && (
+                                                                        <span className="time-info">{request.time_value.slice(0, 5)}</span>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                            {request.requestType === 'meal-allowance' && (
+                                                                <>
+                                                                    {request.items && request.items.length > 0 ? (
+                                                                        <>
+                                                                            <span>{formatDateDisplay(request.items[0].expense_date)}</span>
+                                                                            {request.items.length > 1 && (
+                                                                                <>
+                                                                                    <span className="date-separator"> → </span>
+                                                                                    <span>{formatDateDisplay(request.items[request.items.length - 1].expense_date)}</span>
+                                                                                </>
+                                                                            )}
+                                                                        </>
+                                                                    ) : (
+                                                                        <span>-</span>
+                                                                    )}
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td>
@@ -1384,9 +1812,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                             className="btn-delete-small"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                if (showToast) {
-                                                                    showToast('Chức năng xóa đơn đang được phát triển', 'info');
-                                                                }
+                                                                handleDelete(request);
                                                             }}
                                                             title="Xóa đơn"
                                                         >
@@ -1416,9 +1842,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                             className="btn-delete-small"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                if (showToast) {
-                                                                    showToast('Chức năng xóa đơn đang được phát triển', 'info');
-                                                                }
+                                                                handleDelete(request);
                                                             }}
                                                             title="Xóa đơn"
                                                         >
@@ -1447,9 +1871,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                             className="btn-delete-small"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                if (showToast) {
-                                                                    showToast('Chức năng xóa đơn đang được phát triển', 'info');
-                                                                }
+                                                                handleDelete(request);
                                                             }}
                                                             title="Xóa đơn"
                                                         >
@@ -1481,9 +1903,80 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                             className="btn-delete-small"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                if (showToast) {
-                                                                    showToast('Chức năng xóa đơn đang được phát triển', 'info');
-                                                                }
+                                                                handleDelete(request);
+                                                            }}
+                                                            title="Xóa đơn"
+                                                        >
+                                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '4px' }}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                            </svg>
+                                                            Xóa
+                                                        </button>
+                                                    </td>
+                                                </>
+                                            )}
+                                            {activeModule === 'late-early' && (
+                                                <>
+                                                    <td>
+                                                        {request.request_type === 'LATE' ? 'Đi trễ' : request.request_type === 'EARLY' ? 'Về sớm' : 'N/A'}
+                                                    </td>
+                                                    <td>{formatDateDisplay(request.request_date)}</td>
+                                                    <td>
+                                                        {request.time_value ? request.time_value.slice(0, 5) : '-'}
+                                                    </td>
+                                                    <td>
+                                                        <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
+                                                            {getStatusLabel(request.status)}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-delete-small"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDelete(request);
+                                                            }}
+                                                            title="Xóa đơn"
+                                                        >
+                                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '4px' }}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                            </svg>
+                                                            Xóa
+                                                        </button>
+                                                    </td>
+                                                </>
+                                            )}
+                                            {activeModule === 'meal-allowance' && (
+                                                <>
+                                                    <td>
+                                                        {request.items ? request.items.length : 0} mục
+                                                    </td>
+                                                    <td>
+                                                        {request.total_amount ? new Intl.NumberFormat('vi-VN').format(request.total_amount) + ' VNĐ' : '-'}
+                                                    </td>
+                                                    <td>
+                                                        {request.items && request.items.length > 0 ? (
+                                                            <>
+                                                                {formatDateDisplay(request.items[0].expense_date)}
+                                                                {request.items.length > 1 && ` → ${formatDateDisplay(request.items[request.items.length - 1].expense_date)}`}
+                                                            </>
+                                                        ) : (
+                                                            '-'
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
+                                                            {getStatusLabel(request.status)}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-delete-small"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDelete(request);
                                                             }}
                                                             title="Xóa đơn"
                                                         >

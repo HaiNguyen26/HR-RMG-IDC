@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { employeesAPI, leaveRequestsAPI, overtimeRequestsAPI, attendanceAdjustmentsAPI, recruitmentRequestsAPI, customerEntertainmentExpensesAPI, travelExpensesAPI } from '../../services/api';
+import { employeesAPI, leaveRequestsAPI, overtimeRequestsAPI, attendanceAdjustmentsAPI, recruitmentRequestsAPI, customerEntertainmentExpensesAPI, travelExpensesAPI, mealAllowanceRequestsAPI, lateEarlyRequestsAPI } from '../../services/api';
 import './Sidebar.css';
 
 const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout, onChangePassword, isOpen = false, onClose }) => {
@@ -182,17 +182,21 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                 }
 
                 // Fetch pending counts for all modules
-                const [leaveRes, overtimeRes, attendanceRes] = await Promise.all([
+                const [leaveRes, overtimeRes, attendanceRes, mealAllowanceRes, lateEarlyRes] = await Promise.all([
                     leaveRequestsAPI.getAll({ ...params, status: 'PENDING' }).catch(() => ({ data: { success: false, data: [] } })),
                     overtimeRequestsAPI.getAll({ ...params, status: 'PENDING' }).catch(() => ({ data: { success: false, data: [] } })),
-                    attendanceAdjustmentsAPI.getAll({ ...params, status: 'PENDING' }).catch(() => ({ data: { success: false, data: [] } }))
+                    attendanceAdjustmentsAPI.getAll({ ...params, status: 'PENDING' }).catch(() => ({ data: { success: false, data: [] } })),
+                    mealAllowanceRequestsAPI.getAll({ ...params, status: 'PENDING' }).catch(() => ({ data: { success: false, data: [] } })),
+                    lateEarlyRequestsAPI.getAll({ ...params, status: 'PENDING' }).catch(() => ({ data: { success: false, data: [] } }))
                 ]);
 
                 const leavePending = leaveRes.data?.success && Array.isArray(leaveRes.data.data) ? leaveRes.data.data.length : 0;
                 const overtimePending = overtimeRes.data?.success && Array.isArray(overtimeRes.data.data) ? overtimeRes.data.data.length : 0;
                 const attendancePending = attendanceRes.data?.success && Array.isArray(attendanceRes.data.data) ? attendanceRes.data.data.length : 0;
+                const mealAllowancePending = mealAllowanceRes.data?.success && Array.isArray(mealAllowanceRes.data.data) ? mealAllowanceRes.data.data.length : 0;
+                const lateEarlyPending = lateEarlyRes.data?.success && Array.isArray(lateEarlyRes.data.data) ? lateEarlyRes.data.data.length : 0;
 
-                setPendingLeaveApprovalsCount(leavePending + overtimePending + attendancePending);
+                setPendingLeaveApprovalsCount(leavePending + overtimePending + attendancePending + mealAllowancePending + lateEarlyPending);
             } catch (error) {
                 console.error('Error fetching pending leave approvals count:', error);
                 setPendingLeaveApprovalsCount(0);
@@ -485,11 +489,22 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
 
         const fetchPendingExpenseCeoCount = async () => {
             try {
-                const response = await customerEntertainmentExpensesAPI.getAll({
-                    status: 'APPROVED_BY_BRANCH_DIRECTOR'
-                });
-                const count = response.data?.data?.length || 0;
-                setPendingExpenseCeoCount(count);
+                // Fetch cả PENDING_CEO (đơn chọn Tổng giám đốc làm người duyệt) và APPROVED_BY_BRANCH_DIRECTOR (đơn đã được kế toán xử lý)
+                const [pendingCeoResponse, accountantProcessedResponse] = await Promise.all([
+                    customerEntertainmentExpensesAPI.getAll({
+                        status: 'PENDING_CEO',
+                        ceoId: currentUser.id
+                    }),
+                    customerEntertainmentExpensesAPI.getAll({
+                        status: 'ACCOUNTANT_PROCESSED'
+                    })
+                ]);
+                
+                const pendingCeoCount = pendingCeoResponse.data?.data?.length || 0;
+                const accountantProcessedCount = accountantProcessedResponse.data?.data?.length || 0;
+                const totalCount = pendingCeoCount + accountantProcessedCount;
+                
+                setPendingExpenseCeoCount(totalCount);
             } catch (error) {
                 console.error('Error fetching pending expense CEO count:', error);
                 setPendingExpenseCeoCount(0);
@@ -993,17 +1008,16 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                             </li>
                         </>
                     )}
-                    {/* Placeholder for future modules */}
-                    <li className="nav-section-label">
-                        <p>Modules</p>
-                    </li>
-                    {/* Module cho nhân viên: Xin nghỉ phép, nghỉ việc */}
+                    {/* Nhóm 1: Xin đơn - Blue */}
                     {currentUser?.role === 'EMPLOYEE' && (
                         <>
+                            <li className="nav-section-label">
+                                <p>Xin Đơn</p>
+                            </li>
                             <li>
                                 <button
                                     onClick={() => onNavigate('leave-request')}
-                                    className={`nav-item ${currentView === 'leave-request' ? 'active' : ''}`}
+                                    className={`nav-item nav-item-request ${currentView === 'leave-request' ? 'active' : ''}`}
                                 >
                                     <span className="nav-icon-wrapper">
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1017,8 +1031,36 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                             </li>
                             <li>
                                 <button
+                                    onClick={() => onNavigate('late-early-request')}
+                                    className={`nav-item nav-item-request ${currentView === 'late-early-request' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z">
+                                            </path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Xin đi trễ về sớm</span>
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => onNavigate('meal-allowance-request')}
+                                    className={`nav-item nav-item-request ${currentView === 'meal-allowance-request' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Xin phụ cấp cơm công trình</span>
+                                </button>
+                            </li>
+                            <li>
+                                <button
                                     onClick={() => onNavigate('overtime-request')}
-                                    className={`nav-item ${currentView === 'overtime-request' ? 'active' : ''}`}
+                                    className={`nav-item nav-item-request ${currentView === 'overtime-request' ? 'active' : ''}`}
                                 >
                                     <span className="nav-icon-wrapper">
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1033,7 +1075,7 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                             <li>
                                 <button
                                     onClick={() => onNavigate('attendance-request')}
-                                    className={`nav-item ${currentView === 'attendance-request' ? 'active' : ''}`}
+                                    className={`nav-item nav-item-request ${currentView === 'attendance-request' ? 'active' : ''}`}
                                 >
                                     <span className="nav-icon-wrapper">
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1045,10 +1087,19 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                     <span className="nav-label">Bổ sung chấm công</span>
                                 </button>
                             </li>
+                        </>
+                    )}
+
+                    {/* Nhóm 2: Chi phí - Green */}
+                    {currentUser?.role === 'EMPLOYEE' && (
+                        <>
+                            <li className="nav-section-label">
+                                <p>Chi Phí</p>
+                            </li>
                             <li>
                                 <button
                                     onClick={() => onNavigate('customer-entertainment-expense-request')}
-                                    className={`nav-item ${currentView === 'customer-entertainment-expense-request' ? 'active' : ''}`}
+                                    className={`nav-item nav-item-expense ${currentView === 'customer-entertainment-expense-request' ? 'active' : ''}`}
                                 >
                                     <span className="nav-icon-wrapper">
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1063,7 +1114,7 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                             <li>
                                 <button
                                     onClick={() => onNavigate('travel-expense')}
-                                    className={`nav-item ${currentView === 'travel-expense' ? 'active' : ''}`}
+                                    className={`nav-item nav-item-expense ${currentView === 'travel-expense' ? 'active' : ''}`}
                                 >
                                     <span className="nav-icon-wrapper">
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1078,7 +1129,7 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                             <li>
                                 <button
                                     onClick={() => onNavigate('travel-expense-settlement')}
-                                    className={`nav-item ${currentView === 'travel-expense-settlement' ? 'active' : ''}`}
+                                    className={`nav-item nav-item-expense ${currentView === 'travel-expense-settlement' ? 'active' : ''}`}
                                 >
                                     <span className="nav-icon-wrapper">
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1090,120 +1141,122 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                     <span className="nav-label">Quyết toán công tác</span>
                                 </button>
                             </li>
-                            {/* Kế toán: Trần Nhật Thanh - Báo Cáo Tổng Hợp Chi Phí Tiếp Khách */}
-                            {(() => {
-                                if (!currentUser) return false;
-
-                                const userName = (currentUser.hoTen || currentUser.username || '').trim();
-                                const normalizedUserName = userName.toLowerCase().replace(/\s+/g, ' ');
-                                const normalizedUserNameNoAccents = removeVietnameseAccents(normalizedUserName);
-
-                                // Check by name - multiple variations
-                                const nameMatches = (
-                                    normalizedUserName === 'trần nhật thanh' ||
-                                    normalizedUserName === 'tran nhat thanh' ||
-                                    normalizedUserNameNoAccents === 'tran nhat thanh' ||
-                                    normalizedUserName.includes('trần nhật thanh') ||
-                                    normalizedUserName.includes('tran nhat thanh') ||
-                                    normalizedUserNameNoAccents.includes('tran nhat thanh') ||
-                                    (normalizedUserName.includes('trần nhật') && normalizedUserName.includes('thanh')) ||
-                                    (normalizedUserNameNoAccents.includes('tran nhat') && normalizedUserNameNoAccents.includes('thanh')) ||
-                                    (normalizedUserName.includes('nhật thanh') && normalizedUserName.includes('trần')) ||
-                                    (normalizedUserNameNoAccents.includes('nhat thanh') && normalizedUserNameNoAccents.includes('tran'))
-                                );
-
-                                // Check by title (chức danh) - "Nhân viên Kế toán Thanh toán"
-                                const titleMatches = (
-                                    normalizedTitle.includes('kế toán') ||
-                                    normalizedTitle.includes('ke toan') ||
-                                    normalizedTitleNoAccents.includes('ke toan') ||
-                                    normalizedTitle.includes('kế toán tổng hợp') ||
-                                    normalizedTitleNoAccents.includes('ke toan tong hop') ||
-                                    normalizedTitle.includes('kế toán thanh toán') ||
-                                    normalizedTitleNoAccents.includes('ke toan thanh toan') ||
-                                    normalizedTitle.includes('nhân viên kế toán') ||
-                                    normalizedTitleNoAccents.includes('nhan vien ke toan') ||
-                                    normalizedTitle.includes('thanh toán') ||
-                                    normalizedTitleNoAccents.includes('thanh toan')
-                                );
-
-                                const isAccountant = nameMatches || titleMatches;
-
-                                // Debug log
-                                console.log('[Sidebar] Accountant check:', {
-                                    role: currentUser.role,
-                                    hoTen: currentUser.hoTen,
-                                    username: currentUser.username,
-                                    chucDanh: chucDanh,
-                                    normalizedTitle: normalizedTitle,
-                                    normalizedTitleNoAccents: normalizedTitleNoAccents,
-                                    userName,
-                                    normalizedUserName,
-                                    normalizedUserNameNoAccents,
-                                    nameMatches,
-                                    titleMatches,
-                                    isAccountant
-                                });
-
-                                return isAccountant;
-                            })() && (
-                                    <>
-                                        <li>
-                                            <button
-                                                onClick={() => onNavigate('customer-entertainment-expense-accountant')}
-                                                className={`nav-item ${currentView === 'customer-entertainment-expense-accountant' ? 'active' : ''}`}
-                                            >
-                                                <span className="nav-icon-wrapper">
-                                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                                    </svg>
-                                                </span>
-                                                <span className="nav-label">Báo Cáo Tổng Hợp Chi Phí</span>
-                                            </button>
-                                        </li>
-                                        <li>
-                                            <button
-                                                onClick={() => onNavigate('customer-entertainment-expense-payment')}
-                                                className={`nav-item ${currentView === 'customer-entertainment-expense-payment' ? 'active' : ''}`}
-                                            >
-                                                <span className="nav-icon-wrapper">
-                                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                                                    </svg>
-                                                </span>
-                                                <span className="nav-label">Thanh Toán & Lưu Trữ</span>
-                                            </button>
-                                        </li>
-                                        <li>
-                                            <button
-                                                onClick={() => onNavigate('travel-expense-accountant')}
-                                                className={`nav-item ${currentView === 'travel-expense-accountant' ? 'active' : ''}`}
-                                            >
-                                                <span className="nav-icon-wrapper">
-                                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4">
-                                                        </path>
-                                                    </svg>
-                                                </span>
-                                                <span className="nav-label">Kiểm tra quyết toán công tác</span>
-                                            </button>
-                                        </li>
-                                    </>
-                                )}
                         </>
                     )}
-                    {/* Divider trước nhóm module duyệt và lịch sử đơn từ */}
-                    {currentUser?.role === 'EMPLOYEE' && (
-                        <li className="nav-divider">
-                            <div className="nav-divider-line"></div>
-                        </li>
+
+                    {/* Kế toán: Trần Nhật Thanh - Báo Cáo Tổng Hợp Chi Phí Tiếp Khách */}
+                    {(() => {
+                        if (!currentUser) return false;
+
+                        const userName = (currentUser.hoTen || currentUser.username || '').trim();
+                        const normalizedUserName = userName.toLowerCase().replace(/\s+/g, ' ');
+                        const normalizedUserNameNoAccents = removeVietnameseAccents(normalizedUserName);
+                        
+                        const chucDanh = (currentUser?.chucDanh || '').trim().replace(/^["']+|["']+$/g, '');
+                        const normalizedTitle = chucDanh.toLowerCase();
+                        const normalizedTitleNoAccents = removeVietnameseAccents(normalizedTitle);
+
+                        // Check by name - multiple variations
+                        const nameMatches = (
+                            normalizedUserName === 'trần nhật thanh' ||
+                            normalizedUserName === 'tran nhat thanh' ||
+                            normalizedUserNameNoAccents === 'tran nhat thanh' ||
+                            normalizedUserName.includes('trần nhật thanh') ||
+                            normalizedUserName.includes('tran nhat thanh') ||
+                            normalizedUserNameNoAccents.includes('tran nhat thanh') ||
+                            (normalizedUserName.includes('trần nhật') && normalizedUserName.includes('thanh')) ||
+                            (normalizedUserNameNoAccents.includes('tran nhat') && normalizedUserNameNoAccents.includes('thanh')) ||
+                            (normalizedUserName.includes('nhật thanh') && normalizedUserName.includes('trần')) ||
+                            (normalizedUserNameNoAccents.includes('nhat thanh') && normalizedUserNameNoAccents.includes('tran'))
+                        );
+
+                        // Check by title (chức danh) - "Nhân viên Kế toán Thanh toán"
+                        const titleMatches = (
+                            normalizedTitle.includes('kế toán') ||
+                            normalizedTitle.includes('ke toan') ||
+                            normalizedTitleNoAccents.includes('ke toan') ||
+                            normalizedTitle.includes('kế toán tổng hợp') ||
+                            normalizedTitleNoAccents.includes('ke toan tong hop') ||
+                            normalizedTitle.includes('kế toán thanh toán') ||
+                            normalizedTitleNoAccents.includes('ke toan thanh toan') ||
+                            normalizedTitle.includes('nhân viên kế toán') ||
+                            normalizedTitleNoAccents.includes('nhan vien ke toan') ||
+                            normalizedTitle.includes('thanh toán') ||
+                            normalizedTitleNoAccents.includes('thanh toan')
+                        );
+
+                        const isAccountant = nameMatches || titleMatches;
+
+                        // Debug log
+                        console.log('[Sidebar] Accountant check:', {
+                            role: currentUser.role,
+                            hoTen: currentUser.hoTen,
+                            username: currentUser.username,
+                            chucDanh: chucDanh,
+                            normalizedTitle: normalizedTitle,
+                            normalizedTitleNoAccents: normalizedTitleNoAccents,
+                            userName,
+                            normalizedUserName,
+                            normalizedUserNameNoAccents,
+                            nameMatches,
+                            titleMatches,
+                            isAccountant
+                        });
+
+                        return isAccountant;
+                    })() && (
+                        <>
+                            <li>
+                                <button
+                                    onClick={() => onNavigate('customer-entertainment-expense-accountant')}
+                                    className={`nav-item nav-item-expense ${currentView === 'customer-entertainment-expense-accountant' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Báo Cáo Tổng Hợp Chi Phí</span>
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => onNavigate('customer-entertainment-expense-payment')}
+                                    className={`nav-item nav-item-expense ${currentView === 'customer-entertainment-expense-payment' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Thanh Toán & Lưu Trữ</span>
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => onNavigate('travel-expense-accountant')}
+                                    className={`nav-item nav-item-expense ${currentView === 'travel-expense-accountant' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4">
+                                            </path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Kiểm tra quyết toán công tác</span>
+                                </button>
+                            </li>
+                        </>
                     )}
-                    {/* Nhóm module duyệt và lịch sử đơn từ - Cùng màu chủ đạo */}
+                    {/* Nhóm 3: Duyệt - Orange */}
                     {currentUser?.role === 'EMPLOYEE' && (
                         <>
                             {showEmployeeApprovalModule && (
                                 <>
+                                    <li className="nav-section-label">
+                                        <p>Duyệt</p>
+                                    </li>
                                     <li>
                                         <button
                                             onClick={() => onNavigate('leave-approvals')}
@@ -1216,7 +1269,7 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                                     </path>
                                                 </svg>
                                             </span>
-                                            <span className="nav-label">Duyệt đơn nghỉ</span>
+                                            <span className="nav-label">Duyệt đơn</span>
                                             {pendingLeaveApprovalsCount > 0 && (
                                                 <span className="nav-badge nav-badge-pending">{pendingLeaveApprovalsCount > 99 ? '99+' : pendingLeaveApprovalsCount}</span>
                                             )}
@@ -1247,23 +1300,6 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                                         {pendingRecruitmentCount}
                                                     </span>
                                                 )}
-                                            </button>
-                                        </li>
-                                    )}
-                                    {canApproveFromManagerLookup && (
-                                        <li>
-                                            <button
-                                                onClick={() => onNavigate('probation-list')}
-                                                className={`nav-item nav-item-approval ${currentView === 'probation-list' ? 'active' : ''}`}
-                                            >
-                                                <span className="nav-icon-wrapper">
-                                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                                                        </path>
-                                                    </svg>
-                                                </span>
-                                                <span className="nav-label">Danh sách thử việc</span>
                                             </button>
                                         </li>
                                     )}
@@ -1342,49 +1378,92 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
 
                                         return isLeThanhTung;
                                     })() && (
-                                            <>
-                                                {/* CEO Progress Tracking - Menu đặc biệt */}
-                                                <li>
-                                                    <button
-                                                        onClick={() => onNavigate('ceo-progress-tracking')}
-                                                        className={`nav-item nav-item-ceo-special ${currentView === 'ceo-progress-tracking' ? 'active' : ''}`}
-                                                    >
-                                                        <span className="nav-icon-wrapper">
-                                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                                            </svg>
-                                                        </span>
-                                                        <span className="nav-label">
-                                                            <svg className="nav-label-crown" fill="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '6px' }}>
-                                                                <path d="M12 2L9 12h6l-3-10zm0 20c-3.87 0-7-3.13-7-7h14c0 3.87-3.13 7-7 7z" />
-                                                            </svg>
-                                                            Theo dõi Tiến độ
-                                                        </span>
-                                                    </button>
-                                                </li>
+                                        <>
+                                            {/* CEO Progress Tracking - Menu đặc biệt */}
+                                            <li>
+                                                <button
+                                                    onClick={() => onNavigate('ceo-progress-tracking')}
+                                                    className={`nav-item nav-item-ceo-special ${currentView === 'ceo-progress-tracking' ? 'active' : ''}`}
+                                                >
+                                                    <span className="nav-icon-wrapper">
+                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                        </svg>
+                                                    </span>
+                                                    <span className="nav-label">
+                                                        <svg className="nav-label-crown" fill="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '6px' }}>
+                                                            <path d="M12 2L9 12h6l-3-10zm0 20c-3.87 0-7-3.13-7-7h14c0 3.87-3.13 7-7 7z" />
+                                                        </svg>
+                                                        Theo dõi Tiến độ
+                                                    </span>
+                                                </button>
+                                            </li>
 
-                                                <li>
-                                                    <button
-                                                        onClick={() => onNavigate('customer-entertainment-expense-ceo')}
-                                                        className={`nav-item nav-item-approval ${currentView === 'customer-entertainment-expense-ceo' ? 'active' : ''}`}
-                                                    >
-                                                        <span className="nav-icon-wrapper">
-                                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                                                            </svg>
+                                            <li>
+                                                <button
+                                                    onClick={() => onNavigate('customer-entertainment-expense-ceo-approval')}
+                                                    className={`nav-item nav-item-approval ${currentView === 'customer-entertainment-expense-ceo-approval' ? 'active' : ''}`}
+                                                >
+                                                    <span className="nav-icon-wrapper">
+                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
+                                                            </path>
+                                                        </svg>
+                                                    </span>
+                                                    <span className="nav-label">Duyệt Chi phí Tiếp khách</span>
+                                                    {pendingExpenseCeoCount > 0 && (
+                                                        <span className="nav-badge nav-badge-pulse">
+                                                            {pendingExpenseCeoCount}
                                                         </span>
-                                                        <span className="nav-label">Phê Duyệt Cuối Cùng Chi Phí</span>
-                                                        {pendingExpenseCeoCount > 0 && (
-                                                            <span className="nav-badge nav-badge-pulse">
-                                                                {pendingExpenseCeoCount}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                </li>
-                                            </>
-                                        )}
+                                                    )}
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button
+                                                    onClick={() => onNavigate('customer-entertainment-expense-ceo')}
+                                                    className={`nav-item nav-item-approval ${currentView === 'customer-entertainment-expense-ceo' ? 'active' : ''}`}
+                                                >
+                                                    <span className="nav-icon-wrapper">
+                                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                                                        </svg>
+                                                    </span>
+                                                    <span className="nav-label">Phê Duyệt Cuối Cùng Chi Phí</span>
+                                                </button>
+                                            </li>
+                                        </>
+                                    )}
                                 </>
                             )}
+                        </>
+                    )}
+
+                    {/* Nhóm 4: Thử việc - Purple */}
+                    {currentUser?.role === 'EMPLOYEE' && (
+                        <>
+                            {canApproveFromManagerLookup && (
+                                <>
+                                    <li className="nav-section-label">
+                                        <p>Thử Việc</p>
+                                    </li>
+                                    <li>
+                                        <button
+                                            onClick={() => onNavigate('probation-list')}
+                                            className={`nav-item nav-item-probation ${currentView === 'probation-list' ? 'active' : ''}`}
+                                        >
+                                            <span className="nav-icon-wrapper">
+                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                                        </path>
+                                                    </svg>
+                                                </span>
+                                                <span className="nav-label">Danh sách thử việc</span>
+                                            </button>
+                                        </li>
+                                    </>
+                                )}
                         </>
                     )}
                     {/* Divider sau nhóm module duyệt và lịch sử đơn từ */}
@@ -1393,23 +1472,28 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                             <div className="nav-divider-line"></div>
                         </li>
                     )}
-                    {/* Xin nghỉ việc - Module đặc biệt, đặt riêng lẻ */}
+                    {/* Nhóm 5: Nghỉ việc - Red */}
                     {currentUser?.role === 'EMPLOYEE' && (
-                        <li>
-                            <button
-                                onClick={() => onNavigate('resign-request')}
-                                className={`nav-item ${currentView === 'resign-request' ? 'active' : ''}`}
-                            >
-                                <span className="nav-icon-wrapper">
-                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
-                                        </path>
-                                    </svg>
-                                </span>
-                                <span className="nav-label">Xin nghỉ việc</span>
-                            </button>
-                        </li>
+                        <>
+                            <li className="nav-section-label">
+                                <p>Nghỉ Việc</p>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => onNavigate('resign-request')}
+                                    className={`nav-item nav-item-resign ${currentView === 'resign-request' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                                            </path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Xin nghỉ việc</span>
+                                </button>
+                            </li>
+                        </>
                     )}
                     {/* Phỏng vấn & duyệt ứng viên cho Admin */}
                     {(currentUser?.role !== 'EMPLOYEE') && (

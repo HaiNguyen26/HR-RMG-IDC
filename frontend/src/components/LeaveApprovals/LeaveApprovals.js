@@ -3,6 +3,8 @@ import {
     attendanceAdjustmentsAPI,
     leaveRequestsAPI,
     overtimeRequestsAPI,
+    lateEarlyRequestsAPI,
+    mealAllowanceRequestsAPI,
     employeesAPI
 } from '../../services/api';
 import './LeaveApprovals.css';
@@ -73,6 +75,30 @@ const MODULE_OPTIONS = [
         description: {
             teamLead: 'Xử lý các yêu cầu bổ sung giờ vào/ra của nhân viên.',
             hr: 'Theo dõi tiến độ phê duyệt đơn bổ sung công.'
+        }
+    },
+    {
+        key: 'late-early',
+        label: 'Đơn xin đi trễ về sớm',
+        header: {
+            teamLead: 'Đơn xin đi trễ về sớm chờ quản lý duyệt',
+            hr: 'Theo dõi đơn xin đi trễ về sớm'
+        },
+        description: {
+            teamLead: 'Xem và xử lý các đơn xin đi trễ về sớm của nhân viên.',
+            hr: 'Theo dõi tiến độ phê duyệt đơn xin đi trễ về sớm.'
+        }
+    },
+    {
+        key: 'meal-allowance',
+        label: 'Đơn xin phụ cấp công trình',
+        header: {
+            teamLead: 'Đơn xin phụ cấp công trình chờ quản lý duyệt',
+            hr: 'Theo dõi đơn xin phụ cấp công trình'
+        },
+        description: {
+            teamLead: 'Xem và xử lý các đơn xin phụ cấp cơm công trình của nhân viên.',
+            hr: 'Theo dõi tiến độ phê duyệt đơn xin phụ cấp cơm công trình.'
         }
     }
 ];
@@ -177,7 +203,9 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [moduleStatistics, setModuleStatistics] = useState({
         leave: { pending: 0, total: 0 },
         overtime: { pending: 0, total: 0 },
-        attendance: { pending: 0, total: 0 }
+        attendance: { pending: 0, total: 0 },
+        'late-early': { pending: 0, total: 0 },
+        'meal-allowance': { pending: 0, total: 0 }
     });
 
     // Refs để track previous values và tránh setState không cần thiết
@@ -486,11 +514,19 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             const attendancePromises = statuses.map(status =>
                 attendanceAdjustmentsAPI.getAll({ ...params, status })
             );
+            const lateEarlyPromises = statuses.map(status =>
+                lateEarlyRequestsAPI.getAll({ ...params, status })
+            );
+            const mealAllowancePromises = statuses.map(status =>
+                mealAllowanceRequestsAPI.getAll({ ...params, status })
+            );
 
-            const [leaveResults, overtimeResults, attendanceResults] = await Promise.all([
+            const [leaveResults, overtimeResults, attendanceResults, lateEarlyResults, mealAllowanceResults] = await Promise.all([
                 Promise.all(leavePromises),
                 Promise.all(overtimePromises),
-                Promise.all(attendancePromises)
+                Promise.all(attendancePromises),
+                Promise.all(lateEarlyPromises),
+                Promise.all(mealAllowancePromises)
             ]);
 
             // Tính tổng và pending cho từng module
@@ -512,19 +548,25 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             const leaveStats = calculateStats(leaveResults);
             const overtimeStats = calculateStats(overtimeResults);
             const attendanceStats = calculateStats(attendanceResults);
+            const lateEarlyStats = calculateStats(lateEarlyResults);
+            const mealAllowanceStats = calculateStats(mealAllowanceResults);
 
             // Không cần tính 'all' stats nữa vì đã bỏ module 'all'
             const newModuleStats = {
                 leave: leaveStats,
                 overtime: overtimeStats,
-                attendance: attendanceStats
+                attendance: attendanceStats,
+                'late-early': lateEarlyStats,
+                'meal-allowance': mealAllowanceStats
             };
 
             // Chỉ update state nếu data thực sự thay đổi (không check 'all' nữa)
             if (!prevModuleStatsRef.current ||
                 !shallowEqual(prevModuleStatsRef.current.leave, newModuleStats.leave) ||
                 !shallowEqual(prevModuleStatsRef.current.overtime, newModuleStats.overtime) ||
-                !shallowEqual(prevModuleStatsRef.current.attendance, newModuleStats.attendance)) {
+                !shallowEqual(prevModuleStatsRef.current.attendance, newModuleStats.attendance) ||
+                !shallowEqual(prevModuleStatsRef.current['late-early'], newModuleStats['late-early']) ||
+                !shallowEqual(prevModuleStatsRef.current['meal-allowance'], newModuleStats['meal-allowance'])) {
                 setModuleStatistics(newModuleStats);
                 prevModuleStatsRef.current = newModuleStats;
             }
@@ -541,7 +583,9 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
         () => ({
             leave: leaveRequestsAPI,
             overtime: overtimeRequestsAPI,
-            attendance: attendanceAdjustmentsAPI
+            attendance: attendanceAdjustmentsAPI,
+            'late-early': lateEarlyRequestsAPI,
+            'meal-allowance': mealAllowanceRequestsAPI
         }),
         []
     );
@@ -883,6 +927,68 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
         }
     };
 
+    const handleDelete = async (request) => {
+        if (!showConfirm) {
+            if (!window.confirm('Bạn có chắc chắn muốn xóa đơn này? Hành động này không thể hoàn tác.')) {
+                return;
+            }
+        } else {
+            const confirmed = await showConfirm({
+                title: 'Xác nhận xóa đơn',
+                message: 'Bạn có chắc chắn muốn xóa đơn này? Hành động này không thể hoàn tác.',
+                confirmText: 'Xóa',
+                cancelText: 'Hủy',
+                type: 'warning'
+            });
+
+            if (!confirmed) {
+                return;
+            }
+        }
+
+        try {
+            // Xác định API dựa trên activeModule
+            const api = moduleApiMap[activeModule];
+
+            // Kiểm tra API có tồn tại và có method remove không
+            if (!api || typeof api.remove !== 'function') {
+                throw new Error(`API không hợp lệ cho loại đơn này. Module: ${activeModule}`);
+            }
+
+            await api.remove(request.id, {
+                employeeId: currentUser.id,
+                role: currentUser.role
+            });
+
+            if (showToast) {
+                // Xác định loại đơn từ request hoặc activeModule (bỏ qua 'all')
+                let moduleLabel = 'đơn';
+                const requestType = request.requestType || activeModule;
+                if (requestType && requestType !== 'all') {
+                    const module = MODULE_OPTIONS.find(m => m.key === requestType);
+                    moduleLabel = module?.label || 'đơn';
+                } else if (activeModule && activeModule !== 'all') {
+                    const module = MODULE_OPTIONS.find(m => m.key === activeModule);
+                    moduleLabel = module?.label || 'đơn';
+                }
+                showToast(`Đã xóa ${moduleLabel} thành công`, 'success');
+            }
+
+            if (showDetailModal && selectedRequest && selectedRequest.id === request.id) {
+                setShowDetailModal(false);
+                setSelectedRequest(null);
+            }
+
+            fetchRequests(null, false);
+        } catch (error) {
+            console.error('Error deleting request:', error);
+            if (showToast) {
+                const message =
+                    error.response?.data?.message || 'Không thể xóa đơn. Vui lòng thử lại.';
+                showToast(message, 'error');
+            }
+        }
+    };
 
     // Xóa handleEscalate và handleProcessOverdue vì không còn trong quy trình mới
 
@@ -918,6 +1024,20 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                         <th>Ngày bổ sung</th>
                         <th>Loại bổ sung</th>
                         <th>Giờ vào/ra</th>
+                    </>
+                )}
+                {activeModule === 'late-early' && (
+                    <>
+                        <th>Loại đơn</th>
+                        <th>Ngày</th>
+                        <th>Thời gian</th>
+                    </>
+                )}
+                {activeModule === 'meal-allowance' && (
+                    <>
+                        <th>Khoảng ngày</th>
+                        <th>Số mục</th>
+                        <th>Tổng tiền</th>
                     </>
                 )}
                 <th className="text-center">Trạng thái</th>
@@ -991,17 +1111,60 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             );
         }
 
-        return (
-            <>
-                <h3>Đơn bổ sung chấm công</h3>
-                <p className="leave-approvals-period">
-                    {formatDateDisplay(request.adjustment_date || request.request_date)} •{' '}
-                    {request.check_type === 'CHECK_OUT' ? '-' : request.check_in_time?.slice(0, 5) || '-'}
-                    {' → '}
-                    {request.check_type === 'CHECK_IN' ? '-' : request.check_out_time?.slice(0, 5) || '-'}
-                </p>
-            </>
-        );
+        if (requestType === 'attendance' || activeModule === 'attendance') {
+            return (
+                <>
+                    <h3>Đơn bổ sung chấm công</h3>
+                    <p className="leave-approvals-period">
+                        {formatDateDisplay(request.adjustment_date || request.request_date)} •{' '}
+                        {request.check_type === 'CHECK_OUT' ? '-' : request.check_in_time?.slice(0, 5) || '-'}
+                        {' → '}
+                        {request.check_type === 'CHECK_IN' ? '-' : request.check_out_time?.slice(0, 5) || '-'}
+                    </p>
+                </>
+            );
+        }
+
+        if (requestType === 'late-early' || activeModule === 'late-early') {
+            const formatTimeDisplay = (timeValue) => {
+                if (!timeValue) return '-';
+                if (typeof timeValue === 'string' && timeValue.includes(':')) {
+                    const [hours, minutes] = timeValue.split(':');
+                    return `${hours}:${minutes}`;
+                }
+                return timeValue;
+            };
+
+            return (
+                <>
+                    <h3>{request.request_type === 'LATE' ? 'Đơn xin đi trễ' : 'Đơn xin về sớm'}</h3>
+                    <p className="leave-approvals-period">
+                        {formatDateDisplay(request.request_date)} • {formatTimeDisplay(request.time_value)}
+                    </p>
+                </>
+            );
+        }
+
+        if (requestType === 'meal-allowance' || activeModule === 'meal-allowance') {
+            return (
+                <>
+                    <h3>Đơn xin phụ cấp cơm công trình</h3>
+                    <p className="leave-approvals-period">
+                        {request.items && request.items.length > 0 ? (
+                            <>
+                                {formatDateDisplay(request.items[0].expense_date)}
+                                {request.items.length > 1 && ` → ${formatDateDisplay(request.items[request.items.length - 1].expense_date)}`}
+                                {request.total_amount && ` • ${new Intl.NumberFormat('vi-VN').format(request.total_amount)} VNĐ`}
+                            </>
+                        ) : (
+                            '-'
+                        )}
+                    </p>
+                </>
+            );
+        }
+
+        return null;
     };
 
     const renderReasonSection = (request) => {
@@ -1025,10 +1188,69 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                 </svg>
             );
+        } else if (activeModule === 'late-early') {
+            title = 'Lý do';
+            icon = (
+                <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+            );
+        } else if (activeModule === 'meal-allowance') {
+            title = 'Ghi chú';
+            icon = (
+                <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+            );
         }
 
         // Lọc bỏ ATTENDANCE_TYPE từ notes khi hiển thị
         const cleanNotes = request.notes ? request.notes.replace(/ATTENDANCE_TYPE:[^\n]*\n?/g, '').trim() : null;
+
+        // Xử lý đặc biệt cho meal-allowance
+        if (activeModule === 'meal-allowance') {
+            return (
+                <div className="leave-approvals-modal-section">
+                    <h3 className="leave-approvals-modal-section-title">
+                        {icon}
+                        {title}
+                    </h3>
+                    <div className="leave-approvals-reason-content">
+                        {request.notes && (
+                            <p className="leave-approvals-reason-text">{request.notes}</p>
+                        )}
+                        {request.items && request.items.length > 0 && (
+                            <div className="leave-approvals-notes" style={{ marginTop: '1rem' }}>
+                                <strong>Danh sách mục cơm:</strong>
+                                <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
+                                    {request.items.map((item, index) => (
+                                        <li key={index} style={{ marginBottom: '0.5rem' }}>
+                                            {formatDateDisplay(item.expense_date)} - {item.content} - {new Intl.NumberFormat('vi-VN').format(item.amount)} VNĐ
+                                        </li>
+                                    ))}
+                                </ul>
+                                {request.total_amount && (
+                                    <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #e5e7eb' }}>
+                                        <strong>Tổng số tiền: {new Intl.NumberFormat('vi-VN').format(request.total_amount)} VNĐ</strong>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {request.team_lead_comment && (
+                            <div className="leave-approvals-manager-comment">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                    </svg>
+                                    Nhận xét từ quản lý
+                                </span>
+                                <p className="leave-approvals-manager-comment-text">{request.team_lead_comment}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
 
         return (
             <div className="leave-approvals-modal-section">
@@ -1047,6 +1269,17 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                 Ghi chú
                             </span>
                             <p className="leave-approvals-notes-text">{cleanNotes}</p>
+                        </div>
+                    )}
+                    {activeModule === 'late-early' && request.notes && !cleanNotes && (
+                        <div className="leave-approvals-notes">
+                            <span className="info-label">
+                                <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                                Ghi chú
+                            </span>
+                            <p className="leave-approvals-notes-text">{request.notes}</p>
                         </div>
                     )}
                     {request.team_lead_comment && (
@@ -1159,28 +1392,43 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
         );
     };
 
-    const renderActionButtons = (request) => (
-        <div className="leave-approvals-actions-row">
-            {isTeamLead && request.status === 'PENDING' && (
-                <>
+    const renderActionButtons = (request) => {
+        const isHr = currentUser?.role && currentUser.role !== 'EMPLOYEE';
+        return (
+            <div className="leave-approvals-actions-row">
+                {isTeamLead && request.status === 'PENDING' && (
+                    <>
+                        <button
+                            type="button"
+                            className="btn-approve"
+                            onClick={() => handleDecision(request, 'APPROVE')}
+                        >
+                            Duyệt
+                        </button>
+                        <button
+                            type="button"
+                            className="btn-reject"
+                            onClick={() => handleDecision(request, 'REJECT')}
+                        >
+                            Từ chối
+                        </button>
+                    </>
+                )}
+                {isHr && (
                     <button
                         type="button"
-                        className="btn-approve"
-                        onClick={() => handleDecision(request, 'APPROVE')}
+                        className="btn-delete"
+                        onClick={() => handleDelete(request)}
                     >
-                        Duyệt
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Xóa đơn
                     </button>
-                    <button
-                        type="button"
-                        className="btn-reject"
-                        onClick={() => handleDecision(request, 'REJECT')}
-                    >
-                        Từ chối
-                    </button>
-                </>
-            )}
-        </div>
-    );
+                )}
+            </div>
+        );
+    };
 
     return (
         <div className="leave-approvals">
@@ -1429,6 +1677,64 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                     </td>
                                                 </>
                                             )}
+                                            {activeModule === 'late-early' && (
+                                                <>
+                                                    <td className="leave-request-type-cell">
+                                                        <span className="leave-request-type">
+                                                            {request.request_type === 'LATE' ? 'Đi trễ' : request.request_type === 'EARLY' ? 'Về sớm' : 'N/A'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="leave-request-dates-cell">
+                                                        <div className="leave-request-dates-info">
+                                                            <span>{formatDateDisplay(request.request_date)}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="leave-request-dates-cell">
+                                                        <div className="leave-request-dates-info">
+                                                            {request.time_value ? (
+                                                                <span className="time-info">{request.time_value.slice(0, 5)}</span>
+                                                            ) : (
+                                                                <span>-</span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </>
+                                            )}
+                                            {activeModule === 'meal-allowance' && (
+                                                <>
+                                                    <td className="leave-request-dates-cell">
+                                                        <div className="leave-request-dates-info">
+                                                            {request.items && request.items.length > 0 ? (
+                                                                <>
+                                                                    <span>{formatDateDisplay(request.items[0].expense_date)}</span>
+                                                                    {request.items.length > 1 && (
+                                                                        <>
+                                                                            <span className="date-separator"> → </span>
+                                                                            <span>{formatDateDisplay(request.items[request.items.length - 1].expense_date)}</span>
+                                                                        </>
+                                                                    )}
+                                                                </>
+                                                            ) : (
+                                                                <span>-</span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="leave-request-type-cell">
+                                                        <span className="leave-request-type">
+                                                            {request.items ? `${request.items.length} mục` : '0 mục'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="leave-request-dates-cell">
+                                                        <div className="leave-request-dates-info">
+                                                            {request.total_amount ? (
+                                                                <span className="time-info">{new Intl.NumberFormat('vi-VN').format(request.total_amount)} VNĐ</span>
+                                                            ) : (
+                                                                <span>-</span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </>
+                                            )}
                                             <td className="leave-request-status-cell">
                                                 <span className={`leave-status-tag ${request.status.toLowerCase().replace('_', '-')}`}>
                                                     {getStatusLabel(request.status)}
@@ -1463,11 +1769,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                         <button
                                                             type="button"
                                                             className="btn-fast-delete"
-                                                            onClick={() => {
-                                                                if (showToast) {
-                                                                    showToast('Chức năng xóa đơn đang được phát triển', 'info');
-                                                                }
-                                                            }}
+                                                            onClick={() => handleDelete(request)}
                                                             title="Xóa đơn"
                                                         >
                                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1891,6 +2193,99 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                     </div>
                                 );
                             })()}
+
+                            {activeModule === 'late-early' && (
+                                <div className="leave-approvals-modal-section">
+                                    <h3 className="leave-approvals-modal-section-title">
+                                        <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Chi tiết đơn xin đi trễ về sớm
+                                    </h3>
+                                    <div className="leave-approvals-modal-info-grid">
+                                        <div className="leave-approvals-modal-info-item">
+                                            <span className="info-label">
+                                                <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                                                </svg>
+                                                Loại đơn
+                                            </span>
+                                            <span className="info-value">
+                                                {selectedRequest.request_type === 'LATE' ? 'Đi trễ' : selectedRequest.request_type === 'EARLY' ? 'Về sớm' : 'N/A'}
+                                            </span>
+                                        </div>
+                                        <div className="leave-approvals-modal-info-item">
+                                            <span className="info-label">
+                                                <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                                </svg>
+                                                Ngày
+                                            </span>
+                                            <span className="info-value">{formatDateDisplay(selectedRequest.request_date)}</span>
+                                        </div>
+                                        <div className="leave-approvals-modal-info-item">
+                                            <span className="info-label">
+                                                <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                                Thời gian
+                                            </span>
+                                            <span className="info-value">{selectedRequest.time_value ? selectedRequest.time_value.slice(0, 5) : '-'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeModule === 'meal-allowance' && (
+                                <div className="leave-approvals-modal-section">
+                                    <h3 className="leave-approvals-modal-section-title">
+                                        <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                        </svg>
+                                        Chi tiết đơn xin phụ cấp cơm công trình
+                                    </h3>
+                                    <div className="leave-approvals-modal-info-grid">
+                                        {selectedRequest.items && selectedRequest.items.length > 0 && (
+                                            <>
+                                                <div className="leave-approvals-modal-info-item">
+                                                    <span className="info-label">
+                                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                                        </svg>
+                                                        Khoảng ngày
+                                                    </span>
+                                                    <span className="info-value">
+                                                        {formatDateDisplay(selectedRequest.items[0].expense_date)}
+                                                        {selectedRequest.items.length > 1 && ` → ${formatDateDisplay(selectedRequest.items[selectedRequest.items.length - 1].expense_date)}`}
+                                                    </span>
+                                                </div>
+                                                <div className="leave-approvals-modal-info-item">
+                                                    <span className="info-label">
+                                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                                        </svg>
+                                                        Số mục
+                                                    </span>
+                                                    <span className="info-value">{selectedRequest.items.length} mục</span>
+                                                </div>
+                                                {selectedRequest.total_amount && (
+                                                    <div className="leave-approvals-modal-info-item">
+                                                        <span className="info-label">
+                                                            <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                            </svg>
+                                                            Tổng tiền
+                                                        </span>
+                                                        <span className="info-value info-value-highlight">
+                                                            {new Intl.NumberFormat('vi-VN').format(selectedRequest.total_amount)} VNĐ
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Reason */}
                             {renderReasonSection(selectedRequest)}

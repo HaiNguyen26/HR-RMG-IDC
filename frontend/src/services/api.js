@@ -178,6 +178,21 @@ export const attendanceAdjustmentsAPI = {
   remove: (id, data) => api.delete(`/attendance-adjustments/${id}`, { data }),
 };
 
+// Late Early Requests API
+export const lateEarlyRequestsAPI = {
+  create: (data) => api.post('/late-early-requests', data),
+  getAll: (params) => api.get('/late-early-requests', { params }),
+  decide: (id, data) => api.post(`/late-early-requests/${id}/decision`, data),
+  remove: (id, data) => api.delete(`/late-early-requests/${id}`, { data }),
+};
+
+export const mealAllowanceRequestsAPI = {
+  create: (data) => api.post('/meal-allowance-requests', data),
+  getAll: (params) => api.get('/meal-allowance-requests', { params }),
+  decide: (id, data) => api.post(`/meal-allowance-requests/${id}/decision`, data),
+  remove: (id, data) => api.delete(`/meal-allowance-requests/${id}`, { data }),
+};
+
 // Candidates API
 export const candidatesAPI = {
   getAll: (params) => api.get('/candidates', { params }),
@@ -304,8 +319,23 @@ export const customerEntertainmentExpensesAPI = {
   create: (data) => {
     const formData = new FormData();
     formData.append('employeeId', data.employeeId);
-    formData.append('branchDirectorId', data.branchDirectorId);
-    formData.append('branchDirectorName', data.branchDirectorName);
+    
+    // Chỉ append branchDirectorId nếu có giá trị
+    if (data.branchDirectorId !== undefined && data.branchDirectorId !== null && data.branchDirectorId !== '') {
+      formData.append('branchDirectorId', data.branchDirectorId);
+      if (data.branchDirectorName) {
+        formData.append('branchDirectorName', data.branchDirectorName);
+      }
+    }
+    
+    // Chỉ append ceoId nếu có giá trị
+    if (data.ceoId !== undefined && data.ceoId !== null && data.ceoId !== '') {
+      formData.append('ceoId', data.ceoId);
+      if (data.ceoName) {
+        formData.append('ceoName', data.ceoName);
+      }
+    }
+    
     if (data.managerId) {
       formData.append('managerId', data.managerId);
     }

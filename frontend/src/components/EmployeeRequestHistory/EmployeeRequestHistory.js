@@ -3,6 +3,8 @@ import {
     attendanceAdjustmentsAPI,
     leaveRequestsAPI,
     overtimeRequestsAPI,
+    lateEarlyRequestsAPI,
+    mealAllowanceRequestsAPI,
 } from '../../services/api';
 import './EmployeeRequestHistory.css';
 
@@ -49,6 +51,18 @@ const MODULE_OPTIONS = [
         label: 'Đơn bổ sung công',
         header: 'Lịch sử đơn bổ sung công',
         description: 'Theo dõi tiến độ phê duyệt các đơn bổ sung công của bạn.'
+    },
+    {
+        key: 'late-early',
+        label: 'Đơn xin đi trễ về sớm',
+        header: 'Lịch sử đơn đi trễ về sớm',
+        description: 'Theo dõi tiến độ phê duyệt các đơn xin đi trễ/về sớm của bạn.'
+    },
+    {
+        key: 'meal-allowance',
+        label: 'Đơn xin phụ cấp công trình',
+        header: 'Lịch sử đơn xin phụ cấp công trình',
+        description: 'Theo dõi tiến độ phê duyệt các đơn xin phụ cấp cơm công trình của bạn.'
     }
 ];
 
@@ -147,10 +161,12 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
             // Luôn thêm employeeId để chỉ lấy đơn của nhân viên hiện tại
             const baseParams = { employeeId: currentUser.id };
 
-            const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
+            const [leaveResponse, overtimeResponse, attendanceResponse, lateEarlyResponse, mealAllowanceResponse] = await Promise.all([
                 Promise.all(statuses.map(status => leaveRequestsAPI.getAll({ ...baseParams, status }))),
                 Promise.all(statuses.map(status => overtimeRequestsAPI.getAll({ ...baseParams, status }))),
-                Promise.all(statuses.map(status => attendanceAdjustmentsAPI.getAll({ ...baseParams, status })))
+                Promise.all(statuses.map(status => attendanceAdjustmentsAPI.getAll({ ...baseParams, status }))),
+                Promise.all(statuses.map(status => lateEarlyRequestsAPI.getAll({ ...baseParams, status }))),
+                Promise.all(statuses.map(status => mealAllowanceRequestsAPI.getAll({ ...baseParams, status })))
             ]);
 
             const leaveStats = {
@@ -183,19 +199,41 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
             // Không tính CANCELLED vào total
             attendanceStats.total = attendanceStats.pending + attendanceStats.approved + attendanceStats.rejected;
 
+            const lateEarlyStats = {
+                pending: lateEarlyResponse[0].data.success ? (lateEarlyResponse[0].data.data || []).length : 0,
+                approved: lateEarlyResponse[1].data.success ? (lateEarlyResponse[1].data.data || []).length : 0,
+                rejected: lateEarlyResponse[2].data.success ? (lateEarlyResponse[2].data.data || []).length : 0,
+                cancelled: lateEarlyResponse[3].data.success ? (lateEarlyResponse[3].data.data || []).length : 0,
+                total: 0
+            };
+            // Không tính CANCELLED vào total
+            lateEarlyStats.total = lateEarlyStats.pending + lateEarlyStats.approved + lateEarlyStats.rejected;
+
+            const mealAllowanceStats = {
+                pending: mealAllowanceResponse[0].data.success ? (mealAllowanceResponse[0].data.data || []).length : 0,
+                approved: mealAllowanceResponse[1].data.success ? (mealAllowanceResponse[1].data.data || []).length : 0,
+                rejected: mealAllowanceResponse[2].data.success ? (mealAllowanceResponse[2].data.data || []).length : 0,
+                cancelled: mealAllowanceResponse[3].data.success ? (mealAllowanceResponse[3].data.data || []).length : 0,
+                total: 0
+            };
+            // Không tính CANCELLED vào total
+            mealAllowanceStats.total = mealAllowanceStats.pending + mealAllowanceStats.approved + mealAllowanceStats.rejected;
+
             const allStats = {
-                pending: leaveStats.pending + overtimeStats.pending + attendanceStats.pending,
-                approved: leaveStats.approved + overtimeStats.approved + attendanceStats.approved,
-                rejected: leaveStats.rejected + overtimeStats.rejected + attendanceStats.rejected,
-                cancelled: leaveStats.cancelled + overtimeStats.cancelled + attendanceStats.cancelled,
-                total: leaveStats.total + overtimeStats.total + attendanceStats.total // Đã loại bỏ CANCELLED
+                pending: leaveStats.pending + overtimeStats.pending + attendanceStats.pending + lateEarlyStats.pending + mealAllowanceStats.pending,
+                approved: leaveStats.approved + overtimeStats.approved + attendanceStats.approved + lateEarlyStats.approved + mealAllowanceStats.approved,
+                rejected: leaveStats.rejected + overtimeStats.rejected + attendanceStats.rejected + lateEarlyStats.rejected + mealAllowanceStats.rejected,
+                cancelled: leaveStats.cancelled + overtimeStats.cancelled + attendanceStats.cancelled + lateEarlyStats.cancelled + mealAllowanceStats.cancelled,
+                total: leaveStats.total + overtimeStats.total + attendanceStats.total + lateEarlyStats.total + mealAllowanceStats.total // Đã loại bỏ CANCELLED
             };
 
             const newModuleStats = {
                 all: { pending: allStats.pending, total: allStats.total },
                 leave: { pending: leaveStats.pending, total: leaveStats.total },
                 overtime: { pending: overtimeStats.pending, total: overtimeStats.total },
-                attendance: { pending: attendanceStats.pending, total: attendanceStats.total }
+                attendance: { pending: attendanceStats.pending, total: attendanceStats.total },
+                'late-early': { pending: lateEarlyStats.pending, total: lateEarlyStats.total },
+                'meal-allowance': { pending: mealAllowanceStats.pending, total: mealAllowanceStats.total }
             };
 
             // Chỉ update state nếu data thực sự thay đổi
@@ -203,7 +241,9 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 !shallowEqual(prevModuleStatsRef.current.all, newModuleStats.all) ||
                 !shallowEqual(prevModuleStatsRef.current.leave, newModuleStats.leave) ||
                 !shallowEqual(prevModuleStatsRef.current.overtime, newModuleStats.overtime) ||
-                !shallowEqual(prevModuleStatsRef.current.attendance, newModuleStats.attendance)) {
+                !shallowEqual(prevModuleStatsRef.current.attendance, newModuleStats.attendance) ||
+                !shallowEqual(prevModuleStatsRef.current['late-early'], newModuleStats['late-early']) ||
+                !shallowEqual(prevModuleStatsRef.current['meal-allowance'], newModuleStats['meal-allowance'])) {
                 setModuleStatistics(newModuleStats);
                 prevModuleStatsRef.current = newModuleStats;
             }
@@ -218,6 +258,10 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 newStatusStats = overtimeStats;
             } else if (activeModule === 'attendance') {
                 newStatusStats = attendanceStats;
+            } else if (activeModule === 'late-early') {
+                newStatusStats = lateEarlyStats;
+            } else if (activeModule === 'meal-allowance') {
+                newStatusStats = mealAllowanceStats;
             } else {
                 newStatusStats = allStats;
             }
@@ -272,16 +316,20 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
             let newRequests = [];
 
             if (activeModule === 'all') {
-                const [leaveResponse, overtimeResponse, attendanceResponse] = await Promise.all([
+                const [leaveResponse, overtimeResponse, attendanceResponse, lateEarlyResponse, mealAllowanceResponse] = await Promise.all([
                     leaveRequestsAPI.getAll(params),
                     overtimeRequestsAPI.getAll(params),
-                    attendanceAdjustmentsAPI.getAll(params)
+                    attendanceAdjustmentsAPI.getAll(params),
+                    lateEarlyRequestsAPI.getAll(params),
+                    mealAllowanceRequestsAPI.getAll(params)
                 ]);
 
                 newRequests = [
                     ...(leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: 'leave' })) : []),
                     ...(overtimeResponse.data.success ? (overtimeResponse.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
-                    ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : [])
+                    ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : []),
+                    ...(lateEarlyResponse.data.success ? (lateEarlyResponse.data.data || []).map(r => ({ ...r, requestType: 'late-early' })) : []),
+                    ...(mealAllowanceResponse.data.success ? (mealAllowanceResponse.data.data || []).map(r => ({ ...r, requestType: 'meal-allowance' })) : [])
                 ];
 
                 // Sắp xếp theo thời gian tạo mới nhất
@@ -300,6 +348,16 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 const response = await attendanceAdjustmentsAPI.getAll(params);
                 if (response.data.success) {
                     newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'attendance' }));
+                }
+            } else if (activeModule === 'late-early') {
+                const response = await lateEarlyRequestsAPI.getAll(params);
+                if (response.data.success) {
+                    newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'late-early' }));
+                }
+            } else if (activeModule === 'meal-allowance') {
+                const response = await mealAllowanceRequestsAPI.getAll(params);
+                if (response.data.success) {
+                    newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'meal-allowance' }));
                 }
             }
 
@@ -386,6 +444,10 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 response = await overtimeRequestsAPI.remove(request.id, deleteData);
             } else if (request.requestType === 'attendance') {
                 response = await attendanceAdjustmentsAPI.remove(request.id, deleteData);
+            } else if (request.requestType === 'late-early') {
+                response = await lateEarlyRequestsAPI.remove(request.id, deleteData);
+            } else if (request.requestType === 'meal-allowance') {
+                response = await mealAllowanceRequestsAPI.remove(request.id, deleteData);
             }
 
             if (response?.data?.success) {
@@ -653,7 +715,9 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                             <span className={`request-type-badge ${request.requestType || 'leave'}`}>
                                                 {request.requestType === 'leave' ? 'Đơn xin nghỉ' :
                                                     request.requestType === 'overtime' ? 'Đơn tăng ca' :
-                                                        request.requestType === 'attendance' ? 'Đơn bổ sung công' : 'Đơn xin nghỉ'}
+                                                        request.requestType === 'attendance' ? 'Đơn bổ sung công' :
+                                                            request.requestType === 'late-early' ? 'Đơn xin đi trễ về sớm' :
+                                                                request.requestType === 'meal-allowance' ? 'Đơn xin phụ cấp cơm công trình' : 'Đơn xin nghỉ'}
                                             </span>
                                         </td>
                                         <td>
@@ -684,6 +748,22 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                                     </p>
                                                 </>
                                             )}
+                                            {request.requestType === 'late-early' && (
+                                                <>
+                                                    <strong>Đơn xin đi trễ về sớm</strong>
+                                                    <p className="request-period">
+                                                        {request.request_type === 'LATE' ? 'Đi trễ' : request.request_type === 'EARLY' ? 'Về sớm' : 'N/A'}
+                                                    </p>
+                                                </>
+                                            )}
+                                            {request.requestType === 'meal-allowance' && (
+                                                <>
+                                                    <strong>Đơn xin phụ cấp cơm công trình</strong>
+                                                    <p className="request-period">
+                                                        {request.items ? `${request.items.length} mục - ${new Intl.NumberFormat('vi-VN').format(request.total_amount || 0)} VNĐ` : 'N/A'}
+                                                    </p>
+                                                </>
+                                            )}
                                         </td>
                                         <td>
                                             {request.requestType === 'leave' && (
@@ -708,6 +788,27 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                                         {request.check_in_time && request.check_out_time && ' / '}
                                                         {request.check_out_time && `Ra: ${request.check_out_time.slice(0, 5)}`}
                                                     </small>
+                                                </>
+                                            )}
+                                            {request.requestType === 'late-early' && (
+                                                <>
+                                                    {formatDateDisplay(request.request_date)}
+                                                    <br />
+                                                    <small>
+                                                        {request.time_value ? request.time_value.slice(0, 5) : '-'}
+                                                    </small>
+                                                </>
+                                            )}
+                                            {request.requestType === 'meal-allowance' && (
+                                                <>
+                                                    {request.items && request.items.length > 0 ? (
+                                                        <>
+                                                            {formatDateDisplay(request.items[0].expense_date)}
+                                                            {request.items.length > 1 && ` → ${formatDateDisplay(request.items[request.items.length - 1].expense_date)}`}
+                                                        </>
+                                                    ) : (
+                                                        '-'
+                                                    )}
                                                 </>
                                             )}
                                         </td>

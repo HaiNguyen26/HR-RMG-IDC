@@ -284,20 +284,6 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
       const [endHour, endMin] = formData.endTime.split(':').map(Number);
       endDateTime.setHours(endHour, endMin || 0, 0, 0);
 
-      // Kiểm tra không cho phép chọn giờ từ 17:00-17:30
-      const isStartTimeInForbiddenRange = startHour === 17 && startMin <= 30;
-      const isEndTimeInForbiddenRange = endHour === 17 && endMin <= 30;
-
-      if (isStartTimeInForbiddenRange) {
-        setError('Không được chọn thời gian bắt đầu từ 17:00-17:30. Vui lòng chọn từ 17:45 trở đi.');
-        return;
-      }
-
-      if (isEndTimeInForbiddenRange) {
-        setError('Không được chọn thời gian kết thúc từ 17:00-17:30. Vui lòng chọn từ 17:45 trở đi.');
-        return;
-      }
-
       if (endDateTime <= startDateTime) {
         setError('Thời gian kết thúc phải sau thời gian bắt đầu.');
         return;
@@ -535,7 +521,6 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
                         onChange={handleTimeChange('endTime')}
                         className="overtime-form-timepicker"
                         minuteStep={15}
-                        disabledMinutesForHour={{ hour: 17, minutes: [0, 15, 30] }}
                       />
                     </div>
                   </div>

@@ -181,6 +181,8 @@ router.post('/', upload.array('files', 20), async (req, res) => {
             branchDirectorName,
             managerId,
             managerName,
+            ceoId,
+            ceoName,
             branch,
             startDate,
             endDate,
@@ -188,7 +190,40 @@ router.post('/', upload.array('files', 20), async (req, res) => {
             expenseItems
         } = req.body;
 
-        if (!employeeId || !branchDirectorId || !branch || !startDate || !endDate) {
+        // Debug: Log để kiểm tra dữ liệu nhận được
+        console.log('[Customer Entertainment Expense] Received data:', {
+            employeeId,
+            branchDirectorId,
+            ceoId,
+            branch,
+            startDate,
+            endDate,
+            hasBranchDirector: !!branchDirectorId,
+            hasCeo: !!ceoId
+        });
+
+        // Phải có branchDirectorId hoặc ceoId (validate cả undefined, null, và chuỗi rỗng)
+        // Với FormData, các giá trị có thể là string, cần kiểm tra kỹ
+        const hasBranchDirector = branchDirectorId !== undefined && 
+                                  branchDirectorId !== null && 
+                                  branchDirectorId !== '' && 
+                                  String(branchDirectorId) !== 'undefined' &&
+                                  String(branchDirectorId) !== 'null';
+        const hasCeo = ceoId !== undefined && 
+                       ceoId !== null && 
+                       ceoId !== '' && 
+                       String(ceoId) !== 'undefined' &&
+                       String(ceoId) !== 'null';
+        
+        if (!employeeId || (!hasBranchDirector && !hasCeo) || !branch || !startDate || !endDate) {
+            console.log('[Customer Entertainment Expense] Validation failed:', {
+                hasEmployeeId: !!employeeId,
+                hasBranchDirector,
+                hasCeo,
+                hasBranch: !!branch,
+                hasStartDate: !!startDate,
+                hasEndDate: !!endDate
+            });
             return res.status(400).json({
                 success: false,
                 message: 'Thiếu thông tin bắt buộc'
@@ -261,26 +296,61 @@ router.post('/', upload.array('files', 20), async (req, res) => {
             }
         }
 
+        // Xác định status và current_step dựa trên việc chọn Tổng giám đốc hay Giám đốc chi nhánh
+        let initialStatus = 'PENDING_BRANCH_DIRECTOR';
+        let initialStep = 'STEP_1';
+        let finalCeoId = null;
+
+        if (ceoId) {
+            // Validate và parse ceoId
+            const parsedCeoId = parseInt(ceoId);
+            if (!isNaN(parsedCeoId) && parsedCeoId > 0) {
+                // Nếu chọn Tổng giám đốc, status sẽ là PENDING_CEO
+                initialStatus = 'PENDING_CEO';
+                initialStep = 'STEP_3'; // Bỏ qua bước duyệt GĐ chi nhánh
+                finalCeoId = parsedCeoId;
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: 'CEO ID không hợp lệ'
+                });
+            }
+        }
+
+        // Validate và parse branchDirectorId nếu có
+        let finalBranchDirectorId = null;
+        if (hasBranchDirector) {
+            const parsedBranchDirectorId = parseInt(branchDirectorId);
+            if (isNaN(parsedBranchDirectorId) || parsedBranchDirectorId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Branch Director ID không hợp lệ'
+                });
+            }
+            finalBranchDirectorId = parsedBranchDirectorId;
+        }
+
         // Insert request
         const requestResult = await pool.query(
             `INSERT INTO customer_entertainment_expense_requests (
                 employee_id, request_number, branch_director_id, branch_director_name,
-                manager_id, manager_name, branch, start_date, end_date, advance_amount, total_amount, status, current_step
-            )             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+                manager_id, manager_name, ceo_id, branch, start_date, end_date, advance_amount, total_amount, status, current_step
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
             [
                 parseInt(employeeId),
                 requestNumber,
-                parseInt(branchDirectorId),
-                branchDirectorName,
+                finalBranchDirectorId,
+                branchDirectorName || null,
                 finalManagerId,
                 finalManagerName,
+                finalCeoId,
                 branch,
                 startDate,
                 endDate,
                 parseFloat(advanceAmount) || 0,
                 totalAmount,
-                'PENDING_BRANCH_DIRECTOR',
-                'STEP_1'
+                initialStatus,
+                initialStep
             ]
         );
 
@@ -346,7 +416,7 @@ router.post('/', upload.array('files', 20), async (req, res) => {
 // GET /api/customer-entertainment-expenses - Lấy danh sách yêu cầu
 router.get('/', async (req, res) => {
     try {
-        const { employeeId, branchDirectorId, managerId, status } = req.query;
+        const { employeeId, branchDirectorId, managerId, ceoId, status } = req.query;
 
         let query = `
             SELECT 
@@ -375,6 +445,12 @@ router.get('/', async (req, res) => {
         if (managerId) {
             query += ` AND r.manager_id = $${paramIndex}`;
             params.push(parseInt(managerId));
+            paramIndex++;
+        }
+
+        if (ceoId) {
+            query += ` AND r.ceo_id = $${paramIndex}`;
+            params.push(parseInt(ceoId));
             paramIndex++;
         }
 
