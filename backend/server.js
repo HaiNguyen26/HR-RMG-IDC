@@ -11,6 +11,8 @@ const requestsRoutes = require('./routes/requests');
 const leaveRequestsRoutes = require('./routes/leaveRequests');
 const overtimeRequestsRoutes = require('./routes/overtimeRequests');
 const attendanceRequestsRoutes = require('./routes/attendanceRequests');
+const lateEarlyRequestsRoutes = require('./routes/lateEarlyRequests');
+const mealAllowanceRequestsRoutes = require('./routes/mealAllowanceRequests');
 const travelExpensesRoutes = require('./routes/travelExpenses');
 const customerEntertainmentExpensesRoutes = require('./routes/customerEntertainmentExpenses');
 const candidatesRoutes = require('./routes/candidates');
@@ -43,6 +45,8 @@ app.use('/api/requests', requestsRoutes);
 app.use('/api/leave-requests', leaveRequestsRoutes);
 app.use('/api/overtime-requests', overtimeRequestsRoutes);
 app.use('/api/attendance-adjustments', attendanceRequestsRoutes);
+app.use('/api/late-early-requests', lateEarlyRequestsRoutes);
+app.use('/api/meal-allowance-requests', mealAllowanceRequestsRoutes);
 app.use('/api/travel-expenses', travelExpensesRoutes);
 app.use('/api/customer-entertainment-expenses', customerEntertainmentExpensesRoutes);
 app.use('/api/candidates', candidatesRoutes);
@@ -69,6 +73,8 @@ app.get('/', (req, res) => {
             leaveRequests: '/api/leave-requests',
             overtimeRequests: '/api/overtime-requests',
             attendanceAdjustments: '/api/attendance-adjustments',
+            lateEarlyRequests: '/api/late-early-requests',
+            mealAllowanceRequests: '/api/meal-allowance-requests',
             travelExpenses: '/api/travel-expenses',
             customerEntertainmentExpenses: '/api/customer-entertainment-expenses',
             candidates: '/api/candidates',
