@@ -206,6 +206,14 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
         // (vì có thể cache chưa đầy đủ hoặc có nhiều người cùng tên nhưng chưa được load)
         if (matches.length === 1) {
             const match = matches[0];
+            
+            // Nếu manager là Head Office, cho phép quản lý tất cả chi nhánh
+            const normalizedMatchChiNhanh = normalizeChiNhanhValue(match.chi_nhanh);
+            if (normalizedMatchChiNhanh === 'head office' || normalizedMatchChiNhanh === 'ho') {
+                console.log(`[findManagerFromCache] Single match found: "${match.ho_ten}" (ID: ${match.id}, Head Office) - Allowing Head Office manager to manage employee from "${normalizedEmployeeChiNhanh || 'N/A'}"`);
+                return match;
+            }
+            
             // Nếu có chi_nhanh context, kiểm tra xem manager có cấp dưới trong cùng chi_nhanh không
             if (normalizedEmployeeChiNhanh) {
                 // QUAN TRỌNG: Chỉ xem xét manager có chi_nhanh match với employee đang tạo đơn
@@ -816,14 +824,7 @@ router.delete('/:id', async (req, res) => {
         const isHr = role && role !== 'EMPLOYEE';
 
         if (isHr) {
-            // HR có thể xóa đơn đã bị từ chối hoặc đã hủy
-            if (request.status !== STATUSES.REJECTED && request.status !== STATUSES.CANCELLED) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'HR chỉ có thể xóa đơn đã bị từ chối hoặc đã hủy'
-                });
-            }
-
+            // HR có thể xóa đơn ở bất kỳ trạng thái nào
             // Xóa đơn (hard delete)
             await pool.query(
                 `DELETE FROM leave_requests WHERE id = $1`,

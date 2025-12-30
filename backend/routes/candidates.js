@@ -301,19 +301,43 @@ router.post('/', (req, res, next) => {
 
         try {
             if (diaChiTamTru) {
-                diaChiTamTruObj = typeof diaChiTamTru === 'string' ? JSON.parse(diaChiTamTru) : diaChiTamTru;
+                if (typeof diaChiTamTru === 'string') {
+                    // Kiểm tra nếu là [object Object] hoặc không phải JSON hợp lệ
+                    const trimmed = diaChiTamTru.trim();
+                    if (trimmed === '[object Object]' || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+                        diaChiTamTruObj = {};
+                    } else {
+                        diaChiTamTruObj = JSON.parse(diaChiTamTru);
+                    }
+                } else if (typeof diaChiTamTru === 'object' && diaChiTamTru !== null) {
+                    diaChiTamTruObj = diaChiTamTru;
+                } else {
+                    diaChiTamTruObj = {};
+                }
             }
         } catch (e) {
-            console.error('Error parsing diaChiTamTru:', e);
+            console.error('Error parsing diaChiTamTru:', e.message);
             diaChiTamTruObj = {};
         }
 
         try {
             if (diaChiLienLac) {
-                diaChiLienLacObj = typeof diaChiLienLac === 'string' ? JSON.parse(diaChiLienLac) : diaChiLienLac;
+                if (typeof diaChiLienLac === 'string') {
+                    // Kiểm tra nếu là [object Object] hoặc không phải JSON hợp lệ
+                    const trimmed = diaChiLienLac.trim();
+                    if (trimmed === '[object Object]' || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+                        diaChiLienLacObj = {};
+                    } else {
+                        diaChiLienLacObj = JSON.parse(diaChiLienLac);
+                    }
+                } else if (typeof diaChiLienLac === 'object' && diaChiLienLac !== null) {
+                    diaChiLienLacObj = diaChiLienLac;
+                } else {
+                    diaChiLienLacObj = {};
+                }
             }
         } catch (e) {
-            console.error('Error parsing diaChiLienLac:', e);
+            console.error('Error parsing diaChiLienLac:', e.message);
             diaChiLienLacObj = {};
         }
 
@@ -591,19 +615,43 @@ router.put('/:id', upload.fields([
 
         try {
             if (diaChiTamTru) {
-                diaChiTamTruObj = typeof diaChiTamTru === 'string' ? JSON.parse(diaChiTamTru) : diaChiTamTru;
+                if (typeof diaChiTamTru === 'string') {
+                    // Kiểm tra nếu là [object Object] hoặc không phải JSON hợp lệ
+                    const trimmed = diaChiTamTru.trim();
+                    if (trimmed === '[object Object]' || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+                        diaChiTamTruObj = {};
+                    } else {
+                        diaChiTamTruObj = JSON.parse(diaChiTamTru);
+                    }
+                } else if (typeof diaChiTamTru === 'object' && diaChiTamTru !== null) {
+                    diaChiTamTruObj = diaChiTamTru;
+                } else {
+                    diaChiTamTruObj = {};
+                }
             }
         } catch (e) {
-            console.error('Error parsing diaChiTamTru:', e);
+            console.error('Error parsing diaChiTamTru:', e.message);
             diaChiTamTruObj = {};
         }
 
         try {
             if (diaChiLienLac) {
-                diaChiLienLacObj = typeof diaChiLienLac === 'string' ? JSON.parse(diaChiLienLac) : diaChiLienLac;
+                if (typeof diaChiLienLac === 'string') {
+                    // Kiểm tra nếu là [object Object] hoặc không phải JSON hợp lệ
+                    const trimmed = diaChiLienLac.trim();
+                    if (trimmed === '[object Object]' || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+                        diaChiLienLacObj = {};
+                    } else {
+                        diaChiLienLacObj = JSON.parse(diaChiLienLac);
+                    }
+                } else if (typeof diaChiLienLac === 'object' && diaChiLienLac !== null) {
+                    diaChiLienLacObj = diaChiLienLac;
+                } else {
+                    diaChiLienLacObj = {};
+                }
             }
         } catch (e) {
-            console.error('Error parsing diaChiLienLac:', e);
+            console.error('Error parsing diaChiLienLac:', e.message);
             diaChiLienLacObj = {};
         }
 
