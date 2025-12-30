@@ -506,6 +506,20 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 26: $MIGRATION26${NC}"
 fi
 
+# Migration 27: grant_permissions_late_early_meal_allowance.sql (Cấp quyền cho hr_user trên các bảng mới - QUAN TRỌNG)
+MIGRATION27="$PROJECT_DIR/database/grant_permissions_late_early_meal_allowance.sql"
+if [ -f "$MIGRATION27" ]; then
+    echo -e "${BLUE}→ Chạy migration: grant_permissions_late_early_meal_allowance.sql (Cấp quyền SELECT, INSERT, UPDATE, DELETE cho hr_user trên late_early_requests, meal_allowance_requests, meal_allowance_items)${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION27"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 27 thành công - Đã cấp quyền cho hr_user trên các bảng mới${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 27${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 27: $MIGRATION27${NC}"
+fi
 
 # 4.5. Tạo và cấp quyền cho thư mục uploads
 echo -e "${YELLOW}[4.5/5] Tạo và cấp quyền cho thư mục uploads...${NC}"
