@@ -465,10 +465,27 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         return LEAVE_TYPE_LABELS[leaveType] || leaveType;
     };
 
-    const handleViewRequest = useCallback((request) => {
+    const handleViewRequest = useCallback(async (request) => {
         setSelectedRequest(request);
         setShowDetailModal(true);
-    }, []);
+        
+        // Fetch full request details để có đầy đủ thông tin (đặc biệt cho meal-allowance với items)
+        if ((request.requestType === 'meal-allowance' || activeModule === 'meal-allowance') && request.id) {
+            try {
+                const detailResponse = await mealAllowanceRequestsAPI.getById(request.id);
+                if (detailResponse.data && detailResponse.data.success) {
+                    // Đảm bảo requestType được giữ lại từ request ban đầu
+                    setSelectedRequest({
+                        ...detailResponse.data.data,
+                        requestType: request.requestType || 'meal-allowance'
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching request details:', error);
+                // Giữ nguyên request hiện tại nếu fetch lỗi
+            }
+        }
+    }, [activeModule]);
 
     // Export approved requests to Excel
     const handleExportRequests = async () => {
@@ -694,7 +711,8 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     const renderRequestDetails = (request) => {
         if (!request) return null;
 
-        const requestType = request.requestType || activeModule;
+        // Khi activeModule === 'all', sử dụng request.requestType thay vì activeModule
+        const requestType = activeModule === 'all' ? (request.requestType || 'unknown') : (request.requestType || activeModule);
 
         if (requestType === 'leave' || activeModule === 'leave') {
             // Tính số ngày nghỉ
@@ -1403,6 +1421,204 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             );
         }
 
+        if (requestType === 'meal-allowance' || activeModule === 'meal-allowance' || request.requestType === 'meal-allowance') {
+            return (
+                <>
+                    {/* Thông tin đơn */}
+                    <div className="request-management-modal-section">
+                        <h3 className="request-management-modal-section-title">
+                            <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Thông tin đơn
+                        </h3>
+                        <div className="request-management-modal-info-grid">
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                    </svg>
+                                    Tên nhân viên
+                                </span>
+                                <span className="info-value">{request.employee_name || request.ho_ten || '-'}</span>
+                            </div>
+                            {request.ma_nhan_vien && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path>
+                                        </svg>
+                                        Mã nhân viên
+                                    </span>
+                                    <span className="info-value">{request.ma_nhan_vien}</span>
+                                </div>
+                            )}
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    Mã đơn
+                                </span>
+                                <span className="info-value">ĐPCC{String(request.id).padStart(6, '0')}</span>
+                            </div>
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">
+                                    <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    Trạng thái
+                                </span>
+                                <span className={`leave-status-tag ${request.status?.toLowerCase() || 'pending'}`}>
+                                    {getStatusLabel(request.status)}
+                                </span>
+                            </div>
+                            {request.created_at && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Ngày tạo
+                                    </span>
+                                    <span className="info-value">{formatDateDisplay(request.created_at, true)}</span>
+                                </div>
+                            )}
+                            {request.team_lead_action_at && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">
+                                        <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Ngày quản lý xử lý
+                                    </span>
+                                    <span className="info-value">{formatDateDisplay(request.team_lead_action_at, true)}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Chi tiết đơn xin phụ cấp cơm công trình */}
+                    <div className="request-management-modal-section">
+                        <h3 className="request-management-modal-section-title">
+                            <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                            </svg>
+                            Chi tiết đơn xin phụ cấp cơm công trình
+                        </h3>
+                        <div className="request-management-modal-info-grid">
+                            {request.items && request.items.length > 0 && (
+                                <>
+                                    <div className="request-management-modal-info-item">
+                                        <span className="info-label">
+                                            <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                            </svg>
+                                            Khoảng ngày
+                                        </span>
+                                        <span className="info-value">
+                                            {formatDateDisplay(request.items[0].expense_date)}
+                                            {request.items.length > 1 && ` → ${formatDateDisplay(request.items[request.items.length - 1].expense_date)}`}
+                                        </span>
+                                    </div>
+                                    <div className="request-management-modal-info-item">
+                                        <span className="info-label">
+                                            <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                            </svg>
+                                            Số mục
+                                        </span>
+                                        <span className="info-value">{request.items.length} mục</span>
+                                    </div>
+                                    {request.total_amount && (
+                                        <div className="request-management-modal-info-item">
+                                            <span className="info-label">
+                                                <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                                Tổng tiền
+                                            </span>
+                                            <span className="info-value info-value-highlight">
+                                                {new Intl.NumberFormat('vi-VN').format(request.total_amount)} VNĐ
+                                            </span>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                        
+                        {/* Bảng chi tiết các mục cơm */}
+                        {request.items && request.items.length > 0 && (
+                            <div style={{ marginTop: '1.5rem' }}>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.95rem', fontWeight: '600', color: '#374151' }}>
+                                    Danh sách các mục cơm
+                                </h4>
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                                        <thead>
+                                            <tr style={{ backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                                                <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600', color: '#374151' }}>STT</th>
+                                                <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Ngày</th>
+                                                <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Nội dung</th>
+                                                <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Số tiền</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {request.items.map((item, index) => (
+                                                <tr key={index} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                                    <td style={{ padding: '0.75rem', color: '#6b7280' }}>{index + 1}</td>
+                                                    <td style={{ padding: '0.75rem', color: '#1f2937' }}>{formatDateDisplay(item.expense_date)}</td>
+                                                    <td style={{ padding: '0.75rem', color: '#1f2937' }}>{item.content || '-'}</td>
+                                                    <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '500', color: '#059669' }}>
+                                                        {new Intl.NumberFormat('vi-VN').format(item.amount || 0)} VNĐ
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            <tr style={{ backgroundColor: '#f9fafb', borderTop: '2px solid #e5e7eb' }}>
+                                                <td colSpan="3" style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#374151' }}>
+                                                    Tổng cộng:
+                                                </td>
+                                                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#059669', fontSize: '1rem' }}>
+                                                    {new Intl.NumberFormat('vi-VN').format(request.total_amount || 0)} VNĐ
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Ghi chú và Nhận xét */}
+                    {(request.notes || request.team_lead_comment) && (
+                        <div className="request-management-modal-section">
+                            <h3 className="request-management-modal-section-title">
+                                <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Ghi chú và Nhận xét
+                            </h3>
+                            {request.notes && (
+                                <div className="request-management-notes-text">
+                                    <strong>Ghi chú:</strong> {request.notes}
+                                </div>
+                            )}
+                            {request.team_lead_comment && (
+                                <div className="request-management-manager-comment-text">
+                                    <strong>Nhận xét của quản lý:</strong> {request.team_lead_comment}
+                                    {request.team_lead_action_at && (
+                                        <span style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                                            ({formatDateDisplay(request.team_lead_action_at, true)})
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
+            );
+        }
+
         return null;
     };
 
@@ -1732,6 +1948,22 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                 <strong>Đơn xin đi trễ về sớm</strong>
                                                                 <p className="request-management-period">
                                                                     {request.request_type === 'LATE' ? 'Đi trễ' : request.request_type === 'EARLY' ? 'Về sớm' : 'N/A'}
+                                                                </p>
+                                                            </>
+                                                        )}
+                                                        {request.requestType === 'meal-allowance' && (
+                                                            <>
+                                                                <strong>Đơn xin phụ cấp cơm công trình</strong>
+                                                                <p className="request-management-period">
+                                                                    {request.items && request.items.length > 0 ? (
+                                                                        <>
+                                                                            {formatDateDisplay(request.items[0].expense_date)}
+                                                                            {request.items.length > 1 && ` → ${formatDateDisplay(request.items[request.items.length - 1].expense_date)}`}
+                                                                            {request.total_amount && ` • ${new Intl.NumberFormat('vi-VN').format(request.total_amount)} VNĐ`}
+                                                                        </>
+                                                                    ) : (
+                                                                        '-'
+                                                                    )}
                                                                 </p>
                                                             </>
                                                         )}

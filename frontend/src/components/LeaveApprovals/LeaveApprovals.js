@@ -994,10 +994,26 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
 
     // All hooks must be called before any early returns
     // Memoize handleViewRequest
-    const handleViewRequest = useCallback((request) => {
+    const handleViewRequest = useCallback(async (request) => {
         setSelectedRequest(request);
         setShowDetailModal(true);
-    }, []);
+        
+        // Fetch full request details để có đầy đủ thông tin (đặc biệt cho meal-allowance với items)
+        if (activeModule === 'meal-allowance' && request.id) {
+            try {
+                const api = moduleApiMap[activeModule];
+                if (api && typeof api.getById === 'function') {
+                    const detailResponse = await api.getById(request.id);
+                    if (detailResponse.data && detailResponse.data.success) {
+                        setSelectedRequest(detailResponse.data.data);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching request details:', error);
+                // Giữ nguyên request hiện tại nếu fetch lỗi
+            }
+        }
+    }, [activeModule, moduleApiMap]);
 
     // Memoize table header để tránh render lại
     const tableHeader = useMemo(() => {
@@ -1005,6 +1021,9 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             <tr>
                 <th>Mã đơn</th>
                 <th>Tên nhân viên</th>
+                {activeModule === 'all' && (
+                    <th>Thông tin đơn</th>
+                )}
                 {activeModule === 'leave' && (
                     <>
                         <th>Loại nghỉ</th>
@@ -1579,6 +1598,79 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                     )}
                                                 </div>
                                             </td>
+                                            {activeModule === 'all' && (() => {
+                                                const requestType = request.requestType || request.type || 'unknown';
+                                                if (requestType === 'leave' || request.request_type === 'LEAVE') {
+                                                    return (
+                                                        <td className="leave-request-info-cell">
+                                                            <div className="leave-request-info">
+                                                                <div><strong>{getRequestTypeLabel(request.request_type) || 'N/A'}</strong></div>
+                                                                <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                                                    {formatDateDisplay(request.start_date)}
+                                                                    {request.end_date && ` → ${formatDateDisplay(request.end_date)}`}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                } else if (requestType === 'overtime' || request.request_type === 'OVERTIME') {
+                                                    return (
+                                                        <td className="leave-request-info-cell">
+                                                            <div className="leave-request-info">
+                                                                <div><strong>Đơn tăng ca</strong></div>
+                                                                <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                                                    {formatDateDisplay(request.request_date)} • {request.start_time?.slice(0, 5) || '-'} → {getCorrectEndTime(request)?.slice(0, 5) || request.end_time?.slice(0, 5) || '-'}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                } else if (requestType === 'attendance' || request.request_type === 'ATTENDANCE') {
+                                                    return (
+                                                        <td className="leave-request-info-cell">
+                                                            <div className="leave-request-info">
+                                                                <div><strong>Đơn bổ sung chấm công</strong></div>
+                                                                <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                                                    {formatDateDisplay(request.adjustment_date || request.request_date)}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                } else if (requestType === 'late-early' || request.request_type === 'LATE' || request.request_type === 'EARLY') {
+                                                    return (
+                                                        <td className="leave-request-info-cell">
+                                                            <div className="leave-request-info">
+                                                                <div><strong>{request.request_type === 'LATE' ? 'Đi trễ' : request.request_type === 'EARLY' ? 'Về sớm' : 'N/A'}</strong></div>
+                                                                <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                                                    {formatDateDisplay(request.request_date)} • {request.time_value ? request.time_value.slice(0, 5) : '-'}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                } else if (requestType === 'meal-allowance') {
+                                                    return (
+                                                        <td className="leave-request-info-cell">
+                                                            <div className="leave-request-info">
+                                                                <div><strong>Đơn xin phụ cấp cơm công trình</strong></div>
+                                                                <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                                                    {request.items && request.items.length > 0 ? (
+                                                                        <>
+                                                                            {formatDateDisplay(request.items[0].expense_date)}
+                                                                            {request.items.length > 1 && ` → ${formatDateDisplay(request.items[request.items.length - 1].expense_date)}`}
+                                                                            {request.total_amount && ` • ${new Intl.NumberFormat('vi-VN').format(request.total_amount)} VNĐ`}
+                                                                        </>
+                                                                    ) : (
+                                                                        '-'
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                }
+                                                return (
+                                                    <td className="leave-request-info-cell">
+                                                        <div className="leave-request-info">-</div>
+                                                    </td>
+                                                );
+                                            })()}
                                             {activeModule === 'leave' && (
                                                 <>
                                                     <td className="leave-request-type-cell">
@@ -2245,7 +2337,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                         Chi tiết đơn xin phụ cấp cơm công trình
                                     </h3>
                                     <div className="leave-approvals-modal-info-grid">
-                                        {selectedRequest.items && selectedRequest.items.length > 0 && (
+                                        {selectedRequest.items && selectedRequest.items.length > 0 ? (
                                             <>
                                                 <div className="leave-approvals-modal-info-item">
                                                     <span className="info-label">
@@ -2282,8 +2374,53 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                     </div>
                                                 )}
                                             </>
+                                        ) : (
+                                            <div className="leave-approvals-modal-info-item" style={{ gridColumn: '1 / -1' }}>
+                                                <span className="info-label">Đang tải chi tiết...</span>
+                                            </div>
                                         )}
                                     </div>
+                                    
+                                    {/* Bảng chi tiết các mục cơm */}
+                                    {selectedRequest.items && selectedRequest.items.length > 0 && (
+                                        <div style={{ marginTop: '1.5rem' }}>
+                                            <h4 style={{ marginBottom: '1rem', fontSize: '0.95rem', fontWeight: '600', color: '#374151' }}>
+                                                Danh sách các mục cơm
+                                            </h4>
+                                            <div style={{ overflowX: 'auto' }}>
+                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                                                    <thead>
+                                                        <tr style={{ backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                                                            <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600', color: '#374151' }}>STT</th>
+                                                            <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Ngày</th>
+                                                            <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Nội dung</th>
+                                                            <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Số tiền</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {selectedRequest.items.map((item, index) => (
+                                                            <tr key={index} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                                                <td style={{ padding: '0.75rem', color: '#6b7280' }}>{index + 1}</td>
+                                                                <td style={{ padding: '0.75rem', color: '#1f2937' }}>{formatDateDisplay(item.expense_date)}</td>
+                                                                <td style={{ padding: '0.75rem', color: '#1f2937' }}>{item.content || '-'}</td>
+                                                                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '500', color: '#059669' }}>
+                                                                    {new Intl.NumberFormat('vi-VN').format(item.amount || 0)} VNĐ
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                        <tr style={{ backgroundColor: '#f9fafb', borderTop: '2px solid #e5e7eb' }}>
+                                                            <td colSpan="3" style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#374151' }}>
+                                                                Tổng cộng:
+                                                            </td>
+                                                            <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#059669', fontSize: '1rem' }}>
+                                                                {new Intl.NumberFormat('vi-VN').format(selectedRequest.total_amount || 0)} VNĐ
+                                                            </td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

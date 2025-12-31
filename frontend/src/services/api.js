@@ -189,6 +189,7 @@ export const lateEarlyRequestsAPI = {
 export const mealAllowanceRequestsAPI = {
   create: (data) => api.post('/meal-allowance-requests', data),
   getAll: (params) => api.get('/meal-allowance-requests', { params }),
+  getById: (id) => api.get(`/meal-allowance-requests/${id}`),
   decide: (id, data) => api.post(`/meal-allowance-requests/${id}/decision`, data),
   remove: (id, data) => api.delete(`/meal-allowance-requests/${id}`, { data }),
 };

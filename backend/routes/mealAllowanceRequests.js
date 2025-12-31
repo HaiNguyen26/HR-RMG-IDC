@@ -277,6 +277,61 @@ router.get('/', async (req, res) => {
     }
 });
 
+// GET /api/meal-allowance-requests/:id - Lấy chi tiết một đơn
+router.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const requestResult = await pool.query(
+            `SELECT mar.*,
+                   e.ho_ten as employee_name,
+                   e.email as employee_email,
+                   e.phong_ban as employee_department,
+                   e.chi_nhanh as employee_branch,
+                   e.ma_nhan_vien,
+                   team.ho_ten as team_lead_name,
+                   team.email as team_lead_email
+            FROM meal_allowance_requests mar
+            LEFT JOIN employees e ON mar.employee_id = e.id
+            LEFT JOIN employees team ON mar.team_lead_id = team.id
+            WHERE mar.id = $1`,
+            [parseInt(id, 10)]
+        );
+
+        if (requestResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy đơn'
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Lấy items
+        const itemsResult = await pool.query(
+            `SELECT * FROM meal_allowance_items 
+             WHERE meal_allowance_request_id = $1 
+             ORDER BY expense_date ASC, created_at ASC`,
+            [parseInt(id, 10)]
+        );
+
+        res.json({
+            success: true,
+            message: 'Chi tiết đơn xin phụ cấp cơm công trình',
+            data: {
+                ...request,
+                items: itemsResult.rows
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching meal allowance request details:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Không thể lấy chi tiết đơn: ' + error.message
+        });
+    }
+});
+
 // POST /api/meal-allowance-requests - Nhân viên tạo đơn
 router.post('/', async (req, res) => {
     try {
