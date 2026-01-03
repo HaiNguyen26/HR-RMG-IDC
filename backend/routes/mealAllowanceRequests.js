@@ -131,6 +131,41 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
             if (bestMatch) {
                 return bestMatch;
             }
+
+            // Nếu employee ở Head Office, cho phép tìm manager từ bất kỳ chi nhánh nào
+            const isEmployeeHeadOffice = normalizedEmployeeChiNhanh === 'head office' || normalizedEmployeeChiNhanh === 'ho';
+            if (isEmployeeHeadOffice && matches.length > 0) {
+                let bestMatch = null;
+                let maxSubordinates = 0;
+
+                for (const match of matches) {
+                    const managerEmployees = cache.all.filter(e => {
+                        if (!e.quan_ly_truc_tiep) return false;
+                        const empManagerName = (e.quan_ly_truc_tiep || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                        return empManagerName === normalizedName;
+                    });
+
+                    if (managerEmployees.length > maxSubordinates) {
+                        maxSubordinates = managerEmployees.length;
+                        bestMatch = match;
+                    }
+                }
+
+                if (bestMatch) {
+                    console.log(`[findManagerFromCache] Employee is at Head Office, allowing manager "${bestMatch.ho_ten}" (${bestMatch.chi_nhanh || 'N/A'}) from different branch with ${maxSubordinates} subordinates.`);
+                    return bestMatch;
+                }
+            }
+        }
+
+        // Nếu chỉ có 1 match và employee ở Head Office, cho phép sử dụng manager từ bất kỳ chi nhánh nào
+        if (matches.length === 1) {
+            const match = matches[0];
+            const isEmployeeHeadOffice = normalizedEmployeeChiNhanh === 'head office' || normalizedEmployeeChiNhanh === 'ho';
+            if (isEmployeeHeadOffice) {
+                console.log(`[findManagerFromCache] Employee is at Head Office, allowing manager "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) from different branch.`);
+                return match;
+            }
         }
 
         return matches[0];

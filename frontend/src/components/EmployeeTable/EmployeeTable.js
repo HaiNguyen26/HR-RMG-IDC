@@ -9,6 +9,7 @@ import './EmployeeTable.css';
 const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfirm, onUpdateEquipment, branchFilter }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [selectedEmployees, setSelectedEmployees] = useState(new Set());
   const [detailModal, setDetailModal] = useState({
     isOpen: false,
     mode: 'view',
@@ -609,11 +610,112 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
         .replace(/[\u0300-\u036f]/g, '') === normalizedFilter)
     : employees;
 
+  // Sync selectedEmployees with available employees
+  useEffect(() => {
+    const availableIds = new Set(filteredEmployees.map(emp => emp.id));
+    setSelectedEmployees(prev => {
+      const newSet = new Set();
+      prev.forEach(id => {
+        if (availableIds.has(id)) {
+          newSet.add(id);
+        }
+      });
+      return newSet;
+    });
+  }, [filteredEmployees]);
+
+  // Handle checkbox selection
+  const handleSelectEmployee = (employeeId, event) => {
+    event.stopPropagation(); // Prevent row click
+    setSelectedEmployees(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(employeeId)) {
+        newSet.delete(employeeId);
+      } else {
+        newSet.add(employeeId);
+      }
+      return newSet;
+    });
+  };
+
+  // Handle select all
+  const handleSelectAll = (event) => {
+    event.stopPropagation();
+    if (selectedEmployees.size === filteredEmployees.length) {
+      setSelectedEmployees(new Set());
+    } else {
+      setSelectedEmployees(new Set(filteredEmployees.map(emp => emp.id)));
+    }
+  };
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedEmployees.size === 0 || !canManage) return;
+
+    const selectedIds = Array.from(selectedEmployees);
+    console.log('[EmployeeTable] Bulk delete - Selected IDs:', selectedIds);
+
+    let confirmed = true;
+    if (showConfirm) {
+      confirmed = await showConfirm({
+        title: 'Xóa nhiều nhân viên',
+        message: `Bạn có chắc chắn muốn xóa ${selectedEmployees.size} nhân viên đã chọn?`,
+        confirmText: 'Xóa',
+        cancelText: 'Hủy',
+        type: 'danger',
+      });
+    } else {
+      confirmed = window.confirm(`Bạn có chắc chắn muốn xóa ${selectedEmployees.size} nhân viên đã chọn?`);
+    }
+
+    if (!confirmed) {
+      console.log('[EmployeeTable] Bulk delete cancelled');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      console.log('[EmployeeTable] Calling bulkDelete API with IDs:', selectedIds);
+      const response = await employeesAPI.bulkDelete(selectedIds);
+      console.log('[EmployeeTable] Bulk delete response:', response);
+      
+      if (response.data.success) {
+        if (showToast) {
+          showToast(`Đã xóa ${response.data.data.deletedCount} nhân viên thành công!`, 'success');
+        }
+        setSelectedEmployees(new Set());
+        onRefresh && onRefresh();
+      } else {
+        const message = response.data.message || 'Không thể xóa nhân viên';
+        console.error('[EmployeeTable] Bulk delete failed:', message);
+        setError(message);
+        if (showToast) {
+          showToast(message, 'error');
+        }
+      }
+    } catch (deleteError) {
+      const message = deleteError.response?.data?.message || deleteError.message || 'Lỗi khi xóa nhân viên';
+      console.error('[EmployeeTable] Bulk delete error:', deleteError);
+      setError(message);
+      if (showToast) {
+        showToast(message, 'error');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check if all employees are selected
+  const isAllSelected = filteredEmployees.length > 0 && selectedEmployees.size === filteredEmployees.length;
+  const isIndeterminate = selectedEmployees.size > 0 && selectedEmployees.size < filteredEmployees.length;
+
   return (
     <div className="employee-table-body">
       {error && (
         <div className="employee-table-error">
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="error-icon" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
               d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -621,6 +723,33 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
             />
           </svg>
           <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setError('')}
+            className="error-close-btn"
+            aria-label="Đóng thông báo lỗi"
+          >
+            <svg className="error-close-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {canManage && selectedEmployees.size > 0 && (
+        <div className="employee-table-bulk-actions">
+          <span className="bulk-actions-count">Đã chọn: {selectedEmployees.size} nhân viên</span>
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            className="bulk-delete-btn"
+            disabled={loading}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            {loading ? 'Đang xóa...' : `Xóa ${selectedEmployees.size} nhân viên`}
+          </button>
         </div>
       )}
 
@@ -628,6 +757,20 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
         <table className="employee-table">
           <thead className="employee-table-thead">
             <tr>
+              {canManage && (
+                <th className="employee-checkbox-header">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    ref={(input) => {
+                      if (input) input.indeterminate = isIndeterminate;
+                    }}
+                    onChange={handleSelectAll}
+                    className="employee-checkbox"
+                    title={isAllSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                  />
+                </th>
+              )}
               <th>Mã Nhân Viên</th>
               <th>Mã Chấm Công</th>
               <th>Họ Và Tên</th>
@@ -648,7 +791,7 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
           <tbody className="employee-table-tbody">
             {!filteredEmployees || filteredEmployees.length === 0 ? (
               <tr>
-                <td colSpan={15} className="employee-table-empty">
+                <td colSpan={canManage ? 16 : 15} className="employee-table-empty">
                   <div className="empty-state-content">
                     <div className="empty-state-icon">
                       <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -669,8 +812,33 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
               filteredEmployees.map((employee) => {
                 const isPendingEquipment =
                   (employee.trang_thai || employee.trangThai || employee.status) === 'PENDING';
+                const isSelected = selectedEmployees.has(employee.id);
                 return (
-                  <tr key={employee.id} onClick={() => handleRowClick(employee)}>
+                  <tr key={employee.id} onClick={() => handleRowClick(employee)} className={isSelected ? 'employee-row-selected' : ''}>
+                    {canManage && (
+                      <td 
+                        className="employee-checkbox-cell" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleSelectEmployee(employee.id, e);
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          className="employee-checkbox"
+                        />
+                      </td>
+                    )}
                     <td>{employee.ma_nhan_vien || '-'}</td>
                     <td>{employee.ma_cham_cong || '-'}</td>
                     <td>

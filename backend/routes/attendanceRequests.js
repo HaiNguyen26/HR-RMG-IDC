@@ -160,6 +160,34 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
                 return bestMatch;
             }
 
+            // Nếu employee ở Head Office, cho phép tìm manager từ bất kỳ chi nhánh nào
+            const isEmployeeHeadOffice = normalizedEmployeeChiNhanh === 'head office' || normalizedEmployeeChiNhanh === 'ho';
+            if (isEmployeeHeadOffice && matches.length > 0) {
+                let bestMatch = null;
+                let maxSubordinates = 0;
+
+                for (const match of matches) {
+                    const managerEmployees = cache.all.filter(e => {
+                        if (!e.quan_ly_truc_tiep) return false;
+                        const empManagerName = (e.quan_ly_truc_tiep || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                        const matchNormalizedName = (match.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                        const nameMatches = empManagerName === matchNormalizedName ||
+                            removeVietnameseAccents(empManagerName) === removeVietnameseAccents(matchNormalizedName);
+                        return nameMatches;
+                    });
+
+                    if (managerEmployees.length > maxSubordinates) {
+                        maxSubordinates = managerEmployees.length;
+                        bestMatch = match;
+                    }
+                }
+
+                if (bestMatch) {
+                    console.log(`[findManagerFromCache] Employee is at Head Office, allowing manager "${bestMatch.ho_ten}" (${bestMatch.chi_nhanh || 'N/A'}) from different branch with ${maxSubordinates} subordinates.`);
+                    return bestMatch;
+                }
+            }
+
             // Nếu không có manager nào match chi_nhanh, không trả về để tránh nhầm lẫn
             console.error(`[findManagerFromCache] ❌ ERROR: Found ${matches.length} employees with name "${managerName}" but NONE matches chi_nhanh "${normalizedEmployeeChiNhanh}". Returning NULL to avoid incorrect assignment. Available managers: ${matches.map(m => `${m.ho_ten} (ID: ${m.id}, chi_nhanh: ${m.chi_nhanh || 'N/A'})`).join(', ')}`);
             return null;
@@ -169,6 +197,13 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
         // (vì có thể cache chưa đầy đủ hoặc có nhiều người cùng tên nhưng chưa được load)
         if (matches.length === 1) {
             const match = matches[0];
+            // Nếu employee ở Head Office, cho phép sử dụng manager từ bất kỳ chi nhánh nào
+            const isEmployeeHeadOffice = normalizedEmployeeChiNhanh === 'head office' || normalizedEmployeeChiNhanh === 'ho';
+            if (isEmployeeHeadOffice) {
+                console.log(`[findManagerFromCache] Employee is at Head Office, allowing manager "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) from different branch.`);
+                return match;
+            }
+
             // Nếu có chi_nhanh context, kiểm tra xem manager có cấp dưới trong cùng chi_nhanh không
             if (normalizedEmployeeChiNhanh) {
                 // QUAN TRỌNG: Chỉ xem xét manager có chi_nhanh match với employee đang tạo đơn

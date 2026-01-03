@@ -103,6 +103,10 @@ export const employeesAPI = {
     }
     return api.delete(`/employees/${cleanedId}`);
   },
+  bulkDelete: (ids) => {
+    // Use POST for bulk delete to ensure body is sent correctly
+    return api.post('/employees/bulk-delete', { ids });
+  },
   bulkCreate: (employees) => api.post('/employees/bulk', { employees }),
   getDepartments: () => api.get('/employees/departments'),
   getBoPhan: () => api.get('/employees/bo-phan'),

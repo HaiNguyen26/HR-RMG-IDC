@@ -155,11 +155,46 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
                 }
             }
 
+            // Nếu employee ở Head Office, cho phép tìm manager từ bất kỳ chi nhánh nào
+            const isEmployeeHeadOffice = normalizedEmployeeChiNhanh === 'head office' || normalizedEmployeeChiNhanh === 'ho';
+            if (isEmployeeHeadOffice && matches.length > 0) {
+                let bestMatch = null;
+                let maxSubordinates = 0;
+
+                for (const match of matches) {
+                    const managerEmployees = cache.all.filter(e => {
+                        if (!e.quan_ly_truc_tiep) return false;
+                        const empManagerName = (e.quan_ly_truc_tiep || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                        const matchNormalizedName = (match.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                        const nameMatches = empManagerName === matchNormalizedName ||
+                            removeVietnameseAccents(empManagerName) === removeVietnameseAccents(matchNormalizedName);
+                        return nameMatches;
+                    });
+
+                    if (managerEmployees.length > maxSubordinates) {
+                        maxSubordinates = managerEmployees.length;
+                        bestMatch = match;
+                    }
+                }
+
+                if (bestMatch) {
+                    console.log(`[findManagerFromCache] Employee is at Head Office, allowing manager "${bestMatch.ho_ten}" (${bestMatch.chi_nhanh || 'N/A'}) from different branch with ${maxSubordinates} subordinates.`);
+                    return bestMatch;
+                }
+            }
+
             return null;
         }
 
         if (matches.length === 1) {
             const match = matches[0];
+            // Nếu employee ở Head Office, cho phép sử dụng manager từ bất kỳ chi nhánh nào
+            const isEmployeeHeadOffice = normalizedEmployeeChiNhanh === 'head office' || normalizedEmployeeChiNhanh === 'ho';
+            if (isEmployeeHeadOffice) {
+                console.log(`[findManagerFromCache] Employee is at Head Office, allowing manager "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) from different branch.`);
+                return match;
+            }
+
             if (normalizedEmployeeChiNhanh) {
                 const managerChiNhanhMatches = chiNhanhMatches(match.chi_nhanh);
 

@@ -197,6 +197,37 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
                 }
             }
 
+            // Ưu tiên 4: Nếu employee ở Head Office, cho phép tìm manager từ bất kỳ chi nhánh nào
+            // (vì Head Office có thể được quản lý bởi manager từ chi nhánh khác)
+            const isEmployeeHeadOffice = normalizedEmployeeChiNhanh === 'head office' || normalizedEmployeeChiNhanh === 'ho';
+            if (isEmployeeHeadOffice && matches.length > 0) {
+                // Nếu có nhiều manager cùng tên, ưu tiên manager có nhiều cấp dưới nhất
+                let bestMatch = null;
+                let maxSubordinates = 0;
+
+                for (const match of matches) {
+                    // Đếm tất cả cấp dưới của manager này (không cần match chi_nhanh vì employee ở Head Office)
+                    const managerEmployees = cache.all.filter(e => {
+                        if (!e.quan_ly_truc_tiep) return false;
+                        const empManagerName = (e.quan_ly_truc_tiep || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                        const matchNormalizedName = (match.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                        const nameMatches = empManagerName === matchNormalizedName ||
+                            removeVietnameseAccents(empManagerName) === removeVietnameseAccents(matchNormalizedName);
+                        return nameMatches;
+                    });
+
+                    if (managerEmployees.length > maxSubordinates) {
+                        maxSubordinates = managerEmployees.length;
+                        bestMatch = match;
+                    }
+                }
+
+                if (bestMatch) {
+                    console.log(`[findManagerFromCache] Employee is at Head Office, allowing manager "${bestMatch.ho_ten}" (${bestMatch.chi_nhanh || 'N/A'}) from different branch with ${maxSubordinates} subordinates.`);
+                    return bestMatch;
+                }
+            }
+
             // Nếu vẫn không tìm thấy, trả về null để người dùng biết cần kiểm tra lại
             console.error(`[findManagerFromCache] ❌ ERROR: Found ${matches.length} employees with name "${managerName}" but NONE matches chi_nhanh "${normalizedEmployeeChiNhanh}". Returning NULL to avoid incorrect assignment. Available managers: ${matches.map(m => `${m.ho_ten} (ID: ${m.id}, chi_nhanh: ${m.chi_nhanh || 'N/A'})`).join(', ')}`);
             return null;
@@ -303,6 +334,13 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
                             console.log(`[findManagerFromCache] Exact match found (found better match with ${maxOtherSubordinates} subordinates in chi_nhanh "${normalizedEmployeeChiNhanh}"): "${bestOtherMatch.ho_ten}" (${bestOtherMatch.chi_nhanh || 'N/A'}) instead of "${match.ho_ten}" (${match.chi_nhanh || 'N/A'})`);
                             return bestOtherMatch;
                         }
+                    }
+
+                    // Nếu employee ở Head Office, cho phép sử dụng manager từ bất kỳ chi nhánh nào
+                    const isEmployeeHeadOffice = normalizedEmployeeChiNhanh === 'head office' || normalizedEmployeeChiNhanh === 'ho';
+                    if (isEmployeeHeadOffice) {
+                        console.log(`[findManagerFromCache] Employee is at Head Office, allowing manager "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) from different branch.`);
+                        return match;
                     }
 
                     // QUAN TRỌNG: Nếu manager không có chi_nhanh match, KHÔNG được trả về để tránh nhầm lẫn

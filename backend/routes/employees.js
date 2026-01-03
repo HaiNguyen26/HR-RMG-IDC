@@ -1723,6 +1723,196 @@ router.put('/:id', async (req, res) => {
 
 
 /**
+ * POST /api/employees/bulk-delete - Xóa nhiều nhân viên cùng lúc (hard delete)
+ * Using POST instead of DELETE to ensure request body is properly received
+ */
+router.post('/bulk-delete', async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+        const { ids } = req.body;
+        console.log('[POST /employees/bulk-delete] Received request:', { body: req.body, ids });
+
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vui lòng cung cấp danh sách ID nhân viên cần xóa'
+            });
+        }
+
+        // Validate all IDs are numbers
+        const validIds = ids.filter(id => {
+            const numId = parseInt(id, 10);
+            return !isNaN(numId) && numId > 0;
+        }).map(id => parseInt(id, 10));
+
+        if (validIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Không có ID hợp lệ'
+            });
+        }
+
+        await client.query('BEGIN');
+
+        // Get all employees to be deleted (for response)
+        const employeesResult = await client.query(
+            'SELECT id, ma_nhan_vien, ho_ten, email FROM employees WHERE id = ANY($1::int[])',
+            [validIds]
+        );
+
+        if (employeesResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy nhân viên nào'
+            });
+        }
+
+        const employeesToDelete = employeesResult.rows;
+        const employeeIds = employeesToDelete.map(emp => emp.id);
+        const employeeEmails = employeesToDelete
+            .map(emp => emp.email)
+            .filter(email => email && email.trim() !== '');
+
+        // Delete related records for all employees
+        // 1. Delete equipment assignments
+        await client.query('DELETE FROM equipment_assignments WHERE employee_id = ANY($1::int[])', [employeeIds]);
+
+        // 2. Delete requests and related data
+        const requestIdsResult = await client.query('SELECT id FROM requests WHERE employee_id = ANY($1::int[])', [employeeIds]);
+        const requestIds = requestIdsResult.rows.map(row => row.id);
+
+        if (requestIds.length > 0) {
+            // Delete request_items for these requests
+            await client.query('DELETE FROM request_items WHERE request_id = ANY($1::int[])', [requestIds]);
+            // Delete requests
+            await client.query('DELETE FROM requests WHERE employee_id = ANY($1::int[])', [employeeIds]);
+        }
+
+        // 3. Update or delete customer entertainment expense requests
+        // Set NULL for foreign keys that reference these employees
+        // Use SAVEPOINT to handle errors gracefully
+        try {
+            await client.query('SAVEPOINT before_customer_expense_update');
+            await client.query(`
+                UPDATE customer_entertainment_expense_requests 
+                SET branch_director_id = NULL, 
+                    manager_id = NULL, 
+                    accountant_id = NULL, 
+                    ceo_id = NULL, 
+                    payment_processed_by = NULL
+                WHERE branch_director_id = ANY($1::int[])
+                   OR manager_id = ANY($1::int[])
+                   OR accountant_id = ANY($1::int[])
+                   OR ceo_id = ANY($1::int[])
+                   OR payment_processed_by = ANY($1::int[])
+            `, [employeeIds]);
+            await client.query('RELEASE SAVEPOINT before_customer_expense_update');
+        } catch (err) {
+            await client.query('ROLLBACK TO SAVEPOINT before_customer_expense_update');
+            await client.query('RELEASE SAVEPOINT before_customer_expense_update');
+            console.log('[Bulk delete] Skipping customer_entertainment_expense_requests update:', err.message);
+        }
+
+        // 4. Update or delete travel expense requests
+        // Set NULL for foreign keys that reference these employees
+        try {
+            await client.query('SAVEPOINT before_travel_expense_update');
+            await client.query(`
+                UPDATE travel_expense_requests 
+                SET manager_id = NULL, 
+                    ceo_id = NULL, 
+                    finance_id = NULL, 
+                    requested_by = NULL, 
+                    budget_approved_by = NULL
+                WHERE manager_id = ANY($1::int[])
+                   OR ceo_id = ANY($1::int[])
+                   OR finance_id = ANY($1::int[])
+                   OR requested_by = ANY($1::int[])
+                   OR budget_approved_by = ANY($1::int[])
+            `, [employeeIds]);
+            await client.query('RELEASE SAVEPOINT before_travel_expense_update');
+        } catch (err) {
+            await client.query('ROLLBACK TO SAVEPOINT before_travel_expense_update');
+            await client.query('RELEASE SAVEPOINT before_travel_expense_update');
+            console.log('[Bulk delete] Skipping travel_expense_requests update:', err.message);
+        }
+
+        // 5. Update recruitment requests
+        // Only update columns that exist: created_by_employee_id, branch_director_id
+        try {
+            await client.query('SAVEPOINT before_recruitment_update');
+            await client.query(`
+                UPDATE recruitment_requests 
+                SET created_by_employee_id = NULL, 
+                    branch_director_id = NULL
+                WHERE created_by_employee_id = ANY($1::int[])
+                   OR branch_director_id = ANY($1::int[])
+            `, [employeeIds]);
+            await client.query('RELEASE SAVEPOINT before_recruitment_update');
+        } catch (err) {
+            await client.query('ROLLBACK TO SAVEPOINT before_recruitment_update');
+            await client.query('RELEASE SAVEPOINT before_recruitment_update');
+            console.log('[Bulk delete] Skipping recruitment_requests update:', err.message);
+        }
+
+        // 6. Update interview requests
+        try {
+            await client.query('SAVEPOINT before_interview_update');
+            await client.query(`
+                UPDATE interview_requests 
+                SET manager_id = NULL, 
+                    branch_director_id = NULL
+                WHERE manager_id = ANY($1::int[])
+                   OR branch_director_id = ANY($1::int[])
+            `, [employeeIds]);
+            await client.query('RELEASE SAVEPOINT before_interview_update');
+        } catch (err) {
+            await client.query('ROLLBACK TO SAVEPOINT before_interview_update');
+            await client.query('RELEASE SAVEPOINT before_interview_update');
+            console.log('[Bulk delete] Skipping interview_requests update:', err.message);
+        }
+
+        // 7. Delete user accounts if exist
+        if (employeeEmails.length > 0) {
+            for (const email of employeeEmails) {
+                await client.query('DELETE FROM users WHERE LOWER(email) = LOWER($1) AND email IS NOT NULL', [email]);
+            }
+        }
+
+        // 6. Finally, delete the employees
+        const deleteResult = await client.query(
+            `DELETE FROM employees 
+             WHERE id = ANY($1::int[])
+             RETURNING id, ma_nhan_vien, ho_ten`,
+            [employeeIds]
+        );
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: `Đã xóa ${deleteResult.rows.length} nhân viên và tất cả dữ liệu liên quan`,
+            data: {
+                deletedCount: deleteResult.rows.length,
+                deletedEmployees: deleteResult.rows
+            }
+        });
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error bulk deleting employees:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi xóa nhân viên: ' + error.message
+        });
+    } finally {
+        client.release();
+    }
+});
+
+/**
  * DELETE /api/employees/:id - Xóa nhân viên (hard delete - xóa hoàn toàn khỏi database)
  */
 router.delete('/:id', async (req, res) => {
@@ -1772,14 +1962,97 @@ router.delete('/:id', async (req, res) => {
             await client.query('DELETE FROM requests WHERE employee_id = $1', [id]);
         }
 
-        // 3. Delete user account if exists (users table may have email reference)
+        // 3. Update customer entertainment expense requests
+        // Set NULL for foreign keys that reference this employee
+        try {
+            await client.query('SAVEPOINT before_customer_expense_update');
+            await client.query(`
+                UPDATE customer_entertainment_expense_requests 
+                SET branch_director_id = NULL, 
+                    manager_id = NULL, 
+                    accountant_id = NULL, 
+                    ceo_id = NULL, 
+                    payment_processed_by = NULL
+                WHERE branch_director_id = $1
+                   OR manager_id = $1
+                   OR accountant_id = $1
+                   OR ceo_id = $1
+                   OR payment_processed_by = $1
+            `, [id]);
+            await client.query('RELEASE SAVEPOINT before_customer_expense_update');
+        } catch (err) {
+            await client.query('ROLLBACK TO SAVEPOINT before_customer_expense_update');
+            await client.query('RELEASE SAVEPOINT before_customer_expense_update');
+            console.log('[Delete employee] Skipping customer_entertainment_expense_requests update:', err.message);
+        }
+
+        // 4. Update travel expense requests
+        // Set NULL for foreign keys that reference this employee
+        try {
+            await client.query('SAVEPOINT before_travel_expense_update');
+            await client.query(`
+                UPDATE travel_expense_requests 
+                SET manager_id = NULL, 
+                    ceo_id = NULL, 
+                    finance_id = NULL, 
+                    requested_by = NULL, 
+                    budget_approved_by = NULL
+                WHERE manager_id = $1
+                   OR ceo_id = $1
+                   OR finance_id = $1
+                   OR requested_by = $1
+                   OR budget_approved_by = $1
+            `, [id]);
+            await client.query('RELEASE SAVEPOINT before_travel_expense_update');
+        } catch (err) {
+            await client.query('ROLLBACK TO SAVEPOINT before_travel_expense_update');
+            await client.query('RELEASE SAVEPOINT before_travel_expense_update');
+            console.log('[Delete employee] Skipping travel_expense_requests update:', err.message);
+        }
+
+        // 5. Update recruitment requests
+        // Only update columns that exist: created_by_employee_id, branch_director_id
+        try {
+            await client.query('SAVEPOINT before_recruitment_update');
+            await client.query(`
+                UPDATE recruitment_requests 
+                SET created_by_employee_id = NULL, 
+                    branch_director_id = NULL
+                WHERE created_by_employee_id = $1
+                   OR branch_director_id = $1
+            `, [id]);
+            await client.query('RELEASE SAVEPOINT before_recruitment_update');
+        } catch (err) {
+            await client.query('ROLLBACK TO SAVEPOINT before_recruitment_update');
+            await client.query('RELEASE SAVEPOINT before_recruitment_update');
+            console.log('[Delete employee] Skipping recruitment_requests update:', err.message);
+        }
+
+        // 6. Update interview requests
+        try {
+            await client.query('SAVEPOINT before_interview_update');
+            await client.query(`
+                UPDATE interview_requests 
+                SET manager_id = NULL, 
+                    branch_director_id = NULL
+                WHERE manager_id = $1
+                   OR branch_director_id = $1
+            `, [id]);
+            await client.query('RELEASE SAVEPOINT before_interview_update');
+        } catch (err) {
+            await client.query('ROLLBACK TO SAVEPOINT before_interview_update');
+            await client.query('RELEASE SAVEPOINT before_interview_update');
+            console.log('[Delete employee] Skipping interview_requests update:', err.message);
+        }
+
+        // 7. Delete user account if exists (users table may have email reference)
         // Delete all users with matching email (case-insensitive to handle any case variations)
         // Only delete if email exists and is not empty
         if (employeeEmail && employeeEmail.trim() !== '') {
             await client.query('DELETE FROM users WHERE LOWER(email) = LOWER($1) AND email IS NOT NULL', [employeeEmail]);
         }
 
-        // 4. Finally, delete the employee (hard delete)
+        // 6. Finally, delete the employee (hard delete)
         const deleteQuery = `
             DELETE FROM employees 
             WHERE id = $1
