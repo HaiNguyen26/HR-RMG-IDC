@@ -971,6 +971,7 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                     )}
                     {currentUser?.role === 'HR' && (
                         <>
+                            {/* EPAD - chưa hoàn thành
                             <li>
                                 <button
                                     onClick={() => onNavigate('attendance-records')}
@@ -986,6 +987,7 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                     <span className="nav-label">Dữ liệu chấm công</span>
                                 </button>
                             </li>
+                            */}
                             <li>
                                 <button
                                     onClick={() => onNavigate('recruitment-management')}

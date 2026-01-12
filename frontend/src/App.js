@@ -30,7 +30,7 @@ import CustomerEntertainmentExpenseAccountant from './components/CustomerEnterta
 import CustomerEntertainmentExpenseCEO from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseCEO';
 import CustomerEntertainmentExpenseCEOApproval from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseCEOApproval';
 import CustomerEntertainmentExpensePayment from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpensePayment';
-import AttendanceRecords from './components/AttendanceRecords/AttendanceRecords';
+// import AttendanceRecords from './components/AttendanceRecords/AttendanceRecords'; // EPAD - chưa hoàn thành
 import Login from './components/Login/Login';
 import ChangePasswordModal from './components/Common/ChangePasswordModal';
 import ToastContainer from './components/Common/ToastContainer';
@@ -489,11 +489,18 @@ function App() {
           />
         );
       case 'attendance-records':
+        // EPAD - chưa hoàn thành
+        showToast('Module Dữ liệu chấm công đang được phát triển. Vui lòng quay lại sau.', 'info');
+        setCurrentView('dashboard');
         return (
-          <AttendanceRecords
+          <Dashboard
+            onAddEmployee={handleAddEmployee}
+            employees={employees}
+            onRefreshEmployees={fetchEmployees}
             currentUser={currentUser}
-            showToast={showToast}
             showConfirm={showConfirm}
+            onUpdateEquipment={handleUpdateEquipment}
+            onOpenRequestsModal={() => setIsRequestsModalOpen(true)}
           />
         );
       case 'probation-list':
