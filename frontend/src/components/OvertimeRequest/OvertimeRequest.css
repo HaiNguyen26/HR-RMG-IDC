@@ -5,7 +5,7 @@
 .overtime-request-container {
     width: 100%;
     height: 100vh;
-    padding: 1.5rem;
+    padding: 1rem 1.5rem;
     box-sizing: border-box;
     /* Calm Integrity Gradient: Sky Blue 50 → White (60%) → Indigo 50 */
     background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 60%, #f5f6ff 100%);
@@ -14,7 +14,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 0.5rem;
     position: relative;
 }
 
@@ -47,7 +47,7 @@
 
 /* II. HEADER FORM (Phần Đầu Form) */
 .overtime-request-header {
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.5rem;
     flex-shrink: 0;
 }
 
@@ -64,6 +64,7 @@
     /* Bo tròn 4 góc */
     box-shadow: 0 4px 12px rgba(14, 165, 233, 0.08);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
 }
 
 .overtime-request-header-content:hover {
@@ -140,10 +141,10 @@
 }
 
 .overtime-request-form {
-    padding: 1.25rem;
+    padding: 1rem 1.25rem;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 1rem;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -250,12 +251,76 @@
     background: #9ca3af;
 }
 
+/* Toggle Button for Double Overtime - In Header */
+.overtime-double-toggle-wrapper-header {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+/* Toggle Button for Double Overtime - In Form (deprecated, kept for backward compatibility) */
+.overtime-double-toggle-wrapper {
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: center;
+}
+
+.overtime-double-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border: 2px solid #6366f1;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    color: #6366f1;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+}
+
+.overtime-double-toggle:hover {
+    background: #f5f6ff;
+    border-color: #4f46e5;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.overtime-double-toggle.active {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    color: #ffffff;
+    border-color: #4f46e5;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.overtime-double-toggle.active:hover {
+    background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+}
+
+.overtime-toggle-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+}
+
 /* Form Section */
 .overtime-form-section {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     /* Reduced gap to save space */
+}
+
+/* Second Form Section - Different background to distinguish */
+.overtime-form-section-second {
+    background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 50%, #f5f6ff 100%);
+    padding: 1.25rem;
+    border-radius: 0.75rem;
+    border: 2px solid #e0e7ff;
+    margin-top: 1rem;
 }
 
 /* Approver Box (II. Thông tin Duyệt): Light gray background to separate from input fields */

@@ -86,6 +86,12 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
         if (!normalizedEmployeeChiNhanh) return true;
         const normalized = normalizeChiNhanhValue(empChiNhanh);
         if (!normalized) return false;
+
+        // QUAN TRỌNG: Nếu manager là Head Office, cho phép quản lý tất cả chi nhánh
+        if (normalized === 'head office' || normalized === 'ho') {
+            return true;
+        }
+
         if (normalized === normalizedEmployeeChiNhanh) return true;
         if (normalized.includes(normalizedEmployeeChiNhanh) || normalizedEmployeeChiNhanh.includes(normalized)) {
             const words1 = normalized.split(/\s+/).filter(w => w.length > 1);
@@ -199,18 +205,10 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
                 const managerChiNhanhMatches = chiNhanhMatches(match.chi_nhanh);
 
                 if (managerChiNhanhMatches) {
-                    const managerEmployees = cache.all.filter(e => {
-                        if (!e.quan_ly_truc_tiep) return false;
-                        const empManagerName = (e.quan_ly_truc_tiep || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
-                        const matchNormalizedName = (match.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
-                        const nameMatches = empManagerName === matchNormalizedName ||
-                            removeVietnameseAccents(empManagerName) === removeVietnameseAccents(matchNormalizedName);
-                        return nameMatches && chiNhanhMatches(e.chi_nhanh);
-                    });
-
-                    if (managerEmployees.length > 0) {
-                        return match;
-                    }
+                    // Nếu manager có chi_nhanh match, trả về ngay (không cần kiểm tra cấp dưới)
+                    // Vì có thể manager này mới được thêm vào hoặc chưa có cấp dưới trong database
+                    console.log(`[findManagerFromCache] Exact match found (single match, chi_nhanh matches): "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) matches employee chi_nhanh "${normalizedEmployeeChiNhanh}"`);
+                    return match;
                 } else {
                     const normalizedMatchChiNhanh = normalizeChiNhanhValue(match.chi_nhanh);
                     const isHeadOffice = normalizedMatchChiNhanh === 'head office' || normalizedMatchChiNhanh === 'ho';

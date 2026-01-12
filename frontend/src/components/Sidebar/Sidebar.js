@@ -726,6 +726,26 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                 if (employeeBranch && userBranch) {
                                     if (normalizedUserBranch === normalizedEmployeeBranch) {
                                         hasPermission = true;
+                                    } else {
+                                        // Kiểm tra nếu user là giám đốc Head Office - có thể duyệt đơn từ tất cả chi nhánh
+                                        const isHeadOfficeDirector = normalizedUserBranch === 'headoffice' || 
+                                                                    normalizedUserBranch === 'head office' ||
+                                                                    normalizedUserBranch === 'ho' ||
+                                                                    userBranch.toLowerCase().includes('head office') ||
+                                                                    userBranch.toLowerCase().includes('headoffice');
+                                        
+                                        // Kiểm tra nếu employee ở Head Office
+                                        const isHeadOfficeEmployee = normalizedEmployeeBranch === 'headoffice' || 
+                                                                     normalizedEmployeeBranch === 'head office' ||
+                                                                     normalizedEmployeeBranch === 'ho' ||
+                                                                     employeeBranch.toLowerCase().includes('head office') ||
+                                                                     employeeBranch.toLowerCase().includes('headoffice');
+                                        
+                                        if (isHeadOfficeDirector || isHeadOfficeEmployee) {
+                                            // Giám đốc Head Office có thể duyệt đơn từ tất cả chi nhánh
+                                            // Các giám đốc chi nhánh khác cũng có thể duyệt đơn của nhân viên Head Office
+                                            hasPermission = true;
+                                        }
                                     }
                                 } else {
                                     // Nếu một trong hai không có thông tin chi nhánh, vẫn cho phép nếu là Giám đốc (fallback)
@@ -951,6 +971,21 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                     )}
                     {currentUser?.role === 'HR' && (
                         <>
+                            <li>
+                                <button
+                                    onClick={() => onNavigate('attendance-records')}
+                                    className={`nav-item ${currentView === 'attendance-records' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z">
+                                            </path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Dữ liệu chấm công</span>
+                                </button>
+                            </li>
                             <li>
                                 <button
                                     onClick={() => onNavigate('recruitment-management')}

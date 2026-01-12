@@ -17,6 +17,8 @@ const LeaveRequest = ({ currentUser, showToast }) => {
   const [error, setError] = useState('');
   const [employeeProfile, setEmployeeProfile] = useState(null);
   const [createdDate] = useState(new Date()); // Ngày tạo form (ngày hiện tại)
+  const [showHalfDayModal, setShowHalfDayModal] = useState(false);
+  const [halfDayDate, setHalfDayDate] = useState(null);
 
   // Fetch employee profile to get manager info
   useEffect(() => {
@@ -228,7 +230,15 @@ const LeaveRequest = ({ currentUser, showToast }) => {
   const endDateValue = parseISODateString(formData.endDate);
 
   // Tính toán số ngày nghỉ: (Đến ngày - Từ ngày + 1)
+  // Nếu là nghỉ nửa ngày thì trả về 0.5
   const calculateLeaveDays = () => {
+    // Kiểm tra nếu là nghỉ nửa ngày (start_date = end_date và có note về half day)
+    if (formData.startDate && formData.endDate && formData.startDate === formData.endDate) {
+      if (formData.notes && (formData.notes.includes('Nghỉ nửa ngày - Sáng') || formData.notes.includes('Nghỉ nửa ngày - Chiều'))) {
+        return 0.5;
+      }
+    }
+    
     if (!startDateValue || !endDateValue) {
       return null;
     }
@@ -239,6 +249,40 @@ const LeaveRequest = ({ currentUser, showToast }) => {
     const diffTime = end.getTime() - start.getTime();
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
     return diffDays >= 1 ? diffDays : null;
+  };
+
+  // Handle half day leave
+  const handleHalfDayClick = () => {
+    // Set ngày mặc định là hôm nay
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    setHalfDayDate(today);
+    setShowHalfDayModal(true);
+  };
+
+  const handleHalfDaySelect = (period) => {
+    // period: 'morning' hoặc 'afternoon'
+    const selectedDate = halfDayDate || new Date();
+    const dateStr = formatDateToISO(selectedDate);
+    const periodLabel = period === 'morning' ? 'Sáng (8h-12h)' : 'Chiều (13h-17h)';
+    const periodNote = period === 'morning' ? 'Nghỉ nửa ngày - Sáng (8h-12h)' : 'Nghỉ nửa ngày - Chiều (13h-17h)';
+    
+    // Set form data
+    setFormData(prev => ({
+      ...prev,
+      startDate: dateStr,
+      endDate: dateStr, // Cùng ngày
+      leaveType: prev.leaveType || 'annual', // Mặc định là phép năm nếu chưa chọn
+      notes: prev.notes && !prev.notes.includes('Nghỉ nửa ngày') ? `${prev.notes}\n${periodNote}` : periodNote,
+      reason: prev.reason && !prev.reason.includes('Nghỉ nửa ngày') ? prev.reason : `Nghỉ nửa ngày - ${periodLabel}`
+    }));
+    
+    setShowHalfDayModal(false);
+    setHalfDayDate(null);
+    
+    if (showToast) {
+      showToast(`Đã chọn nghỉ ${periodLabel}`, 'success');
+    }
   };
 
   // Tính toán số ngày thông báo trước: (Từ ngày - Ngày tạo)
@@ -329,6 +373,22 @@ const LeaveRequest = ({ currentUser, showToast }) => {
 
             {/* Form Fields */}
             <div className="leave-form-fields">
+              {/* Quick Action: Half Day Leave */}
+              <div className="leave-quick-action-section">
+                <button
+                  type="button"
+                  className="leave-half-day-button"
+                  onClick={handleHalfDayClick}
+                  disabled={loading}
+                >
+                  <svg className="leave-half-day-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span>Nghỉ nửa ngày</span>
+                </button>
+                <p className="leave-quick-action-hint">Click để đăng ký nghỉ nửa ngày (sáng hoặc chiều)</p>
+              </div>
+
               {/* Date Fields */}
               <div className="leave-form-row">
                 <div className="leave-form-group">
@@ -379,8 +439,8 @@ const LeaveRequest = ({ currentUser, showToast }) => {
                     <div className="leave-form-group">
                       <label className="leave-form-label">Số ngày nghỉ</label>
                       <div className="leave-calculated-field">
-                        <span className="leave-calculated-value">{leaveDays}</span>
-                        <span className="leave-calculated-unit">ngày</span>
+                        <span className="leave-calculated-value">{leaveDays === 0.5 ? '0.5' : leaveDays}</span>
+                        <span className="leave-calculated-unit">{leaveDays === 0.5 ? 'ngày (nửa ngày)' : 'ngày'}</span>
                       </div>
                       <p className="leave-form-hint">
                         Công thức: (Đến ngày - Từ ngày + 1)
@@ -519,6 +579,72 @@ const LeaveRequest = ({ currentUser, showToast }) => {
           </div>
         </div>
       </div>
+
+      {/* Half Day Modal */}
+      {showHalfDayModal && (
+        <div className="leave-half-day-modal-overlay" onClick={() => setShowHalfDayModal(false)}>
+          <div className="leave-half-day-modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="leave-half-day-modal-header">
+              <h2>Chọn thời gian nghỉ nửa ngày</h2>
+              <button
+                className="leave-half-day-modal-close"
+                onClick={() => setShowHalfDayModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="leave-half-day-modal-body">
+              <div className="leave-half-day-date-section">
+                <label className="leave-half-day-date-label">Chọn ngày nghỉ:</label>
+                <DatePicker
+                  selected={halfDayDate}
+                  onChange={(date) => setHalfDayDate(date)}
+                  dateFormat="dd/MM/yyyy"
+                  locale={DATE_PICKER_LOCALE}
+                  placeholderText="dd/mm/yyyy"
+                  className="leave-half-day-datepicker"
+                  minDate={new Date()}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="leave-half-day-options">
+                <button
+                  type="button"
+                  className="leave-half-day-option morning"
+                  onClick={() => handleHalfDaySelect('morning')}
+                  disabled={!halfDayDate}
+                >
+                  <div className="half-day-option-icon">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                    </svg>
+                  </div>
+                  <div className="half-day-option-content">
+                    <div className="half-day-option-title">Nghỉ buổi sáng</div>
+                    <div className="half-day-option-time">8:00 - 12:00</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className="leave-half-day-option afternoon"
+                  onClick={() => handleHalfDaySelect('afternoon')}
+                  disabled={!halfDayDate}
+                >
+                  <div className="half-day-option-icon">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                    </svg>
+                  </div>
+                  <div className="half-day-option-content">
+                    <div className="half-day-option-title">Nghỉ buổi chiều</div>
+                    <div className="half-day-option-time">13:00 - 17:00</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

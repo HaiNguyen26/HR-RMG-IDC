@@ -276,6 +276,25 @@
   flex-direction: column;
   gap: 1rem;
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+/* Section 01 - Khi dropdown chi nhánh mở, tăng z-index để không bị che bởi section 02 */
+.form-section-01:has(.form-group-chi-nhanh .custom-select-wrapper.is-open) {
+  z-index: 10010 !important;
+  position: relative;
+}
+
+/* Section 02 - Đảm bảo z-index thấp hơn section 01 khi section 01 có dropdown mở */
+.form-section-02 {
+  position: relative;
+  z-index: 1;
+}
+
+/* Khi section 01 có dropdown mở, section 02 phải có z-index thấp hơn */
+.employee-form:has(.form-section-01 .form-group-chi-nhanh .custom-select-wrapper.is-open) .form-section-02 {
+  z-index: 1 !important;
 }
 
 /* Section Header với số thứ tự */
@@ -361,6 +380,55 @@
 /* When dropdown is open in a form group, ensure it's on top */
 .form-group:has(.custom-select-wrapper.is-open) {
   z-index: 9998;
+}
+
+/* Chi nhánh - tăng z-index để không bị che bởi phòng ban */
+.form-group-chi-nhanh {
+  position: relative;
+  z-index: 1;
+}
+
+/* Đảm bảo phòng ban và các form-group khác không có z-index cao hơn chi nhánh */
+.form-group:has(.custom-select-wrapper.is-open):not(.form-group-chi-nhanh) {
+  z-index: 9998;
+}
+
+/* Khi chi nhánh dropdown mở, tăng z-index rất cao */
+.form-group-chi-nhanh:has(.custom-select-wrapper.is-open) {
+  z-index: 10010 !important;
+  position: relative;
+}
+
+.form-group-chi-nhanh .custom-select-wrapper {
+  position: relative;
+  z-index: 1;
+}
+
+.form-group-chi-nhanh .custom-select-wrapper.is-open {
+  z-index: 10010 !important;
+  position: relative;
+}
+
+/* Đảm bảo dropdown menu của chi nhánh luôn hiển thị trên cùng - z-index rất cao */
+.form-group-chi-nhanh .custom-select-wrapper.is-open .custom-select-menu {
+  z-index: 10011 !important;
+  position: absolute !important;
+}
+
+/* Đảm bảo form-group phòng ban có z-index thấp hơn khi chi nhánh mở */
+.form-group:has(#phongBan) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Khi phòng ban mở nhưng chi nhánh không mở, vẫn giữ z-index bình thường */
+.form-group:has(#phongBan):has(.custom-select-wrapper.is-open):not(:has(.form-group-chi-nhanh .custom-select-wrapper.is-open)) {
+  z-index: 9998;
+}
+
+/* Khi chi nhánh mở, đảm bảo phòng ban có z-index thấp hơn */
+.employee-form:has(.form-group-chi-nhanh .custom-select-wrapper.is-open) .form-group:has(#phongBan) {
+  z-index: 1 !important;
 }
 
 

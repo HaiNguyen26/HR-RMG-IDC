@@ -134,6 +134,18 @@
     isolation: isolate;
 }
 
+/* Chi nhánh dropdown menu - z-index cao nhất để không bị che */
+.form-group-chi-nhanh .custom-select-menu {
+    z-index: 10011 !important;
+    isolation: isolate;
+    position: absolute !important;
+}
+
+/* Đảm bảo wrapper của chi nhánh tạo stacking context riêng */
+.form-group-chi-nhanh .custom-select-wrapper.is-open {
+    isolation: isolate;
+}
+
 /* Dropup Mode - Menu hiển thị phía trên */
 .custom-select-wrapper.dropup .custom-select-menu {
     top: auto;

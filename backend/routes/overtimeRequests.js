@@ -96,6 +96,11 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
         const normalized = normalizeChiNhanh(empChiNhanh);
         if (!normalized) return false;
 
+        // QUAN TRỌNG: Nếu manager là Head Office, cho phép quản lý tất cả chi nhánh
+        if (normalized === 'head office' || normalized === 'ho') {
+            return true;
+        }
+
         // Exact match
         if (normalized === normalizedEmployeeChiNhanh) return true;
 
@@ -197,31 +202,17 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
         // (vì có thể cache chưa đầy đủ hoặc có nhiều người cùng tên nhưng chưa được load)
         if (matches.length === 1) {
             const match = matches[0];
-            // Nếu có chi_nhanh context, kiểm tra xem manager có cấp dưới trong cùng chi_nhanh không
+            // Nếu có chi_nhanh context, kiểm tra xem manager có chi_nhanh match không
             if (normalizedEmployeeChiNhanh) {
                 // QUAN TRỌNG: Chỉ xem xét manager có chi_nhanh match với employee đang tạo đơn
                 // Nếu manager không có chi_nhanh match, không phải manager đúng
                 const managerChiNhanhMatches = chiNhanhMatches(match.chi_nhanh);
 
                 if (managerChiNhanhMatches) {
-                    // Kiểm tra xem manager này có cấp dưới trong cùng chi_nhanh với employee đang tạo đơn không
-                    const managerEmployees = cache.all.filter(e => {
-                        if (!e.quan_ly_truc_tiep) return false;
-                        const empManagerName = (e.quan_ly_truc_tiep || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
-                        const matchNormalizedName = (match.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
-                        const nameMatches = empManagerName === matchNormalizedName ||
-                            removeVietnameseAccents(empManagerName) === removeVietnameseAccents(matchNormalizedName);
-                        // QUAN TRỌNG: Kiểm tra chi_nhanh của employee (e.chi_nhanh) match với chi_nhanh của employee đang tạo đơn (normalizedEmployeeChiNhanh)
-                        return nameMatches && chiNhanhMatches(e.chi_nhanh);
-                    });
-
-                    if (managerEmployees.length > 0) {
-                        // Log chi tiết để debug
-                        const subordinatesChiNhanh = managerEmployees.map(e => e.chi_nhanh || 'N/A');
-                        console.log(`[findManagerFromCache] Manager "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) has ${managerEmployees.length} subordinates. Their chi_nhanh: ${[...new Set(subordinatesChiNhanh)].join(', ')}. Looking for chi_nhanh: "${normalizedEmployeeChiNhanh}"`);
-                        console.log(`[findManagerFromCache] Exact match found (single match with ${managerEmployees.length} subordinates in chi_nhanh "${normalizedEmployeeChiNhanh}"): "${match.ho_ten}" (${match.chi_nhanh || 'N/A'})`);
-                        return match;
-                    }
+                    // Nếu manager có chi_nhanh match, trả về ngay (không cần kiểm tra cấp dưới)
+                    // Vì có thể manager này mới được thêm vào hoặc chưa có cấp dưới trong database
+                    console.log(`[findManagerFromCache] Exact match found (single match, chi_nhanh matches): "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) matches employee chi_nhanh "${normalizedEmployeeChiNhanh}"`);
+                    return match;
                 } else {
                     // Manager này không có chi_nhanh match, không phải manager đúng
                     console.log(`[findManagerFromCache] Manager "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) does not match employee chi_nhanh "${normalizedEmployeeChiNhanh}". Searching for other managers...`);
@@ -439,6 +430,17 @@ const isValidTime = (value) => {
 // GET /api/overtime-requests - Lấy danh sách đơn
 router.get('/', async (req, res) => {
     try {
+        // Đảm bảo cột parent_request_id tồn tại
+        try {
+            await pool.query(`
+                ALTER TABLE overtime_requests 
+                ADD COLUMN IF NOT EXISTS parent_request_id INTEGER REFERENCES overtime_requests(id) ON DELETE CASCADE
+            `);
+        } catch (alterError) {
+            // Column có thể đã tồn tại, bỏ qua lỗi
+            console.log('[OvertimeRequest GET] parent_request_id column check:', alterError.message);
+        }
+
         const { employeeId, teamLeadId, status } = req.query;
 
         const conditions = [];
@@ -476,6 +478,9 @@ router.get('/', async (req, res) => {
             paramIndex += 1;
         }
 
+        // Lọc bỏ các request con (chỉ hiển thị request cha)
+        conditions.push(`orq.parent_request_id IS NULL`);
+
         const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '1=1';
 
         const query = `
@@ -484,7 +489,15 @@ router.get('/', async (req, res) => {
                    e.email AS employee_email,
                    e.phong_ban AS employee_department,
                    team.ho_ten AS team_lead_name,
-                   team.email AS team_lead_email
+                   team.email AS team_lead_email,
+                   (SELECT id FROM overtime_requests WHERE parent_request_id = orq.id ORDER BY created_at ASC LIMIT 1) AS child_request_id,
+                   (SELECT start_date FROM overtime_requests WHERE parent_request_id = orq.id ORDER BY created_at ASC LIMIT 1) AS child_start_date,
+                   (SELECT start_time FROM overtime_requests WHERE parent_request_id = orq.id ORDER BY created_at ASC LIMIT 1) AS child_start_time,
+                   (SELECT end_date FROM overtime_requests WHERE parent_request_id = orq.id ORDER BY created_at ASC LIMIT 1) AS child_end_date,
+                   (SELECT end_time FROM overtime_requests WHERE parent_request_id = orq.id ORDER BY created_at ASC LIMIT 1) AS child_end_time,
+                   (SELECT duration FROM overtime_requests WHERE parent_request_id = orq.id ORDER BY created_at ASC LIMIT 1) AS child_duration,
+                   (SELECT reason FROM overtime_requests WHERE parent_request_id = orq.id ORDER BY created_at ASC LIMIT 1) AS child_reason,
+                   (SELECT is_late_request FROM overtime_requests WHERE parent_request_id = orq.id ORDER BY created_at ASC LIMIT 1) AS child_is_late_request
             FROM overtime_requests orq
             LEFT JOIN employees e ON orq.employee_id = e.id
             LEFT JOIN employees team ON orq.team_lead_id = team.id
@@ -522,7 +535,8 @@ router.post('/', async (req, res) => {
             duration,
             reason,
             notes,
-            isLateRequest
+            isLateRequest,
+            parentRequestId
         } = req.body;
 
         // Use startDate if provided, otherwise fallback to requestDate for backward compatibility
@@ -611,6 +625,17 @@ router.post('/', async (req, res) => {
             console.log('[OvertimeRequest] is_late_request column check:', alterError.message);
         }
 
+        // Kiểm tra và thêm cột parent_request_id nếu chưa có
+        try {
+            await pool.query(`
+                ALTER TABLE overtime_requests 
+                ADD COLUMN IF NOT EXISTS parent_request_id INTEGER REFERENCES overtime_requests(id) ON DELETE CASCADE
+            `);
+        } catch (alterError) {
+            // Column có thể đã tồn tại, bỏ qua lỗi
+            console.log('[OvertimeRequest] parent_request_id column check:', alterError.message);
+        }
+
         // Tạo đơn
         const insertResult = await pool.query(
             `INSERT INTO overtime_requests (
@@ -625,8 +650,9 @@ router.post('/', async (req, res) => {
                 reason,
                 notes,
                 status,
-                is_late_request
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                is_late_request,
+                parent_request_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *`,
             [
                 parseInt(employeeId, 10),
@@ -640,7 +666,8 @@ router.post('/', async (req, res) => {
                 reason,
                 notes || null,
                 STATUSES.PENDING,
-                isLateRequest === true || isLateRequest === 'true' || isLateRequest === 1
+                isLateRequest === true || isLateRequest === 'true' || isLateRequest === 1,
+                parentRequestId ? parseInt(parentRequestId, 10) : null
             ]
         );
 

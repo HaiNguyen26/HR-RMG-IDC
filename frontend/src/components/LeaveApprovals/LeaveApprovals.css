@@ -336,6 +336,54 @@
   /* shadow-lg */
 }
 
+/* Tab Active (Đơn xin đi trễ về sớm) - Accent Purple */
+.request-type-filter-chip.late-early.active {
+  background: #8b5cf6;
+  /* bg-purple-500 - Accent Purple */
+  color: #ffffff;
+  /* text-white */
+  border-color: #8b5cf6;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  /* shadow-md */
+}
+
+.request-type-filter-chip.late-early:hover:not(.active) {
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #8b5cf6;
+  /* text-purple-500 */
+}
+
+.request-type-filter-chip.late-early.active:hover {
+  background: #7c3aed;
+  /* bg-purple-600 */
+  box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.12), 0 3px 5px -1px rgba(0, 0, 0, 0.08);
+  /* shadow-lg */
+}
+
+/* Tab Active (Đơn xin phụ cấp công trình) - Accent Orange */
+.request-type-filter-chip.meal-allowance.active {
+  background: #f59e0b;
+  /* bg-amber-500 - Accent Orange */
+  color: #ffffff;
+  /* text-white */
+  border-color: #f59e0b;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  /* shadow-md */
+}
+
+.request-type-filter-chip.meal-allowance:hover:not(.active) {
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+  /* text-amber-500 */
+}
+
+.request-type-filter-chip.meal-allowance.active:hover {
+  background: #d97706;
+  /* bg-amber-600 */
+  box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.12), 0 3px 5px -1px rgba(0, 0, 0, 0.08);
+  /* shadow-lg */
+}
+
 /* Tab Active (Tất cả đơn) - Accent Blue */
 .request-type-filter-chip.all.active {
   background: linear-gradient(135deg, #3b82f6, #10b981);

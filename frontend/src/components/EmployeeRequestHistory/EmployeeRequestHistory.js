@@ -5,6 +5,7 @@ import {
     overtimeRequestsAPI,
     lateEarlyRequestsAPI,
     mealAllowanceRequestsAPI,
+    travelExpensesAPI,
 } from '../../services/api';
 import './EmployeeRequestHistory.css';
 
@@ -32,7 +33,7 @@ const MODULE_OPTIONS = [
         key: 'all',
         label: 'Tất cả đơn',
         header: 'Lịch sử đơn từ của tôi',
-        description: 'Xem và theo dõi tất cả các đơn từ mà bạn đã gửi: đơn xin phép, đơn tăng ca, đơn bổ sung chấm công.'
+        description: 'Xem và theo dõi tất cả các đơn từ mà bạn đã gửi: đơn xin phép, đơn tăng ca, đơn bổ sung chấm công, đơn công tác.'
     },
     {
         key: 'leave',
@@ -63,6 +64,12 @@ const MODULE_OPTIONS = [
         label: 'Đơn xin phụ cấp công trình',
         header: 'Lịch sử đơn xin phụ cấp công trình',
         description: 'Theo dõi tiến độ phê duyệt các đơn xin phụ cấp cơm công trình của bạn.'
+    },
+    {
+        key: 'travel',
+        label: 'Đơn công tác',
+        header: 'Lịch sử đơn công tác',
+        description: 'Theo dõi tiến độ phê duyệt các đơn công tác phí của bạn.'
     }
 ];
 
@@ -161,12 +168,19 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
             // Luôn thêm employeeId để chỉ lấy đơn của nhân viên hiện tại
             const baseParams = { employeeId: currentUser.id };
 
-            const [leaveResponse, overtimeResponse, attendanceResponse, lateEarlyResponse, mealAllowanceResponse] = await Promise.all([
+            const [leaveResponse, overtimeResponse, attendanceResponse, lateEarlyResponse, mealAllowanceResponse, travelResponse] = await Promise.all([
                 Promise.all(statuses.map(status => leaveRequestsAPI.getAll({ ...baseParams, status }))),
                 Promise.all(statuses.map(status => overtimeRequestsAPI.getAll({ ...baseParams, status }))),
                 Promise.all(statuses.map(status => attendanceAdjustmentsAPI.getAll({ ...baseParams, status }))),
                 Promise.all(statuses.map(status => lateEarlyRequestsAPI.getAll({ ...baseParams, status }))),
-                Promise.all(statuses.map(status => mealAllowanceRequestsAPI.getAll({ ...baseParams, status })))
+                Promise.all(statuses.map(status => mealAllowanceRequestsAPI.getAll({ ...baseParams, status }))),
+                // Travel expense có status khác: PENDING_LEVEL_1, PENDING_LEVEL_2, PENDING_CEO, PENDING_FINANCE, APPROVED, REJECTED
+                Promise.all([
+                    travelExpensesAPI.getAll({ ...baseParams, status: 'PENDING_LEVEL_1,PENDING_LEVEL_2,PENDING_CEO,PENDING_FINANCE' }),
+                    travelExpensesAPI.getAll({ ...baseParams, status: 'APPROVED' }),
+                    travelExpensesAPI.getAll({ ...baseParams, status: 'REJECTED' }),
+                    travelExpensesAPI.getAll({ ...baseParams, status: 'CANCELLED' })
+                ])
             ]);
 
             const leaveStats = {
@@ -219,12 +233,22 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
             // Không tính CANCELLED vào total
             mealAllowanceStats.total = mealAllowanceStats.pending + mealAllowanceStats.approved + mealAllowanceStats.rejected;
 
+            const travelStats = {
+                pending: travelResponse[0].data.success ? (travelResponse[0].data.data || []).length : 0,
+                approved: travelResponse[1].data.success ? (travelResponse[1].data.data || []).length : 0,
+                rejected: travelResponse[2].data.success ? (travelResponse[2].data.data || []).length : 0,
+                cancelled: travelResponse[3].data.success ? (travelResponse[3].data.data || []).length : 0,
+                total: 0
+            };
+            // Không tính CANCELLED vào total
+            travelStats.total = travelStats.pending + travelStats.approved + travelStats.rejected;
+
             const allStats = {
-                pending: leaveStats.pending + overtimeStats.pending + attendanceStats.pending + lateEarlyStats.pending + mealAllowanceStats.pending,
-                approved: leaveStats.approved + overtimeStats.approved + attendanceStats.approved + lateEarlyStats.approved + mealAllowanceStats.approved,
-                rejected: leaveStats.rejected + overtimeStats.rejected + attendanceStats.rejected + lateEarlyStats.rejected + mealAllowanceStats.rejected,
-                cancelled: leaveStats.cancelled + overtimeStats.cancelled + attendanceStats.cancelled + lateEarlyStats.cancelled + mealAllowanceStats.cancelled,
-                total: leaveStats.total + overtimeStats.total + attendanceStats.total + lateEarlyStats.total + mealAllowanceStats.total // Đã loại bỏ CANCELLED
+                pending: leaveStats.pending + overtimeStats.pending + attendanceStats.pending + lateEarlyStats.pending + mealAllowanceStats.pending + travelStats.pending,
+                approved: leaveStats.approved + overtimeStats.approved + attendanceStats.approved + lateEarlyStats.approved + mealAllowanceStats.approved + travelStats.approved,
+                rejected: leaveStats.rejected + overtimeStats.rejected + attendanceStats.rejected + lateEarlyStats.rejected + mealAllowanceStats.rejected + travelStats.rejected,
+                cancelled: leaveStats.cancelled + overtimeStats.cancelled + attendanceStats.cancelled + lateEarlyStats.cancelled + mealAllowanceStats.cancelled + travelStats.cancelled,
+                total: leaveStats.total + overtimeStats.total + attendanceStats.total + lateEarlyStats.total + mealAllowanceStats.total + travelStats.total // Đã loại bỏ CANCELLED
             };
 
             const newModuleStats = {
@@ -233,7 +257,8 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 overtime: { pending: overtimeStats.pending, total: overtimeStats.total },
                 attendance: { pending: attendanceStats.pending, total: attendanceStats.total },
                 'late-early': { pending: lateEarlyStats.pending, total: lateEarlyStats.total },
-                'meal-allowance': { pending: mealAllowanceStats.pending, total: mealAllowanceStats.total }
+                'meal-allowance': { pending: mealAllowanceStats.pending, total: mealAllowanceStats.total },
+                travel: { pending: travelStats.pending, total: travelStats.total }
             };
 
             // Chỉ update state nếu data thực sự thay đổi
@@ -243,7 +268,8 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 !shallowEqual(prevModuleStatsRef.current.overtime, newModuleStats.overtime) ||
                 !shallowEqual(prevModuleStatsRef.current.attendance, newModuleStats.attendance) ||
                 !shallowEqual(prevModuleStatsRef.current['late-early'], newModuleStats['late-early']) ||
-                !shallowEqual(prevModuleStatsRef.current['meal-allowance'], newModuleStats['meal-allowance'])) {
+                !shallowEqual(prevModuleStatsRef.current['meal-allowance'], newModuleStats['meal-allowance']) ||
+                !shallowEqual(prevModuleStatsRef.current.travel, newModuleStats.travel)) {
                 setModuleStatistics(newModuleStats);
                 prevModuleStatsRef.current = newModuleStats;
             }
@@ -262,6 +288,8 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 newStatusStats = lateEarlyStats;
             } else if (activeModule === 'meal-allowance') {
                 newStatusStats = mealAllowanceStats;
+            } else if (activeModule === 'travel') {
+                newStatusStats = travelStats;
             } else {
                 newStatusStats = allStats;
             }
@@ -316,12 +344,13 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
             let newRequests = [];
 
             if (activeModule === 'all') {
-                const [leaveResponse, overtimeResponse, attendanceResponse, lateEarlyResponse, mealAllowanceResponse] = await Promise.all([
+                const [leaveResponse, overtimeResponse, attendanceResponse, lateEarlyResponse, mealAllowanceResponse, travelResponse] = await Promise.all([
                     leaveRequestsAPI.getAll(params),
                     overtimeRequestsAPI.getAll(params),
                     attendanceAdjustmentsAPI.getAll(params),
                     lateEarlyRequestsAPI.getAll(params),
-                    mealAllowanceRequestsAPI.getAll(params)
+                    mealAllowanceRequestsAPI.getAll(params),
+                    travelExpensesAPI.getAll(params)
                 ]);
 
                 newRequests = [
@@ -329,7 +358,8 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                     ...(overtimeResponse.data.success ? (overtimeResponse.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
                     ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : []),
                     ...(lateEarlyResponse.data.success ? (lateEarlyResponse.data.data || []).map(r => ({ ...r, requestType: 'late-early' })) : []),
-                    ...(mealAllowanceResponse.data.success ? (mealAllowanceResponse.data.data || []).map(r => ({ ...r, requestType: 'meal-allowance' })) : [])
+                    ...(mealAllowanceResponse.data.success ? (mealAllowanceResponse.data.data || []).map(r => ({ ...r, requestType: 'meal-allowance' })) : []),
+                    ...(travelResponse.data.success ? (travelResponse.data.data || []).map(r => ({ ...r, requestType: 'travel' })) : [])
                 ];
 
                 // Sắp xếp theo thời gian tạo mới nhất
@@ -358,6 +388,14 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 const response = await mealAllowanceRequestsAPI.getAll(params);
                 if (response.data.success) {
                     newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'meal-allowance' }));
+                }
+            } else if (activeModule === 'travel') {
+                const response = await travelExpensesAPI.getAll(params);
+                if (response.data && response.data.success) {
+                    newRequests = (response.data.data || []).map(r => {
+                        console.log('[EmployeeRequestHistory] Travel request mapped:', { id: r.id, requestType: 'travel' });
+                        return { ...r, requestType: 'travel' };
+                    });
                 }
             }
 
@@ -400,8 +438,101 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [requests, showDetailModal]);
 
-    const getStatusLabel = (status) => {
+    const getStatusLabel = (status, requestType = null) => {
+        // Xử lý travel expense status riêng
+        if (requestType === 'travel') {
+            return getTravelExpenseStatusLabel(status);
+        }
         return STATUS_LABELS[status] || status;
+    };
+
+    const getTravelExpenseStatusLabel = (status) => {
+        const statusMap = {
+            'PENDING_LEVEL_1': 'Chờ quản lý trực tiếp duyệt',
+            'PENDING_LEVEL_2': 'Chờ giám đốc chi nhánh duyệt',
+            'PENDING_CEO': 'Chờ Tổng giám đốc duyệt',
+            'PENDING_FINANCE': 'Chờ phòng tài chính xử lý',
+            'APPROVED': 'Đã duyệt',
+            'REJECTED': 'Đã từ chối',
+            'CANCELLED': 'Đã hủy'
+        };
+        return statusMap[status] || status;
+    };
+
+    const getTravelExpenseProgress = (request) => {
+        // Kiểm tra xem có phải công tác nước ngoài không
+        const isInternational = (request.location_type || request.locationType) === 'INTERNATIONAL';
+        const requiresCEO = request.requires_ceo !== false; // Mặc định true nếu không có field
+        
+        // Xây dựng steps dựa trên loại công tác
+        const allSteps = [
+            { key: 'PENDING_LEVEL_1', label: 'Quản lý trực tiếp', status: request.status, index: 0 },
+            { key: 'PENDING_LEVEL_2', label: 'Giám đốc chi nhánh', status: request.status, index: 1 },
+            { key: 'PENDING_CEO', label: 'Tổng giám đốc', status: request.status, index: 2, requiresInternational: true },
+            { key: 'PENDING_FINANCE', label: 'Phòng tài chính', status: request.status, index: 3 },
+            { key: 'APPROVED', label: 'Hoàn tất', status: request.status, index: 4 }
+        ];
+
+        // Filter steps: chỉ hiển thị CEO step nếu là công tác nước ngoài
+        const steps = allSteps.filter(step => {
+            if (step.requiresInternational) {
+                return isInternational && requiresCEO;
+            }
+            return true;
+        });
+
+        // Xác định bước hiện tại (sau khi filter)
+        let currentStepIndex = -1;
+        if (request.status === 'PENDING_LEVEL_1') {
+            currentStepIndex = 0;
+        } else if (request.status === 'PENDING_LEVEL_2') {
+            currentStepIndex = 1;
+        } else if (request.status === 'PENDING_CEO') {
+            // Nếu là trong nước nhưng status là PENDING_CEO, có thể là lỗi data
+            if (isInternational && requiresCEO) {
+                currentStepIndex = 2; // CEO step
+            } else {
+                // Trong nước không có CEO step, nên PENDING_CEO sẽ map sang step tiếp theo
+                currentStepIndex = 2; // Finance step (sau khi filter CEO)
+            }
+        } else if (request.status === 'PENDING_FINANCE') {
+            // Finance step index phụ thuộc vào việc có CEO step không
+            currentStepIndex = isInternational && requiresCEO ? 3 : 2;
+        } else if (request.status === 'APPROVED') {
+            currentStepIndex = isInternational && requiresCEO ? 4 : 3;
+        } else if (request.status === 'REJECTED') {
+            currentStepIndex = -1; // Bị từ chối
+        }
+
+        // Kiểm tra các bước đã hoàn thành (dựa vào decisions)
+        const completedSteps = [];
+        let stepOffset = 0;
+        
+        // Step 0: Quản lý trực tiếp
+        if (request.manager_decision === 'APPROVE' || request.decisions?.manager?.decision === 'APPROVE') {
+            completedSteps.push(0);
+        }
+        
+        // Step 1: Giám đốc chi nhánh
+        if (request.branch_director_decision === 'APPROVE' || request.decisions?.branchDirector?.decision === 'APPROVE') {
+            completedSteps.push(1);
+        }
+        
+        // Step 2: Tổng giám đốc (chỉ nếu là công tác nước ngoài)
+        if (isInternational && requiresCEO) {
+            if (request.ceo_decision === 'APPROVE' || request.decisions?.ceo?.decision === 'APPROVE') {
+                completedSteps.push(2);
+            }
+            stepOffset = 1; // CEO step tồn tại
+        }
+        
+        // Step cuối: Phòng tài chính
+        const financeStepIndex = isInternational && requiresCEO ? 3 : 2;
+        if (request.finance_decision === 'APPROVE' || request.decisions?.finance?.decision === 'APPROVE') {
+            completedSteps.push(financeStepIndex);
+        }
+
+        return { steps, currentStepIndex, completedSteps };
     };
 
     const getRequestTypeLabel = (requestType) => {
@@ -412,9 +543,30 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
         return LEAVE_TYPE_LABELS[leaveType] || leaveType;
     };
 
-    const handleViewRequest = (request) => {
-        setSelectedRequest(request);
-        setShowDetailModal(true);
+    const handleViewRequest = async (request) => {
+        console.log('[EmployeeRequestHistory] handleViewRequest called:', request);
+        // Nếu là travel expense, fetch full details từ API
+        if (request.requestType === 'travel') {
+            try {
+                // Set selectedRequest ngay để modal có thể hiển thị
+                setSelectedRequest(request);
+                setShowDetailModal(true);
+                
+                // Fetch full details sau đó
+                const response = await travelExpensesAPI.getById(request.id);
+                if (response.data && response.data.success) {
+                    const fullDetails = response.data.data;
+                    setSelectedRequest({ ...request, ...fullDetails });
+                    console.log('[EmployeeRequestHistory] Full details loaded:', fullDetails);
+                }
+            } catch (error) {
+                console.error('Error fetching travel expense details:', error);
+                // Giữ nguyên request hiện tại nếu có lỗi
+            }
+        } else {
+            setSelectedRequest(request);
+            setShowDetailModal(true);
+        }
     };
 
     const handleDelete = async (request) => {
@@ -710,6 +862,13 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                     <tr
                                         key={request.id || index}
                                         className={index % 2 === 1 ? 'even-row-bg' : ''}
+                                        onClick={() => {
+                                            // Chỉ mở modal cho travel expense
+                                            if (request.requestType === 'travel') {
+                                                handleViewRequest(request);
+                                            }
+                                        }}
+                                        style={request.requestType === 'travel' ? { cursor: 'pointer' } : {}}
                                     >
                                         <td>
                                             <span className={`request-type-badge ${request.requestType || 'leave'}`}>
@@ -717,7 +876,8 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                                     request.requestType === 'overtime' ? 'Đơn tăng ca' :
                                                         request.requestType === 'attendance' ? 'Đơn bổ sung công' :
                                                             request.requestType === 'late-early' ? 'Đơn xin đi trễ về sớm' :
-                                                                request.requestType === 'meal-allowance' ? 'Đơn xin phụ cấp cơm công trình' : 'Đơn xin nghỉ'}
+                                                                request.requestType === 'meal-allowance' ? 'Đơn xin phụ cấp cơm công trình' :
+                                                                    request.requestType === 'travel' ? 'Đơn công tác' : 'Đơn xin nghỉ'}
                                             </span>
                                         </td>
                                         <td>
@@ -761,6 +921,15 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                                     <strong>Đơn xin phụ cấp cơm công trình</strong>
                                                     <p className="request-period">
                                                         {request.items ? `${request.items.length} mục - ${new Intl.NumberFormat('vi-VN').format(request.total_amount || 0)} VNĐ` : 'N/A'}
+                                                    </p>
+                                                </>
+                                            )}
+                                            {request.requestType === 'travel' && (
+                                                <>
+                                                    <strong>Đơn công tác</strong>
+                                                    <p className="request-period">
+                                                        {request.location || request.destination || 'N/A'} - 
+                                                        {(request.location_type || request.locationType) === 'INTERNATIONAL' ? ' Nước ngoài' : ' Trong nước'}
                                                     </p>
                                                 </>
                                             )}
@@ -811,11 +980,38 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                                     )}
                                                 </>
                                             )}
+                                            {request.requestType === 'travel' && (
+                                                <>
+                                                    {request.start_time ? formatDateDisplay(request.start_time, true) : formatDateDisplay(request.start_date)}
+                                                    {request.end_time && ` → ${formatDateDisplay(request.end_time, true)}`}
+                                                    {request.end_date && !request.end_time && ` → ${formatDateDisplay(request.end_date)}`}
+                                                </>
+                                            )}
                                         </td>
                                         <td>
-                                            <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
-                                                {getStatusLabel(request.status)}
-                                            </span>
+                                            {request.requestType === 'travel' ? (
+                                                <div className="travel-expense-status-container">
+                                                    <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
+                                                        {getStatusLabel(request.status, 'travel')}
+                                                    </span>
+                                                    {request.status && request.status.startsWith('PENDING') && (
+                                                        <div className="travel-expense-progress">
+                                                            {(() => {
+                                                                const progress = getTravelExpenseProgress(request);
+                                                                return progress.steps.slice(0, progress.currentStepIndex + 1).map((step, idx) => (
+                                                                    <span key={step.key} className={`progress-step ${progress.completedSteps.includes(idx) ? 'completed' : idx === progress.currentStepIndex ? 'current' : ''}`}>
+                                                                        {step.label}
+                                                                    </span>
+                                                                )).filter(Boolean);
+                                                            })()}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
+                                                    {getStatusLabel(request.status)}
+                                                </span>
+                                            )}
                                         </td>
                                         <td>
                                             {(() => {
@@ -902,6 +1098,23 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                                                 title="Xóa đơn"
                                                             >
                                                                 Xóa
+                                                            </button>
+                                                        )}
+                                                        {request.requestType === 'travel' && (
+                                                            <button
+                                                                type="button"
+                                                                className="btn-edit-small"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleViewRequest(request);
+                                                                }}
+                                                                title="Xem chi tiết"
+                                                            >
+                                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '4px' }}>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                                </svg>
+                                                                Xem chi tiết
                                                             </button>
                                                         )}
                                                     </>
@@ -1082,6 +1295,172 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                         <span>Xác nhận bổ sung giờ</span>
                                     </>
                                 )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Detail Modal for Travel Expense */}
+            {showDetailModal && selectedRequest && selectedRequest.requestType === 'travel' && (
+                <div className="employee-request-history-modal-overlay" onClick={() => setShowDetailModal(false)}>
+                    <div className="employee-request-history-modal-container" onClick={(e) => e.stopPropagation()}>
+                        <div className="employee-request-history-modal-header">
+                            <h2>Chi Tiết Đơn Công Tác - {selectedRequest.code || `CTX-${selectedRequest.id}`}</h2>
+                            <button
+                                className="employee-request-history-modal-close"
+                                onClick={() => setShowDetailModal(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="employee-request-history-modal-body">
+                            <div className="travel-expense-detail-section">
+                                <h3>Thông Tin Chung</h3>
+                                <div className="travel-expense-detail-grid">
+                                    <div className="travel-expense-detail-item">
+                                        <span className="detail-label">Mã đơn:</span>
+                                        <span className="detail-value">{selectedRequest.code || `CTX-${selectedRequest.id}`}</span>
+                                    </div>
+                                    <div className="travel-expense-detail-item">
+                                        <span className="detail-label">Nhân viên:</span>
+                                        <span className="detail-value">{selectedRequest.employee_name || selectedRequest.employeeName || 'N/A'}</span>
+                                    </div>
+                                    <div className="travel-expense-detail-item">
+                                        <span className="detail-label">Chi nhánh:</span>
+                                        <span className="detail-value">{selectedRequest.employee_branch || selectedRequest.employeeBranch || 'N/A'}</span>
+                                    </div>
+                                    <div className="travel-expense-detail-item">
+                                        <span className="detail-label">Địa điểm:</span>
+                                        <span className="detail-value">{selectedRequest.location || selectedRequest.destination || 'N/A'}</span>
+                                    </div>
+                                    <div className="travel-expense-detail-item">
+                                        <span className="detail-label">Phạm vi:</span>
+                                        <span className="detail-value">
+                                            {(selectedRequest.location_type || selectedRequest.locationType) === 'INTERNATIONAL' ? 'Nước ngoài' : 'Trong nước'}
+                                        </span>
+                                    </div>
+                                    <div className="travel-expense-detail-item">
+                                        <span className="detail-label">Mục đích:</span>
+                                        <span className="detail-value">{selectedRequest.purpose || 'N/A'}</span>
+                                    </div>
+                                    <div className="travel-expense-detail-item">
+                                        <span className="detail-label">Thời gian bắt đầu:</span>
+                                        <span className="detail-value">
+                                            {(() => {
+                                                const startTime = selectedRequest.start_time || selectedRequest.startTime;
+                                                const startDate = selectedRequest.start_date || selectedRequest.startDate;
+                                                if (startTime) {
+                                                    try {
+                                                        const date = new Date(startTime);
+                                                        if (!isNaN(date.getTime())) {
+                                                            return formatDateDisplay(startTime, true);
+                                                        }
+                                                    } catch (e) {
+                                                        console.error('Error parsing start_time:', e);
+                                                    }
+                                                }
+                                                if (startDate) {
+                                                    return formatDateDisplay(startDate, true);
+                                                }
+                                                return 'N/A';
+                                            })()}
+                                        </span>
+                                    </div>
+                                    <div className="travel-expense-detail-item">
+                                        <span className="detail-label">Thời gian kết thúc:</span>
+                                        <span className="detail-value">
+                                            {(() => {
+                                                const endTime = selectedRequest.end_time || selectedRequest.endTime;
+                                                const endDate = selectedRequest.end_date || selectedRequest.endDate;
+                                                if (endTime) {
+                                                    try {
+                                                        const date = new Date(endTime);
+                                                        if (!isNaN(date.getTime())) {
+                                                            return formatDateDisplay(endTime, true);
+                                                        }
+                                                    } catch (e) {
+                                                        console.error('Error parsing end_time:', e);
+                                                    }
+                                                }
+                                                if (endDate) {
+                                                    return formatDateDisplay(endDate, true);
+                                                }
+                                                return 'N/A';
+                                            })()}
+                                        </span>
+                                    </div>
+                                    <div className="travel-expense-detail-item">
+                                        <span className="detail-label">Trạng thái:</span>
+                                        <span className={`status-badge ${selectedRequest.status?.toLowerCase() || 'pending'}`}>
+                                            {getStatusLabel(selectedRequest.status, 'travel')}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="travel-expense-detail-section">
+                                <h3>Tiến Độ Duyệt</h3>
+                                <div className="travel-expense-timeline">
+                                    {(() => {
+                                        const progress = getTravelExpenseProgress(selectedRequest);
+                                        return progress.steps.map((step, idx) => {
+                                            const isCompleted = progress.completedSteps.includes(idx);
+                                            const isCurrent = idx === progress.currentStepIndex;
+                                            const isPending = !isCompleted && !isCurrent;
+                                            const isLast = idx === progress.steps.length - 1;
+                                            
+                                            return (
+                                                <div key={step.key} className={`timeline-item ${isCompleted ? 'completed' : isCurrent ? 'current' : isPending ? 'pending' : ''}`}>
+                                                    <div className="timeline-marker">
+                                                        {isCompleted ? (
+                                                            <svg className="timeline-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                                            </svg>
+                                                        ) : isCurrent ? (
+                                                            <div className="timeline-dot-pulse"></div>
+                                                        ) : (
+                                                            <div className="timeline-dot"></div>
+                                                        )}
+                                                    </div>
+                                                    {!isLast && <div className={`timeline-line ${isCompleted ? 'completed' : ''}`}></div>}
+                                                    <div className="timeline-content">
+                                                        <div className="timeline-label">{step.label}</div>
+                                                        <div className="timeline-status-badge-container">
+                                                            {isCurrent && (
+                                                                <div className="timeline-status-badge current">Đang xử lý</div>
+                                                            )}
+                                                            {isCompleted && (
+                                                                <div className="timeline-status-badge completed">Đã hoàn thành</div>
+                                                            )}
+                                                            {isPending && (
+                                                                <div className="timeline-status-badge pending">Chờ xử lý</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        });
+                                    })()}
+                                </div>
+                            </div>
+
+                            {selectedRequest.created_at && (
+                                <div className="travel-expense-detail-section">
+                                    <div className="travel-expense-detail-item">
+                                        <span className="detail-label">Ngày tạo:</span>
+                                        <span className="detail-value">{formatDateDisplay(selectedRequest.created_at, true)}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="employee-request-history-modal-footer">
+                            <button
+                                type="button"
+                                className="employee-request-history-modal-btn-close"
+                                onClick={() => setShowDetailModal(false)}
+                            >
+                                Đóng
                             </button>
                         </div>
                     </div>

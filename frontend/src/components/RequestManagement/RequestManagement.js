@@ -982,6 +982,12 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                             Chi tiết tăng ca
                         </h3>
                         <div className="request-management-modal-info-grid">
+                            {/* Lần tăng ca thứ nhất */}
+                            <div className="request-management-modal-info-item" style={{ gridColumn: '1 / -1', borderBottom: request.child_request_id ? '1px solid #e5e7eb' : 'none', paddingBottom: request.child_request_id ? '1rem' : '0', marginBottom: request.child_request_id ? '1rem' : '0' }}>
+                                <span className="info-label" style={{ fontWeight: '600', fontSize: '0.9375rem', color: '#1f2937' }}>
+                                    Lần tăng ca thứ nhất
+                                </span>
+                            </div>
                             <div className="request-management-modal-info-item">
                                 <span className="info-label">
                                     <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1020,11 +1026,72 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                     <span className="info-value info-value-highlight">{request.duration}</span>
                                 </div>
                             )}
+                            {request.reason && (
+                                <div className="request-management-modal-info-item" style={{ gridColumn: '1 / -1' }}>
+                                    <span className="info-label">Lý do</span>
+                                    <span className="info-value">{request.reason}</span>
+                                </div>
+                            )}
+
+                            {/* Lần tăng ca thứ hai (nếu có) */}
+                            {request.child_request_id && (
+                                <>
+                                    <div className="request-management-modal-info-item" style={{ gridColumn: '1 / -1', borderTop: '1px solid #e5e7eb', paddingTop: '1rem', marginTop: '1rem' }}>
+                                        <span className="info-label" style={{ fontWeight: '600', fontSize: '0.9375rem', color: '#1f2937' }}>
+                                            Lần tăng ca thứ hai
+                                        </span>
+                                    </div>
+                                    <div className="request-management-modal-info-item">
+                                        <span className="info-label">
+                                            <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                            </svg>
+                                            Ngày tăng ca
+                                        </span>
+                                        <span className="info-value">{formatDateDisplay(request.child_start_date || request.request_date) || '-'}</span>
+                                    </div>
+                                    <div className="request-management-modal-info-item">
+                                        <span className="info-label">
+                                            <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            Giờ bắt đầu
+                                        </span>
+                                        <span className="info-value">{request.child_start_time?.slice(0, 5) || '-'}</span>
+                                    </div>
+                                    <div className="request-management-modal-info-item">
+                                        <span className="info-label">
+                                            <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            Giờ kết thúc
+                                        </span>
+                                        <span className="info-value">{request.child_end_time?.slice(0, 5) || '-'}</span>
+                                    </div>
+                                    {request.child_duration && (
+                                        <div className="request-management-modal-info-item">
+                                            <span className="info-label">
+                                                <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                                </svg>
+                                                Thời lượng
+                                            </span>
+                                            <span className="info-value info-value-highlight">{request.child_duration}</span>
+                                        </div>
+                                    )}
+                                    {request.child_reason && (
+                                        <div className="request-management-modal-info-item" style={{ gridColumn: '1 / -1' }}>
+                                            <span className="info-label">Lý do</span>
+                                            <span className="info-value">{request.child_reason}</span>
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
                     </div>
 
-                    {/* Nội dung công việc và Nhận xét */}
-                    {(request.reason || request.manager_comment || request.team_lead_comment) && (
+                    {/* Nội dung công việc và Nhận xét - Chỉ hiển thị nếu không có child request (vì đã hiển thị trong chi tiết) */}
+                    {!request.child_request_id && (request.reason || request.manager_comment || request.team_lead_comment) && (
                         <div className="request-management-modal-section">
                             <h3 className="request-management-modal-section-title">
                                 <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1042,6 +1109,20 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                     <strong>Nhận xét của quản lý:</strong> {request.manager_comment || request.team_lead_comment}
                                 </div>
                             )}
+                        </div>
+                    )}
+                    {/* Nhận xét của quản lý (nếu có child request) */}
+                    {request.child_request_id && (request.manager_comment || request.team_lead_comment) && (
+                        <div className="request-management-modal-section">
+                            <h3 className="request-management-modal-section-title">
+                                <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Nhận xét của quản lý
+                            </h3>
+                            <div className="request-management-manager-comment-text">
+                                {request.manager_comment || request.team_lead_comment}
+                            </div>
                         </div>
                     )}
                 </>
@@ -1984,8 +2065,17 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                             {request.requestType === 'overtime' && (
                                                                 <>
                                                                     <span>{formatDateDisplay(request.request_date)}</span>
-                                                                    {request.start_time && request.end_time && (
-                                                                        <span className="time-info">{request.start_time.slice(0, 5)} → {request.end_time.slice(0, 5)}</span>
+                                                                    {request.start_time && (request.end_time || request.duration) && (
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
+                                                                            <span className="time-info">
+                                                                                <strong>Lần 1:</strong> {request.start_time.slice(0, 5)} → {request.end_time?.slice(0, 5) || '-'}
+                                                                            </span>
+                                                                            {request.child_request_id && request.child_start_time && (
+                                                                                <span className="time-info" style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                                                                    <strong>Lần 2:</strong> {request.child_start_time.slice(0, 5)} → {request.child_end_time?.slice(0, 5) || '-'}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
                                                                     )}
                                                                 </>
                                                             )}
@@ -2090,7 +2180,20 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                 <>
                                                     <td>{formatDateDisplay(request.request_date)}</td>
                                                     <td>
-                                                        {request.start_time?.slice(0, 5)} → {request.end_time?.slice(0, 5)}
+                                                        {request.start_time && (request.end_time || request.duration) ? (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                                <span className="time-info">
+                                                                    <strong>Lần 1:</strong> {request.start_time.slice(0, 5)} → {request.end_time?.slice(0, 5) || '-'}
+                                                                </span>
+                                                                {request.child_request_id && request.child_start_time && (
+                                                                    <span className="time-info" style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                                                        <strong>Lần 2:</strong> {request.child_start_time.slice(0, 5)} → {request.child_end_time?.slice(0, 5) || '-'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span>-</span>
+                                                        )}
                                                     </td>
                                                     <td>
                                                         <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>

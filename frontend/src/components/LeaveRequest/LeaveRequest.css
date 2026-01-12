@@ -879,6 +879,259 @@
     color: #9ca3af;
 }
 
+/* Quick Action: Half Day Leave */
+.leave-quick-action-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(34, 197, 94, 0.05));
+  border: 1px dashed rgba(59, 130, 246, 0.3);
+  border-radius: 0.75rem;
+  text-align: center;
+}
+
+.leave-half-day-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.5rem;
+  background: linear-gradient(135deg, #3b82f6, #10b981);
+  color: #ffffff;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);
+}
+
+.leave-half-day-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, #2563eb, #059669);
+}
+
+.leave-half-day-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.leave-half-day-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.leave-half-day-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.leave-quick-action-hint {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-bottom: 0;
+}
+
+/* Half Day Modal */
+.leave-half-day-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.leave-half-day-modal-container {
+  background: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.leave-half-day-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.leave-half-day-modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.leave-half-day-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  line-height: 1;
+  transition: color 0.2s ease;
+  border-radius: 0.375rem;
+}
+
+.leave-half-day-modal-close:hover {
+  color: #1e293b;
+  background: #f1f5f9;
+}
+
+.leave-half-day-modal-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.leave-half-day-date-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.leave-half-day-date-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.leave-half-day-datepicker {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: #1f2937;
+  background: #ffffff;
+}
+
+.leave-half-day-datepicker:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.leave-half-day-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.leave-half-day-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.leave-half-day-option:hover:not(:disabled) {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(59, 130, 246, 0.1);
+}
+
+.leave-half-day-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.leave-half-day-option.morning:hover:not(:disabled) {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.05);
+}
+
+.leave-half-day-option.afternoon:hover:not(:disabled) {
+  border-color: #f97316;
+  background: rgba(249, 115, 22, 0.05);
+}
+
+.half-day-option-icon {
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.leave-half-day-option.morning .half-day-option-icon {
+  background: rgba(251, 191, 36, 0.1);
+  color: #f59e0b;
+}
+
+.leave-half-day-option.afternoon .half-day-option-icon {
+  background: rgba(249, 115, 22, 0.1);
+  color: #f97316;
+}
+
+.half-day-option-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.half-day-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.half-day-option-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.half-day-option-time {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
 /* IV. NÚT HÀNH ĐỘNG CHÍNH (SUBMIT BUTTON) */
 /* Nền Nút - Xanh Dương Gradient */
 .leave-submit-button {

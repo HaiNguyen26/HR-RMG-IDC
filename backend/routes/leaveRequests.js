@@ -98,6 +98,11 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
         const normalized = normalizeChiNhanh(empChiNhanh);
         if (!normalized) return false;
 
+        // QUAN TRỌNG: Nếu manager là Head Office, cho phép quản lý tất cả chi nhánh
+        if (normalized === 'head office' || normalized === 'ho') {
+            return true;
+        }
+
         // Exact match
         if (normalized === normalizedEmployeeChiNhanh) return true;
 
@@ -237,14 +242,14 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
         // (vì có thể cache chưa đầy đủ hoặc có nhiều người cùng tên nhưng chưa được load)
         if (matches.length === 1) {
             const match = matches[0];
-            
+
             // Nếu manager là Head Office, cho phép quản lý tất cả chi nhánh
             const normalizedMatchChiNhanh = normalizeChiNhanhValue(match.chi_nhanh);
             if (normalizedMatchChiNhanh === 'head office' || normalizedMatchChiNhanh === 'ho') {
                 console.log(`[findManagerFromCache] Single match found: "${match.ho_ten}" (ID: ${match.id}, Head Office) - Allowing Head Office manager to manage employee from "${normalizedEmployeeChiNhanh || 'N/A'}"`);
                 return match;
             }
-            
+
             // Nếu có chi_nhanh context, kiểm tra xem manager có cấp dưới trong cùng chi_nhanh không
             if (normalizedEmployeeChiNhanh) {
                 // QUAN TRỌNG: Chỉ xem xét manager có chi_nhanh match với employee đang tạo đơn
@@ -252,24 +257,10 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
                 const managerChiNhanhMatches = chiNhanhMatches(match.chi_nhanh);
 
                 if (managerChiNhanhMatches) {
-                    // Kiểm tra xem manager này có cấp dưới trong cùng chi_nhanh với employee đang tạo đơn không
-                    const managerEmployees = cache.all.filter(e => {
-                        if (!e.quan_ly_truc_tiep) return false;
-                        const empManagerName = (e.quan_ly_truc_tiep || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
-                        const matchNormalizedName = (match.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
-                        const nameMatches = empManagerName === matchNormalizedName ||
-                            removeVietnameseAccents(empManagerName) === removeVietnameseAccents(matchNormalizedName);
-                        // QUAN TRỌNG: Kiểm tra chi_nhanh của employee (e.chi_nhanh) match với chi_nhanh của employee đang tạo đơn (normalizedEmployeeChiNhanh)
-                        return nameMatches && chiNhanhMatches(e.chi_nhanh);
-                    });
-
-                    if (managerEmployees.length > 0) {
-                        // Log chi tiết để debug
-                        const subordinatesChiNhanh = managerEmployees.map(e => e.chi_nhanh || 'N/A');
-                        console.log(`[findManagerFromCache] Manager "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) has ${managerEmployees.length} subordinates. Their chi_nhanh: ${[...new Set(subordinatesChiNhanh)].join(', ')}. Looking for chi_nhanh: "${normalizedEmployeeChiNhanh}"`);
-                        console.log(`[findManagerFromCache] Exact match found (single match with ${managerEmployees.length} subordinates in chi_nhanh "${normalizedEmployeeChiNhanh}"): "${match.ho_ten}" (${match.chi_nhanh || 'N/A'})`);
-                        return match;
-                    }
+                    // Nếu manager có chi_nhanh match, trả về ngay (không cần kiểm tra cấp dưới)
+                    // Vì có thể manager này mới được thêm vào hoặc chưa có cấp dưới trong database
+                    console.log(`[findManagerFromCache] Exact match found (single match, chi_nhanh matches): "${match.ho_ten}" (${match.chi_nhanh || 'N/A'}) matches employee chi_nhanh "${normalizedEmployeeChiNhanh}"`);
+                    return match;
                 } else {
                     // Manager này không có chi_nhanh match, kiểm tra xem có phải Head Office không
                     const normalizedMatchChiNhanh = normalizeChiNhanh(match.chi_nhanh);

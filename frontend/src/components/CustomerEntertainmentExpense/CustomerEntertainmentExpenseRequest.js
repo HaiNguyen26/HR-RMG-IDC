@@ -8,11 +8,14 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
     const [submitting, setSubmitting] = useState(false);
     const [branches, setBranches] = useState([]);
     const [branchDirectors, setBranchDirectors] = useState([]);
+    const [ceo, setCeo] = useState(null);
     const [formData, setFormData] = useState({
         // Section I: Thông Tin Chung
         requester: '',
         branchDirectorId: '',
         branchDirectorName: '',
+        ceoId: '',
+        ceoName: '',
         startDate: '',
         endDate: '',
         branch: '',
@@ -68,18 +71,21 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                 if (response.data && response.data.success) {
                     const employees = response.data.data || [];
 
-                    // Filter branch directors: Châu Quang Hải, Nguyễn Ngọc Luyễn, Nguyễn Văn Khải, Huỳnh Phúc Văn
-                    // Also include Hoàng Đình Sạch (quản lý trực tiếp được đặc cách duyệt)
+                    // Chỉ cho phép 3 giám đốc chi nhánh: Châu Quang Hải, Nguyễn Ngọc Luyễn, Nguyễn Văn Khải
                     const allowedBranchDirectorNames = [
                         'châu quang hải', 'chau quang hai',
                         'nguyễn ngọc luyễn', 'nguyen ngoc luyen',
-                        'nguyễn văn khải', 'nguyen van khai',
-                        'huỳnh phúc văn', 'huynh phuc van'
+                        'nguyễn văn khải', 'nguyen van khai'
                     ];
 
                     const allowedManagerNames = [
                         'hoàng đình sạch', 'hoang dinh sach',
                         'huỳnh phúc văn', 'huynh phuc van'
+                    ];
+
+                    // Tổng giám đốc: Lê Thanh Tùng
+                    const ceoNames = [
+                        'lê thanh tùng', 'le thanh tung'
                     ];
 
                     const removeVietnameseAccents = (str) => {
@@ -91,6 +97,7 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                             .replace(/Đ/g, 'D');
                     };
 
+                    // Lọc 3 giám đốc chi nhánh được phép
                     const directors = employees.filter(emp => {
                         const hoTen = (emp.hoTen || emp.ho_ten || '').toLowerCase().trim();
                         const hoTenNoAccents = removeVietnameseAccents(hoTen);
@@ -107,7 +114,7 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                             return true; // Include managers (Hoàng Đình Sạch, Huỳnh Phúc Văn)
                         }
 
-                        // Check by name for branch directors
+                        // Check by name for branch directors (chỉ 3 người được phép)
                         const nameMatch = allowedBranchDirectorNames.some(name => {
                             const nameNoAccents = removeVietnameseAccents(name);
                             return hoTen.includes(name) || hoTenNoAccents.includes(nameNoAccents);
@@ -120,7 +127,18 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                         return nameMatch && titleMatch;
                     });
 
+                    // Lọc Tổng giám đốc (Lê Thanh Tùng)
+                    const foundCeo = employees.find(emp => {
+                        const hoTen = (emp.hoTen || emp.ho_ten || '').toLowerCase().trim();
+                        const hoTenNoAccents = removeVietnameseAccents(hoTen);
+                        return ceoNames.some(name => {
+                            const nameNoAccents = removeVietnameseAccents(name);
+                            return hoTen.includes(name) || hoTenNoAccents.includes(nameNoAccents);
+                        });
+                    });
+
                     setBranchDirectors(directors);
+                    setCeo(foundCeo || null);
                 } else {
                     console.error('Error fetching branch directors: Invalid response format');
                 }
@@ -296,7 +314,8 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
         if (!formData.requester.trim()) {
             newErrors.requester = 'Vui lòng nhập người yêu cầu';
         }
-        if (!formData.branchDirectorId) {
+        // Phải chọn branchDirectorId hoặc ceoId (ít nhất một trong hai)
+        if (!formData.branchDirectorId && !formData.ceoId) {
             newErrors.branchDirectorId = 'Vui lòng chọn Người Duyệt';
         }
         if (!formData.startDate) {
@@ -369,39 +388,52 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
 
             // Collect all files from expense items
             const allFiles = [];
+            let totalFileSize = 0;
+            const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB total
+            
             formData.expenseItems.forEach(item => {
                 if (item.files && item.files.length > 0) {
                     item.files.forEach(fileObj => {
                         if (fileObj.file) {
+                            totalFileSize += fileObj.file.size;
                             allFiles.push(fileObj.file);
                         }
                     });
                 }
             });
 
-            // Check if selected director is manager (Hoàng Đình Sạch or Huỳnh Phúc Văn)
-            const selectedDirector = branchDirectors.find(d => d.id === parseInt(formData.branchDirectorId));
-            const directorNameLower = (selectedDirector?.hoTen || selectedDirector?.ho_ten || '').toLowerCase();
+            // Validate total file size
+            if (totalFileSize > MAX_TOTAL_SIZE) {
+                showToast?.(`Tổng kích thước file vượt quá 50MB. Hiện tại: ${(totalFileSize / 1024 / 1024).toFixed(2)}MB. Vui lòng giảm số lượng hoặc kích thước file.`, 'error');
+                setSubmitting(false);
+                return;
+            }
 
-            const isHoangDinhSach = selectedDirector && (
-                directorNameLower.includes('hoàng đình sạch') ||
-                directorNameLower.includes('hoang dinh sach')
-            );
+            // Kiểm tra nếu chọn Tổng giám đốc
+            const isCeoSelected = formData.ceoId && !formData.branchDirectorId;
 
-            const isHuynhPhucVan = selectedDirector && (
-                directorNameLower.includes('huỳnh phúc văn') ||
-                directorNameLower.includes('huynh phuc van')
-            );
+            // Check if selected director is manager (Hoàng Đình Sạch or Huỳnh Phúc Văn) - chỉ khi không chọn CEO
+            let isManager = false;
+            if (!isCeoSelected && formData.branchDirectorId) {
+                const selectedDirector = branchDirectors.find(d => d.id === parseInt(formData.branchDirectorId));
+                const directorNameLower = (selectedDirector?.hoTen || selectedDirector?.ho_ten || '').toLowerCase();
 
-            const isManager = isHoangDinhSach || isHuynhPhucVan;
+                const isHoangDinhSach = selectedDirector && (
+                    directorNameLower.includes('hoàng đình sạch') ||
+                    directorNameLower.includes('hoang dinh sach')
+                );
 
+                const isHuynhPhucVan = selectedDirector && (
+                    directorNameLower.includes('huỳnh phúc văn') ||
+                    directorNameLower.includes('huynh phuc van')
+                );
+
+                isManager = isHoangDinhSach || isHuynhPhucVan;
+            }
+
+            // Chuẩn bị dữ liệu gửi lên, đảm bảo không gửi undefined hoặc chuỗi rỗng
             const submitData = {
                 employeeId: currentUser?.id,
-                branchDirectorId: formData.branchDirectorId,
-                branchDirectorName: formData.branchDirectorName,
-                // If manager (Hoàng Đình Sạch or Huỳnh Phúc Văn) is selected, also set as manager
-                managerId: isManager ? formData.branchDirectorId : undefined,
-                managerName: isManager ? formData.branchDirectorName : undefined,
                 branch: formData.branch,
                 startDate: formData.startDate,
                 endDate: formData.endDate,
@@ -416,6 +448,30 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                 files: allFiles
             };
 
+            // Chỉ thêm branchDirectorId nếu không chọn CEO
+            if (!isCeoSelected && formData.branchDirectorId) {
+                const parsedBranchDirectorId = parseInt(formData.branchDirectorId);
+                if (!isNaN(parsedBranchDirectorId) && parsedBranchDirectorId > 0) {
+                    submitData.branchDirectorId = parsedBranchDirectorId;
+                    submitData.branchDirectorName = formData.branchDirectorName || null;
+                    
+                    // If manager (Hoàng Đình Sạch or Huỳnh Phúc Văn) is selected, also set as manager
+                    if (isManager) {
+                        submitData.managerId = parsedBranchDirectorId;
+                        submitData.managerName = formData.branchDirectorName || null;
+                    }
+                }
+            }
+
+            // Chỉ thêm ceoId nếu chọn CEO
+            if (isCeoSelected && formData.ceoId) {
+                const parsedCeoId = parseInt(formData.ceoId);
+                if (!isNaN(parsedCeoId) && parsedCeoId > 0) {
+                    submitData.ceoId = parsedCeoId;
+                    submitData.ceoName = formData.ceoName || null;
+                }
+            }
+
             const response = await customerEntertainmentExpensesAPI.create(submitData);
 
             if (response.data && response.data.success) {
@@ -426,6 +482,8 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                     requester: `${currentUser?.hoTen || currentUser?.username || ''} - ${currentUser?.phongBan || currentUser?.boPhan || ''}`,
                     branchDirectorId: '',
                     branchDirectorName: '',
+                    ceoId: '',
+                    ceoName: '',
                     startDate: '',
                     endDate: '',
                     branch: '',
@@ -518,31 +576,83 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                                     </div>
                                 </div>
 
-                                {/* Chọn Người Duyệt (Giám đốc Chi nhánh hoặc Quản lý trực tiếp) */}
+                                {/* Chọn Người Duyệt (Giám đốc Chi nhánh hoặc Quản lý trực tiếp hoặc Tổng giám đốc) */}
                                 <div className="customer-entertainment-expense-form-field">
                                     <label className="customer-entertainment-expense-form-label">
                                         Chọn Người Duyệt <span className="required">*</span>
                                     </label>
-                                    <CustomSelect
-                                        id="branch-director-select"
-                                        name="branchDirector"
-                                        value={formData.branchDirectorId}
-                                        onChange={(e) => {
-                                            const selectedDirector = branchDirectors.find(d => d.id === parseInt(e.target.value));
-                                            handleChange('branchDirectorId', e.target.value);
-                                            handleChange('branchDirectorName', selectedDirector ? (selectedDirector.hoTen || selectedDirector.ho_ten) : '');
-                                        }}
-                                        options={[
+                                    {(() => {
+                                        // Kiểm tra xem currentUser có phải là 1 trong 3 giám đốc chi nhánh được phép không
+                                        const removeVietnameseAccents = (str) => {
+                                            if (!str) return '';
+                                            return str
+                                                .normalize('NFD')
+                                                .replace(/[\u0300-\u036f]/g, '')
+                                                .replace(/đ/g, 'd')
+                                                .replace(/Đ/g, 'D');
+                                        };
+
+                                        const allowedBranchDirectorNames = [
+                                            'châu quang hải', 'chau quang hai',
+                                            'nguyễn ngọc luyễn', 'nguyen ngoc luyen',
+                                            'nguyễn văn khải', 'nguyen van khai'
+                                        ];
+
+                                        const currentUserName = (currentUser?.hoTen || currentUser?.ho_ten || '').toLowerCase().trim();
+                                        const currentUserNameNoAccents = removeVietnameseAccents(currentUserName);
+                                        
+                                        const isAllowedToSelectCEO = allowedBranchDirectorNames.some(name => {
+                                            const nameNoAccents = removeVietnameseAccents(name);
+                                            return currentUserName.includes(name) || currentUserNameNoAccents.includes(nameNoAccents);
+                                        });
+
+                                        // Tạo danh sách options
+                                        const options = [
                                             { value: '', label: 'Chọn Người Duyệt' },
                                             ...branchDirectors.map(director => ({
                                                 value: director.id,
                                                 label: `${director.hoTen || director.ho_ten} - ${director.chucDanh || director.chuc_danh || ''}`
                                             }))
-                                        ]}
-                                        placeholder="Chọn Người Duyệt (Giám đốc Chi nhánh hoặc Quản lý trực tiếp)"
-                                        error={errors.branchDirectorId}
-                                        required={true}
-                                    />
+                                        ];
+
+                                        // Chỉ thêm Tổng giám đốc nếu currentUser là 1 trong 3 giám đốc chi nhánh được phép
+                                        if (isAllowedToSelectCEO && ceo) {
+                                            options.push({
+                                                value: `ceo_${ceo.id}`,
+                                                label: `${ceo.hoTen || ceo.ho_ten} - Tổng giám đốc`
+                                            });
+                                        }
+
+                                        return (
+                                            <CustomSelect
+                                                id="branch-director-select"
+                                                name="branchDirector"
+                                                value={formData.branchDirectorId || formData.ceoId ? (formData.ceoId ? `ceo_${formData.ceoId}` : formData.branchDirectorId) : ''}
+                                                onChange={(e) => {
+                                                    const value = String(e.target.value || '');
+                                                    
+                                                    // Kiểm tra nếu chọn Tổng giám đốc
+                                                    if (value && value.startsWith('ceo_')) {
+                                                        const ceoId = value.replace('ceo_', '');
+                                                        handleChange('branchDirectorId', '');
+                                                        handleChange('branchDirectorName', '');
+                                                        handleChange('ceoId', ceoId);
+                                                        handleChange('ceoName', ceo ? (ceo.hoTen || ceo.ho_ten || '') : '');
+                                                    } else {
+                                                        const selectedDirector = branchDirectors.find(d => d.id === parseInt(value));
+                                                        handleChange('branchDirectorId', value);
+                                                        handleChange('branchDirectorName', selectedDirector ? (selectedDirector.hoTen || selectedDirector.ho_ten) : '');
+                                                        handleChange('ceoId', '');
+                                                        handleChange('ceoName', '');
+                                                    }
+                                                }}
+                                                options={options}
+                                                placeholder="Chọn Người Duyệt (Giám đốc Chi nhánh, Quản lý trực tiếp hoặc Tổng giám đốc)"
+                                                error={errors.branchDirectorId}
+                                                required={true}
+                                            />
+                                        );
+                                    })()}
                                     {errors.branchDirectorId && (
                                         <span className="customer-entertainment-expense-error-text">{errors.branchDirectorId}</span>
                                     )}

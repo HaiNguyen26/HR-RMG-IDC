@@ -86,6 +86,12 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
         if (!normalizedEmployeeChiNhanh) return true;
         const normalized = normalizeChiNhanhValue(empChiNhanh);
         if (!normalized) return false;
+
+        // QUAN TRỌNG: Nếu manager là Head Office, cho phép quản lý tất cả chi nhánh
+        if (normalized === 'head office' || normalized === 'ho') {
+            return true;
+        }
+
         if (normalized === normalizedEmployeeChiNhanh) return true;
         if (normalized.includes(normalizedEmployeeChiNhanh) || normalizedEmployeeChiNhanh.includes(normalized)) {
             const words1 = normalized.split(/\s+/).filter(w => w.length > 1);

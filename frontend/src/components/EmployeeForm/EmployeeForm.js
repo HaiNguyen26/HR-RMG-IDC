@@ -402,7 +402,7 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
 
         <form onSubmit={handleSubmit} className="employee-form">
           {/* Section 01: Thông tin cá nhân */}
-          <div className="form-section">
+          <div className="form-section form-section-01">
             <div className="section-header">
               <span className="section-badge">01</span>
               <h3 className="section-title">Thông tin cá nhân</h3>
@@ -487,7 +487,7 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
                 />
               </div>
 
-              <div className="form-group">
+              <div className="form-group form-group-chi-nhanh">
                 <label htmlFor="chiNhanh" className="form-label">
                   Chi nhánh
                 </label>
@@ -497,6 +497,7 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
                   value={formData.chiNhanh}
                   onChange={handleChange}
                   placeholder="Chọn chi nhánh"
+                  className="custom-select-chi-nhanh"
                   options={[
                     { value: '', label: 'Chọn chi nhánh' },
                     ...branches.map((branch) => ({
@@ -510,7 +511,7 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
           </div>
 
           {/* Section 02: Công việc & Tổ chức */}
-          <div className="form-section">
+          <div className="form-section form-section-02">
             <div className="section-header">
               <span className="section-badge">02</span>
               <h3 className="section-title">Công việc & Tổ chức</h3>
@@ -659,6 +660,7 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
                   value={formData.capBac}
                   onChange={handleChange}
                   placeholder="Chọn cấp bậc"
+                  dropup={true}
                   options={[
                     { value: '', label: 'Chọn cấp bậc' },
                     ...ranks.map((rank) => ({
@@ -679,6 +681,7 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
                   value={formData.quanLyTrucTiep}
                   onChange={handleChange}
                   placeholder="Chọn quản lý trực tiếp"
+                  dropup={true}
                   options={[
                     { value: '', label: 'Chọn quản lý trực tiếp' },
                     ...managers.map((manager) => ({
@@ -699,6 +702,7 @@ const EmployeeForm = ({ onSuccess, onCancel, currentUser, showToast, showConfirm
                   value={formData.quanLyGianTiep}
                   onChange={handleChange}
                   placeholder="Chọn quản lý gián tiếp"
+                  dropup={true}
                   options={[
                     { value: '', label: 'Chọn quản lý gián tiếp' },
                     ...managers.map((manager) => ({

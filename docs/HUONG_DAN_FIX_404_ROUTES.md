@@ -85,6 +85,29 @@ curl http://localhost:3000/api/meal-allowance-requests
 
 ## Kiểm tra sau khi fix
 
+### Cách 1: Sử dụng script tự động (Khuyến nghị)
+
+```bash
+# SSH vào server
+ssh root@27.71.16.15
+
+# Di chuyển đến thư mục project
+cd /var/www/hr-management
+
+# Chạy script kiểm tra
+bash scripts/check-routes-on-server.sh
+```
+
+Script này sẽ kiểm tra:
+- File routes có tồn tại không
+- Routes có được import trong server.js không
+- Routes có được mount không
+- PM2 process có đang chạy không
+- Database có bảng không
+- API endpoints có hoạt động không
+
+### Cách 2: Kiểm tra thủ công
+
 1. **Kiểm tra endpoints hoạt động:**
 ```bash
 # Trên server
@@ -103,10 +126,77 @@ curl http://localhost:3000/api/meal-allowance-requests
 pm2 logs hr-management-api --lines 50
 ```
 
+4. **Kiểm tra database có bảng:**
+```bash
+sudo -u postgres psql -d HR_Management_System -c "\dt late_early_requests"
+sudo -u postgres psql -d HR_Management_System -c "\dt meal_allowance_requests"
+```
+
 ## Lưu ý
 
 - Đảm bảo đã pull code mới nhất từ git
 - Đảm bảo đã chạy migrations database (nếu cần)
 - Đảm bảo PM2 đã restart sau khi pull code
 - Nếu vẫn lỗi, kiểm tra logs PM2 để xem chi tiết lỗi
+
+## Troubleshooting chi tiết
+
+### Nếu script báo "Routes KHÔNG TỒN TẠI":
+```bash
+# Pull code mới
+cd /var/www/hr-management
+git pull origin main
+
+# Kiểm tra lại
+ls -la backend/routes/lateEarlyRequests.js
+ls -la backend/routes/mealAllowanceRequests.js
+```
+
+### Nếu script báo "Routes KHÔNG được mount":
+```bash
+# Kiểm tra server.js
+grep -n "late-early-requests\|meal-allowance-requests" backend/server.js
+
+# Nếu không có, có thể file server.js chưa được cập nhật
+git pull origin main
+```
+
+### Nếu script báo "Bảng KHÔNG TỒN TẠI":
+```bash
+# Chạy migrations
+bash scripts/pull-and-migrate-on-server.sh
+```
+
+### Nếu script báo "Endpoint trả về 404":
+```bash
+# 1. Kiểm tra PM2 có chạy không
+pm2 status
+
+# 2. Restart PM2
+pm2 restart hr-management-api
+
+# 3. Kiểm tra logs xem có lỗi không
+pm2 logs hr-management-api --err --lines 100
+
+# 4. Kiểm tra xem server có listen đúng port không
+netstat -tlnp | grep 3000
+```
+
+### Nếu vẫn lỗi sau khi làm tất cả:
+```bash
+# 1. Xem logs chi tiết
+pm2 logs hr-management-api --lines 200
+
+# 2. Kiểm tra xem có lỗi syntax không
+cd /var/www/hr-management/backend
+node -c routes/lateEarlyRequests.js
+node -c routes/mealAllowanceRequests.js
+node -c server.js
+
+# 3. Thử restart lại từ đầu
+pm2 delete hr-management-api
+cd /var/www/hr-management
+pm2 start ecosystem.hr.config.js
+pm2 save
+```
 

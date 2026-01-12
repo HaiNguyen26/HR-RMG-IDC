@@ -30,6 +30,7 @@ import CustomerEntertainmentExpenseAccountant from './components/CustomerEnterta
 import CustomerEntertainmentExpenseCEO from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseCEO';
 import CustomerEntertainmentExpenseCEOApproval from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseCEOApproval';
 import CustomerEntertainmentExpensePayment from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpensePayment';
+import AttendanceRecords from './components/AttendanceRecords/AttendanceRecords';
 import Login from './components/Login/Login';
 import ChangePasswordModal from './components/Common/ChangePasswordModal';
 import ToastContainer from './components/Common/ToastContainer';
@@ -482,6 +483,14 @@ function App() {
       case 'request-management':
         return (
           <RequestManagement
+            currentUser={currentUser}
+            showToast={showToast}
+            showConfirm={showConfirm}
+          />
+        );
+      case 'attendance-records':
+        return (
+          <AttendanceRecords
             currentUser={currentUser}
             showToast={showToast}
             showConfirm={showConfirm}

@@ -7,7 +7,18 @@ import TimePicker24h from '../TimePicker24h/TimePicker24h';
 import './OvertimeRequest.css';
 
 const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
+  const [isDoubleOvertime, setIsDoubleOvertime] = useState(false);
   const [formData, setFormData] = useState({
+    startDate: '',
+    startTime: '',
+    endDate: '',
+    endTime: '',
+    estimatedHours: '',
+    dayHours: '',
+    nightHours: '',
+    reason: ''
+  });
+  const [secondFormData, setSecondFormData] = useState({
     startDate: '',
     startTime: '',
     endDate: '',
@@ -21,6 +32,7 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
   const [error, setError] = useState('');
   const [employeeProfile, setEmployeeProfile] = useState(null);
   const [isLateRequest, setIsLateRequest] = useState(false);
+  const [isSecondLateRequest, setIsSecondLateRequest] = useState(false);
 
   // Fetch employee profile to get manager info
   useEffect(() => {
@@ -124,7 +136,21 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
     }
   }, [formData.startDate, formData.startTime]);
 
-  // Calculate estimated hours and overtime type (day/night)
+  // Check if second request time is in the past (late submission)
+  useEffect(() => {
+    if (isDoubleOvertime && secondFormData.startDate && secondFormData.startTime) {
+      const startDateTime = new Date(secondFormData.startDate);
+      const [startHour, startMin] = secondFormData.startTime.split(':').map(Number);
+      startDateTime.setHours(startHour, startMin || 0, 0, 0);
+
+      const now = new Date();
+      setIsSecondLateRequest(startDateTime < now);
+    } else {
+      setIsSecondLateRequest(false);
+    }
+  }, [isDoubleOvertime, secondFormData.startDate, secondFormData.startTime]);
+
+  // Calculate estimated hours for first form
   useEffect(() => {
     if (formData.startDate && formData.startTime && formData.endDate && formData.endTime) {
       const [startHour, startMin] = formData.startTime.split(':').map(Number);
@@ -209,8 +235,93 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.startDate, formData.startTime, formData.endDate, formData.endTime]);
 
+  // Calculate estimated hours for second form
+  useEffect(() => {
+    if (isDoubleOvertime && secondFormData.startDate && secondFormData.startTime && secondFormData.endDate && secondFormData.endTime) {
+      const [startHour, startMin] = secondFormData.startTime.split(':').map(Number);
+      const [endHour, endMin] = secondFormData.endTime.split(':').map(Number);
+
+      if (startHour !== undefined && endHour !== undefined) {
+        const startDateTime = new Date(secondFormData.startDate);
+        startDateTime.setHours(startHour, startMin || 0, 0, 0);
+
+        const endDateTime = new Date(secondFormData.endDate);
+        endDateTime.setHours(endHour, endMin || 0, 0, 0);
+
+        const diffMs = endDateTime.getTime() - startDateTime.getTime();
+
+        if (diffMs > 0) {
+          const totalHours = (diffMs / (1000 * 60 * 60)).toFixed(2);
+
+          let dayHours = 0;
+          let nightHours = 0;
+
+          let currentTime = new Date(startDateTime);
+          const endTime = new Date(endDateTime);
+          const stepMs = 60 * 1000;
+
+          while (currentTime < endTime) {
+            const currentHour = currentTime.getHours();
+            const currentMinute = currentTime.getMinutes();
+
+            const isNight = currentHour >= 22 || currentHour < 6;
+
+            const nextBoundary = new Date(currentTime);
+            if (currentMinute < 59) {
+              nextBoundary.setMinutes(59, 59, 999);
+            } else {
+              nextBoundary.setHours(currentHour + 1, 0, 0, 0);
+            }
+
+            const segmentEnd = nextBoundary > endTime ? endTime : nextBoundary;
+            const segmentMs = segmentEnd.getTime() - currentTime.getTime();
+            const segmentHours = segmentMs / (1000 * 60 * 60);
+
+            if (isNight) {
+              nightHours += segmentHours;
+            } else {
+              dayHours += segmentHours;
+            }
+
+            currentTime = segmentEnd;
+          }
+
+          setSecondFormData(prev => ({
+            ...prev,
+            estimatedHours: totalHours,
+            dayHours: dayHours > 0 ? dayHours.toFixed(2) : '',
+            nightHours: nightHours > 0 ? nightHours.toFixed(2) : ''
+          }));
+        } else {
+          setSecondFormData(prev => ({
+            ...prev,
+            estimatedHours: '',
+            dayHours: '',
+            nightHours: ''
+          }));
+        }
+      }
+    } else {
+      setSecondFormData(prev => ({
+        ...prev,
+        estimatedHours: '',
+        dayHours: '',
+        nightHours: ''
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDoubleOvertime, secondFormData.startDate, secondFormData.startTime, secondFormData.endDate, secondFormData.endTime]);
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    setError('');
+  };
+
+  const handleSecondInputChange = (field, value) => {
+    setSecondFormData(prev => ({
       ...prev,
       [field]: value
     }));
@@ -264,17 +375,65 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
     }
   };
 
+  const handleSecondTimeChange = (field) => (e) => {
+    let value = e.target.value;
+
+    if (value && value.includes(':')) {
+      const [hours, minutes] = value.split(':');
+      const hours24 = parseInt(hours, 10);
+      const minutesInt = parseInt(minutes, 10);
+
+      if (hours24 >= 0 && hours24 <= 23) {
+        const roundedMinutes = Math.round(minutesInt / 15) * 15;
+        const finalMinutes = Math.min(roundedMinutes, 45);
+
+        value = `${hours24.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}`;
+      }
+    }
+
+    if (value === '' || /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(value)) {
+      handleSecondInputChange(field, value);
+    }
+  };
+
+  const handleSecondStartDateChange = (date) => {
+    if (!date) {
+      handleSecondInputChange('startDate', '');
+    } else {
+      handleSecondInputChange('startDate', formatDateToISO(date));
+      if (!secondFormData.endDate) {
+        handleSecondInputChange('endDate', formatDateToISO(date));
+      }
+    }
+  };
+
+  const handleSecondEndDateChange = (date) => {
+    if (!date) {
+      handleSecondInputChange('endDate', '');
+    } else {
+      handleSecondInputChange('endDate', formatDateToISO(date));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    // Validation
+    // Validation for first form
     if (!formData.startDate || !formData.startTime || !formData.endDate || !formData.endTime || !formData.reason) {
-      setError('Vui lòng điền đầy đủ thông tin bắt buộc.');
+      setError('Vui lòng điền đầy đủ thông tin bắt buộc cho lần tăng ca thứ nhất.');
       return;
     }
 
-    // Validate date and time
+    // Validation for second form if double overtime is enabled
+    if (isDoubleOvertime) {
+      if (!secondFormData.startDate || !secondFormData.startTime || !secondFormData.endDate || !secondFormData.endTime || !secondFormData.reason) {
+        setError('Vui lòng điền đầy đủ thông tin bắt buộc cho cả 2 lần tăng ca (bao gồm lý do/ghi chú cho mỗi lần).');
+        return;
+      }
+    }
+
+    // Validate date and time for first form
     if (formData.startDate && formData.startTime && formData.endDate && formData.endTime) {
       const startDateTime = new Date(formData.startDate);
       const [startHour, startMin] = formData.startTime.split(':').map(Number);
@@ -285,7 +444,23 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
       endDateTime.setHours(endHour, endMin || 0, 0, 0);
 
       if (endDateTime <= startDateTime) {
-        setError('Thời gian kết thúc phải sau thời gian bắt đầu.');
+        setError('Thời gian kết thúc phải sau thời gian bắt đầu (lần tăng ca thứ nhất).');
+        return;
+      }
+    }
+
+    // Validate date and time for second form
+    if (isDoubleOvertime && secondFormData.startDate && secondFormData.startTime && secondFormData.endDate && secondFormData.endTime) {
+      const startDateTime = new Date(secondFormData.startDate);
+      const [startHour, startMin] = secondFormData.startTime.split(':').map(Number);
+      startDateTime.setHours(startHour, startMin || 0, 0, 0);
+
+      const endDateTime = new Date(secondFormData.endDate);
+      const [endHour, endMin] = secondFormData.endTime.split(':').map(Number);
+      endDateTime.setHours(endHour, endMin || 0, 0, 0);
+
+      if (endDateTime <= startDateTime) {
+        setError('Thời gian kết thúc phải sau thời gian bắt đầu (lần tăng ca thứ hai).');
         return;
       }
     }
@@ -297,16 +472,16 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
         return;
       }
 
-      // Check if request time is in the past (late submission)
+      // Submit first request
       const startDateTime = new Date(formData.startDate);
       const [startHour, startMin] = formData.startTime.split(':').map(Number);
       startDateTime.setHours(startHour, startMin || 0, 0, 0);
       const now = new Date();
       const isLate = startDateTime < now;
 
-      const payload = {
+      const payload1 = {
         employeeId: currentUser.id,
-        requestDate: formData.startDate, // Use start date as primary date
+        requestDate: formData.startDate,
         startDate: formData.startDate,
         startTime: formData.startTime,
         endDate: formData.endDate,
@@ -316,27 +491,72 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
         isLateRequest: isLate
       };
 
-      const response = await overtimeRequestsAPI.create(payload);
+      const response1 = await overtimeRequestsAPI.create(payload1);
 
-      if (response.data?.success) {
+      if (!response1.data?.success) {
+        throw new Error(response1.data?.message || 'Không thể gửi đơn tăng ca thứ nhất. Vui lòng thử lại.');
+      }
+
+      // Lấy ID của request đầu tiên
+      const firstRequestId = response1.data?.data?.id;
+
+      // Submit second request if double overtime is enabled
+      if (isDoubleOvertime) {
+        const secondStartDateTime = new Date(secondFormData.startDate);
+        const [secondStartHour, secondStartMin] = secondFormData.startTime.split(':').map(Number);
+        secondStartDateTime.setHours(secondStartHour, secondStartMin || 0, 0, 0);
+        const isSecondLate = secondStartDateTime < now;
+
+        const payload2 = {
+          employeeId: currentUser.id,
+          requestDate: secondFormData.startDate,
+          startDate: secondFormData.startDate,
+          startTime: secondFormData.startTime,
+          endDate: secondFormData.endDate,
+          endTime: secondFormData.endTime,
+          duration: secondFormData.estimatedHours || null,
+          reason: secondFormData.reason,
+          isLateRequest: isSecondLate,
+          parentRequestId: firstRequestId // Liên kết với request đầu tiên
+        };
+
+        const response2 = await overtimeRequestsAPI.create(payload2);
+
+        if (!response2.data?.success) {
+          throw new Error(response2.data?.message || 'Đơn tăng ca thứ nhất đã được gửi, nhưng không thể gửi đơn tăng ca thứ hai. Vui lòng thử lại.');
+        }
+
+        if (showToast) {
+          showToast('Cả 2 đơn xin tăng ca đã được gửi thành công!', 'success');
+        }
+      } else {
         if (showToast) {
           showToast('Đơn xin tăng ca đã được gửi thành công!', 'success');
         }
-
-        // Reset form
-        setFormData({
-          startDate: '',
-          startTime: '',
-          endDate: '',
-          endTime: '',
-          estimatedHours: '',
-          dayHours: '',
-          nightHours: '',
-          reason: ''
-        });
-      } else {
-        throw new Error(response.data?.message || 'Không thể gửi đơn. Vui lòng thử lại.');
       }
+
+      // Reset forms
+      setFormData({
+        startDate: '',
+        startTime: '',
+        endDate: '',
+        endTime: '',
+        estimatedHours: '',
+        dayHours: '',
+        nightHours: '',
+        reason: ''
+      });
+      setSecondFormData({
+        startDate: '',
+        startTime: '',
+        endDate: '',
+        endTime: '',
+        estimatedHours: '',
+        dayHours: '',
+        nightHours: '',
+        reason: ''
+      });
+      setIsDoubleOvertime(false);
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Có lỗi xảy ra. Vui lòng thử lại.';
       setError(message);
@@ -358,11 +578,40 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
             </svg>
           </div>
-          <div>
+          <div style={{ flex: 1 }}>
             <h1 className="overtime-request-title">Đơn Xin Tăng ca</h1>
             <p className="overtime-request-subtitle">
               Điền đầy đủ thông tin để gửi đơn xin tăng ca đến quản lý duyệt.
             </p>
+          </div>
+          {/* Toggle Button for Double Overtime - Moved to Header */}
+          <div className="overtime-double-toggle-wrapper-header">
+            <button
+              type="button"
+              className={`overtime-double-toggle ${isDoubleOvertime ? 'active' : ''}`}
+              onClick={() => {
+                setIsDoubleOvertime(!isDoubleOvertime);
+                if (isDoubleOvertime) {
+                  // Reset second form when disabling
+                  setSecondFormData({
+                    startDate: '',
+                    startTime: '',
+                    endDate: '',
+                    endTime: '',
+                    estimatedHours: '',
+                    dayHours: '',
+                    nightHours: '',
+                    reason: ''
+                  });
+                }
+                setError('');
+              }}
+            >
+              <svg className="overtime-toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+              </svg>
+              <span>{isDoubleOvertime ? 'Đang chọn 2 lần tăng ca' : 'Chọn 2 lần tăng ca'}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -382,9 +631,9 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
 
           {/* Single Container Layout */}
           <div className="overtime-form-content">
-            {/* I. Thông tin cơ bản */}
+            {/* I. Thông tin cơ bản - Lần 1 */}
             <div className="overtime-form-section">
-              <h2 className="overtime-section-title">I. Thông tin cơ bản</h2>
+              <h2 className="overtime-section-title">I. Thông tin cơ bản {isDoubleOvertime ? '(Lần tăng ca thứ nhất)' : ''}</h2>
               <div className="overtime-form-fields">
                 {/* Employee Code and Name - Side by Side */}
                 <div className="overtime-form-row">
@@ -629,6 +878,179 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
                 </div>
               </div>
             </div>
+
+            {/* III. Thông tin cơ bản - Lần 2 (chỉ hiển thị khi isDoubleOvertime = true) */}
+            {isDoubleOvertime && (
+              <div className="overtime-form-section overtime-form-section-second">
+                <h2 className="overtime-section-title">III. Thông tin cơ bản (Lần tăng ca thứ hai)</h2>
+                <div className="overtime-form-fields">
+                  {/* Start Date and Time - Second Form */}
+                  <div className="overtime-form-row">
+                    <div className="overtime-form-group">
+                      <label className="overtime-form-label">
+                        <svg className="overtime-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span>Ngày bắt đầu *</span>
+                      </label>
+                      <div className="overtime-date-picker-wrapper">
+                        <DatePicker
+                          selected={secondFormData.startDate ? parseISODateString(secondFormData.startDate) : null}
+                          onChange={handleSecondStartDateChange}
+                          dateFormat="dd/MM/yyyy"
+                          locale={DATE_PICKER_LOCALE}
+                          placeholderText="Chọn ngày bắt đầu"
+                          className="overtime-form-datepicker"
+                          required
+                          autoComplete="off"
+                        />
+                        <svg className="overtime-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="overtime-form-group">
+                      <label className="overtime-form-label">
+                        <svg className="overtime-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>Giờ bắt đầu *</span>
+                      </label>
+                      <div className="overtime-time-picker-wrapper">
+                        <TimePicker24h
+                          value={secondFormData.startTime}
+                          onChange={handleSecondTimeChange('startTime')}
+                          className="overtime-form-timepicker"
+                          minuteStep={15}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* End Date and Time - Second Form */}
+                  <div className="overtime-form-row">
+                    <div className="overtime-form-group">
+                      <label className="overtime-form-label">
+                        <svg className="overtime-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span>Ngày kết thúc *</span>
+                      </label>
+                      <div className="overtime-date-picker-wrapper">
+                        <DatePicker
+                          selected={secondFormData.endDate ? parseISODateString(secondFormData.endDate) : null}
+                          onChange={handleSecondEndDateChange}
+                          minDate={secondFormData.startDate ? parseISODateString(secondFormData.startDate) : null}
+                          dateFormat="dd/MM/yyyy"
+                          locale={DATE_PICKER_LOCALE}
+                          placeholderText="Chọn ngày kết thúc"
+                          className="overtime-form-datepicker"
+                          required
+                          disabled={!secondFormData.startDate}
+                          autoComplete="off"
+                        />
+                        <svg className="overtime-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="overtime-form-group">
+                      <label className="overtime-form-label">
+                        <svg className="overtime-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>Giờ kết thúc *</span>
+                      </label>
+                      <div className="overtime-time-picker-wrapper">
+                        <TimePicker24h
+                          value={secondFormData.endTime}
+                          onChange={handleSecondTimeChange('endTime')}
+                          className="overtime-form-timepicker"
+                          minuteStep={15}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Estimated Hours - Second Form */}
+                  <div className={`overtime-form-row overtime-hours-row ${secondFormData.dayHours && secondFormData.nightHours ? 'three-columns' : secondFormData.dayHours || secondFormData.nightHours ? 'two-columns' : 'one-column'}`}>
+                    <div className="overtime-form-group">
+                      <label className="overtime-form-label">Thời lượng dự kiến</label>
+                      <div className="overtime-hours-input-wrapper">
+                        <input
+                          type="text"
+                          className="overtime-form-input overtime-hours-input"
+                          value={secondFormData.estimatedHours}
+                          readOnly
+                          disabled
+                          placeholder="0.00"
+                        />
+                        <span className="overtime-hours-tag">giờ</span>
+                      </div>
+                    </div>
+
+                    {secondFormData.dayHours && parseFloat(secondFormData.dayHours) > 0 && (
+                      <div className="overtime-form-group">
+                        <label className="overtime-form-label">Tăng ca ngày</label>
+                        <div className="overtime-hours-input-wrapper overtime-day-hours">
+                          <input
+                            type="text"
+                            className="overtime-form-input overtime-hours-input"
+                            value={secondFormData.dayHours}
+                            readOnly
+                            disabled
+                          />
+                          <span className="overtime-hours-tag">giờ</span>
+                        </div>
+                        <p className="overtime-form-hint">06:00 - 22:00</p>
+                      </div>
+                    )}
+
+                    {secondFormData.nightHours && parseFloat(secondFormData.nightHours) > 0 && (
+                      <div className="overtime-form-group">
+                        <label className="overtime-form-label">Tăng ca đêm</label>
+                        <div className="overtime-hours-input-wrapper overtime-night-hours">
+                          <input
+                            type="text"
+                            className="overtime-form-input overtime-hours-input"
+                            value={secondFormData.nightHours}
+                            readOnly
+                            disabled
+                          />
+                          <span className="overtime-hours-tag">giờ</span>
+                        </div>
+                        <p className="overtime-form-hint">22:00 - 06:00</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Warning Message for Late Request - Second Form */}
+                  {isSecondLateRequest && (
+                    <div className="overtime-request-warning">
+                      <svg className="warning-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                      </svg>
+                      <span><strong>Cảnh báo vi phạm:</strong> Bạn đang nộp đơn tăng ca sau thời gian thực tế. Đơn tăng ca phải được nộp trước khi bắt đầu làm việc.</span>
+                    </div>
+                  )}
+
+                  {/* Reason Field - Second Form */}
+                  <div className="overtime-form-group">
+                    <label className="overtime-form-label">
+                      <span>Lý do *</span>
+                    </label>
+                    <textarea
+                      className="overtime-form-textarea"
+                      rows="3"
+                      value={secondFormData.reason || ''}
+                      onChange={(e) => handleSecondInputChange('reason', e.target.value)}
+                      placeholder="Nhập chi tiết lý do cần tăng ca (lần thứ hai)..."
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Submit Button */}
@@ -659,4 +1081,5 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
 };
 
 export default OvertimeRequest;
+
 

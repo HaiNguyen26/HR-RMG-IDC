@@ -210,16 +210,55 @@ const TravelExpenseApproval = ({ currentUser, showToast, showConfirm }) => {
           });
           return 'BRANCH_DIRECTOR';
         } else {
-          // Khác chi nhánh - không cho phép
-          console.warn('[TravelExpenseApproval] ❌ Branch Director but different branch:', {
-            requestId: request.id,
-            employeeId,
-            employeeBranch: employeeBranch,
-            userBranch: userBranch,
-            normalizedEmployeeBranch,
-            normalizedUserBranch
-          });
-          return null;
+          // Kiểm tra nếu user là giám đốc Head Office - có thể duyệt đơn từ tất cả chi nhánh
+          const normalizedUserBranchForCheck = normalizedUserBranch;
+          const isHeadOfficeDirector = normalizedUserBranchForCheck === 'headoffice' || 
+                                      normalizedUserBranchForCheck === 'head office' ||
+                                      normalizedUserBranchForCheck === 'ho' ||
+                                      userBranch.toLowerCase().includes('head office') ||
+                                      userBranch.toLowerCase().includes('headoffice');
+          
+          // Kiểm tra nếu employee ở Head Office
+          const isHeadOfficeEmployee = normalizedEmployeeBranch === 'headoffice' || 
+                                      normalizedEmployeeBranch === 'head office' ||
+                                      normalizedEmployeeBranch === 'ho' ||
+                                      employeeBranch.toLowerCase().includes('head office') ||
+                                      employeeBranch.toLowerCase().includes('headoffice');
+          
+          if (isHeadOfficeDirector) {
+            // Giám đốc Head Office có thể duyệt đơn từ tất cả chi nhánh
+            console.log('[TravelExpenseApproval] ✅ Determined actorRole as BRANCH_DIRECTOR (Head Office director - can approve all branches):', {
+              requestId: request.id,
+              employeeId,
+              employeeBranch: employeeBranch,
+              userBranch: userBranch,
+              normalizedEmployeeBranch,
+              normalizedUserBranch
+            });
+            return 'BRANCH_DIRECTOR';
+          } else if (isHeadOfficeEmployee) {
+            // Các giám đốc chi nhánh khác cũng có thể duyệt đơn của nhân viên Head Office
+            console.log('[TravelExpenseApproval] ✅ Determined actorRole as BRANCH_DIRECTOR (can approve Head Office employee):', {
+              requestId: request.id,
+              employeeId,
+              employeeBranch: employeeBranch,
+              userBranch: userBranch,
+              normalizedEmployeeBranch,
+              normalizedUserBranch
+            });
+            return 'BRANCH_DIRECTOR';
+          } else {
+            // Khác chi nhánh và không phải Head Office - không cho phép
+            console.warn('[TravelExpenseApproval] ❌ Branch Director but different branch:', {
+              requestId: request.id,
+              employeeId,
+              employeeBranch: employeeBranch,
+              userBranch: userBranch,
+              normalizedEmployeeBranch,
+              normalizedUserBranch
+            });
+            return null;
+          }
         }
       } else {
         // Nếu một trong hai không có thông tin chi nhánh, vẫn cho phép nếu là Giám đốc (fallback)

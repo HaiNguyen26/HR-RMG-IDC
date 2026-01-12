@@ -997,7 +997,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const handleViewRequest = useCallback(async (request) => {
         setSelectedRequest(request);
         setShowDetailModal(true);
-        
+
         // Fetch full request details để có đầy đủ thông tin (đặc biệt cho meal-allowance với items)
         if (activeModule === 'meal-allowance' && request.id) {
             try {
@@ -1702,14 +1702,26 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                     <td className="leave-request-dates-cell">
                                                         <div className="leave-request-dates-info">
                                                             {request.start_time && (request.end_time || request.duration) ? (
-                                                                <span className="time-info">{request.start_time.slice(0, 5)} → {getCorrectEndTime(request)?.slice(0, 5) || request.end_time?.slice(0, 5) || '-'}</span>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                                    <span className="time-info">
+                                                                        <strong>Lần 1:</strong> {request.start_time.slice(0, 5)} → {getCorrectEndTime(request)?.slice(0, 5) || request.end_time?.slice(0, 5) || '-'}
+                                                                    </span>
+                                                                    {request.child_request_id && request.child_start_time && (
+                                                                        <span className="time-info" style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                                                            <strong>Lần 2:</strong> {request.child_start_time.slice(0, 5)} → {request.child_end_time?.slice(0, 5) || '-'}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             ) : (
                                                                 <span>-</span>
                                                             )}
                                                         </div>
                                                     </td>
                                                     <td className="leave-request-days-cell">
-                                                        <span className="leave-request-days">{request.duration || '-'}</span>
+                                                        <span className="leave-request-days">
+                                                            {request.duration || '-'}
+                                                            {request.child_duration && ` + ${request.child_duration}`}
+                                                        </span>
                                                     </td>
                                                 </>
                                             )}
@@ -2108,6 +2120,12 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                             Chi tiết tăng ca
                                         </h3>
                                         <div className="leave-approvals-modal-info-grid">
+                                            {/* Lần tăng ca thứ nhất */}
+                                            <div className="leave-approvals-modal-info-item" style={{ gridColumn: '1 / -1', borderBottom: selectedRequest.child_request_id ? '1px solid #e5e7eb' : 'none', paddingBottom: selectedRequest.child_request_id ? '1rem' : '0', marginBottom: selectedRequest.child_request_id ? '1rem' : '0' }}>
+                                                <span className="info-label" style={{ fontWeight: '600', fontSize: '0.9375rem', color: '#1f2937' }}>
+                                                    Lần tăng ca thứ nhất
+                                                </span>
+                                            </div>
                                             <div className="leave-approvals-modal-info-item">
                                                 <span className="info-label">
                                                     <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2145,6 +2163,77 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                     </span>
                                                     <span className="info-value info-value-highlight">{selectedRequest.duration}</span>
                                                 </div>
+                                            )}
+                                            {selectedRequest.reason && (
+                                                <div className="leave-approvals-modal-info-item" style={{ gridColumn: '1 / -1' }}>
+                                                    <span className="info-label">Lý do</span>
+                                                    <span className="info-value">{selectedRequest.reason}</span>
+                                                </div>
+                                            )}
+
+                                            {/* Lần tăng ca thứ hai (nếu có) */}
+                                            {selectedRequest.child_request_id && (
+                                                <>
+                                                    <div className="leave-approvals-modal-info-item" style={{ gridColumn: '1 / -1', borderTop: '1px solid #e5e7eb', paddingTop: '1rem', marginTop: '1rem' }}>
+                                                        <span className="info-label" style={{ fontWeight: '600', fontSize: '0.9375rem', color: '#1f2937' }}>
+                                                            Lần tăng ca thứ hai
+                                                        </span>
+                                                    </div>
+                                                    <div className="leave-approvals-modal-info-item">
+                                                        <span className="info-label">
+                                                            <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                                            </svg>
+                                                            Ngày tăng ca
+                                                        </span>
+                                                        <span className="info-value">{formatDateDisplay(selectedRequest.child_start_date || selectedRequest.request_date)}</span>
+                                                    </div>
+                                                    <div className="leave-approvals-modal-info-item">
+                                                        <span className="info-label">
+                                                            <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                            </svg>
+                                                            Giờ bắt đầu
+                                                        </span>
+                                                        <span className="info-value">{selectedRequest.child_start_time?.slice(0, 5) || '-'}</span>
+                                                    </div>
+                                                    <div className="leave-approvals-modal-info-item">
+                                                        <span className="info-label">
+                                                            <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                            </svg>
+                                                            Giờ kết thúc
+                                                        </span>
+                                                        <span className="info-value">{selectedRequest.child_end_time?.slice(0, 5) || '-'}</span>
+                                                    </div>
+                                                    {selectedRequest.child_duration && (
+                                                        <div className="leave-approvals-modal-info-item">
+                                                            <span className="info-label">
+                                                                <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                                                </svg>
+                                                                Thời lượng
+                                                            </span>
+                                                            <span className="info-value info-value-highlight">{selectedRequest.child_duration}</span>
+                                                        </div>
+                                                    )}
+                                                    {selectedRequest.child_reason && (
+                                                        <div className="leave-approvals-modal-info-item" style={{ gridColumn: '1 / -1' }}>
+                                                            <span className="info-label">Lý do</span>
+                                                            <span className="info-value">{selectedRequest.child_reason}</span>
+                                                        </div>
+                                                    )}
+                                                    {selectedRequest.child_is_late_request && (
+                                                        <div className="leave-approvals-modal-warning" style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
+                                                            <svg className="warning-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                                            </svg>
+                                                            <div className="warning-content">
+                                                                <strong>Cảnh báo vi phạm:</strong> Lần tăng ca thứ hai đã được nộp sau thời gian thực tế.
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </div>
@@ -2380,7 +2469,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                             </div>
                                         )}
                                     </div>
-                                    
+
                                     {/* Bảng chi tiết các mục cơm */}
                                     {selectedRequest.items && selectedRequest.items.length > 0 && (
                                         <div style={{ marginTop: '1.5rem' }}>
