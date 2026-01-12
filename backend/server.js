@@ -19,8 +19,9 @@ const candidatesRoutes = require('./routes/candidates');
 const recruitmentRequestsRoutes = require('./routes/recruitmentRequests');
 const interviewRequestsRoutes = require('./routes/interviewRequests');
 const interviewEvaluationsRoutes = require('./routes/interviewEvaluations');
-const attendanceSyncRoutes = require('./routes/attendanceSync');
-const attendanceRecordsRoutes = require('./routes/attendanceRecords');
+// EPAD - chưa hoàn thành
+// const attendanceSyncRoutes = require('./routes/attendanceSync');
+// const attendanceRecordsRoutes = require('./routes/attendanceRecords');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -55,8 +56,9 @@ app.use('/api/candidates', candidatesRoutes);
 app.use('/api/recruitment-requests', recruitmentRequestsRoutes);
 app.use('/api/interview-requests', interviewRequestsRoutes);
 app.use('/api/interview-evaluations', interviewEvaluationsRoutes);
-app.use('/api/attendance-sync', attendanceSyncRoutes);
-app.use('/api/attendance-records', attendanceRecordsRoutes);
+// EPAD - chưa hoàn thành
+// app.use('/api/attendance-sync', attendanceSyncRoutes);
+// app.use('/api/attendance-records', attendanceRecordsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
