@@ -396,22 +396,23 @@ export const interviewRequestsAPI = {
   reject: (id, data) => api.put(`/interview-requests/${id}/reject`, data),
 };
 
+// EPAD - chưa hoàn thành
 // Attendance Sync API (EPAD Integration)
-export const attendanceSyncAPI = {
-  sync: (data) => api.post('/attendance-sync/sync', data),
-  test: () => api.get('/attendance-sync/test'),
-  getEmployees: () => api.get('/attendance-sync/employees'),
-  getDevices: () => api.get('/attendance-sync/devices'),
-};
+// export const attendanceSyncAPI = {
+//   sync: (data) => api.post('/attendance-sync/sync', data),
+//   test: () => api.get('/attendance-sync/test'),
+//   getEmployees: () => api.get('/attendance-sync/employees'),
+//   getDevices: () => api.get('/attendance-sync/devices'),
+// };
 
 // Attendance Records API
-export const attendanceRecordsAPI = {
-  getAll: (params) => api.get('/attendance-records', { params }),
-  getById: (id) => api.get(`/attendance-records/${id}`),
-  getSummary: (params) => api.get('/attendance-records/summary', { params }),
-  updateCheckType: (id, checkType) => api.put(`/attendance-records/${id}/check-type`, { checkType }),
-  linkEmployee: (id, employeeId) => api.post(`/attendance-records/${id}/link-employee`, { employeeId }),
-};
+// export const attendanceRecordsAPI = {
+//   getAll: (params) => api.get('/attendance-records', { params }),
+//   getById: (id) => api.get(`/attendance-records/${id}`),
+//   getSummary: (params) => api.get('/attendance-records/summary', { params }),
+//   updateCheckType: (id, checkType) => api.put(`/attendance-records/${id}/check-type`, { checkType }),
+//   linkEmployee: (id, employeeId) => api.post(`/attendance-records/${id}/link-employee`, { employeeId }),
+// };
 
 export const interviewEvaluationsAPI = {
   getAll: (params) => api.get('/interview-evaluations', { params }),
