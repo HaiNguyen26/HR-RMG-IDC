@@ -317,6 +317,7 @@ export const travelExpensesAPI = {
   confirmAdvanceTransfer: (id, data) => api.post(`/travel-expenses/${id}/advance`, data),
   approveException: (id, data) => api.post(`/travel-expenses/${id}/exception-approval`, data),
   confirmPayment: (id, data) => api.post(`/travel-expenses/${id}/payment`, data),
+  cancel: (id, data) => api.post(`/travel-expenses/${id}/cancel`, data),
 };
 
 // Customer Entertainment Expenses API
@@ -420,6 +421,10 @@ export const interviewEvaluationsAPI = {
   create: (data) => api.post('/interview-evaluations', data),
   update: (id, data) => api.put(`/interview-evaluations/${id}`, data),
   checkAndUpdateStatus: (candidateId) => api.post(`/interview-evaluations/check-and-update-status/${candidateId}`),
+};
+
+export const requestViewerAPI = {
+  getAll: (params) => api.get('/request-viewer', { params }),
 };
 
 // Notification system removed

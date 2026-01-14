@@ -30,6 +30,7 @@ import CustomerEntertainmentExpenseAccountant from './components/CustomerEnterta
 import CustomerEntertainmentExpenseCEO from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseCEO';
 import CustomerEntertainmentExpenseCEOApproval from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpenseCEOApproval';
 import CustomerEntertainmentExpensePayment from './components/CustomerEntertainmentExpense/CustomerEntertainmentExpensePayment';
+import RequestViewer from './components/RequestViewer/RequestViewer';
 // import AttendanceRecords from './components/AttendanceRecords/AttendanceRecords'; // EPAD - chưa hoàn thành
 import Login from './components/Login/Login';
 import ChangePasswordModal from './components/Common/ChangePasswordModal';
@@ -100,6 +101,45 @@ function App() {
       setLoading(false);
     }
   }, [employees.length]);
+
+  // Hard reset khi đóng trình duyệt - Clear tất cả localStorage
+  useEffect(() => {
+    // Sử dụng một flag trong sessionStorage để đánh dấu page đã load
+    // sessionStorage sẽ tự động clear khi đóng tab, nên có thể dùng để phân biệt
+    const pageLoadId = `page_${Date.now()}_${Math.random()}`;
+    sessionStorage.setItem('currentPageId', pageLoadId);
+    
+    // Lưu pageLoadId vào localStorage để so sánh sau
+    localStorage.setItem('lastPageId', pageLoadId);
+
+    const handlePageHide = (e) => {
+      // Clear khi page bị unload và không được cache (đóng tab/browser)
+      // e.persisted = false nghĩa là page không được lưu vào back/forward cache
+      if (e.persisted === false) {
+        const currentPageId = sessionStorage.getItem('currentPageId');
+        const lastPageId = localStorage.getItem('lastPageId');
+        
+        // Nếu currentPageId không khớp với lastPageId, nghĩa là đây là refresh
+        // (vì refresh sẽ tạo pageLoadId mới nhưng sessionStorage vẫn giữ giá trị cũ)
+        // Nếu khớp, nghĩa là đóng tab (sessionStorage sẽ bị clear khi đóng tab)
+        // Tuy nhiên, trong thực tế, khi refresh, sessionStorage vẫn giữ nguyên
+        // Vậy nên cách tốt nhất là luôn clear khi pagehide với persisted = false
+        // vì đây là cách đáng tin cậy nhất để biết page đang bị unload hoàn toàn
+        
+        // Clear tất cả localStorage và sessionStorage khi đóng tab/browser
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+    };
+
+    // Lắng nghe sự kiện pagehide
+    window.addEventListener('pagehide', handlePageHide);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, []);
 
   // Kiểm tra authentication khi component mount
   useEffect(() => {
@@ -349,6 +389,13 @@ function App() {
               currentUser={currentUser}
               showToast={showToast}
               showConfirm={showConfirm}
+            />
+          );
+        case 'request-viewer':
+          return (
+            <RequestViewer
+              currentUser={currentUser}
+              showToast={showToast}
             />
           );
         case 'interview-approvals':

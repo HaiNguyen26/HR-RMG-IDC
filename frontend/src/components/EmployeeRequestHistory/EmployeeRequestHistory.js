@@ -103,6 +103,9 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
     const [additionalHours, setAdditionalHours] = useState('');
     const [editReason, setEditReason] = useState('');
     const [isUpdatingOvertime, setIsUpdatingOvertime] = useState(false);
+    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
+    const [requestToCancel, setRequestToCancel] = useState(null);
 
     // Statistics cho tất cả các status của module hiện tại
     const [moduleStatusStatistics, setModuleStatusStatistics] = useState({
@@ -569,18 +572,30 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
         }
     };
 
-    const handleDelete = async (request) => {
-        if (!showConfirm) return;
+    const handleDelete = async (request, skipModal = false) => {
+        // Nếu đơn đã APPROVED và chưa có lý do hủy, hiển thị modal nhập lý do hủy
+        if (request.status === 'APPROVED' && !skipModal && !cancelReason) {
+            if (!showConfirm) return;
+            setRequestToCancel(request);
+            setCancelReason('');
+            setShowCancelModal(true);
+            return;
+        }
 
-        const confirmed = await showConfirm({
-            title: 'Xác nhận xóa đơn',
-            message: `Bạn có chắc chắn muốn xóa đơn này không?`,
-            confirmText: 'Xóa',
-            cancelText: 'Hủy',
-            type: 'warning'
-        });
+        // Nếu đang hủy đơn APPROVED từ modal (đã có cancelReason), bỏ qua showConfirm
+        // Nếu là đơn PENDING hoặc REJECTED, cần showConfirm
+        if (!skipModal && request.status !== 'APPROVED') {
+            if (!showConfirm) return;
+            const confirmed = await showConfirm({
+                title: 'Xác nhận xóa đơn',
+                message: `Bạn có chắc chắn muốn xóa đơn này không?`,
+                confirmText: 'Xóa',
+                cancelText: 'Hủy',
+                type: 'warning'
+            });
 
-        if (!confirmed) return;
+            if (!confirmed) return;
+        }
 
         try {
             setLoading(true);
@@ -589,6 +604,11 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 employeeId: currentUser.id,
                 role: currentUser.role
             };
+
+            // Thêm cancellationReason nếu đơn đã APPROVED
+            if (request.status === 'APPROVED' && cancelReason) {
+                deleteData.cancellationReason = cancelReason.trim();
+            }
 
             if (request.requestType === 'leave') {
                 response = await leaveRequestsAPI.remove(request.id, deleteData);
@@ -600,24 +620,55 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 response = await lateEarlyRequestsAPI.remove(request.id, deleteData);
             } else if (request.requestType === 'meal-allowance') {
                 response = await mealAllowanceRequestsAPI.remove(request.id, deleteData);
+            } else if (request.requestType === 'travel') {
+                // Travel expense cần API riêng để hủy
+                if (request.status === 'APPROVED' && cancelReason) {
+                    response = await travelExpensesAPI.cancel(request.id, { 
+                        cancellationReason: cancelReason.trim(),
+                        employeeId: currentUser.id
+                    });
+                } else {
+                    // PENDING travel expense có thể xóa qua API khác nếu có
+                    if (showToast) {
+                        showToast('Chức năng hủy đơn công tác đang được phát triển', 'info');
+                    }
+                    return;
+                }
             }
 
             if (response?.data?.success) {
                 if (showToast) {
-                    showToast('Đã xóa đơn thành công', 'success');
+                    showToast(request.status === 'APPROVED' ? 'Đã hủy đơn thành công' : 'Đã xóa đơn thành công', 'success');
                 }
                 setShowDetailModal(false);
                 setSelectedRequest(null);
+                setShowCancelModal(false);
+                setRequestToCancel(null);
+                setCancelReason('');
 
                 // Refresh requests - Luôn thêm employeeId
                 await fetchRequests();
                 await fetchModuleStatistics(false);
+            } else {
+                // Nếu response không thành công, đóng modal và hiển thị lỗi
+                setShowCancelModal(false);
+                setRequestToCancel(null);
+                setCancelReason('');
+                if (showToast) {
+                    showToast(response?.data?.message || 'Không thể hủy đơn. Vui lòng thử lại.', 'error');
+                }
             }
         } catch (error) {
             console.error('Error deleting request:', error);
             const errorMessage = error.response?.data?.message || error.message || 'Lỗi khi xóa đơn';
             if (showToast) {
                 showToast(errorMessage, 'error');
+            }
+            // Đóng modal ngay cả khi có lỗi (nếu đang mở modal hủy đơn)
+            if (showCancelModal) {
+                setShowCancelModal(false);
+                setRequestToCancel(null);
+                setCancelReason('');
             }
         } finally {
             setLoading(false);
@@ -1016,14 +1067,14 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                         <td>
                                             {(() => {
                                                 const isHr = currentUser?.role && currentUser.role !== 'EMPLOYEE';
-                                                const canCancel = request.status === 'PENDING';
+                                                const canCancel = request.status === 'PENDING' || request.status === 'APPROVED';
                                                 const canDelete = isHr && (request.status === 'REJECTED' || request.status === 'CANCELLED');
                                                 const showDeleteButton = canCancel || canDelete;
 
                                                 return (
-                                                    <>
+                                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                                         {request.status === 'PENDING' && request.requestType !== 'overtime' && (
-                                                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                                            <>
                                                                 <button
                                                                     type="button"
                                                                     className="btn-edit-small"
@@ -1051,10 +1102,24 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                                                 >
                                                                     Xóa
                                                                 </button>
-                                                            </div>
+                                                            </>
+                                                        )}
+                                                        {request.status === 'APPROVED' && request.requestType !== 'overtime' && (
+                                                            <button
+                                                                type="button"
+                                                                className="btn-delete-small"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDelete(request);
+                                                                }}
+                                                                title="Hủy đơn đã duyệt"
+                                                                style={{ backgroundColor: '#f59e0b', color: '#ffffff' }}
+                                                            >
+                                                                Hủy đơn
+                                                            </button>
                                                         )}
                                                         {request.requestType === 'overtime' && request.status === 'APPROVED' && (
-                                                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                                            <>
                                                                 <button
                                                                     type="button"
                                                                     className="btn-edit-small"
@@ -1072,9 +1137,23 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                                                     </svg>
                                                                     Bổ sung giờ
                                                                 </button>
-                                                            </div>
+                                                                {showDeleteButton && (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn-delete-small"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleDelete(request);
+                                                                        }}
+                                                                        title={canCancel ? "Hủy đơn" : "Xóa đơn"}
+                                                                        style={canCancel ? { backgroundColor: '#f59e0b', color: '#ffffff' } : {}}
+                                                                    >
+                                                                        {canCancel ? 'Hủy đơn' : 'Xóa'}
+                                                                    </button>
+                                                                )}
+                                                            </>
                                                         )}
-                                                        {request.requestType === 'overtime' && showDeleteButton && (
+                                                        {request.requestType === 'overtime' && request.status === 'PENDING' && showDeleteButton && (
                                                             <button
                                                                 type="button"
                                                                 className="btn-delete-small"
@@ -1082,7 +1161,7 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                                                     e.stopPropagation();
                                                                     handleDelete(request);
                                                                 }}
-                                                                title={canCancel ? "Hủy đơn" : "Xóa đơn"}
+                                                                title="Hủy đơn"
                                                             >
                                                                 Xóa
                                                             </button>
@@ -1117,7 +1196,7 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                                                 Xem chi tiết
                                                             </button>
                                                         )}
-                                                    </>
+                                                    </div>
                                                 );
                                             })()}
                                         </td>
@@ -1461,6 +1540,242 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                 onClick={() => setShowDetailModal(false)}
                             >
                                 Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal hủy đơn đã APPROVED */}
+            {showCancelModal && requestToCancel && (
+                <div className="cancel-request-modal-overlay" onClick={() => {
+                    setShowCancelModal(false);
+                    setRequestToCancel(null);
+                    setCancelReason('');
+                }}>
+                    <div className="cancel-request-modal-container" onClick={(e) => e.stopPropagation()}>
+                        <div className="cancel-request-modal-header">
+                            <div className="cancel-request-modal-header-content">
+                                <div className="cancel-request-modal-icon-wrapper">
+                                    <svg className="cancel-request-modal-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 className="cancel-request-modal-title">Hủy đơn đã được duyệt</h2>
+                                    <p className="cancel-request-modal-subtitle">Vui lòng cung cấp lý do hủy đơn</p>
+                                </div>
+                            </div>
+                            <button 
+                                className="cancel-request-modal-close" 
+                                onClick={() => {
+                                    setShowCancelModal(false);
+                                    setRequestToCancel(null);
+                                    setCancelReason('');
+                                }}
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="cancel-request-modal-body">
+                            <div className="cancel-request-info-box">
+                                <div className="cancel-request-info-icon">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                </div>
+                                <div className="cancel-request-info-content">
+                                    <p className="cancel-request-info-label">Đơn đang hủy:</p>
+                                    <p className="cancel-request-info-value">{requestToCancel.code || `#${requestToCancel.id}`}</p>
+                                </div>
+                            </div>
+                            <div className="cancel-request-form-group">
+                                <label className="cancel-request-label">
+                                    Lý do hủy đơn
+                                    <span className="cancel-request-required">*</span>
+                                </label>
+                                <textarea
+                                    className="cancel-request-textarea"
+                                    value={cancelReason}
+                                    onChange={(e) => setCancelReason(e.target.value)}
+                                    placeholder="Vui lòng nhập lý do hủy đơn một cách chi tiết..."
+                                    rows={5}
+                                    maxLength={500}
+                                    required
+                                />
+                                <div className="cancel-request-char-count">
+                                    {cancelReason.length} / 500 ký tự
+                                </div>
+                            </div>
+                        </div>
+                        <div className="cancel-request-modal-footer">
+                            <button
+                                type="button"
+                                className="cancel-request-btn-secondary"
+                                onClick={() => {
+                                    setShowCancelModal(false);
+                                    setRequestToCancel(null);
+                                    setCancelReason('');
+                                }}
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button
+                                type="button"
+                                className="cancel-request-btn-primary"
+                                onClick={async () => {
+                                    if (!cancelReason.trim()) {
+                                        if (showToast) {
+                                            showToast('Vui lòng nhập lý do hủy đơn', 'error');
+                                        }
+                                        return;
+                                    }
+                                    if (cancelReason.trim().length < 10) {
+                                        if (showToast) {
+                                            showToast('Lý do hủy đơn phải có ít nhất 10 ký tự', 'error');
+                                        }
+                                        return;
+                                    }
+                                    await handleDelete(requestToCancel, true);
+                                }}
+                                disabled={!cancelReason.trim() || cancelReason.trim().length < 10 || loading}
+                            >
+                                {loading ? (
+                                    <>
+                                        <svg className="cancel-request-btn-spinner" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Đang xử lý...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '1rem', height: '1rem', marginRight: '0.5rem' }}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        Xác nhận hủy đơn
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal hủy đơn đã APPROVED */}
+            {showCancelModal && requestToCancel && (
+                <div className="cancel-request-modal-overlay" onClick={() => {
+                    setShowCancelModal(false);
+                    setRequestToCancel(null);
+                    setCancelReason('');
+                }}>
+                    <div className="cancel-request-modal-container" onClick={(e) => e.stopPropagation()}>
+                        <div className="cancel-request-modal-header">
+                            <div className="cancel-request-modal-header-content">
+                                <div className="cancel-request-modal-icon-wrapper">
+                                    <svg className="cancel-request-modal-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 className="cancel-request-modal-title">Hủy đơn đã được duyệt</h2>
+                                    <p className="cancel-request-modal-subtitle">Vui lòng cung cấp lý do hủy đơn</p>
+                                </div>
+                            </div>
+                            <button 
+                                className="cancel-request-modal-close" 
+                                onClick={() => {
+                                    setShowCancelModal(false);
+                                    setRequestToCancel(null);
+                                    setCancelReason('');
+                                }}
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="cancel-request-modal-body">
+                            <div className="cancel-request-info-box">
+                                <div className="cancel-request-info-icon">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                </div>
+                                <div className="cancel-request-info-content">
+                                    <p className="cancel-request-info-label">Đơn đang hủy:</p>
+                                    <p className="cancel-request-info-value">{requestToCancel.code || `#${requestToCancel.id}`}</p>
+                                </div>
+                            </div>
+                            <div className="cancel-request-form-group">
+                                <label className="cancel-request-label">
+                                    Lý do hủy đơn
+                                    <span className="cancel-request-required">*</span>
+                                </label>
+                                <textarea
+                                    className="cancel-request-textarea"
+                                    value={cancelReason}
+                                    onChange={(e) => setCancelReason(e.target.value)}
+                                    placeholder="Vui lòng nhập lý do hủy đơn một cách chi tiết..."
+                                    rows={5}
+                                    maxLength={500}
+                                    required
+                                />
+                                <div className="cancel-request-char-count">
+                                    {cancelReason.length} / 500 ký tự
+                                </div>
+                            </div>
+                        </div>
+                        <div className="cancel-request-modal-footer">
+                            <button
+                                type="button"
+                                className="cancel-request-btn-secondary"
+                                onClick={() => {
+                                    setShowCancelModal(false);
+                                    setRequestToCancel(null);
+                                    setCancelReason('');
+                                }}
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button
+                                type="button"
+                                className="cancel-request-btn-primary"
+                                onClick={async () => {
+                                    if (!cancelReason.trim()) {
+                                        if (showToast) {
+                                            showToast('Vui lòng nhập lý do hủy đơn', 'error');
+                                        }
+                                        return;
+                                    }
+                                    if (cancelReason.trim().length < 10) {
+                                        if (showToast) {
+                                            showToast('Lý do hủy đơn phải có ít nhất 10 ký tự', 'error');
+                                        }
+                                        return;
+                                    }
+                                    await handleDelete(requestToCancel, true);
+                                }}
+                                disabled={!cancelReason.trim() || cancelReason.trim().length < 10 || loading}
+                            >
+                                {loading ? (
+                                    <>
+                                        <svg className="cancel-request-btn-spinner" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Đang xử lý...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '1rem', height: '1rem', marginRight: '0.5rem' }}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        Xác nhận hủy đơn
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>

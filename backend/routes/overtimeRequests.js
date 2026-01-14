@@ -955,17 +955,42 @@ router.delete('/:id', async (req, res) => {
                 });
             }
 
-            if (request.status !== STATUSES.PENDING) {
+            // Cho phép hủy đơn PENDING hoặc APPROVED
+            if (request.status !== STATUSES.PENDING && request.status !== STATUSES.APPROVED) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Chỉ có thể hủy đơn đang chờ duyệt'
+                    message: 'Chỉ có thể hủy đơn đang chờ duyệt hoặc đã được duyệt'
                 });
             }
 
-            await pool.query(
-                `UPDATE overtime_requests SET status = $1 WHERE id = $2`,
-                [STATUSES.CANCELLED, parseInt(id, 10)]
+            // Lấy lý do hủy từ body
+            const { cancellationReason } = req.body;
+            if (request.status === STATUSES.APPROVED && !cancellationReason) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Vui lòng nhập lý do hủy đơn'
+                });
+            }
+
+            // Kiểm tra xem có cột cancellation_reason không
+            const columnCheck = await pool.query(
+                `SELECT column_name FROM information_schema.columns 
+                 WHERE table_name = 'overtime_requests' AND column_name = 'cancellation_reason'`
             );
+            const hasCancellationReason = columnCheck.rows.length > 0;
+
+            // Cập nhật status thành CANCELLED
+            if (hasCancellationReason && cancellationReason) {
+                await pool.query(
+                    `UPDATE overtime_requests SET status = $1, cancellation_reason = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+                    [STATUSES.CANCELLED, cancellationReason.trim(), parseInt(id, 10)]
+                );
+            } else {
+                await pool.query(
+                    `UPDATE overtime_requests SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+                    [STATUSES.CANCELLED, parseInt(id, 10)]
+                );
+            }
 
             res.json({
                 success: true,

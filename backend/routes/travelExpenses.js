@@ -995,11 +995,28 @@ router.post('/:id/decision', async (req, res) => {
                             }
                         }
 
+                        // Kiểm tra xem employee có phải là Hoàng Đình Sạch không
+                        const employeeName = (employee.ho_ten || '').trim().toLowerCase();
+                        const isHoangDinhSach = employeeName.includes('hoàng đình sạch') || 
+                                               employeeName.includes('hoang dinh sach') ||
+                                               employeeName.includes('hoàng đình sách') ||
+                                               employeeName.includes('hoang dinh sach');
+
                         if (isManagerBranchDirector) {
                             // Nếu quản lý là giám đốc chi nhánh -> bỏ qua bước giám đốc chi nhánh, chuyển thẳng đến CEO
                             // (không tự động duyệt Level 2, cần CEO duyệt)
                             nextStatus = 'PENDING_CEO';
                             nextStep = 'CEO';
+                        } else if (isHoangDinhSach) {
+                            // Hoàng Đình Sạch: bỏ qua bước GĐ Chi nhánh, chuyển thẳng đến CEO (nếu nước ngoài) hoặc PENDING_FINANCE (nếu trong nước)
+                            if (request.requires_ceo || request.location_type === 'INTERNATIONAL') {
+                                nextStatus = 'PENDING_CEO';
+                                nextStep = 'CEO';
+                            } else {
+                                // Công tác trong nước: chuyển thẳng sang xử lý tạm ứng
+                                nextStatus = 'PENDING_FINANCE';
+                                nextStep = 'FINANCE';
+                            }
                         } else {
                             // Bình thường: Sau khi Cấp 1 duyệt → chuyển đến Cấp 2 (Giám đốc Chi nhánh)
                             // Áp dụng cho cả nhân viên và quản lý trực tiếp nộp đơn
@@ -2379,6 +2396,104 @@ router.post('/:id/payment', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Lỗi khi xác nhận giải ngân: ' + error.message,
+        });
+    } finally {
+        client.release();
+    }
+});
+
+// POST /api/travel-expenses/:id/cancel - Nhân viên hủy đơn đã APPROVED
+router.post('/:id/cancel', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const { cancellationReason, employeeId } = req.body;
+
+        if (!cancellationReason || !cancellationReason.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vui lòng nhập lý do hủy đơn'
+            });
+        }
+
+        if (!employeeId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu thông tin nhân viên'
+            });
+        }
+
+        await client.query('BEGIN');
+
+        const requestResult = await client.query(
+            'SELECT * FROM travel_expense_requests WHERE id = $1 FOR UPDATE',
+            [parseInt(id, 10)]
+        );
+
+        if (requestResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy đơn công tác'
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Chỉ nhân viên tạo đơn mới được hủy
+        if (request.employee_id !== parseInt(employeeId, 10)) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền hủy đơn này'
+            });
+        }
+
+        // Chỉ hủy được đơn đã APPROVED
+        if (request.status !== 'APPROVED') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Chỉ có thể hủy đơn đã được duyệt'
+            });
+        }
+
+        // Kiểm tra xem có cột cancellation_reason không
+        const columnCheck = await client.query(
+            `SELECT column_name FROM information_schema.columns 
+             WHERE table_name = 'travel_expense_requests' AND column_name = 'cancellation_reason'`
+        );
+        const hasCancellationReason = columnCheck.rows.length > 0;
+
+        // Cập nhật status thành CANCELLED
+        if (hasCancellationReason) {
+            await client.query(
+                `UPDATE travel_expense_requests 
+                 SET status = 'CANCELLED', cancellation_reason = $1, updated_at = CURRENT_TIMESTAMP 
+                 WHERE id = $2`,
+                [cancellationReason.trim(), parseInt(id, 10)]
+            );
+        } else {
+            await client.query(
+                `UPDATE travel_expense_requests 
+                 SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP 
+                 WHERE id = $1`,
+                [parseInt(id, 10)]
+            );
+        }
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Đã hủy đơn công tác thành công'
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error cancelling travel expense request:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Không thể hủy đơn: ' + error.message
         });
     } finally {
         client.release();

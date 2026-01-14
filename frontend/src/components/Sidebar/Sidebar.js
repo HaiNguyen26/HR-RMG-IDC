@@ -5,6 +5,7 @@ import './Sidebar.css';
 const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout, onChangePassword, isOpen = false, onClose }) => {
     const [managerAccessResolved, setManagerAccessResolved] = useState(false);
     const [canApproveFromManagerLookup, setCanApproveFromManagerLookup] = useState(false);
+    const [isIndirectManager, setIsIndirectManager] = useState(false);
     const [pendingLeaveApprovalsCount, setPendingLeaveApprovalsCount] = useState(0);
     const [interviewAccessResolved, setInterviewAccessResolved] = useState(false);
     const [hasInterviewAccess, setHasInterviewAccess] = useState(false);
@@ -137,14 +138,68 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                     }
                 }
 
+                // Kiểm tra quản lý gián tiếp: có nhân viên nào có quan_ly_gian_tiep trùng với tên user hiện tại không
+                const matchingIndirectEmployees = [];
+                employees.forEach((emp) => {
+                    if (!emp.quan_ly_gian_tiep) return;
+                    const indirectManagerName = (emp.quan_ly_gian_tiep || '').trim();
+                    const normalizedIndirectManagerName = indirectManagerName.toLowerCase().replace(/\s+/g, ' ').trim();
+                    const normalizedIndirectManagerNameNoAccents = removeVietnameseAccents(normalizedIndirectManagerName);
+
+                    // Match exact (có dấu)
+                    if (normalizedIndirectManagerName === normalizedCurrentName) {
+                        matchingIndirectEmployees.push({ emp, indirectManagerName });
+                        return;
+                    }
+
+                    // Match exact (không dấu)
+                    if (normalizedIndirectManagerNameNoAccents === normalizedCurrentNameNoAccents) {
+                        matchingIndirectEmployees.push({ emp, indirectManagerName });
+                        return;
+                    }
+
+                    // Fuzzy match (contains)
+                    if (normalizedIndirectManagerName.includes(normalizedCurrentName) || normalizedCurrentName.includes(normalizedIndirectManagerName)) {
+                        matchingIndirectEmployees.push({ emp, indirectManagerName });
+                        return;
+                    }
+
+                    if (normalizedIndirectManagerNameNoAccents.includes(normalizedCurrentNameNoAccents) || normalizedCurrentNameNoAccents.includes(normalizedIndirectManagerNameNoAccents)) {
+                        matchingIndirectEmployees.push({ emp, indirectManagerName });
+                        return;
+                    }
+                });
+
+                // Xác định quản lý gián tiếp tương tự như quản lý trực tiếp
+                let isIndirectManagerFlag = false;
+                if (matchingIndirectEmployees.length === 0) {
+                    isIndirectManagerFlag = false;
+                } else if (matchingIndirectEmployees.length === 1) {
+                    if (normalizedCurrentUserChiNhanh) {
+                        isIndirectManagerFlag = chiNhanhMatches(matchingIndirectEmployees[0].emp.chi_nhanh);
+                    } else {
+                        isIndirectManagerFlag = true;
+                    }
+                } else {
+                    if (normalizedCurrentUserChiNhanh) {
+                        const matchingByBranch = matchingIndirectEmployees.find(({ emp }) => chiNhanhMatches(emp.chi_nhanh));
+                        isIndirectManagerFlag = !!matchingByBranch;
+                    } else {
+                        console.warn(`[Sidebar] ⚠️ User "${currentUserName}" matches ${matchingIndirectEmployees.length} employees as indirect manager but user has no chi_nhanh. Denying access to avoid confusion.`);
+                        isIndirectManagerFlag = false;
+                    }
+                }
+
                 if (isMounted) {
                     setCanApproveFromManagerLookup(Boolean(isTeamLead));
+                    setIsIndirectManager(Boolean(isIndirectManagerFlag));
                     setManagerAccessResolved(true);
                 }
             } catch (error) {
                 console.error('Error checking manager access:', error);
                 if (isMounted) {
                     setCanApproveFromManagerLookup(false);
+                    setIsIndirectManager(false);
                     setManagerAccessResolved(true);
                 }
             }
@@ -1476,6 +1531,29 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                         </>
                     )}
 
+                    {/* Request Viewer - Section riêng với màu đặc biệt */}
+                    {isIndirectManager && (
+                        <>
+                            <li className="nav-section-label">
+                                <p>Theo Dõi</p>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => onNavigate('request-viewer')}
+                                    className={`nav-item nav-item-viewer ${currentView === 'request-viewer' ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon-wrapper">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                        </svg>
+                                    </span>
+                                    <span className="nav-label">Request Viewer</span>
+                                </button>
+                            </li>
+                        </>
+                    )}
                     {/* Nhóm 4: Thử việc - Purple */}
                     {currentUser?.role === 'EMPLOYEE' && (
                         <>
