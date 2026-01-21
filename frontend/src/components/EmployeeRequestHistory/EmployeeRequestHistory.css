@@ -413,6 +413,30 @@
   /* shadow-lg */
 }
 
+/* Tab Active (Đơn tiếp khách) - Accent Teal */
+.request-type-filter-chip.customer-entertainment.active {
+  background: #14b8a6;
+  /* bg-teal-500 */
+  color: #ffffff;
+  /* text-white */
+  border-color: #14b8a6;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  /* shadow-md */
+}
+
+.request-type-filter-chip.customer-entertainment:hover:not(.active) {
+  border-color: rgba(20, 184, 166, 0.4);
+  color: #14b8a6;
+  /* text-teal-500 */
+}
+
+.request-type-filter-chip.customer-entertainment.active:hover {
+  background: #0d9488;
+  /* bg-teal-600 */
+  box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.12), 0 3px 5px -1px rgba(0, 0, 0, 0.08);
+  /* shadow-lg */
+}
+
 /* Tab Active (Tất cả đơn) - Accent Blue */
 .request-type-filter-chip.all.active {
   background: linear-gradient(135deg, #3b82f6, #10b981);
@@ -477,6 +501,12 @@
   background: linear-gradient(135deg, #fef3c7, #fde68a);
   color: #92400e;
   border: 1px solid #fcd34d;
+}
+
+.request-type-badge.customer-entertainment {
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.15), rgba(13, 148, 136, 0.25));
+  color: #0f766e;
+  border: 1px solid rgba(13, 148, 136, 0.3);
 }
 
 .request-type-badge.travel {

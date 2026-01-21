@@ -177,6 +177,78 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
         return matches[0];
     }
 
+    // Fallback: match không dấu
+    const accentMatches = cache.all.filter(emp => {
+        const empNormalized = removeVietnameseAccents(
+            (emp.ho_ten || '').toLowerCase().replace(/\s+/g, ' ').trim()
+        );
+        return empNormalized === normalizedWithoutAccents;
+    });
+
+    if (accentMatches.length > 0) {
+        if (accentMatches.length > 1 && normalizedEmployeeChiNhanh) {
+            const branchMatch = accentMatches.find(emp => chiNhanhMatches(emp.chi_nhanh));
+            if (branchMatch) {
+                return branchMatch;
+            }
+
+            let bestMatch = null;
+            let maxSubordinates = 0;
+
+            for (const match of accentMatches) {
+                if (!chiNhanhMatches(match.chi_nhanh)) {
+                    continue;
+                }
+
+                const managerEmployees = cache.all.filter(e => {
+                    if (!e.quan_ly_truc_tiep) return false;
+                    const empManagerName = removeVietnameseAccents(
+                        (e.quan_ly_truc_tiep || '').toLowerCase().replace(/\s+/g, ' ').trim()
+                    );
+                    return empManagerName === normalizedWithoutAccents && chiNhanhMatches(e.chi_nhanh);
+                });
+
+                if (managerEmployees.length > maxSubordinates) {
+                    maxSubordinates = managerEmployees.length;
+                    bestMatch = match;
+                }
+            }
+
+            if (bestMatch) {
+                return bestMatch;
+            }
+        }
+
+        // Head Office logic fallback
+        const isEmployeeHeadOffice = normalizedEmployeeChiNhanh === 'head office' || normalizedEmployeeChiNhanh === 'ho';
+        if (isEmployeeHeadOffice && accentMatches.length > 0) {
+            let bestMatch = null;
+            let maxSubordinates = 0;
+
+            for (const match of accentMatches) {
+                const managerEmployees = cache.all.filter(e => {
+                    if (!e.quan_ly_truc_tiep) return false;
+                    const empManagerName = removeVietnameseAccents(
+                        (e.quan_ly_truc_tiep || '').toLowerCase().replace(/\s+/g, ' ').trim()
+                    );
+                    return empManagerName === normalizedWithoutAccents;
+                });
+
+                if (managerEmployees.length > maxSubordinates) {
+                    maxSubordinates = managerEmployees.length;
+                    bestMatch = match;
+                }
+            }
+
+            if (bestMatch) {
+                console.log(`[findManagerFromCache] Employee is at Head Office, allowing manager "${bestMatch.ho_ten}" (${bestMatch.chi_nhanh || 'N/A'}) from different branch with ${maxSubordinates} subordinates.`);
+                return bestMatch;
+            }
+        }
+
+        return accentMatches[0];
+    }
+
     return null;
 };
 

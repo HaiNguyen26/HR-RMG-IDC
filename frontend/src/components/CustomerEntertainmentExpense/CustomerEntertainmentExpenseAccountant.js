@@ -11,6 +11,8 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
     const [branches, setBranches] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [selectedRequestIds, setSelectedRequestIds] = useState(new Set());
+    const [selectedRequest, setSelectedRequest] = useState(null);
+    const [showDetailModal, setShowDetailModal] = useState(false);
 
     // Fetch requests from API
     useEffect(() => {
@@ -38,11 +40,14 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
                             requester: request.requester_name || '',
                             department: request.requester_department || '',
                             branch: request.branch,
+                            startDate: request.start_date,
+                            endDate: request.end_date,
                             requestedAmount: totalAmount,
                             approvedAmount: totalAmount,
                             advanceAmount: advanceAmount,
                             supplementAmount: supplementAmount,
-                            status: request.status
+                            status: request.status,
+                            expenseItems: request.expenseItems || []
                         };
                     });
 
@@ -127,10 +132,31 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
         setFilteredRequests(filtered);
     }, [branchFilter, statusFilter, requests]);
 
+    const apiBaseUrl = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/hr/api' : 'http://localhost:3000/api');
+
+    const buildFileUrl = (url) => {
+        if (!url) return '#';
+        if (/^https?:\/\//i.test(url)) return url;
+        if (url.startsWith('/api/')) {
+            return `${apiBaseUrl.replace(/\/api$/, '')}${url}`;
+        }
+        if (url.startsWith('/uploads/')) {
+            return `${apiBaseUrl}${url}`;
+        }
+        return `${apiBaseUrl}/${url.replace(/^\/+/, '')}`;
+    };
+
     const formatCurrency = (amount) => {
         // Hiển thị số âm với dấu trừ
         const formatted = new Intl.NumberFormat('vi-VN').format(Math.abs(amount));
         return amount < 0 ? `-${formatted} VND` : `${formatted} VND`;
+    };
+
+    const formatDate = (value) => {
+        if (!value) return '-';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '-';
+        return date.toLocaleDateString('vi-VN');
     };
 
     const handleSubmitReport = async () => {
@@ -171,7 +197,7 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
                 });
                 if (response.data && response.data.success) {
                     const apiRequests = response.data.data || [];
-                    const mappedRequests = apiRequests.map(request => {
+                        const mappedRequests = apiRequests.map(request => {
                         const totalAmount = (request.expenseItems || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
                         const advanceAmount = parseFloat(request.advance_amount) || 0;
                         const supplementAmount = totalAmount - advanceAmount;
@@ -181,11 +207,14 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
                             requester: request.requester_name || '',
                             department: request.requester_department || '',
                             branch: request.branch,
+                                startDate: request.start_date,
+                                endDate: request.end_date,
                             requestedAmount: totalAmount,
                             approvedAmount: totalAmount,
                             advanceAmount: advanceAmount,
                             supplementAmount: supplementAmount,
-                            status: request.status
+                                status: request.status,
+                                expenseItems: request.expenseItems || []
                         };
                     });
                     setRequests(mappedRequests);
@@ -340,7 +369,17 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
                             </thead>
                             <tbody>
                                 {filteredRequests.map(request => (
-                                    <tr key={request.id}>
+                                    <tr
+                                        key={request.id}
+                                        onClick={(event) => {
+                                            if (event.target.closest('input')) {
+                                                return;
+                                            }
+                                            setSelectedRequest(request);
+                                            setShowDetailModal(true);
+                                        }}
+                                        style={{ cursor: 'pointer' }}
+                                    >
                                         <td style={{ textAlign: 'center' }}>
                                             <input
                                                 type="checkbox"
@@ -406,6 +445,109 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
                         </div>
                     )}
                 </div>
+
+                {showDetailModal && selectedRequest && (
+                    <div
+                        className="customer-entertainment-expense-accountant-modal-overlay"
+                        onClick={() => setShowDetailModal(false)}
+                    >
+                        <div
+                            className="customer-entertainment-expense-accountant-modal"
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <div className="customer-entertainment-expense-accountant-modal-header">
+                                <h2>
+                                    Chi tiết quyết toán - {selectedRequest.requestNumber || `TK-${selectedRequest.id}`}
+                                </h2>
+                                <button
+                                    type="button"
+                                    className="customer-entertainment-expense-accountant-modal-close"
+                                    onClick={() => setShowDetailModal(false)}
+                                >
+                                    ×
+                                </button>
+                            </div>
+                            <div className="customer-entertainment-expense-accountant-modal-body">
+                                <div className="customer-entertainment-expense-accountant-modal-section">
+                                    <h3>Thông tin chung</h3>
+                                    <div className="customer-entertainment-expense-accountant-modal-grid">
+                                        <div>
+                                            <span className="label">Người yêu cầu:</span>
+                                            <span className="value">{selectedRequest.requester} ({selectedRequest.department})</span>
+                                        </div>
+                                        <div>
+                                            <span className="label">Chi nhánh:</span>
+                                            <span className="value">{selectedRequest.branch}</span>
+                                        </div>
+                                        <div>
+                                            <span className="label">Thời gian:</span>
+                                            <span className="value">
+                                                {formatDate(selectedRequest.startDate)} → {formatDate(selectedRequest.endDate)}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="label">Tạm ứng:</span>
+                                            <span className="value">{formatCurrency(selectedRequest.advanceAmount || 0)}</span>
+                                        </div>
+                                        <div>
+                                            <span className="label">Tổng chi:</span>
+                                            <span className="value">{formatCurrency(selectedRequest.requestedAmount || 0)}</span>
+                                        </div>
+                                        <div>
+                                            <span className="label">Cần bổ sung:</span>
+                                            <span className="value">{formatCurrency(selectedRequest.supplementAmount || 0)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="customer-entertainment-expense-accountant-modal-section">
+                                    <h3>Danh sách khoản chi</h3>
+                                    {selectedRequest.expenseItems && selectedRequest.expenseItems.length > 0 ? (
+                                        <div className="customer-entertainment-expense-accountant-modal-items">
+                                            {selectedRequest.expenseItems.map((item, index) => (
+                                                <div key={item.id || index} className="customer-entertainment-expense-accountant-modal-item">
+                                                    <div>
+                                                        <strong>{item.company_name || item.companyName || 'N/A'}</strong>
+                                                        <div>{item.content || 'N/A'}</div>
+                                                        {item.invoice_number || item.invoiceNumber ? (
+                                                            <div>Hóa đơn: {item.invoice_number || item.invoiceNumber}</div>
+                                                        ) : null}
+                                                    </div>
+                                                    <div className="amount">{formatCurrency(item.amount || 0)}</div>
+                                                    {item.files && item.files.length > 0 && (
+                                                        <div className="files">
+                                                            {item.files.map((file) => (
+                                                                <a
+                                                                    key={file.id || file.name}
+                                                                    href={buildFileUrl(file.url)}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                >
+                                                                    {file.name}
+                                                                </a>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="customer-entertainment-expense-accountant-empty">Không có khoản chi.</div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="customer-entertainment-expense-accountant-modal-footer">
+                                <button
+                                    type="button"
+                                    className="customer-entertainment-expense-accountant-modal-close-btn"
+                                    onClick={() => setShowDetailModal(false)}
+                                >
+                                    Đóng
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

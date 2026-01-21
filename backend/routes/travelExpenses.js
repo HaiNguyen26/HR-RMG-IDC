@@ -404,6 +404,19 @@ const normalizeLocationType = (value, location) => {
 const mapRowToResponse = (row) => {
     if (!row) return null;
 
+    const normalizeName = (name) => {
+        return (name || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/đ/g, 'd')
+            .replace(/Đ/g, 'D')
+            .trim();
+    };
+
+    const isManagerHoangDinhSach =
+        normalizeName(row.employee_manager_name) === 'hoang dinh sach';
+
     const flow = [
         {
             key: 'STEP_EMPLOYEE',
@@ -426,7 +439,10 @@ const mapRowToResponse = (row) => {
             decidedAt: row.manager_decision_at,
             notes: row.manager_notes,
         },
-        {
+    ];
+
+    if (!isManagerHoangDinhSach) {
+        flow.push({
             key: 'STEP_BRANCH_DIRECTOR',
             order: 3,
             actor: 'Giám đốc Chi nhánh',
@@ -440,8 +456,8 @@ const mapRowToResponse = (row) => {
             decision: row.branch_director_decision,
             decidedAt: row.branch_director_decision_at,
             notes: row.branch_director_notes,
-        },
-    ];
+        });
+    }
 
     if (row.requires_ceo) {
         flow.push({
@@ -511,6 +527,7 @@ const mapRowToResponse = (row) => {
         employeeId: row.employee_id,
         employee_name: row.employee_name || null,
         employee_branch: row.employee_branch || null,
+        employee_manager_name: row.employee_manager_name || null,
         title: row.title,
         purpose: row.purpose,
         companyName: row.company_name || null,
@@ -638,7 +655,8 @@ router.get('/', async (req, res) => {
             SELECT 
                 ter.*,
                 e.ho_ten as employee_name,
-                e.chi_nhanh as employee_branch
+                e.chi_nhanh as employee_branch,
+                e.quan_ly_truc_tiep as employee_manager_name
             FROM travel_expense_requests ter
             LEFT JOIN employees e ON ter.employee_id = e.id
             ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
@@ -685,7 +703,8 @@ router.get('/:id', async (req, res) => {
             SELECT 
                 ter.*,
                 e.ho_ten as employee_name,
-                e.chi_nhanh as employee_branch
+                e.chi_nhanh as employee_branch,
+                e.quan_ly_truc_tiep as employee_manager_name
             FROM travel_expense_requests ter
             LEFT JOIN employees e ON ter.employee_id = e.id
             WHERE ter.id = $1
@@ -946,6 +965,16 @@ router.post('/:id/decision', async (req, res) => {
                     if (employeeCheck.rows.length > 0) {
                         const employee = employeeCheck.rows[0];
 
+                        const normalizeName = (name) => {
+                            return (name || '')
+                                .toLowerCase()
+                                .normalize('NFD')
+                                .replace(/[\u0300-\u036f]/g, '')
+                                .replace(/đ/g, 'd')
+                                .replace(/Đ/g, 'D')
+                                .trim();
+                        };
+
                         // Kiểm tra xem manager (người duyệt) có phải là branch director không
                         // Nếu có, bỏ qua bước giám đốc chi nhánh, chuyển thẳng đến CEO
                         let isManagerBranchDirector = false;
@@ -977,16 +1006,6 @@ router.post('/:id/decision', async (req, res) => {
                                     if (actorCheck.rows.length > 0) {
                                         const actorName = (actorCheck.rows[0].ho_ten || '').trim();
 
-                                        // So sánh tên (case-insensitive, normalize)
-                                        const normalizeName = (name) => {
-                                            return name.toLowerCase()
-                                                .normalize('NFD')
-                                                .replace(/[\u0300-\u036f]/g, '')
-                                                .replace(/đ/g, 'd')
-                                                .replace(/Đ/g, 'D')
-                                                .trim();
-                                        };
-
                                         if (normalizeName(actorName) === normalizeName(employee.quan_ly_truc_tiep)) {
                                             isManagerBranchDirector = true;
                                         }
@@ -995,28 +1014,19 @@ router.post('/:id/decision', async (req, res) => {
                             }
                         }
 
-                        // Kiểm tra xem employee có phải là Hoàng Đình Sạch không
-                        const employeeName = (employee.ho_ten || '').trim().toLowerCase();
-                        const isHoangDinhSach = employeeName.includes('hoàng đình sạch') || 
-                                               employeeName.includes('hoang dinh sach') ||
-                                               employeeName.includes('hoàng đình sách') ||
-                                               employeeName.includes('hoang dinh sach');
+                        // Nếu quản lý trực tiếp là Hoàng Đình Sạch -> bỏ qua GĐ chi nhánh, qua Finance luôn
+                        const isManagerHoangDinhSach =
+                            normalizeName(employee.quan_ly_truc_tiep) === 'hoang dinh sach';
 
                         if (isManagerBranchDirector) {
                             // Nếu quản lý là giám đốc chi nhánh -> bỏ qua bước giám đốc chi nhánh, chuyển thẳng đến CEO
                             // (không tự động duyệt Level 2, cần CEO duyệt)
                             nextStatus = 'PENDING_CEO';
                             nextStep = 'CEO';
-                        } else if (isHoangDinhSach) {
-                            // Hoàng Đình Sạch: bỏ qua bước GĐ Chi nhánh, chuyển thẳng đến CEO (nếu nước ngoài) hoặc PENDING_FINANCE (nếu trong nước)
-                            if (request.requires_ceo || request.location_type === 'INTERNATIONAL') {
-                                nextStatus = 'PENDING_CEO';
-                                nextStep = 'CEO';
-                            } else {
-                                // Công tác trong nước: chuyển thẳng sang xử lý tạm ứng
-                                nextStatus = 'PENDING_FINANCE';
-                                nextStep = 'FINANCE';
-                            }
+                        } else if (isManagerHoangDinhSach) {
+                            // Đơn có quản lý trực tiếp là Hoàng Đình Sạch: bỏ qua GĐ chi nhánh, chuyển thẳng sang Finance
+                            nextStatus = 'PENDING_FINANCE';
+                            nextStep = 'FINANCE';
                         } else {
                             // Bình thường: Sau khi Cấp 1 duyệt → chuyển đến Cấp 2 (Giám đốc Chi nhánh)
                             // Áp dụng cho cả nhân viên và quản lý trực tiếp nộp đơn
