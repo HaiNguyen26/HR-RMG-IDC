@@ -1,15 +1,12 @@
-# Quy Trình Công Tác Phí - Flow Ngắn Gọn
+# Quy Trình Công Tác Phí & Chi Phí Tiếp Khách - Tổng Hợp
 
-## 📋 Tổng Quan
-
-Quy trình công tác phí được chia thành **2 flow riêng biệt** tùy thuộc vào loại địa điểm:
-
-- 🏠 **Trong nước (DOMESTIC)**: 2 bước phê duyệt (Cấp 1 + Cấp 2)
-- 🛫 **Ngoài nước (INTERNATIONAL)**: 3 bước phê duyệt (Cấp 1 + Cấp 2 + CEO)
+Tài liệu này tổng hợp **Công tác phí** và **Chi phí tiếp khách** vào một file để tiện tra cứu.
 
 ---
 
-## 🏠 FLOW CÔNG TÁC TRONG NƯỚC (DOMESTIC)
+## 📋 Flow Ngắn Gọn (Công tác phí)
+
+### 🏠 Công tác trong nước (DOMESTIC)
 
 ```
 [1] Nhân viên tạo đơn
@@ -82,11 +79,7 @@ Quy trình công tác phí được chia thành **2 flow riêng biệt** tùy th
           └─→ Kế toán giải ngân ✅
 ```
 
-**Tóm tắt**: Nhân viên → Quản lý → Giám đốc Chi nhánh → HR → Kế toán → Nhân viên báo cáo → HR xác nhận → Kế toán quyết toán & giải ngân
-
----
-
-## 🛫 FLOW CÔNG TÁC NGOÀI NƯỚC (INTERNATIONAL)
+### 🛫 Công tác ngoài nước (INTERNATIONAL)
 
 ```
 [1] Nhân viên tạo đơn
@@ -168,82 +161,134 @@ Quy trình công tác phí được chia thành **2 flow riêng biệt** tùy th
           └─→ Kế toán giải ngân ✅
 ```
 
-**Tóm tắt**: Nhân viên → Quản lý → Giám đốc Chi nhánh → **CEO** → HR → Kế toán → Nhân viên báo cáo → HR xác nhận → Kế toán quyết toán & giải ngân
+---
+
+## 📊 Tài Liệu Đầy Đủ
+
+### Tổng quan
+
+Quy trình công tác phí được chia thành 2 flow (DOMESTIC/INTERNATIONAL). Điểm khác biệt chính:
+- Công tác trong nước **không cần CEO duyệt**
+- Công tác ngoài nước **bắt buộc CEO duyệt**
+
+### Chi tiết flow (đầy đủ)
+
+Nội dung chi tiết về điều kiện, status, xử lý tạm ứng, hoàn ứng, quyết toán và ngoại lệ được giữ nguyên từ tài liệu đầy đủ trước đây.
 
 ---
 
-## 📊 So Sánh 2 Flow
+## 🔄 FLOW - QUY TRÌNH HOẠT ĐỘNG (CHI TIẾT)
 
-| Tiêu chí | Trong nước (DOMESTIC) | Ngoài nước (INTERNATIONAL) |
-|----------|----------------------|---------------------------|
-| **Số bước phê duyệt** | 2 bước | 3 bước |
-| **Bước phê duyệt** | Cấp 1 + Cấp 2 | Cấp 1 + Cấp 2 + **CEO** |
-| **Phê duyệt CEO** | ❌ Không có | ✅ Bắt buộc (Bước 4) |
-| **Trạng thái sau phê duyệt** | Chờ xử lý tạm ứng (từ Cấp 2) | Chờ xử lý tạm ứng (từ CEO) |
-| **Phụ cấp sinh hoạt** | 230,000 VND/ngày<br>(nếu qua đêm) | EU: 60 USD/ngày<br>Asian: 40 USD/ngày |
-| **Các bước còn lại** | ✅ Giống nhau (Bước 5-9) | ✅ Giống nhau (Bước 5-10) |
+### 🛫 FLOW CÔNG TÁC NGOÀI NƯỚC (INTERNATIONAL)
 
----
+**GIAI ĐOẠN 1: KHỞI TẠO VÀ PHÊ DUYỆT**
+1. Nhân viên tạo yêu cầu công tác (chọn "Ngoài nước")
+2. Quản lý trực tiếp phê duyệt (Cấp 1)
+3. Giám đốc Chi nhánh phê duyệt (Cấp 2)
+4. Tổng Giám đốc phê duyệt (Bắt buộc cho công tác nước ngoài)
+5. HR xử lý tạm ứng
+6. Kế toán xác nhận chuyển khoản tạm ứng
 
-## ⚠️ Trường Hợp Đặc Biệt
-
-**Nếu Quản lý Trực tiếp = Giám đốc Chi nhánh:**
-
-- **Trong nước**: Bỏ qua bước Cấp 2 → Chuyển thẳng `PENDING_FINANCE` sau Cấp 1
-- **Ngoài nước**: Bỏ qua bước Cấp 2 → Chuyển thẳng `PENDING_CEO` sau Cấp 1
+**GIAI ĐOẠN 2: HOÀN ỨNG VÀ QUYẾT TOÁN**
+7. Nhân viên submit báo cáo hoàn ứng
+8. HR xác nhận báo cáo
+9. Kế toán kiểm tra, quyết toán và giải ngân
+10. CEO/Admin phê duyệt ngoại lệ (nếu vượt ngân sách)
 
 ---
 
-## 🔄 Luồng Trạng Thái
+### 🏠 FLOW CÔNG TÁC TRONG NƯỚC (DOMESTIC)
 
-### Trong nước (DOMESTIC):
+**GIAI ĐOẠN 1: KHỞI TẠO VÀ PHÊ DUYỆT**
+1. Nhân viên tạo yêu cầu công tác (chọn "Trong nước")
+2. Quản lý trực tiếp phê duyệt (Cấp 1)
+3. Giám đốc Chi nhánh phê duyệt (Cấp 2)
+4. Bỏ qua bước CEO → chuyển thẳng đến xử lý tạm ứng
+5. HR xử lý tạm ứng
+6. Kế toán xác nhận chuyển khoản tạm ứng
+
+**GIAI ĐOẠN 2: HOÀN ỨNG VÀ QUYẾT TOÁN**
+7. Nhân viên submit báo cáo hoàn ứng
+8. HR xác nhận báo cáo
+9. Kế toán kiểm tra, quyết toán và giải ngân
+10. CEO/Admin phê duyệt ngoại lệ (nếu vượt ngân sách)
+
+---
+
+## 📌 Lưu ý đặc biệt
+
+- Nếu quản lý trực tiếp cũng là Giám đốc Chi nhánh:
+  - Trong nước: bỏ qua bước Cấp 2 → `PENDING_FINANCE`
+  - Ngoài nước: bỏ qua bước Cấp 2 → `PENDING_CEO`
+
+---
+
+## 📋 Trạng thái chính
+
+| Trạng thái | Mô tả |
+|-----------|-------|
+| `PENDING_LEVEL_1` | Chờ Quản lý Trực tiếp duyệt |
+| `PENDING_LEVEL_2` | Chờ Giám đốc Chi nhánh duyệt |
+| `PENDING_CEO` | Chờ Tổng Giám đốc duyệt |
+| `PENDING_FINANCE` | Chờ HR xử lý tạm ứng |
+| `PENDING_SETTLEMENT` | Chờ nhân viên submit báo cáo |
+| `PENDING_ACCOUNTANT` | Chờ kế toán xử lý quyết toán |
+| `PENDING_EXCEPTION_APPROVAL` | Chờ CEO/Admin duyệt ngoại lệ |
+| `SETTLED` | Hoàn tất |
+| `REJECTED` | Từ chối |
+
+---
+
+## 🍽️ Quy Trình Chi Phí Tiếp Khách
+
+### Flow tổng quan
+
 ```
-Chờ duyệt cấp 1 → Chờ duyệt cấp 2 → Chờ xử lý tạm ứng → 
-Chờ quyết toán → Chờ kế toán xử lý → Đã hoàn tất
+[1] Nhân viên tạo đơn tiếp khách
+    ├─ Nhập: Chi nhánh, ngày tiếp khách, khoản chi, hóa đơn/chứng từ
+    └─ Trạng thái: PENDING_BRANCH_DIRECTOR (mặc định)
+          │
+          ↓
+[2] Quản lý/Giám đốc chi nhánh duyệt
+    ├─ Duyệt/Từ chối/YC bổ sung
+    └─ Nếu duyệt: APPROVED_BRANCH_DIRECTOR
+          │
+          ↓
+[3] Kế toán tổng hợp & xử lý
+    ├─ Tổng hợp báo cáo
+    └─ Trạng thái: ACCOUNTANT_PROCESSED
+          │
+          ↓
+[4] CEO duyệt
+    ├─ Duyệt/Từ chối
+    └─ Nếu duyệt: APPROVED_CEO
+          │
+          ↓
+[5] Kế toán thanh toán
+    └─ Trạng thái: PAID
 ```
 
-### Ngoài nước (INTERNATIONAL):
-```
-Chờ duyệt cấp 1 → Chờ duyệt cấp 2 → Chờ CEO duyệt → 
-Chờ xử lý tạm ứng → Chờ quyết toán → Chờ kế toán xử lý → Đã hoàn tất
-```
+### Trường hợp chọn CEO ngay từ đầu
+- Nếu đơn được chọn duyệt bởi CEO ngay từ bước tạo:
+  - Trạng thái ban đầu: `PENDING_CEO`
+  - Bỏ qua bước Giám đốc chi nhánh
 
-**Lưu ý**: Nếu chi phí > tạm ứng, sẽ có thêm "Chờ phê duyệt ngoại lệ" trước khi "Đã hoàn tất".
+### Trạng thái chính (Tiếp khách)
+
+| Trạng thái | Mô tả |
+|-----------|-------|
+| `PENDING_BRANCH_DIRECTOR` | Chờ Giám đốc chi nhánh duyệt |
+| `REQUEST_CORRECTION` | Yêu cầu bổ sung |
+| `APPROVED_BRANCH_DIRECTOR` | Đã duyệt cấp 1 |
+| `REJECTED_BRANCH_DIRECTOR` | Từ chối ở cấp 1 |
+| `ACCOUNTANT_PROCESSED` | Kế toán đã tổng hợp |
+| `PENDING_CEO` | Chờ CEO duyệt |
+| `APPROVED_CEO` | CEO đã duyệt |
+| `REJECTED_CEO` | CEO từ chối |
+| `PAID` | Đã thanh toán |
 
 ---
 
-## 📝 Các Module Liên Quan
+**Ngày cập nhật**: 2025-01-XX  
+**Trạng thái**: Hoàn thành 100%
 
-| Bước | Module | Route |
-|------|--------|-------|
-| 1. Tạo đơn | `TravelExpense` | `/travel-expense` |
-| 2-3-4. Phê duyệt | `TravelExpenseApproval` | `/travel-expense-approval` |
-| 4-5. HR xử lý tạm ứng | `TravelExpenseAdvanceProcessing` | `/travel-expense-advance-processing` |
-| 5-6. Kế toán chuyển khoản | `TravelExpenseAccountant` (Tab "Tạm ứng") | `/travel-expense-accountant` |
-| 6-7. Báo cáo hoàn ứng | `TravelExpenseSettlement` | `/travel-expense-settlement` |
-| 7-8. HR xác nhận | `TravelExpenseManagement` | `/travel-expense-management` |
-| 8-9. Quyết toán & giải ngân | `TravelExpenseAccountant` (Tab "Kiểm tra") | `/travel-expense-accountant` |
-
----
-
-## 📌 Bảng Tra Cứu Trạng Thái
-
-| Trạng thái (Tiếng Việt) | Trạng thái (Code) | Mô tả |
-|-------------------------|-------------------|-------|
-| Chờ duyệt cấp 1 | `PENDING_LEVEL_1` | Đơn mới tạo, chờ Quản lý Trực tiếp duyệt |
-| Chờ duyệt cấp 2 | `PENDING_LEVEL_2` | Đã được Cấp 1 duyệt, chờ Giám đốc Chi nhánh duyệt |
-| Chờ CEO duyệt | `PENDING_CEO` | Đã được Cấp 2 duyệt (ngoài nước), chờ CEO duyệt |
-| Chờ xử lý tạm ứng | `PENDING_FINANCE` | Đã qua phê duyệt, chờ HR xử lý tạm ứng |
-| Chờ quyết toán | `PENDING_SETTLEMENT` | Đã nhận tạm ứng, chờ nhân viên submit báo cáo |
-| Chờ kế toán xử lý | `PENDING_ACCOUNTANT` | Đã submit báo cáo, chờ kế toán quyết toán |
-| Chờ phê duyệt ngoại lệ | `PENDING_EXCEPTION_APPROVAL` | Chi phí vượt ngân sách, chờ CEO phê duyệt |
-| Đã hoàn tất | `SETTLED` | Đã hoàn tất toàn bộ quy trình |
-| Đã từ chối | `REJECTED` | Đơn bị từ chối ở bất kỳ bước nào |
-
-### Trạng thái Tạm ứng (advance_status):
-- **Chờ kế toán xác nhận** (`PENDING_ACCOUNTANT`): HR đã xử lý, chờ kế toán chuyển khoản
-- **Đã chuyển khoản** (`TRANSFERRED`): Kế toán đã chuyển khoản tạm ứng
-
-### Trạng thái Quyết toán (settlement_status):
-- **Đã gửi** (`SUBMITTED`): Nhân viên đã submit báo cáo hoàn ứng
-- **HR đã xác nhận** (`HR_CONFIRMED`): HR đã xác nhận báo cáo hợp lệ

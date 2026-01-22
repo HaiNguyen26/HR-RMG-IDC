@@ -4,6 +4,7 @@
 - Hệ thống quản lý nhân sự (HR) gồm Backend API (Node.js/Express) và Frontend (React).
 - Cơ sở dữ liệu: PostgreSQL.
 - Chạy đồng thời Backend + Frontend từ thư mục gốc bằng một lệnh.
+- **GitHub:** https://github.com/HaiNguyen26/HR-RMG-IDC.git
 
 ## 2) Tech Stack
 - **Backend:** Node.js, Express, PostgreSQL (`pg`), bcrypt, multer
@@ -78,6 +79,30 @@ createdb -U postgres HR_Management_System
 psql -U postgres -d HR_Management_System -f database/database_schema_postgresql.sql
 ```
 
+### Cấu hình DB (.env)
+`backend/.env`
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=HR_Management_System
+DB_USER=postgres
+DB_PASSWORD=Hainguyen261097
+```
+
+### Chạy lệnh DB trên Windows
+#### Git Bash
+```bash
+createdb -U postgres HR_Management_System
+psql -U postgres -d HR_Management_System -f database/database_schema_postgresql.sql
+```
+
+#### PowerShell
+```powershell
+ $env:PGPASSWORD = "Hainguyen261097"
+createdb -U postgres HR_Management_System
+psql -U postgres -d HR_Management_System -f database\database_schema_postgresql.sql
+```
+
 ## 6) Thông tin server (production)
 **Tham khảo chi tiết:** `HR_SERVER_INFO.md`  
 **Lưu ý:** File này có thông tin nhạy cảm (password). Không public.
@@ -129,13 +154,13 @@ tail -f /var/log/nginx/it-request-error.log | grep hr
 ### Các bước chuẩn
 ```bash
 # 1) Clone dự án
-git clone <repo_url>
+git clone https://github.com/HaiNguyen26/HR-RMG-IDC.git
 cd Web-App-HR-Demo
 
 # 2) Cài dependencies
 npm run install:all
 
-# 3) Tạo và cấu hình DB
+# 3) Tạo và cấu hình DB (Tên DB: HR_Management_System)
 createdb -U postgres HR_Management_System
 psql -U postgres -d HR_Management_System -f database/database_schema_postgresql.sql
 
