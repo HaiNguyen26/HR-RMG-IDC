@@ -54,33 +54,19 @@ function killProcessOnPort(port) {
   }
 }
 
-// Kill all node processes first
-console.log('[1/3] Stopping all Node.js processes...');
-try {
-  if (os.platform() === 'win32') {
-    execSync('taskkill /F /IM node.exe /T', { stdio: 'ignore' });
-    console.log('  ✓ All Node.js processes stopped');
-  } else {
-    execSync('pkill -f node || true', { stdio: 'ignore' });
-    console.log('  ✓ All Node.js processes stopped');
-  }
-} catch (err) {
-  console.log('  ℹ No Node.js processes found');
-}
-
-console.log('\n[2/4] Checking and fixing port 3000...');
+console.log('[1/3] Checking and fixing port 3000...');
 const port3000Fixed = killProcessOnPort(3000);
 if (!port3000Fixed) {
   console.log('  ✓ Port 3000 is free');
 }
 
-console.log('\n[3/4] Checking and fixing port 3001...');
+console.log('\n[2/3] Checking and fixing port 3001...');
 const port3001Fixed = killProcessOnPort(3001);
 if (!port3001Fixed) {
   console.log('  ✓ Port 3001 is free');
 }
 
-console.log('\n[4/4] Checking and fixing port 3002...');
+console.log('\n[3/3] Checking and fixing port 3002...');
 const port3002Fixed = killProcessOnPort(3002);
 if (!port3002Fixed) {
   console.log('  ✓ Port 3002 is free');

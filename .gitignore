@@ -15,6 +15,10 @@ frontend/.env
 # Build outputs
 frontend/build/
 backend/dist/
+backend/uploads/
+
+# Local scratch files
+query
 
 # Logs
 *.log

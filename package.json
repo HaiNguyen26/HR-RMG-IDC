@@ -4,8 +4,8 @@
   "description": "HR Management System - Full Stack Application",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:safe": "node scripts/fix-ports.js && concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend:hr\"",
+    "dev:safe": "node scripts/fix-ports.js && concurrently \"npm run dev:backend\" \"npm run dev:frontend:hr\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:dual": "concurrently \"npm run dev:backend\" \"npm run dev:frontend:hr\" \"npm run dev:frontend:employee\"",

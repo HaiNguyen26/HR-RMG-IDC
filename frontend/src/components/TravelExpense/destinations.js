@@ -8,6 +8,14 @@ export const destinations = [
     { value: 'Đà Nẵng, Việt Nam', label: 'Đà Nẵng, Việt Nam', type: 'domestic', continent: null },
     { value: 'Hải Phòng, Việt Nam', label: 'Hải Phòng, Việt Nam', type: 'domestic', continent: null },
     { value: 'Cần Thơ, Việt Nam', label: 'Cần Thơ, Việt Nam', type: 'domestic', continent: null },
+    { value: 'Dung Quất → Bình Sơn, Quảng Ngãi', label: 'Dung Quất → Bình Sơn, Quảng Ngãi', type: 'domestic', continent: null },
+    { value: 'KCN Chu Lai → Núi Thành, Đà Nẵng', label: 'KCN Chu Lai → Núi Thành, Đà Nẵng', type: 'domestic', continent: null },
+    { value: 'KCN Tam Thăng → Tam Kỳ, Đà Nẵng', label: 'KCN Tam Thăng → Tam Kỳ, Đà Nẵng', type: 'domestic', continent: null },
+    { value: 'KCN Điện Ngọc → Điện Bàn, Đà Nẵng', label: 'KCN Điện Ngọc → Điện Bàn, Đà Nẵng', type: 'domestic', continent: null },
+    { value: 'KCN Hòa Khánh → Liên Chiểu, Đà Nẵng', label: 'KCN Hòa Khánh → Liên Chiểu, Đà Nẵng', type: 'domestic', continent: null },
+    { value: 'KCN Hòa Cầm → Cẩm Lệ, Đà Nẵng', label: 'KCN Hòa Cầm → Cẩm Lệ, Đà Nẵng', type: 'domestic', continent: null },
+    { value: 'KCN Cao Đồn → Biên Hòa, Đồng Nai', label: 'KCN Cao Đồn → Biên Hòa, Đồng Nai', type: 'domestic', continent: null },
+    { value: 'KCN An Phú → Tuy Hòa, Phú Yên', label: 'KCN An Phú → Tuy Hòa, Phú Yên', type: 'domestic', continent: null },
 
     // Châu Á
     { value: 'Singapore, Singapore', label: 'Singapore, Singapore', type: 'international', continent: 'ASIAN' },

@@ -32,19 +32,37 @@ const LEAVE_TYPE_LABELS = {
     maternity: 'Nghỉ Thai Sản'
 };
 
+const getLeaveModuleKey = (request) => {
+    const rawType = request?.request_type || request?.requestType || '';
+    return rawType.toString().trim().toUpperCase() === 'RESIGN' ? 'resign' : 'leave';
+};
+
+const isLeaveModuleKey = (key) => key === 'leave' || key === 'resign';
+
+const countLeaveType = (items, type) => items.filter((item) => {
+    const rawType = item?.request_type || item?.requestType || '';
+    return rawType.toString().trim().toUpperCase() === type;
+}).length;
+
 // Module options - Chỉ cho HR/ADMIN (xem toàn bộ đơn trong hệ thống)
 const MODULE_OPTIONS = [
     {
         key: 'all',
         label: 'Tất cả đơn',
         header: 'Quản lý đơn từ',
-        description: 'Xem và theo dõi tất cả các đơn xin phép, đơn tăng ca, đơn bổ sung chấm công trong hệ thống.'
+        description: 'Xem và theo dõi tất cả các đơn xin nghỉ phép, đơn xin nghỉ việc, đơn tăng ca, đơn bổ sung chấm công trong hệ thống.'
     },
     {
         key: 'leave',
-        label: 'Đơn xin nghỉ',
-        header: 'Quản lý đơn nghỉ',
-        description: 'Theo dõi trạng thái và tiến độ phê duyệt đơn nghỉ.'
+        label: 'Đơn xin nghỉ phép',
+        header: 'Quản lý đơn nghỉ phép',
+        description: 'Theo dõi trạng thái và tiến độ phê duyệt đơn xin nghỉ phép.'
+    },
+    {
+        key: 'resign',
+        label: 'Đơn xin nghỉ việc',
+        header: 'Quản lý đơn nghỉ việc',
+        description: 'Theo dõi trạng thái và tiến độ phê duyệt đơn xin nghỉ việc.'
     },
     {
         key: 'overtime',
@@ -113,9 +131,11 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     const [moduleStatistics, setModuleStatistics] = useState({
         all: { pending: 0, total: 0 },
         leave: { pending: 0, total: 0 },
+        resign: { pending: 0, total: 0 },
         overtime: { pending: 0, total: 0 },
         attendance: { pending: 0, total: 0 },
-        'late-early': { pending: 0, total: 0 }
+        'late-early': { pending: 0, total: 0 },
+        'meal-allowance': { pending: 0, total: 0 }
     });
 
     // Refs để track previous values và tránh setState không cần thiết
@@ -165,15 +185,28 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 Promise.all(statuses.map(status => mealAllowanceRequestsAPI.getAll({ ...baseParams, status })))
             ]);
 
+            const leavePendingList = leaveResponse[0].data.success ? (leaveResponse[0].data.data || []) : [];
+            const leaveApprovedList = leaveResponse[1].data.success ? (leaveResponse[1].data.data || []) : [];
+            const leaveRejectedList = leaveResponse[2].data.success ? (leaveResponse[2].data.data || []) : [];
+            const leaveCancelledList = leaveResponse[3].data.success ? (leaveResponse[3].data.data || []) : [];
+
             const leaveStats = {
-                pending: leaveResponse[0].data.success ? (leaveResponse[0].data.data || []).length : 0,
-                approved: leaveResponse[1].data.success ? (leaveResponse[1].data.data || []).length : 0,
-                rejected: leaveResponse[2].data.success ? (leaveResponse[2].data.data || []).length : 0,
-                cancelled: leaveResponse[3].data.success ? (leaveResponse[3].data.data || []).length : 0,
+                pending: countLeaveType(leavePendingList, 'LEAVE'),
+                approved: countLeaveType(leaveApprovedList, 'LEAVE'),
+                rejected: countLeaveType(leaveRejectedList, 'LEAVE'),
+                cancelled: countLeaveType(leaveCancelledList, 'LEAVE'),
                 total: 0
             };
-            // Không tính CANCELLED vào total
             leaveStats.total = leaveStats.pending + leaveStats.approved + leaveStats.rejected;
+
+            const resignStats = {
+                pending: countLeaveType(leavePendingList, 'RESIGN'),
+                approved: countLeaveType(leaveApprovedList, 'RESIGN'),
+                rejected: countLeaveType(leaveRejectedList, 'RESIGN'),
+                cancelled: countLeaveType(leaveCancelledList, 'RESIGN'),
+                total: 0
+            };
+            resignStats.total = resignStats.pending + resignStats.approved + resignStats.rejected;
 
             const overtimeStats = {
                 pending: overtimeResponse[0].data.success ? (overtimeResponse[0].data.data || []).length : 0,
@@ -216,16 +249,17 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             mealAllowanceStats.total = mealAllowanceStats.pending + mealAllowanceStats.approved + mealAllowanceStats.rejected;
 
             const allStats = {
-                pending: leaveStats.pending + overtimeStats.pending + attendanceStats.pending + lateEarlyStats.pending + mealAllowanceStats.pending,
-                approved: leaveStats.approved + overtimeStats.approved + attendanceStats.approved + lateEarlyStats.approved + mealAllowanceStats.approved,
-                rejected: leaveStats.rejected + overtimeStats.rejected + attendanceStats.rejected + lateEarlyStats.rejected + mealAllowanceStats.rejected,
-                cancelled: leaveStats.cancelled + overtimeStats.cancelled + attendanceStats.cancelled + lateEarlyStats.cancelled + mealAllowanceStats.cancelled,
-                total: leaveStats.total + overtimeStats.total + attendanceStats.total + lateEarlyStats.total + mealAllowanceStats.total // Đã loại bỏ CANCELLED
+                pending: leaveStats.pending + resignStats.pending + overtimeStats.pending + attendanceStats.pending + lateEarlyStats.pending + mealAllowanceStats.pending,
+                approved: leaveStats.approved + resignStats.approved + overtimeStats.approved + attendanceStats.approved + lateEarlyStats.approved + mealAllowanceStats.approved,
+                rejected: leaveStats.rejected + resignStats.rejected + overtimeStats.rejected + attendanceStats.rejected + lateEarlyStats.rejected + mealAllowanceStats.rejected,
+                cancelled: leaveStats.cancelled + resignStats.cancelled + overtimeStats.cancelled + attendanceStats.cancelled + lateEarlyStats.cancelled + mealAllowanceStats.cancelled,
+                total: leaveStats.total + resignStats.total + overtimeStats.total + attendanceStats.total + lateEarlyStats.total + mealAllowanceStats.total
             };
 
             const newModuleStats = {
                 all: { pending: allStats.pending, total: allStats.total },
                 leave: { pending: leaveStats.pending, total: leaveStats.total },
+                resign: { pending: resignStats.pending, total: resignStats.total },
                 overtime: { pending: overtimeStats.pending, total: overtimeStats.total },
                 attendance: { pending: attendanceStats.pending, total: attendanceStats.total },
                 'late-early': { pending: lateEarlyStats.pending, total: lateEarlyStats.total },
@@ -235,6 +269,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             // Chỉ update state nếu data thực sự thay đổi
             if (!prevModuleStatsRef.current || !shallowEqual(prevModuleStatsRef.current.all, newModuleStats.all) ||
                 !shallowEqual(prevModuleStatsRef.current.leave, newModuleStats.leave) ||
+                !shallowEqual(prevModuleStatsRef.current.resign, newModuleStats.resign) ||
                 !shallowEqual(prevModuleStatsRef.current.overtime, newModuleStats.overtime) ||
                 !shallowEqual(prevModuleStatsRef.current.attendance, newModuleStats.attendance) ||
                 !shallowEqual(prevModuleStatsRef.current['late-early'], newModuleStats['late-early']) ||
@@ -249,6 +284,8 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 newStatusStats = allStats;
             } else if (activeModule === 'leave') {
                 newStatusStats = leaveStats;
+            } else if (activeModule === 'resign') {
+                newStatusStats = resignStats;
             } else if (activeModule === 'overtime') {
                 newStatusStats = overtimeStats;
             } else if (activeModule === 'attendance') {
@@ -316,7 +353,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 ]);
 
                 newRequests = [
-                    ...(leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: 'leave' })) : []),
+                    ...(leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: getLeaveModuleKey(r) })) : []),
                     ...(overtimeResponse.data.success ? (overtimeResponse.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
                     ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : []),
                     ...(lateEarlyResponse.data.success ? (lateEarlyResponse.data.data || []).map(r => ({ ...r, requestType: 'late-early' })) : []),
@@ -325,10 +362,12 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
 
                 // Sắp xếp theo thời gian tạo mới nhất
                 newRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            } else if (activeModule === 'leave') {
+            } else if (isLeaveModuleKey(activeModule)) {
                 const response = await leaveRequestsAPI.getAll(params);
                 if (response.data.success) {
-                    newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'leave' }));
+                    newRequests = (response.data.data || [])
+                        .filter((r) => getLeaveModuleKey(r) === activeModule)
+                        .map((r) => ({ ...r, requestType: activeModule }));
                 }
             } else if (activeModule === 'overtime') {
                 const response = await overtimeRequestsAPI.getAll(params);
@@ -401,7 +440,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             
             // Xác định API dựa trên requestType
             const requestType = request.requestType || activeModule;
-            if (requestType === 'leave') {
+            if (isLeaveModuleKey(requestType)) {
                 api = leaveRequestsAPI;
             } else if (requestType === 'overtime') {
                 api = overtimeRequestsAPI;
@@ -571,7 +610,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 };
 
                 const getRequestTypeLabel = () => {
-                    if (req.requestType === 'leave') {
+                    if (isLeaveModuleKey(req.requestType)) {
                         return req.request_type === 'LEAVE' ? 'Xin nghỉ phép' : 'Xin nghỉ việc';
                     } else if (req.requestType === 'overtime') {
                         return 'Đơn tăng ca';
@@ -634,7 +673,17 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             // Tạo tên file
             let fileName = 'don_tu_da_duyet';
             if (activeModule !== 'all') {
-                const moduleName = activeModule === 'leave' ? 'don_nghi' : activeModule === 'overtime' ? 'don_tang_ca' : activeModule === 'late-early' ? 'don_di_tre_ve_som' : activeModule === 'meal-allowance' ? 'don_phu_cap_com' : 'don_bo_sung_cong';
+                const moduleName = activeModule === 'leave'
+                    ? 'don_nghi_phep'
+                    : activeModule === 'resign'
+                        ? 'don_nghi_viec'
+                        : activeModule === 'overtime'
+                            ? 'don_tang_ca'
+                            : activeModule === 'late-early'
+                                ? 'don_di_tre_ve_som'
+                                : activeModule === 'meal-allowance'
+                                    ? 'don_phu_cap_com'
+                                    : 'don_bo_sung_cong';
                 fileName = `${moduleName}_da_duyet`;
             }
             if (exportFilterStartDate && exportFilterEndDate) {
@@ -663,7 +712,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     const renderCardHeader = (request) => {
         const requestType = request.requestType || activeModule;
 
-        if (requestType === 'leave' || activeModule === 'leave') {
+        if (isLeaveModuleKey(requestType) || isLeaveModuleKey(activeModule)) {
             return (
                 <>
                     <h3>{getRequestTypeLabel(request.request_type)}</h3>
@@ -714,7 +763,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         // Khi activeModule === 'all', sử dụng request.requestType thay vì activeModule
         const requestType = activeModule === 'all' ? (request.requestType || 'unknown') : (request.requestType || activeModule);
 
-        if (requestType === 'leave' || activeModule === 'leave') {
+        if (isLeaveModuleKey(requestType) || isLeaveModuleKey(activeModule)) {
             // Tính số ngày nghỉ
             let totalDays = '-';
             if (request.request_type === 'LEAVE' && request.start_date && request.end_date) {
@@ -1723,7 +1772,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     <th>Hành động</th>
                 </>
             );
-        } else if (activeModule === 'leave') {
+        } else if (isLeaveModuleKey(activeModule)) {
             return (
                 <>
                     <th>Loại đơn</th>
@@ -1989,18 +2038,30 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                 <>
                                                     <td className="request-type-cell">
                                                         <span className={`request-type-badge ${request.requestType || 'leave'}`}>
-                                                            {request.requestType === 'leave' ? 'Đơn xin nghỉ' :
-                                                                request.requestType === 'overtime' ? 'Đơn tăng ca' :
-                                                                    request.requestType === 'attendance' ? 'Đơn bổ sung công' :
-                                                                        request.requestType === 'late-early' ? 'Đơn xin đi trễ về sớm' :
-                                                                            request.requestType === 'meal-allowance' ? 'Đơn xin phụ cấp cơm công trình' : 'Đơn xin nghỉ'}
+                                                            {request.requestType === 'leave'
+                                                                ? 'Đơn xin nghỉ phép'
+                                                                : request.requestType === 'resign'
+                                                                    ? 'Đơn xin nghỉ việc'
+                                                                    : request.requestType === 'overtime'
+                                                                        ? 'Đơn tăng ca'
+                                                                        : request.requestType === 'attendance'
+                                                                            ? 'Đơn bổ sung công'
+                                                                            : request.requestType === 'late-early'
+                                                                                ? 'Đơn xin đi trễ về sớm'
+                                                                                : request.requestType === 'meal-allowance'
+                                                                                    ? 'Đơn xin phụ cấp cơm công trình'
+                                                                                    : 'Đơn xin nghỉ'}
                                                         </span>
                                                     </td>
                                                     <td className="request-info-cell">
-                                                        {request.requestType === 'leave' && (
+                                                        {isLeaveModuleKey(request.requestType) && (
                                                             <>
                                                                 <strong>{getRequestTypeLabel(request.request_type)}</strong>
-                                                                <p className="request-management-period">{getLeaveTypeLabel(request.leave_type)}</p>
+                                                                <p className="request-management-period">
+                                                                    {request.requestType === 'leave'
+                                                                        ? getLeaveTypeLabel(request.leave_type)
+                                                                        : 'Nghỉ việc'}
+                                                                </p>
                                                             </>
                                                         )}
                                                         {request.requestType === 'overtime' && (
@@ -2051,10 +2112,10 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     </td>
                                                     <td className="request-dates-cell">
                                                         <div className="request-dates-info">
-                                                            {request.requestType === 'leave' && (
+                                                            {isLeaveModuleKey(request.requestType) && (
                                                                 <>
                                                                     <span>{formatDateDisplay(request.start_date)}</span>
-                                                                    {request.end_date && (
+                                                                    {request.request_type === 'LEAVE' && request.end_date && (
                                                                         <>
                                                                             <span className="date-separator"> → </span>
                                                                             <span>{formatDateDisplay(request.end_date)}</span>
@@ -2146,12 +2207,12 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     </td>
                                                 </>
                                             )}
-                                            {activeModule === 'leave' && (
+                                            {isLeaveModuleKey(activeModule) && (
                                                 <>
                                                     <td>{getRequestTypeLabel(request.request_type)}</td>
                                                     <td>
                                                         {formatDateDisplay(request.start_date)}
-                                                        {request.end_date && ` → ${formatDateDisplay(request.end_date)}`}
+                                                        {request.request_type === 'LEAVE' && request.end_date && ` → ${formatDateDisplay(request.end_date)}`}
                                                     </td>
                                                     <td>
                                                         <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>

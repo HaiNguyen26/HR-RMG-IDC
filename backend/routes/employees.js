@@ -76,6 +76,25 @@ const sanitizeDepartment = (value) => {
     return raw !== '' ? raw : null;
 };
 
+const normalizeEmailLocalPart = (value) => {
+    if (!value) return null;
+    const normalized = String(value)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]+/g, '.')
+        .replace(/^\.+|\.+$/g, '')
+        .toLowerCase();
+    return normalized || null;
+};
+
+const buildPlaceholderEmail = (maNhanVien, hoTen, index) => {
+    const base =
+        normalizeEmailLocalPart(maNhanVien) ||
+        normalizeEmailLocalPart(hoTen) ||
+        `employee-${index + 1}`;
+    return `${base}@rmg.local`;
+};
+
 let ensureManagerColumnsPromise = null;
 const ensureManagerColumns = async () => {
     if (ensureManagerColumnsPromise) {
@@ -258,6 +277,8 @@ router.post('/bulk', async (req, res) => {
             placeholders: []
         };
 
+        const generatedEmailSet = new Set();
+
         for (let index = 0; index < employees.length; index++) {
             const empData = employees[index];
             const savepointName = `sp_employee_${index}`;
@@ -279,6 +300,7 @@ router.post('/bulk', async (req, res) => {
             }
 
             try {
+                let shouldSkip = false;
                 const {
                     maNhanVien,
                     maChamCong,
@@ -323,7 +345,24 @@ router.post('/bulk', async (req, res) => {
                 const finalPhongBan = sanitizeDepartment(phongBan);
                 const finalBoPhan = sanitizeDepartment(boPhan);
                 const finalChiNhanh = chiNhanh && chiNhanh.trim() !== '' ? chiNhanh.trim() : null;
-                const finalEmail = email && email.trim() !== '' ? email.trim() : null;
+                let finalEmail = email && email.trim() !== '' ? email.trim() : null;
+                let isPlaceholderEmail = false;
+                if (!finalEmail) {
+                    let placeholderEmail = buildPlaceholderEmail(maNhanVien, hoTen, index);
+                    if (generatedEmailSet.has(placeholderEmail)) {
+                        placeholderEmail = buildPlaceholderEmail(maNhanVien, hoTen, index + 1);
+                    }
+                    finalEmail = placeholderEmail;
+                    generatedEmailSet.add(placeholderEmail);
+                    isPlaceholderEmail = true;
+                    results.placeholders.push({
+                        index: index + 1,
+                        maNhanVien: maNhanVien || null,
+                        hoTen: hoTen || null,
+                        email: placeholderEmail,
+                        reason: 'Thiếu email trong file Excel, hệ thống tạo email tạm'
+                    });
+                }
                 const finalChucDanh = chucDanh && chucDanh.trim() !== '' ? chucDanh.trim() : null;
                 const finalNgayGiaNhap = ngayGiaNhap && String(ngayGiaNhap).trim() !== ''
                     ? String(ngayGiaNhap).trim()
@@ -338,21 +377,46 @@ router.post('/bulk', async (req, res) => {
 
                 // Check email uniqueness (case-insensitive)
                 if (finalEmail) {
-                    const checkEmailResult = await client.query(`
-                        SELECT id FROM employees 
-                        WHERE LOWER(email) = LOWER($1) 
-                        AND email IS NOT NULL 
-                        AND email != ''
-                        AND (trang_thai = 'ACTIVE' OR trang_thai IS NULL)
-                    `, [finalEmail]);
+                    let emailToCheck = finalEmail;
+                    let suffix = 1;
+                    while (true) {
+                        if (generatedEmailSet.has(emailToCheck) && emailToCheck !== finalEmail) {
+                            suffix += 1;
+                            emailToCheck = finalEmail.replace(/@/, `-${suffix}@`);
+                            continue;
+                        }
 
-                    if (checkEmailResult.rows.length > 0) {
-                        results.failed.push({
-                            data: empData,
-                            error: 'Email đã tồn tại trong hệ thống'
-                        });
-                        continue;
+                        const checkEmailResult = await client.query(`
+                            SELECT id FROM employees 
+                            WHERE LOWER(email) = LOWER($1) 
+                            AND email IS NOT NULL 
+                            AND email != ''
+                            AND (trang_thai = 'ACTIVE' OR trang_thai IS NULL)
+                        `, [emailToCheck]);
+
+                        if (checkEmailResult.rows.length === 0) {
+                            if (emailToCheck !== finalEmail) {
+                                finalEmail = emailToCheck;
+                            }
+                            break;
+                        }
+
+                        if (!isPlaceholderEmail) {
+                            shouldSkip = true;
+                            break;
+                        }
+
+                        suffix += 1;
+                        emailToCheck = finalEmail.replace(/@/, `-${suffix}@`);
                     }
+                }
+
+                if (shouldSkip) {
+                    results.failed.push({
+                        data: empData,
+                        error: 'Email đã tồn tại trong hệ thống'
+                    });
+                    continue;
                 }
 
                 // Check mã nhân viên uniqueness

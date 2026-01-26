@@ -21,6 +21,11 @@ DB_USER="hr_user"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+echo -e "${YELLOW}[WRAP] Dùng pull-only + migrate-only...${NC}"
+bash "$SCRIPT_DIR/pull-only.sh"
+bash "$SCRIPT_DIR/migrate-only.sh"
+exit 0
+
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}PULL CODE VÀ CHẠY MIGRATION DATABASE${NC}"
 echo -e "${BLUE}========================================${NC}"

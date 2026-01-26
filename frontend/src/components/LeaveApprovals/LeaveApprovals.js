@@ -28,6 +28,11 @@ const LEAVE_TYPE_LABELS = {
     maternity: 'Nghỉ Thai Sản'
 };
 
+const LEAVE_MODULES = [
+    'leave-permission',
+    'leave-resign'
+];
+
 const MODULE_OPTIONS = [
     {
         key: 'all',
@@ -42,15 +47,29 @@ const MODULE_OPTIONS = [
         }
     },
     {
-        key: 'leave',
-        label: 'Đơn xin nghỉ',
+        key: 'leave-permission',
+        label: 'Đơn xin nghỉ phép',
+        requestType: 'LEAVE',
         header: {
-            teamLead: 'Đơn nghỉ chờ quản lý duyệt',
-            hr: 'Theo dõi đơn nghỉ'
+            teamLead: 'Đơn xin nghỉ phép chờ quản lý duyệt',
+            hr: 'Theo dõi đơn xin nghỉ phép'
         },
         description: {
-            teamLead: 'Xem và xử lý các đơn xin nghỉ của nhân viên thuộc nhóm bạn phụ trách.',
-            hr: 'Theo dõi trạng thái và tiến độ phê duyệt đơn nghỉ.'
+            teamLead: 'Xem và xử lý các đơn xin nghỉ phép của nhân viên thuộc nhóm bạn phụ trách.',
+            hr: 'Theo dõi trạng thái và tiến độ phê duyệt đơn xin nghỉ phép.'
+        }
+    },
+    {
+        key: 'leave-resign',
+        label: 'Đơn xin nghỉ việc',
+        requestType: 'RESIGN',
+        header: {
+            teamLead: 'Đơn xin nghỉ việc chờ quản lý duyệt',
+            hr: 'Theo dõi đơn xin nghỉ việc'
+        },
+        description: {
+            teamLead: 'Xem và xử lý các đơn xin nghỉ việc của nhân viên thuộc nhóm bạn phụ trách.',
+            hr: 'Theo dõi trạng thái và tiến độ phê duyệt đơn xin nghỉ việc.'
         }
     },
     {
@@ -173,14 +192,14 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [selectedStatus, setSelectedStatus] = useState('PENDING');
     const [stats, setStats] = useState({ total: 0, overdueCount: 0 });
     const [refreshToken, setRefreshToken] = useState(0);
-    const [activeModule, setActiveModule] = useState('leave');
+    const [activeModule, setActiveModule] = useState('leave-permission');
     const [managerOverride, setManagerOverride] = useState(null);
     const [managerResolved, setManagerResolved] = useState(false);
     const [isBranchDirector, setIsBranchDirector] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
 
-    // activeModule mặc định là 'leave' (Đơn xin nghỉ)
+    // activeModule mặc định là 'leave-permission' (Đơn xin nghỉ phép)
 
     // Statistics for badge counts - overall (tính từ requests hiện tại)
     const statistics = useMemo(() => {
@@ -201,7 +220,8 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
 
     // Statistics per module - fetch all modules to show badges (đã bỏ 'all')
     const [moduleStatistics, setModuleStatistics] = useState({
-        leave: { pending: 0, total: 0 },
+        'leave-permission': { pending: 0, total: 0 },
+        'leave-resign': { pending: 0, total: 0 },
         overtime: { pending: 0, total: 0 },
         attendance: { pending: 0, total: 0 },
         'late-early': { pending: 0, total: 0 },
@@ -545,7 +565,24 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 return { pending, total };
             };
 
-            const leaveStats = calculateStats(leaveResults);
+            const buildLeaveStats = (results, requestType) => {
+                let pending = 0;
+                let total = 0;
+                results.forEach((result, index) => {
+                    const data = result.data?.success && Array.isArray(result.data.data)
+                        ? result.data.data
+                        : [];
+                    const count = data.filter(r => r.request_type === requestType).length;
+                    total += count;
+                    if (index === 0) {
+                        pending = count;
+                    }
+                });
+                return { pending, total };
+            };
+
+            const leavePermissionStats = buildLeaveStats(leaveResults, 'LEAVE');
+            const leaveResignStats = buildLeaveStats(leaveResults, 'RESIGN');
             const overtimeStats = calculateStats(overtimeResults);
             const attendanceStats = calculateStats(attendanceResults);
             const lateEarlyStats = calculateStats(lateEarlyResults);
@@ -553,7 +590,8 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
 
             // Không cần tính 'all' stats nữa vì đã bỏ module 'all'
             const newModuleStats = {
-                leave: leaveStats,
+                'leave-permission': leavePermissionStats,
+                'leave-resign': leaveResignStats,
                 overtime: overtimeStats,
                 attendance: attendanceStats,
                 'late-early': lateEarlyStats,
@@ -562,7 +600,8 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
 
             // Chỉ update state nếu data thực sự thay đổi (không check 'all' nữa)
             if (!prevModuleStatsRef.current ||
-                !shallowEqual(prevModuleStatsRef.current.leave, newModuleStats.leave) ||
+                !shallowEqual(prevModuleStatsRef.current['leave-permission'], newModuleStats['leave-permission']) ||
+                !shallowEqual(prevModuleStatsRef.current['leave-resign'], newModuleStats['leave-resign']) ||
                 !shallowEqual(prevModuleStatsRef.current.overtime, newModuleStats.overtime) ||
                 !shallowEqual(prevModuleStatsRef.current.attendance, newModuleStats.attendance) ||
                 !shallowEqual(prevModuleStatsRef.current['late-early'], newModuleStats['late-early']) ||
@@ -581,7 +620,8 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
 
     const moduleApiMap = useMemo(
         () => ({
-            leave: leaveRequestsAPI,
+            'leave-permission': leaveRequestsAPI,
+            'leave-resign': leaveRequestsAPI,
             overtime: overtimeRequestsAPI,
             attendance: attendanceAdjustmentsAPI,
             'late-early': lateEarlyRequestsAPI,
@@ -622,10 +662,20 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 cancelled: 0
             };
 
+            const requestTypeFilter = activeModule === 'leave-permission'
+                ? 'LEAVE'
+                : activeModule === 'leave-resign'
+                    ? 'RESIGN'
+                    : null;
+
             results.forEach((result, index) => {
                 const status = statuses[index];
-                const count = result.data?.success && Array.isArray(result.data.data)
-                    ? result.data.data.length : 0;
+                const data = result.data?.success && Array.isArray(result.data.data)
+                    ? result.data.data
+                    : [];
+                const count = requestTypeFilter
+                    ? data.filter(r => r.request_type === requestTypeFilter).length
+                    : data.length;
 
                 if (status === 'PENDING') stats.pending = count;
                 else if (status === 'APPROVED') stats.approved = count;
@@ -690,6 +740,8 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
         return filterKey;
     }, []);
 
+    const isLeaveModule = LEAVE_MODULES.includes(activeModule);
+
     const currentModuleConfig = useMemo(
         () => MODULE_OPTIONS.find((module) => module.key === activeModule) || MODULE_OPTIONS.find(m => m.key !== 'all') || MODULE_OPTIONS[1],
         [activeModule]
@@ -751,7 +803,15 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             const response = await moduleApiMap[activeModule].getAll(params);
 
             if (response.data.success) {
-                const newRequests = response.data.data || [];
+                const requestTypeFilter = activeModule === 'leave-permission'
+                    ? 'LEAVE'
+                    : activeModule === 'leave-resign'
+                        ? 'RESIGN'
+                        : null;
+                const newRequestsRaw = response.data.data || [];
+                const newRequests = requestTypeFilter
+                    ? newRequestsRaw.filter(r => r.request_type === requestTypeFilter)
+                    : newRequestsRaw;
 
                 // *** NOTIFICATION LOGIC ĐÃ CHUYỂN SANG GlobalNotifications (App.js) ***
 
@@ -764,7 +824,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
 
                     // Nếu modal đang mở, cập nhật selectedRequest với dữ liệu mới
                     if (showDetailModal && selectedRequest) {
-                        const updatedRequest = newRequests.find(r =>
+                    const updatedRequest = newRequests.find(r =>
                             r.id === selectedRequest.id &&
                             (r.requestType === selectedRequest.requestType ||
                                 r.requestType === (selectedRequest.requestType || selectedRequest.request_type))
@@ -1024,7 +1084,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 {activeModule === 'all' && (
                     <th>Thông tin đơn</th>
                 )}
-                {activeModule === 'leave' && (
+                {isLeaveModule && (
                     <>
                         <th>Loại nghỉ</th>
                         <th>Ngày bắt đầu/kết thúc</th>
@@ -1063,7 +1123,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                 <th className="text-center">Hành động</th>
             </tr>
         );
-    }, [activeModule]);
+    }, [activeModule, isLeaveModule]);
 
     // Memoize style objects để tránh tạo mới mỗi lần render
     const rowStyle = useMemo(() => ({ cursor: 'pointer' }), []);
@@ -1101,9 +1161,9 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     );
 
     const renderCardHeader = (request) => {
-        const requestType = request.requestType || activeModule;
+        const requestType = request.requestType || (isLeaveModule ? 'leave' : activeModule);
 
-        if (requestType === 'leave' || activeModule === 'leave') {
+        if (requestType === 'leave' || isLeaveModule) {
             return (
                 <>
                     <h3>{getRequestTypeLabel(request.request_type)}</h3>
@@ -1671,7 +1731,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                     </td>
                                                 );
                                             })()}
-                                            {activeModule === 'leave' && (
+                                            {isLeaveModule && (
                                                 <>
                                                     <td className="leave-request-type-cell">
                                                         <span className="leave-request-type">{getRequestTypeLabel(request.request_type) || 'N/A'}</span>
@@ -2027,7 +2087,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                             )}
 
                             {/* Module-specific details */}
-                            {((activeModule === 'leave') || (activeModule === 'all' && selectedRequest?.requestType === 'leave')) && (
+                            {(isLeaveModule || (activeModule === 'all' && selectedRequest?.requestType === 'leave')) && (
                                 <div className="leave-approvals-modal-section">
                                     <h3 className="leave-approvals-modal-section-title">
                                         <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">

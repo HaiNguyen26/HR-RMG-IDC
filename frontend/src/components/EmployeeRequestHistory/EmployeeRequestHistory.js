@@ -49,10 +49,16 @@ const MODULE_OPTIONS = [
         description: 'Xem và theo dõi tất cả các đơn từ mà bạn đã gửi: đơn xin phép, đơn tăng ca, đơn bổ sung chấm công, đơn công tác, đơn tiếp khách.'
     },
     {
-        key: 'leave',
-        label: 'Đơn xin nghỉ',
-        header: 'Lịch sử đơn xin nghỉ',
-        description: 'Theo dõi trạng thái và tiến độ phê duyệt các đơn xin nghỉ của bạn.'
+        key: 'leave-permission',
+        label: 'Đơn xin nghỉ phép',
+        header: 'Lịch sử đơn xin nghỉ phép',
+        description: 'Theo dõi trạng thái và tiến độ phê duyệt các đơn xin nghỉ phép của bạn.'
+    },
+    {
+        key: 'leave-resign',
+        label: 'Đơn xin nghỉ việc',
+        header: 'Lịch sử đơn xin nghỉ việc',
+        description: 'Theo dõi trạng thái và tiến độ phê duyệt các đơn xin nghỉ việc của bạn.'
     },
     {
         key: 'overtime',
@@ -141,7 +147,8 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
     // Statistics per module - fetch all modules to show badges
     const [moduleStatistics, setModuleStatistics] = useState({
         all: { pending: 0, total: 0 },
-        leave: { pending: 0, total: 0 },
+        'leave-permission': { pending: 0, total: 0 },
+        'leave-resign': { pending: 0, total: 0 },
         overtime: { pending: 0, total: 0 },
         attendance: { pending: 0, total: 0 },
         'customer-entertainment': { pending: 0, total: 0 }
@@ -207,15 +214,28 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                 customerEntertainmentExpensesAPI.getAll(baseParams)
             ]);
 
-            const leaveStats = {
-                pending: leaveResponse[0].data.success ? (leaveResponse[0].data.data || []).length : 0,
-                approved: leaveResponse[1].data.success ? (leaveResponse[1].data.data || []).length : 0,
-                rejected: leaveResponse[2].data.success ? (leaveResponse[2].data.data || []).length : 0,
-                cancelled: leaveResponse[3].data.success ? (leaveResponse[3].data.data || []).length : 0,
+            const countLeaveByType = (result, requestType) => {
+                const data = result.data?.success ? (result.data.data || []) : [];
+                return data.filter(r => r.request_type === requestType).length;
+            };
+
+            const leavePermissionStats = {
+                pending: countLeaveByType(leaveResponse[0], 'LEAVE'),
+                approved: countLeaveByType(leaveResponse[1], 'LEAVE'),
+                rejected: countLeaveByType(leaveResponse[2], 'LEAVE'),
+                cancelled: countLeaveByType(leaveResponse[3], 'LEAVE'),
                 total: 0
             };
-            // Không tính CANCELLED vào total
-            leaveStats.total = leaveStats.pending + leaveStats.approved + leaveStats.rejected;
+            leavePermissionStats.total = leavePermissionStats.pending + leavePermissionStats.approved + leavePermissionStats.rejected;
+
+            const leaveResignStats = {
+                pending: countLeaveByType(leaveResponse[0], 'RESIGN'),
+                approved: countLeaveByType(leaveResponse[1], 'RESIGN'),
+                rejected: countLeaveByType(leaveResponse[2], 'RESIGN'),
+                cancelled: countLeaveByType(leaveResponse[3], 'RESIGN'),
+                total: 0
+            };
+            leaveResignStats.total = leaveResignStats.pending + leaveResignStats.approved + leaveResignStats.rejected;
 
             const overtimeStats = {
                 pending: overtimeResponse[0].data.success ? (overtimeResponse[0].data.data || []).length : 0,
@@ -281,16 +301,17 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
             customerEntertainmentStats.total = customerEntertainmentStats.pending + customerEntertainmentStats.approved + customerEntertainmentStats.rejected;
 
             const allStats = {
-                pending: leaveStats.pending + overtimeStats.pending + attendanceStats.pending + lateEarlyStats.pending + mealAllowanceStats.pending + travelStats.pending + customerEntertainmentStats.pending,
-                approved: leaveStats.approved + overtimeStats.approved + attendanceStats.approved + lateEarlyStats.approved + mealAllowanceStats.approved + travelStats.approved + customerEntertainmentStats.approved,
-                rejected: leaveStats.rejected + overtimeStats.rejected + attendanceStats.rejected + lateEarlyStats.rejected + mealAllowanceStats.rejected + travelStats.rejected + customerEntertainmentStats.rejected,
-                cancelled: leaveStats.cancelled + overtimeStats.cancelled + attendanceStats.cancelled + lateEarlyStats.cancelled + mealAllowanceStats.cancelled + travelStats.cancelled + customerEntertainmentStats.cancelled,
-                total: leaveStats.total + overtimeStats.total + attendanceStats.total + lateEarlyStats.total + mealAllowanceStats.total + travelStats.total + customerEntertainmentStats.total // Đã loại bỏ CANCELLED
+                pending: leavePermissionStats.pending + leaveResignStats.pending + overtimeStats.pending + attendanceStats.pending + lateEarlyStats.pending + mealAllowanceStats.pending + travelStats.pending + customerEntertainmentStats.pending,
+                approved: leavePermissionStats.approved + leaveResignStats.approved + overtimeStats.approved + attendanceStats.approved + lateEarlyStats.approved + mealAllowanceStats.approved + travelStats.approved + customerEntertainmentStats.approved,
+                rejected: leavePermissionStats.rejected + leaveResignStats.rejected + overtimeStats.rejected + attendanceStats.rejected + lateEarlyStats.rejected + mealAllowanceStats.rejected + travelStats.rejected + customerEntertainmentStats.rejected,
+                cancelled: leavePermissionStats.cancelled + leaveResignStats.cancelled + overtimeStats.cancelled + attendanceStats.cancelled + lateEarlyStats.cancelled + mealAllowanceStats.cancelled + travelStats.cancelled + customerEntertainmentStats.cancelled,
+                total: leavePermissionStats.total + leaveResignStats.total + overtimeStats.total + attendanceStats.total + lateEarlyStats.total + mealAllowanceStats.total + travelStats.total + customerEntertainmentStats.total // Đã loại bỏ CANCELLED
             };
 
             const newModuleStats = {
                 all: { pending: allStats.pending, total: allStats.total },
-                leave: { pending: leaveStats.pending, total: leaveStats.total },
+                'leave-permission': { pending: leavePermissionStats.pending, total: leavePermissionStats.total },
+                'leave-resign': { pending: leaveResignStats.pending, total: leaveResignStats.total },
                 overtime: { pending: overtimeStats.pending, total: overtimeStats.total },
                 attendance: { pending: attendanceStats.pending, total: attendanceStats.total },
                 'late-early': { pending: lateEarlyStats.pending, total: lateEarlyStats.total },
@@ -302,7 +323,8 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
             // Chỉ update state nếu data thực sự thay đổi
             if (!prevModuleStatsRef.current ||
                 !shallowEqual(prevModuleStatsRef.current.all, newModuleStats.all) ||
-                !shallowEqual(prevModuleStatsRef.current.leave, newModuleStats.leave) ||
+                !shallowEqual(prevModuleStatsRef.current['leave-permission'], newModuleStats['leave-permission']) ||
+                !shallowEqual(prevModuleStatsRef.current['leave-resign'], newModuleStats['leave-resign']) ||
                 !shallowEqual(prevModuleStatsRef.current.overtime, newModuleStats.overtime) ||
                 !shallowEqual(prevModuleStatsRef.current.attendance, newModuleStats.attendance) ||
                 !shallowEqual(prevModuleStatsRef.current['late-early'], newModuleStats['late-early']) ||
@@ -317,8 +339,10 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
             let newStatusStats;
             if (activeModule === 'all') {
                 newStatusStats = allStats;
-            } else if (activeModule === 'leave') {
-                newStatusStats = leaveStats;
+            } else if (activeModule === 'leave-permission') {
+                newStatusStats = leavePermissionStats;
+            } else if (activeModule === 'leave-resign') {
+                newStatusStats = leaveResignStats;
             } else if (activeModule === 'overtime') {
                 newStatusStats = overtimeStats;
             } else if (activeModule === 'attendance') {
@@ -411,10 +435,13 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
 
                 // Sắp xếp theo thời gian tạo mới nhất
                 newRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            } else if (activeModule === 'leave') {
+            } else if (activeModule === 'leave-permission' || activeModule === 'leave-resign') {
                 const response = await leaveRequestsAPI.getAll(params);
                 if (response.data.success) {
-                    newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'leave' }));
+                    const requestTypeFilter = activeModule === 'leave-permission' ? 'LEAVE' : 'RESIGN';
+                    newRequests = (response.data.data || [])
+                        .filter(r => r.request_type === requestTypeFilter)
+                        .map(r => ({ ...r, requestType: 'leave' }));
                 }
             } else if (activeModule === 'overtime') {
                 const response = await overtimeRequestsAPI.getAll(params);
@@ -1045,7 +1072,9 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
                                     >
                                         <td>
                                             <span className={`request-type-badge ${request.requestType || 'leave'}`}>
-                                                {request.requestType === 'leave' ? 'Đơn xin nghỉ' :
+                                                {request.requestType === 'leave'
+                                                    ? (request.request_type === 'RESIGN' ? 'Đơn xin nghỉ việc' : 'Đơn xin nghỉ phép')
+                                                    :
                                                     request.requestType === 'overtime' ? 'Đơn tăng ca' :
                                                         request.requestType === 'attendance' ? 'Đơn bổ sung công' :
                                                             request.requestType === 'late-early' ? 'Đơn xin đi trễ về sớm' :
