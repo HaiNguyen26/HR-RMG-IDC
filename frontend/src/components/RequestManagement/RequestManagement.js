@@ -659,7 +659,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 const baseData = {
                     'Mã đơn': req.id || '',
                     'Nhân viên': req.employee_name || req.employee?.ho_ten || '',
-                    'Phòng ban': req.employee_department || '',
+                    'Phòng ban': req.employee_department || req.employee?.phong_ban || '',
                     'Chi nhánh': req.employee_branch || req.employee?.chi_nhanh || '',
                 };
 

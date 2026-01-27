@@ -564,6 +564,7 @@ router.get('/', async (req, res) => {
                    e.ho_ten as employee_name,
                    e.email as employee_email,
                    e.phong_ban as employee_department,
+                   e.chi_nhanh as employee_branch,
                    team.ho_ten as team_lead_name,
                    team.email as team_lead_email
             FROM leave_requests lr
@@ -799,6 +800,8 @@ router.post('/:id/decision', async (req, res) => {
             `SELECT lr.*,
                     e.ho_ten as employee_name,
                     e.email as employee_email,
+                    e.phong_ban as employee_department,
+                    e.chi_nhanh as employee_branch,
                     team.ho_ten as team_lead_name,
                     team.email as team_lead_email
              FROM leave_requests lr

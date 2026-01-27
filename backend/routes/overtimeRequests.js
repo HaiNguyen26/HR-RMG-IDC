@@ -488,6 +488,7 @@ router.get('/', async (req, res) => {
                    e.ho_ten AS employee_name,
                    e.email AS employee_email,
                    e.phong_ban AS employee_department,
+                   e.chi_nhanh AS employee_branch,
                    team.ho_ten AS team_lead_name,
                    team.email AS team_lead_email,
                    (SELECT id FROM overtime_requests WHERE parent_request_id = orq.id ORDER BY created_at ASC LIMIT 1) AS child_request_id,
