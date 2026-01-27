@@ -8,6 +8,7 @@ import {
     travelExpensesAPI,
     customerEntertainmentExpensesAPI,
 } from '../../services/api';
+import usePageVisibility from '../../utils/usePageVisibility';
 import './EmployeeRequestHistory.css';
 
 const STATUS_LABELS = {
@@ -28,6 +29,9 @@ const LEAVE_TYPE_LABELS = {
     statutory: 'Nghỉ chế độ',
     maternity: 'Nghỉ Thai Sản'
 };
+
+const STATS_POLL_INTERVAL_MS = 20000;
+const REQUESTS_POLL_INTERVAL_MS = 20000;
 
 const CUSTOMER_ENTERTAINMENT_STATUS_GROUPS = {
     pending: [
@@ -131,6 +135,7 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
     const [requestToCancel, setRequestToCancel] = useState(null);
+    const isPageVisible = usePageVisibility();
 
     // Statistics cho tất cả các status của module hiện tại
     const [moduleStatusStatistics, setModuleStatusStatistics] = useState({
@@ -376,10 +381,13 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
     // Fetch module statistics với realtime update
     useEffect(() => {
         fetchModuleStatistics(false); // Lần đầu hiển thị loading
-        // Realtime update: polling mỗi 5 giây (silent mode - không hiển thị loading)
-        const interval = setInterval(() => fetchModuleStatistics(true), 5000);
+        // Realtime update: polling mỗi 20s (silent mode - không hiển thị loading)
+        const interval = setInterval(() => {
+            if (!isPageVisible) return;
+            fetchModuleStatistics(true);
+        }, STATS_POLL_INTERVAL_MS);
         return () => clearInterval(interval);
-    }, [currentUser?.id, activeModule]);
+    }, [currentUser?.id, activeModule, isPageVisible]);
 
     const statusFilters = useMemo(() => {
         return [
@@ -499,10 +507,13 @@ const EmployeeRequestHistory = ({ currentUser, showToast, showConfirm }) => {
 
     useEffect(() => {
         fetchRequests(false); // Lần đầu hiển thị loading
-        // Realtime update: polling mỗi 5 giây (silent mode - không hiển thị loading, không re-render nếu không có thay đổi)
-        const interval = setInterval(() => fetchRequests(true), 5000);
+        // Realtime update: polling mỗi 20s (silent mode - không hiển thị loading, không re-render nếu không có thay đổi)
+        const interval = setInterval(() => {
+            if (!isPageVisible) return;
+            fetchRequests(true);
+        }, REQUESTS_POLL_INTERVAL_MS);
         return () => clearInterval(interval);
-    }, [fetchRequests]);
+    }, [fetchRequests, isPageVisible]);
 
     // Tự động cập nhật selectedRequest khi requests được refresh và modal đang mở
     useEffect(() => {

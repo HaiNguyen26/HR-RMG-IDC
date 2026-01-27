@@ -10,6 +10,7 @@ import {
 } from '../../services/api';
 import { parseISODateString, formatDateToISO } from '../../utils/dateUtils';
 import { DATE_PICKER_LOCALE } from '../../utils/datepickerLocale';
+import usePageVisibility from '../../utils/usePageVisibility';
 import 'react-datepicker/dist/react-datepicker.css';
 import './RequestManagement.css';
 
@@ -118,6 +119,10 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [exportFilterStartDate, setExportFilterStartDate] = useState(null);
     const [exportFilterEndDate, setExportFilterEndDate] = useState(null);
+    const isPageVisible = usePageVisibility();
+
+    const STATS_POLL_INTERVAL_MS = 20000;
+    const REQUESTS_POLL_INTERVAL_MS = 20000;
 
     // Statistics cho tất cả các status của module hiện tại
     const [moduleStatusStatistics, setModuleStatusStatistics] = useState({
@@ -315,10 +320,13 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     // Fetch statistics với realtime update
     useEffect(() => {
         fetchModuleStatistics(false); // Lần đầu hiển thị loading
-        // Realtime update: polling mỗi 5 giây (silent mode - không hiển thị loading)
-        const interval = setInterval(() => fetchModuleStatistics(true), 5000);
+        // Realtime update: polling mỗi 20s (silent mode - không hiển thị loading)
+        const interval = setInterval(() => {
+            if (!isPageVisible) return;
+            fetchModuleStatistics(true);
+        }, STATS_POLL_INTERVAL_MS);
         return () => clearInterval(interval);
-    }, [fetchModuleStatistics]);
+    }, [fetchModuleStatistics, isPageVisible]);
 
     const statusFilters = useMemo(() => {
         return [
@@ -410,10 +418,13 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
 
     useEffect(() => {
         fetchRequests(false); // Lần đầu hiển thị loading
-        // Realtime update: polling mỗi 5 giây (silent mode - không hiển thị loading)
-        const interval = setInterval(() => fetchRequests(true), 5000);
+        // Realtime update: polling mỗi 20s (silent mode - không hiển thị loading)
+        const interval = setInterval(() => {
+            if (!isPageVisible) return;
+            fetchRequests(true);
+        }, REQUESTS_POLL_INTERVAL_MS);
         return () => clearInterval(interval);
-    }, [fetchRequests]);
+    }, [fetchRequests, isPageVisible]);
 
     const handleDelete = async (request) => {
         if (!showConfirm) {

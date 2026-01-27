@@ -7,6 +7,7 @@ import {
     mealAllowanceRequestsAPI,
     employeesAPI
 } from '../../services/api';
+import usePageVisibility from '../../utils/usePageVisibility';
 import './LeaveApprovals.css';
 
 const STATUS_LABELS = {
@@ -32,6 +33,9 @@ const LEAVE_MODULES = [
     'leave-permission',
     'leave-resign'
 ];
+
+const STATS_POLL_INTERVAL_MS = 20000;
+const REQUESTS_POLL_INTERVAL_MS = 20000;
 
 const MODULE_OPTIONS = [
     {
@@ -198,6 +202,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const [isBranchDirector, setIsBranchDirector] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
+    const isPageVisible = usePageVisibility();
 
     // activeModule mặc định là 'leave-permission' (Đơn xin nghỉ phép)
 
@@ -696,14 +701,15 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     useEffect(() => {
         if (viewerMode) {
             fetchModuleStatistics(false); // Lần đầu hiển thị loading
-            // Realtime update: polling mỗi 5 giây để cập nhật badge (silent mode)
+            // Realtime update: polling mỗi 20s để cập nhật badge (silent mode)
             const interval = setInterval(() => {
+                if (!isPageVisible) return;
                 fetchModuleStatistics(true);
                 fetchModuleStatusStatistics();
-            }, 5000);
+            }, STATS_POLL_INTERVAL_MS);
             return () => clearInterval(interval);
         }
-    }, [fetchModuleStatistics, fetchModuleStatusStatistics, viewerMode]);
+    }, [fetchModuleStatistics, fetchModuleStatusStatistics, viewerMode, isPageVisible]);
 
     // Fetch statistics ngay khi activeModule hoặc selectedStatus thay đổi (để badge cập nhật nhanh)
     useEffect(() => {
@@ -882,10 +888,13 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
         // Fetch requests when changing module or status (initial fetch - show loading)
         fetchRequests(null, false);
 
-        // Realtime update: polling mỗi 5 giây để cập nhật danh sách (silent mode - không show loading)
-        const interval = setInterval(() => fetchRequests(null, true), 5000);
+        // Realtime update: polling mỗi 20s để cập nhật danh sách (silent mode - không show loading)
+        const interval = setInterval(() => {
+            if (!isPageVisible) return;
+            fetchRequests(null, true);
+        }, REQUESTS_POLL_INTERVAL_MS);
         return () => clearInterval(interval);
-    }, [fetchRequests, viewerMode]);
+    }, [fetchRequests, viewerMode, isPageVisible]);
 
 
     const askForComment = async ({ title, message, required = false }) => {
