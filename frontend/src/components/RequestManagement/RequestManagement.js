@@ -660,6 +660,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     'Mã đơn': req.id || '',
                     'Nhân viên': req.employee_name || req.employee?.ho_ten || '',
                     'Phòng ban': req.employee_department || '',
+                    'Chi nhánh': req.employee_branch || req.employee?.chi_nhanh || '',
                 };
 
                 // Xử lý theo loại đơn
