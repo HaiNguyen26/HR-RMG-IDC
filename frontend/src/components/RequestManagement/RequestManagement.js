@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+﻿import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import DatePicker from 'react-datepicker';
 import {
@@ -611,98 +611,136 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 return;
             }
 
-            // Định nghĩa headers cho Excel
-            const headers = [
-                'Mã đơn',
-                'Loại đơn',
-                'Nhân viên',
-                'Ngày bắt đầu',
-                'Ngày kết thúc',
-                'Thời gian',
-                'Lý do',
-                'Trạng thái',
-                'Ngày tạo',
-                'Ngày duyệt'
-            ];
-
-            // Chuẩn hóa dữ liệu
-            const data = approvedRequests.map((req) => {
-                const formatDate = (dateString) => {
-                    if (!dateString) return '';
-                    try {
-                        const date = new Date(dateString);
-                        if (isNaN(date.getTime())) return '';
-                        return date.toLocaleDateString('vi-VN');
-                    } catch {
-                        return '';
-                    }
-                };
-
-                const formatDateTime = (dateString) => {
-                    if (!dateString) return '';
-                    try {
-                        const date = new Date(dateString);
-                        if (isNaN(date.getTime())) return '';
-                        return date.toLocaleString('vi-VN');
-                    } catch {
-                        return '';
-                    }
-                };
-
-                const getRequestTypeLabel = () => {
-                    if (isLeaveModuleKey(req.requestType)) {
-                        return req.request_type === 'LEAVE' ? 'Xin nghỉ phép' : 'Xin nghỉ việc';
-                    } else if (req.requestType === 'overtime') {
-                        return 'Đơn tăng ca';
-                    } else if (req.requestType === 'attendance') {
-                        return 'Đơn bổ sung công';
-                    } else if (req.requestType === 'late-early') {
-                        return req.request_type === 'LATE' ? 'Đơn xin đi trễ' : 'Đơn xin về sớm';
-                    } else if (req.requestType === 'meal-allowance') {
-                        return 'Đơn xin phụ cấp cơm công trình';
-                    }
-                    return 'Không xác định';
-                };
-
-                const getTimeInfo = () => {
-                    if (req.requestType === 'overtime') {
-                        return `${req.start_time || ''} - ${req.end_time || ''}`;
-                    } else if (req.requestType === 'late-early') {
-                        return req.time_value || '';
-                    }
+                        // Định nghĩa helper functions
+            const formatDate = (dateString) => {
+                if (!dateString) return '';
+                try {
+                    const date = new Date(dateString);
+                    if (isNaN(date.getTime())) return '';
+                    return date.toLocaleDateString('vi-VN');
+                } catch {
                     return '';
-                };
+                }
+            };
 
-                const getStartDate = () => {
-                    if (req.requestType === 'late-early') {
-                        return formatDate(req.request_date);
-                    }
-                    return formatDate(req.start_date);
-                };
+            const formatDateTime = (dateString) => {
+                if (!dateString) return '';
+                try {
+                    const date = new Date(dateString);
+                    if (isNaN(date.getTime())) return '';
+                    return date.toLocaleString('vi-VN');
+                } catch {
+                    return '';
+                }
+            };
 
-                const getEndDate = () => {
-                    if (req.requestType === 'late-early') {
-                        return '-';
-                    }
-                    return formatDate(req.end_date);
-                };
-
-                return {
+            // Chuẩn hóa dữ liệu theo từng loại đơn
+            const data = approvedRequests.map((req) => {
+                const baseData = {
                     'Mã đơn': req.id || '',
-                    'Loại đơn': getRequestTypeLabel(),
                     'Nhân viên': req.employee_name || req.employee?.ho_ten || '',
-                    'Ngày bắt đầu': getStartDate(),
-                    'Ngày kết thúc': getEndDate(),
-                    'Thời gian': getTimeInfo(),
+                    'Phòng ban': req.employee_department || '',
+                };
+
+                // Xử lý theo loại đơn
+                if (isLeaveModuleKey(req.requestType)) {
+                    // Tính số ngày nghỉ
+                    let totalDays = '';
+                    if (req.request_type === 'LEAVE' && req.start_date && req.end_date) {
+                        const start = new Date(req.start_date);
+                        const end = new Date(req.end_date);
+                        const diffTime = Math.abs(end - start);
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                        totalDays = `${diffDays} ngày`;
+                    }
+
+                    return {
+                        ...baseData,
+                        'Loại đơn': req.request_type === 'LEAVE' ? 'Xin nghỉ phép' : 'Xin nghỉ việc',
+                        'Ngày bắt đầu': formatDate(req.start_date),
+                        'Ngày kết thúc': req.request_type === 'LEAVE' ? formatDate(req.end_date) : '',
+                        'Tổng số ngày': totalDays,
+                        'Lý do': req.reason || '',
+                        'Ghi chú': req.notes || '',
+                        'Trạng thái': 'Đã duyệt',
+                        'Ngày tạo': formatDateTime(req.created_at),
+                        'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
+                    };
+                } else if (req.requestType === 'overtime') {
+                    return {
+                        ...baseData,
+                        'Loại đơn': 'Đơn tăng ca',
+                        'Ngày tăng ca': formatDate(req.request_date || req.start_date),
+                        'Giờ bắt đầu': req.start_time || '',
+                        'Giờ kết thúc': req.end_time || '',
+                        'Thời lượng (giờ)': req.duration || '',
+                        'Nội dung công việc': req.reason || '',
+                        'Ghi chú': req.notes || '',
+                        'Trạng thái': 'Đã duyệt',
+                        'Ngày tạo': formatDateTime(req.created_at),
+                        'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
+                    };
+                } else if (req.requestType === 'attendance') {
+                    return {
+                        ...baseData,
+                        'Loại đơn': 'Đơn bổ sung công',
+                        'Ngày bổ sung': formatDate(req.adjustment_date || req.request_date),
+                        'Loại bổ sung': req.check_type === 'CHECK_IN' ? 'Giờ vào' : req.check_type === 'CHECK_OUT' ? 'Giờ ra' : 'Cả hai',
+                        'Giờ vào': req.check_in_time || '',
+                        'Giờ ra': req.check_out_time || '',
+                        'Lý do': req.reason || '',
+                        'Ghi chú': req.notes || '',
+                        'Trạng thái': 'Đã duyệt',
+                        'Ngày tạo': formatDateTime(req.created_at),
+                        'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
+                    };
+                } else if (req.requestType === 'late-early') {
+                    return {
+                        ...baseData,
+                        'Loại đơn': req.request_type === 'LATE' ? 'Đơn xin đi trễ' : 'Đơn xin về sớm',
+                        'Ngày': formatDate(req.request_date),
+                        'Thời gian': req.time_value || '',
+                        'Lý do': req.reason || '',
+                        'Ghi chú': req.notes || '',
+                        'Trạng thái': 'Đã duyệt',
+                        'Ngày tạo': formatDateTime(req.created_at),
+                        'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
+                    };
+                } else if (req.requestType === 'meal-allowance') {
+                    const items = req.items || [];
+                    const firstDate = items[0]?.expense_date;
+                    const lastDate = items[items.length - 1]?.expense_date;
+                    const totalAmount = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+
+                    return {
+                        ...baseData,
+                        'Loại đơn': 'Đơn xin phụ cấp cơm công trình',
+                        'Từ ngày': formatDate(firstDate),
+                        'Đến ngày': formatDate(lastDate),
+                        'Số mục chi tiết': items.length,
+                        'Tổng tiền (VNĐ)': totalAmount.toLocaleString('vi-VN'),
+                        'Ghi chú': req.notes || '',
+                        'Trạng thái': 'Đã duyệt',
+                        'Ngày tạo': formatDateTime(req.created_at),
+                        'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
+                    };
+                }
+
+                // Fallback cho các loại đơn khác
+                return {
+                    ...baseData,
+                    'Loại đơn': 'Không xác định',
+                    'Ngày': formatDate(req.created_at),
                     'Lý do': req.reason || req.notes || '',
                     'Trạng thái': 'Đã duyệt',
                     'Ngày tạo': formatDateTime(req.created_at),
-                    'Ngày duyệt': formatDateTime(req.approved_at || req.updated_at)
+                    'Ngày duyệt': formatDateTime(req.updated_at)
                 };
             });
 
+
             // Tạo worksheet
-            const worksheet = XLSX.utils.json_to_sheet(data, { header: headers });
+            const worksheet = XLSX.utils.json_to_sheet(data);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, 'DonTuDaDuyet');
 
@@ -2474,4 +2512,5 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
 };
 
 export default RequestManagement;
+
 
