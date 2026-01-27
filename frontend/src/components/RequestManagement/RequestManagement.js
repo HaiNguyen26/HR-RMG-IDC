@@ -545,7 +545,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             // Lấy dữ liệu đã được duyệt (APPROVED)
             let approvedRequests = requests.filter(req => req.status === 'APPROVED');
 
-            // Filter theo khoảng ngày nếu có
+            // Filter theo khoảng ngày phát sinh đơn nếu có
             if (exportFilterStartDate || exportFilterEndDate) {
                 let startDate = null;
                 let endDate = null;
@@ -560,17 +560,46 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     endDate.setHours(23, 59, 59, 999);
                 }
 
+                const getOccurrenceDate = (req) => {
+                    const normalizeDate = (value) => {
+                        if (!value) return null;
+                        const date = new Date(value);
+                        if (isNaN(date.getTime())) return null;
+                        date.setHours(0, 0, 0, 0);
+                        return date;
+                    };
+
+                    if (isLeaveModuleKey(req.requestType)) {
+                        return normalizeDate(req.start_date);
+                    }
+                    if (req.requestType === 'overtime') {
+                        return normalizeDate(req.request_date || req.start_date);
+                    }
+                    if (req.requestType === 'attendance') {
+                        return normalizeDate(req.adjustment_date || req.request_date);
+                    }
+                    if (req.requestType === 'late-early') {
+                        return normalizeDate(req.request_date);
+                    }
+                    if (req.requestType === 'meal-allowance') {
+                        const firstItemDate = Array.isArray(req.items) && req.items.length > 0
+                            ? req.items[0].expense_date
+                            : null;
+                        return normalizeDate(firstItemDate);
+                    }
+                    return normalizeDate(req.created_at);
+                };
+
                 approvedRequests = approvedRequests.filter(req => {
-                    if (!req.approved_at && !req.updated_at) return false;
-                    const approvedDate = new Date(req.approved_at || req.updated_at);
-                    approvedDate.setHours(0, 0, 0, 0);
+                    const occurrenceDate = getOccurrenceDate(req);
+                    if (!occurrenceDate) return false;
 
                     if (startDate && endDate) {
-                        return approvedDate >= startDate && approvedDate <= endDate;
+                        return occurrenceDate >= startDate && occurrenceDate <= endDate;
                     } else if (startDate) {
-                        return approvedDate >= startDate;
+                        return occurrenceDate >= startDate;
                     } else if (endDate) {
-                        return approvedDate <= endDate;
+                        return occurrenceDate <= endDate;
                     }
                     return true;
                 });
@@ -1864,7 +1893,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                             <p className="request-management-subtitle">
                                 {MODULE_OPTIONS.find(m => m.key === activeModule)?.description || 'Xem và theo dõi tất cả các đơn từ.'}
                                 <span style={subtitleSpanStyle}>
-                                    {!isRefreshing && '● Cập nhật tự động mỗi 5 giây'}
+                                    {!isRefreshing && '● Cập nhật tự động mỗi 20 giây'}
                                 </span>
                             </p>
                         </div>
@@ -1878,7 +1907,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                     selected={exportFilterStartDate}
                                     onChange={(date) => setExportFilterStartDate(date)}
                                     dateFormat="dd/MM/yyyy"
-                                    placeholderText="Từ ngày"
+                                    placeholderText="Từ ngày phát sinh"
                                     locale={DATE_PICKER_LOCALE}
                                     className="request-export-date-picker"
                                     isClearable
@@ -1898,7 +1927,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                     selected={exportFilterEndDate}
                                     onChange={(date) => setExportFilterEndDate(date)}
                                     dateFormat="dd/MM/yyyy"
-                                    placeholderText="Đến ngày"
+                                    placeholderText="Đến ngày phát sinh"
                                     locale={DATE_PICKER_LOCALE}
                                     className="request-export-date-picker"
                                     isClearable
