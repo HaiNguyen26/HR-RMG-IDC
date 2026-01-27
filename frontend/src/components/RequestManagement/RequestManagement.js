@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import DatePicker from 'react-datepicker';
 import {
@@ -8,7 +8,7 @@ import {
     lateEarlyRequestsAPI,
     mealAllowanceRequestsAPI,
 } from '../../services/api';
-import { parseISODateString, formatDateToISO } from '../../utils/dateUtils';
+import { formatDateToISO } from '../../utils/dateUtils';
 import { DATE_PICKER_LOCALE } from '../../utils/datepickerLocale';
 import usePageVisibility from '../../utils/usePageVisibility';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -545,6 +545,26 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             // Lấy dữ liệu đã được duyệt (APPROVED)
             let approvedRequests = requests.filter(req => req.status === 'APPROVED');
 
+            // Filter theo loại đơn (activeModule)
+            if (activeModule !== 'all') {
+                approvedRequests = approvedRequests.filter(req => {
+                    if (activeModule === 'leave-permission') {
+                        return isLeaveModuleKey(req.requestType) && req.request_type === 'LEAVE';
+                    } else if (activeModule === 'leave-resign') {
+                        return isLeaveModuleKey(req.requestType) && req.request_type === 'RESIGN';
+                    } else if (activeModule === 'overtime') {
+                        return req.requestType === 'overtime';
+                    } else if (activeModule === 'attendance') {
+                        return req.requestType === 'attendance';
+                    } else if (activeModule === 'late-early') {
+                        return req.requestType === 'late-early';
+                    } else if (activeModule === 'meal-allowance') {
+                        return req.requestType === 'meal-allowance';
+                    }
+                    return true;
+                });
+            }
+
             // Filter theo khoảng ngày phát sinh đơn nếu có
             if (exportFilterStartDate || exportFilterEndDate) {
                 let startDate = null;
@@ -611,7 +631,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 return;
             }
 
-                        // Định nghĩa helper functions
+            // Định nghĩa headers động theo loại đơn
             const formatDate = (dateString) => {
                 if (!dateString) return '';
                 try {
@@ -738,13 +758,12 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 };
             });
 
-
-            // Tạo worksheet
+            // Tạo worksheet (không cần headers vì json_to_sheet tự động lấy từ object keys)
             const worksheet = XLSX.utils.json_to_sheet(data);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, 'DonTuDaDuyet');
 
-            // Auto width
+            // Auto width cho tất cả cột
             const range = XLSX.utils.decode_range(worksheet['!ref']);
             const colWidths = [];
             for (let C = range.s.c; C <= range.e.c; ++C) {
@@ -755,9 +774,9 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             // Tạo tên file
             let fileName = 'don_tu_da_duyet';
             if (activeModule !== 'all') {
-                const moduleName = activeModule === 'leave'
+                const moduleName = activeModule === 'leave-permission'
                     ? 'don_nghi_phep'
-                    : activeModule === 'resign'
+                    : activeModule === 'leave-resign'
                         ? 'don_nghi_viec'
                         : activeModule === 'overtime'
                             ? 'don_tang_ca'
@@ -765,7 +784,9 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                 ? 'don_di_tre_ve_som'
                                 : activeModule === 'meal-allowance'
                                     ? 'don_phu_cap_com'
-                                    : 'don_bo_sung_cong';
+                                    : activeModule === 'attendance'
+                                        ? 'don_bo_sung_cong'
+                                        : 'don_tu';
                 fileName = `${moduleName}_da_duyet`;
             }
             if (exportFilterStartDate && exportFilterEndDate) {
@@ -789,54 +810,6 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         } finally {
             setLoading(false);
         }
-    };
-
-    const renderCardHeader = (request) => {
-        const requestType = request.requestType || activeModule;
-
-        if (isLeaveModuleKey(requestType) || isLeaveModuleKey(activeModule)) {
-            return (
-                <>
-                    <h3>{getRequestTypeLabel(request.request_type)}</h3>
-                    <p className="request-management-period">
-                        {formatDateDisplay(request.start_date)}
-                        {request.request_type === 'LEAVE' && request.end_date
-                            ? ` → ${formatDateDisplay(request.end_date)}`
-                            : ''}
-                    </p>
-                </>
-            );
-        }
-
-        if (requestType === 'overtime' || activeModule === 'overtime') {
-            return (
-                <>
-                    <h3>Đơn tăng ca</h3>
-                    <p className="request-management-period">
-                        {formatDateDisplay(request.request_date)} • {request.start_time?.slice(0, 5)} →{' '}
-                        {request.end_time?.slice(0, 5)}
-                        {request.duration ? ` • ${request.duration}` : ''}
-                    </p>
-                </>
-            );
-        }
-
-        return (
-            <>
-                <h3>Đơn bổ sung chấm công</h3>
-                <p className="request-management-period">
-                    {formatDateDisplay(request.adjustment_date || request.request_date)}
-                    {request.check_in_time && ` • Vào: ${request.check_in_time.slice(0, 5)}`}
-                    {request.check_out_time && ` • Ra: ${request.check_out_time.slice(0, 5)}`}
-                </p>
-            </>
-        );
-    };
-
-    const mapDecisionLabel = (value, fallback) => {
-        if (!value && fallback) return getStatusLabel(fallback);
-        if (!value) return '-';
-        return getStatusLabel(value);
     };
 
     const renderRequestDetails = (request) => {
@@ -2516,6 +2489,4 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
 };
 
 export default RequestManagement;
-
-
 
