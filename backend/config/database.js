@@ -4,13 +4,13 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const pool = new Pool({
     host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 5432,
+    port: Number(process.env.DB_PORT) || 5432,
     database: process.env.DB_NAME || 'HR_Management_System',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '',
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    max: Number(process.env.DB_POOL_MAX) || 20,
+    idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT) || 30000,
+    connectionTimeoutMillis: Number(process.env.DB_CONN_TIMEOUT) || 10000,
 });
 
 // Test connection
