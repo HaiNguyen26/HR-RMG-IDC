@@ -745,7 +745,11 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             XLSX.utils.book_append_sheet(workbook, worksheet, 'DonTuDaDuyet');
 
             // Auto width
-            const colWidths = headers.map(() => ({ wch: 25 }));
+            const range = XLSX.utils.decode_range(worksheet['!ref']);
+            const colWidths = [];
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                colWidths[C] = { wch: 20 };
+            }
             worksheet['!cols'] = colWidths;
 
             // Tạo tên file
@@ -2512,5 +2516,6 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
 };
 
 export default RequestManagement;
+
 
 
