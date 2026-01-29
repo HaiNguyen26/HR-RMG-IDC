@@ -4,7 +4,8 @@
   position: relative;
   padding: 0;
   min-height: 100%;
-  height: auto;
+  height: 100%;
+  /* Đảm bảo full height của main content */
   /* Calm Integrity Gradient: Sky Blue 50 → White (60%) → Indigo 50 */
   background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 60%, #f5f6ff 100%);
   /* Optional: Ambient Blur - Làm mờ môi trường để tăng chiều sâu */
@@ -182,7 +183,8 @@
   overflow-y: visible;
   overflow-x: hidden;
   height: 100%;
-  /* Đảm bảo full height của main content */
+  min-height: 100%;
+  /* Đảm bảo full height của main content, đặc biệt trên màn hình nhỏ */
 }
 
 .dashboard-content {

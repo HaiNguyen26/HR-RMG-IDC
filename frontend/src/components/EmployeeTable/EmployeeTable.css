@@ -364,8 +364,8 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.6);
   /* Soft Shadow lớn - Glassmorphism */
   width: min(960px, 95vw);
-  max-height: 95vh;
-  /* Đảm bảo modal không cao hơn màn hình */
+  max-height: 90vh;
+  /* Đảm bảo modal không cao hơn màn hình, để lại khoảng trống cho overlay */
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -384,8 +384,10 @@
   -webkit-overflow-scrolling: touch !important;
   /* Performance optimizations */
   transform: translateZ(0);
-  /* Đảm bảo có height constraint */
+  /* Đảm bảo có height constraint để scroll hoạt động */
   min-height: 0;
+  /* Force scroll khi content dài */
+  overscroll-behavior: contain;
 }
 
 @keyframes detailModalZoomInFade {
@@ -525,6 +527,8 @@
   flex: 1;
   min-height: 0;
   /* Đảm bảo body có thể mở rộng và container sẽ scroll */
+  /* Cho phép body mở rộng tự nhiên để trigger scroll của container */
+  flex-shrink: 0;
 }
 
 /* Custom scrollbar cho detail-modal-container */
@@ -556,9 +560,12 @@
   border: none;
   border-radius: 0;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
+  /* Cho phép form mở rộng tự nhiên */
   flex: 1;
   min-height: 0;
+  /* Đảm bảo form có thể mở rộng để trigger scroll của container */
+  flex-shrink: 0;
 }
 
 .detail-form-section {
