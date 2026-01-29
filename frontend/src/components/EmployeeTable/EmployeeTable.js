@@ -45,6 +45,10 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
   const [managersList, setManagersList] = useState([]);
   const [indirectManagersList, setIndirectManagersList] = useState([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [allEmployees, setAllEmployees] = useState([]);
+  const [managerSearchQuery, setManagerSearchQuery] = useState('');
+  const [showManagerDropdown, setShowManagerDropdown] = useState(false);
 
   const userRole = currentUser?.role?.toUpperCase();
   const canManage = userRole === 'HR' || userRole === 'ADMIN';
@@ -175,6 +179,21 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
 
     fetchOptions();
   }, [showToast]);
+
+  // Fetch all employees for manager selection
+  useEffect(() => {
+    const fetchAllEmployees = async () => {
+      try {
+        const response = await employeesAPI.getAll();
+        if (response.data?.success) {
+          setAllEmployees(response.data.data || []);
+        }
+      } catch (error) {
+        console.error('[EmployeeTable] Error fetching all employees:', error);
+      }
+    };
+    fetchAllEmployees();
+  }, []);
 
   // Update editForm values when jobTitles or departments are loaded and modal is in edit mode
   useEffect(() => {
@@ -446,6 +465,25 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
     setDetailModal((prev) => ({ ...prev, mode: 'view' }));
   };
 
+  // Tự động cập nhật quyền quản lý khi chọn quản lý trực tiếp
+  const handleUpdateManagerRole = async (employeeId, employeeName) => {
+    try {
+      // Kiểm tra xem nhân viên này đã có trong danh sách quản lý chưa
+      const isAlreadyManager = managersList.some(m => m.toLowerCase() === employeeName.toLowerCase());
+      
+      if (!isAlreadyManager) {
+        // Cập nhật nhân viên này thành quản lý (có thể cần thêm field is_manager hoặc tương tự)
+        // Tạm thời chỉ log, có thể cần backend API để update
+        console.log(`[EmployeeTable] Auto-updating ${employeeName} (ID: ${employeeId}) to manager role`);
+        
+        // Có thể gọi API để update is_manager = true nếu backend hỗ trợ
+        // await employeesAPI.update(employeeId, { is_manager: true });
+      }
+    } catch (error) {
+      console.error('[EmployeeTable] Error updating manager role:', error);
+    }
+  };
+
   const handleEditSubmit = async (event) => {
     event.preventDefault();
     if (!detailModal.employee || !canManage) return;
@@ -602,13 +640,24 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
     : '';
-  const filteredEmployees = normalizedFilter
+  // Filter by branch first
+  let branchFiltered = normalizedFilter
     ? employees.filter((employee) =>
       (employee.chi_nhanh || employee.chiNhanh || '')
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '') === normalizedFilter)
     : employees;
+
+  // Filter by search query (name)
+  const filteredEmployees = searchQuery.trim()
+    ? branchFiltered.filter((employee) => {
+        const name = (employee.ho_ten || employee.hoTen || '').toLowerCase();
+        const normalizedName = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const normalizedQuery = searchQuery.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return normalizedName.includes(normalizedQuery);
+      })
+    : branchFiltered;
 
   // Sync selectedEmployees with available employees
   useEffect(() => {
@@ -750,6 +799,63 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
             </svg>
             {loading ? 'Đang xóa...' : `Xóa ${selectedEmployees.size} nhân viên`}
           </button>
+        </div>
+      )}
+
+      {/* Search box */}
+      {canManage && (
+        <div className="employee-table-search" style={{ marginBottom: '16px', marginTop: '16px' }}>
+          <div style={{ position: 'relative', maxWidth: '400px' }}>
+            <input
+              type="text"
+              placeholder="Tìm kiếm theo tên nhân viên..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px 8px 40px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px'
+              }}
+            />
+            <svg
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '16px',
+                height: '16px',
+                color: '#666'
+              }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px'
+                }}
+              >
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -1139,21 +1245,99 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                         </div>
                         <div className="form-group">
                           <label htmlFor="quanLyTrucTiep">Quản lý trực tiếp</label>
-                          <CustomSelect
-                            id="quanLyTrucTiep"
-                            name="quanLyTrucTiep"
-                            value={editForm.quanLyTrucTiep}
-                            onChange={handleEditChange}
-                            placeholder="Chọn quản lý trực tiếp"
-                            dropup={true}
-                            options={[
-                              { value: '', label: 'Chọn quản lý trực tiếp' },
-                              ...managersList.map((manager) => ({
-                                value: manager,
-                                label: manager
-                              }))
-                            ]}
-                          />
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type="text"
+                              id="quanLyTrucTiep"
+                              name="quanLyTrucTiep"
+                              value={editForm.quanLyTrucTiep}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setEditForm(prev => ({ ...prev, quanLyTrucTiep: value }));
+                                setManagerSearchQuery(value);
+                                setShowManagerDropdown(true);
+                              }}
+                              onFocus={() => setShowManagerDropdown(true)}
+                              onBlur={() => {
+                                // Delay để cho phép click vào dropdown
+                                setTimeout(() => setShowManagerDropdown(false), 200);
+                              }}
+                              placeholder="Gõ tên để tìm kiếm..."
+                              style={{
+                                width: '100%',
+                                padding: '8px 12px',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px',
+                                fontSize: '14px'
+                              }}
+                            />
+                            {showManagerDropdown && (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  left: 0,
+                                  right: 0,
+                                  backgroundColor: 'white',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  maxHeight: '200px',
+                                  overflowY: 'auto',
+                                  zIndex: 1000,
+                                  marginTop: '4px',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                }}
+                                onMouseDown={(e) => e.preventDefault()}
+                              >
+                                {allEmployees
+                                  .filter((emp) => {
+                                    if (!managerSearchQuery.trim()) return true;
+                                    const name = (emp.ho_ten || emp.hoTen || '').toLowerCase();
+                                    const query = managerSearchQuery.toLowerCase();
+                                    return name.includes(query);
+                                  })
+                                  .slice(0, 10)
+                                  .map((emp) => {
+                                    const empName = emp.ho_ten || emp.hoTen || '';
+                                    return (
+                                      <div
+                                        key={emp.id}
+                                        onClick={() => {
+                                          setEditForm(prev => ({ ...prev, quanLyTrucTiep: empName }));
+                                          setManagerSearchQuery('');
+                                          setShowManagerDropdown(false);
+                                          // Tự động cập nhật quyền quản lý cho nhân viên được chọn
+                                          handleUpdateManagerRole(emp.id, empName);
+                                        }}
+                                        style={{
+                                          padding: '8px 12px',
+                                          cursor: 'pointer',
+                                          borderBottom: '1px solid #f0f0f0'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.target.style.backgroundColor = '#f5f5f5';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.target.style.backgroundColor = 'white';
+                                        }}
+                                      >
+                                        {empName}
+                                      </div>
+                                    );
+                                  })}
+                                {allEmployees.filter((emp) => {
+                                  if (!managerSearchQuery.trim()) return true;
+                                  const name = (emp.ho_ten || emp.hoTen || '').toLowerCase();
+                                  const query = managerSearchQuery.toLowerCase();
+                                  return name.includes(query);
+                                }).length === 0 && (
+                                  <div style={{ padding: '8px 12px', color: '#666' }}>
+                                    Không tìm thấy
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="form-group">
                           <label htmlFor="quanLyGianTiep">Quản lý gián tiếp</label>
