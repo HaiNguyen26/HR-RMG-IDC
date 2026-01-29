@@ -181,7 +181,8 @@
   padding-top: 0;
   overflow-y: visible;
   overflow-x: hidden;
-  height: auto;
+  height: 100%;
+  /* Đảm bảo full height của main content */
 }
 
 .dashboard-content {

@@ -364,16 +364,15 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.6);
   /* Soft Shadow lớn - Glassmorphism */
   width: min(960px, 95vw);
-  max-height: 98vh;
-  height: 98vh;
-  /* Set height cụ thể để overflow hoạt động */
+  max-height: 95vh;
+  /* Đảm bảo modal không cao hơn màn hình */
   padding: 0;
   display: flex;
   flex-direction: column;
   color: #0f172a;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  /* Container scroll trực tiếp - dùng !important để override */
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Container scroll trực tiếp */
   position: relative;
   animation: detailModalZoomInFade 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
   transform-origin: center center;
@@ -525,6 +524,7 @@
   /* Giảm gap */
   flex: 1;
   min-height: 0;
+  /* Đảm bảo body có thể mở rộng và container sẽ scroll */
 }
 
 /* Custom scrollbar cho detail-modal-container */
