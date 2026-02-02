@@ -688,12 +688,72 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
                     };
                 } else if (req.requestType === 'overtime') {
+                    // Tính toán tăng ca ngày và tăng ca đêm từ start_time và end_time
+                    const calculateOvertimeHours = (startTime, endTime, startDate, endDate) => {
+                        if (!startTime || !endTime) return { dayHours: '', nightHours: '' };
+                        
+                        try {
+                            // Parse times
+                            const [startHour, startMin] = startTime.split(':').map(Number);
+                            const [endHour, endMin] = endTime.split(':').map(Number);
+                            
+                            // Convert to minutes
+                            let startMinutes = startHour * 60 + startMin;
+                            let endMinutes = endHour * 60 + endMin;
+                            
+                            // Nếu end_time < start_time, có nghĩa là qua ngày hôm sau
+                            if (endMinutes < startMinutes) {
+                                endMinutes += 24 * 60; // Thêm 24 giờ
+                            }
+                            
+                            let dayMinutes = 0;
+                            let nightMinutes = 0;
+                            
+                            // Night overtime: 22:00 - 06:00 (next day)
+                            const nightStart = 22 * 60; // 22:00
+                            const nightEnd = 6 * 60; // 06:00
+                            
+                            // Tính từng giờ
+                            for (let current = startMinutes; current < endMinutes; current += 60) {
+                                const hourOfDay = current % (24 * 60);
+                                
+                                // Kiểm tra xem giờ này có phải tăng ca đêm không
+                                if (hourOfDay >= nightStart || hourOfDay < nightEnd) {
+                                    // Tăng ca đêm
+                                    const segmentEnd = Math.min(current + 60, endMinutes);
+                                    nightMinutes += (segmentEnd - current) / 60;
+                                } else {
+                                    // Tăng ca ngày
+                                    const segmentEnd = Math.min(current + 60, endMinutes);
+                                    dayMinutes += (segmentEnd - current) / 60;
+                                }
+                            }
+                            
+                            return {
+                                dayHours: dayMinutes > 0 ? dayMinutes.toFixed(2) : '',
+                                nightHours: nightMinutes > 0 ? nightMinutes.toFixed(2) : ''
+                            };
+                        } catch (error) {
+                            console.error('Error calculating overtime hours:', error);
+                            return { dayHours: '', nightHours: '' };
+                        }
+                    };
+                    
+                    const overtimeHours = calculateOvertimeHours(
+                        req.start_time,
+                        req.end_time,
+                        req.start_date || req.request_date,
+                        req.end_date
+                    );
+                    
                     return {
                         ...baseData,
                         'Loại đơn': 'Đơn tăng ca',
                         'Ngày tăng ca': formatDate(req.request_date || req.start_date),
                         'Giờ bắt đầu': req.start_time || '',
                         'Giờ kết thúc': req.end_time || '',
+                        'Tăng ca ngày (giờ)': overtimeHours.dayHours || '0',
+                        'Tăng ca đêm (giờ)': overtimeHours.nightHours || '0',
                         'Thời lượng (giờ)': req.duration || '',
                         'Nội dung công việc': req.reason || '',
                         'Ghi chú': req.notes || '',

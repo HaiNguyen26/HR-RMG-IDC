@@ -423,6 +423,30 @@ const isValidTime = (value) => {
 // GET /api/attendance-adjustments - Lấy danh sách đơn
 router.get('/', async (req, res) => {
     try {
+        // Đảm bảo các cột cần thiết tồn tại
+        try {
+            await pool.query(`
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'employees' AND column_name = 'chi_nhanh'
+                    ) THEN
+                        ALTER TABLE employees ADD COLUMN chi_nhanh VARCHAR(255);
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'employees' AND column_name = 'phong_ban'
+                    ) THEN
+                        ALTER TABLE employees ADD COLUMN phong_ban VARCHAR(255);
+                    END IF;
+                END $$;
+            `);
+        } catch (alterError) {
+            // Column có thể đã tồn tại, bỏ qua lỗi
+            console.log('[AttendanceRequest GET] Column check:', alterError.message);
+        }
+
         const { employeeId, teamLeadId, status } = req.query;
 
         const conditions = [];
@@ -486,6 +510,8 @@ router.get('/', async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching attendance adjustments:', error);
+        console.error('Error details:', error.message);
+        console.error('Error stack:', error.stack);
         console.error('Error stack:', error.stack);
         res.status(500).json({
             success: false,

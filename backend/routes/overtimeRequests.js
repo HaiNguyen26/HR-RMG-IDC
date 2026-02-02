@@ -430,15 +430,35 @@ const isValidTime = (value) => {
 // GET /api/overtime-requests - Lấy danh sách đơn
 router.get('/', async (req, res) => {
     try {
-        // Đảm bảo cột parent_request_id tồn tại
+        // Đảm bảo các cột cần thiết tồn tại
         try {
             await pool.query(`
-                ALTER TABLE overtime_requests 
-                ADD COLUMN IF NOT EXISTS parent_request_id INTEGER REFERENCES overtime_requests(id) ON DELETE CASCADE
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'overtime_requests' AND column_name = 'parent_request_id'
+                    ) THEN
+                        ALTER TABLE overtime_requests 
+                        ADD COLUMN parent_request_id INTEGER REFERENCES overtime_requests(id) ON DELETE CASCADE;
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'employees' AND column_name = 'chi_nhanh'
+                    ) THEN
+                        ALTER TABLE employees ADD COLUMN chi_nhanh VARCHAR(255);
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'employees' AND column_name = 'phong_ban'
+                    ) THEN
+                        ALTER TABLE employees ADD COLUMN phong_ban VARCHAR(255);
+                    END IF;
+                END $$;
             `);
         } catch (alterError) {
             // Column có thể đã tồn tại, bỏ qua lỗi
-            console.log('[OvertimeRequest GET] parent_request_id column check:', alterError.message);
+            console.log('[OvertimeRequest GET] Column check:', alterError.message);
         }
 
         const { employeeId, teamLeadId, status } = req.query;

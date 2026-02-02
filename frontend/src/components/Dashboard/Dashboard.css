@@ -3,9 +3,14 @@
 .dashboard-container {
   position: relative;
   padding: 0;
-  min-height: 100%;
-  height: 100%;
-  /* Đảm bảo full height của main content */
+  margin: 0;
+  min-height: 100vh;
+  height: 100vh;
+  /* Dùng 100vh để đảm bảo full chiều cao viewport */
+  width: 100%;
+  /* Đảm bảo full width và full height của main content */
+  flex: 1;
+  /* Flex để fill hết không gian của main-content */
   /* Calm Integrity Gradient: Sky Blue 50 → White (60%) → Indigo 50 */
   background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 60%, #f5f6ff 100%);
   /* Optional: Ambient Blur - Làm mờ môi trường để tăng chiều sâu */
@@ -13,31 +18,44 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  align-items: stretch;
+  /* Đảm bảo children stretch full width */
   overflow: visible;
+  box-sizing: border-box;
 }
 
 .dashboard-sticky-header {
   position: relative;
   z-index: 40;
-  margin-bottom: 1.25rem;
-  padding-top: 0.75rem;
+  margin-bottom: 0;
+  /* Loại bỏ margin-bottom để banner sát top */
+  padding-top: 0;
+  /* Loại bỏ padding-top để banner sát top */
   width: 100%;
 }
 
 .dashboard-banner {
   position: relative;
   background: transparent;
-  border-radius: 1.25rem;
+  border-radius: 0;
+  /* Không bo góc để full width và không có viền trắng */
   padding: 1.25rem 2rem;
-  margin: 1rem 2rem 0 2rem;
+  margin: 0;
+  /* Loại bỏ margin để full width và sát top */
   overflow: hidden;
   min-height: 90px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  transform: translateY(-4px);
+  transform: translateY(0);
+  /* Loại bỏ transform để không bị lệch */
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   box-shadow: 0 8px 32px rgba(59, 130, 246, 0.4), 0 4px 16px rgba(79, 70, 229, 0.3);
+  width: 100%;
+  /* Đảm bảo full width */
+  box-sizing: border-box;
+  /* Đảm bảo không có viền trắng */
+  border: none;
 }
 
 /* II. MÀU NỀN HEADER: Gradient Sáng Mạnh (Vivid Gradient Header) */
@@ -49,9 +67,13 @@
   background: linear-gradient(to right, #3b82f6, #4f46e5, #06b6d4, #3b82f6);
   /* from-blue-500 to-indigo-600 to-cyan-500 back to blue-500 */
   background-size: 200% 100%;
-  border-radius: 1.25rem;
+  border-radius: 0;
+  /* Không bo góc để match với banner và không có viền trắng */
   z-index: 0;
   animation: gradientShift 2s ease infinite;
+  /* Đảm bảo không có viền */
+  border: none;
+  outline: none;
 }
 
 @keyframes gradientShift {
@@ -73,6 +95,10 @@
   z-index: 1;
   width: 100%;
   background: transparent;
+  padding: 0;
+  margin: 0;
+  /* Đảm bảo full width không có padding/margin */
+  box-sizing: border-box;
 }
 
 /* Text trong header: Trắng để tương phản với gradient đậm */
@@ -178,13 +204,19 @@
   flex-direction: column;
   gap: 0;
   padding: 0;
+  margin: 0;
   padding-bottom: 2rem;
   padding-top: 0;
   overflow-y: visible;
   overflow-x: hidden;
   height: 100%;
-  min-height: 100%;
-  /* Đảm bảo full height của main content, đặc biệt trên màn hình nhỏ */
+  min-height: 100vh;
+  /* Dùng 100vh để đảm bảo full chiều cao viewport */
+  width: 100%;
+  /* Đảm bảo full width và full height của main content, đặc biệt trên màn hình nhỏ */
+  box-sizing: border-box;
+  /* Đảm bảo sát top của main-content */
+  align-items: stretch;
 }
 
 .dashboard-content {
@@ -630,7 +662,8 @@
 /* Tablet Landscape (1024px - 1440px) */
 @media (max-width: 1440px) {
   .dashboard-container {
-    padding: 2.1rem 2rem;
+    padding: 0;
+    /* Loại bỏ tất cả padding để banner sát top */
   }
 
   .dashboard-main-grid {
@@ -638,7 +671,8 @@
   }
 
   .dashboard-banner {
-    margin: 1rem 1.5rem 0 1.5rem;
+    margin: 0;
+    /* Loại bỏ tất cả margin để banner sát top */
     padding: 1.25rem 1.5rem;
   }
 }
@@ -646,16 +680,18 @@
 /* Tablet Portrait (768px - 1024px) */
 @media (max-width: 1024px) {
   .dashboard-container {
-    padding: 1.5rem 1.25rem;
-    padding-top: 4rem;
-    /* Space for hamburger menu */
+    padding: 0;
+    /* Loại bỏ tất cả padding để banner sát top */
+    /* Space for hamburger menu được xử lý bởi banner margin-top nếu cần */
   }
 
   .dashboard-banner {
-    margin: 0.75rem 1rem 0 1rem;
+    margin: 0;
+    /* Loại bỏ tất cả margin để banner sát top */
     padding: 1rem 1.25rem;
     min-height: 80px;
-    border-radius: 1rem;
+    border-radius: 0;
+    /* Loại bỏ border-radius để full width */
   }
 
   .dashboard-title {
@@ -767,16 +803,18 @@
 /* Mobile Landscape & Large Mobile (640px - 768px) */
 @media (max-width: 768px) {
   .dashboard-container {
-    padding: 1rem 1rem;
-    padding-top: 4rem;
-    /* Space for hamburger menu */
+    padding: 0;
+    /* Loại bỏ tất cả padding để banner sát top */
+    /* Space for hamburger menu được xử lý bởi banner margin-top nếu cần */
   }
 
   .dashboard-banner {
-    margin: 0.5rem 0.75rem 0 0.75rem;
+    margin: 0;
+    /* Loại bỏ tất cả margin để banner sát top */
     padding: 0.875rem 1rem;
     min-height: 70px;
-    border-radius: 0.875rem;
+    border-radius: 0;
+    /* Loại bỏ border-radius để full width */
     flex-direction: column;
     align-items: flex-start;
     gap: 0.75rem;
@@ -979,21 +1017,25 @@
 /* Small Mobile (320px - 640px) */
 @media (max-width: 640px) {
   .dashboard-container {
-    padding: 0.75rem 0.75rem;
-    padding-top: 4rem;
-    /* Space for hamburger menu */
+    padding: 0;
+    /* Loại bỏ tất cả padding để banner sát top */
+    /* Space for hamburger menu được xử lý bởi banner margin-top nếu cần */
   }
 
   .dashboard-sticky-header {
-    padding-top: 0.5rem;
-    margin-bottom: 1rem;
+    padding-top: 0;
+    /* Loại bỏ padding-top để banner sát top */
+    margin-bottom: 0;
+    /* Loại bỏ margin-bottom để banner sát top */
   }
 
   .dashboard-banner {
-    margin: 0.5rem 0.5rem 0 0.5rem;
+    margin: 0;
+    /* Loại bỏ tất cả margin để banner sát top */
     padding: 0.75rem 0.875rem;
     min-height: auto;
-    border-radius: 0.75rem;
+    border-radius: 0;
+    /* Loại bỏ border-radius để full width */
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
@@ -1179,11 +1221,13 @@
 /* Extra Small Mobile (max-width: 375px) */
 @media (max-width: 375px) {
   .dashboard-container {
-    padding: 0.5rem 0.5rem;
+    padding: 0;
+    /* Loại bỏ tất cả padding để banner sát top */
   }
 
   .dashboard-banner {
-    margin: 0.5rem 0.5rem 0 0.5rem;
+    margin: 0;
+    /* Loại bỏ tất cả margin để banner sát top */
     padding: 0.65rem 0.75rem;
   }
 

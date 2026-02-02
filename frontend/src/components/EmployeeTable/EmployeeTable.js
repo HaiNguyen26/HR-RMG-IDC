@@ -634,6 +634,17 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
     );
   };
 
+  // Đảm bảo employees là array hợp lệ
+  const safeEmployees = Array.isArray(employees) ? employees : [];
+  
+  // Debug logging để kiểm tra
+  useEffect(() => {
+    console.log('[EmployeeTable] employees prop:', employees);
+    console.log('[EmployeeTable] safeEmployees length:', safeEmployees.length);
+    console.log('[EmployeeTable] branchFilter:', branchFilter);
+    console.log('[EmployeeTable] searchQuery:', searchQuery);
+  }, [employees, branchFilter, searchQuery]);
+
   const normalizedFilter = branchFilter
     ? branchFilter
       .toLowerCase()
@@ -642,12 +653,12 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
     : '';
   // Filter by branch first
   let branchFiltered = normalizedFilter
-    ? employees.filter((employee) =>
+    ? safeEmployees.filter((employee) =>
       (employee.chi_nhanh || employee.chiNhanh || '')
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '') === normalizedFilter)
-    : employees;
+    : safeEmployees;
 
   // Filter by search query (name)
   const filteredEmployees = searchQuery.trim()
@@ -658,6 +669,12 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
         return normalizedName.includes(normalizedQuery);
       })
     : branchFiltered;
+  
+  // Debug logging cho filteredEmployees
+  useEffect(() => {
+    console.log('[EmployeeTable] branchFiltered length:', branchFiltered.length);
+    console.log('[EmployeeTable] filteredEmployees length:', filteredEmployees.length);
+  }, [branchFiltered.length, filteredEmployees.length]);
 
   // Sync selectedEmployees with available employees
   useEffect(() => {
@@ -909,8 +926,40 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                         </path>
                       </svg>
                     </div>
-                    <p className="empty-state-title">Không có nhân viên nào khớp bộ lọc</p>
-                    <p className="empty-state-description">Điều chỉnh bộ lọc hoặc thử lại sau</p>
+                    <p className="empty-state-title">
+                      {safeEmployees.length === 0 
+                        ? 'Chưa có dữ liệu nhân viên' 
+                        : (branchFilter || searchQuery.trim() 
+                          ? 'Không có nhân viên nào khớp bộ lọc' 
+                          : 'Chưa có dữ liệu nhân viên')}
+                    </p>
+                    <p className="empty-state-description">
+                      {safeEmployees.length === 0 
+                        ? 'Vui lòng thêm nhân viên hoặc làm mới trang' 
+                        : (branchFilter || searchQuery.trim() 
+                          ? 'Điều chỉnh bộ lọc hoặc xóa tìm kiếm để xem tất cả nhân viên' 
+                          : 'Vui lòng thêm nhân viên hoặc làm mới trang')}
+                    </p>
+                    {(branchFilter || searchQuery.trim()) && safeEmployees.length > 0 && (
+                      <button
+                        onClick={() => {
+                          setSearchQuery('');
+                          // Reset branch filter nếu có thể
+                        }}
+                        style={{
+                          marginTop: '12px',
+                          padding: '8px 16px',
+                          backgroundColor: '#0b5ed7',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '14px'
+                        }}
+                      >
+                        Xóa bộ lọc
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -1275,7 +1324,7 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                               <div
                                 style={{
                                   position: 'absolute',
-                                  top: '100%',
+                                  bottom: '100%',
                                   left: 0,
                                   right: 0,
                                   backgroundColor: 'white',
@@ -1284,8 +1333,8 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                                   maxHeight: '200px',
                                   overflowY: 'auto',
                                   zIndex: 1000,
-                                  marginTop: '4px',
-                                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                  marginBottom: '4px',
+                                  boxShadow: '0 -2px 8px rgba(0,0,0,0.1)'
                                 }}
                                 onMouseDown={(e) => e.preventDefault()}
                               >
