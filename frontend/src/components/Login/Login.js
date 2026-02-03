@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { authAPI } from '../../services/api';
+import ResetPasswordModal from '../ResetPassword/ResetPasswordModal';
 import './Login.css';
 
 // ============================================================
@@ -29,6 +30,7 @@ const Login = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
 
   // Kiểm tra dev mode từ URL hoặc localStorage
   // Chỉ cho phép dev mode trên localhost để đảm bảo an toàn
@@ -264,6 +266,17 @@ const Login = ({ onLoginSuccess }) => {
                 )}
               </button>
             </div>
+
+            {/* Forgot Password Link */}
+            <div className="login-forgot-password">
+              <button
+                type="button"
+                onClick={() => setShowResetPasswordModal(true)}
+                className="login-forgot-password-btn"
+              >
+                Quên mật khẩu?
+              </button>
+            </div>
           </form>
 
           {/* Footer */}
@@ -276,6 +289,12 @@ const Login = ({ onLoginSuccess }) => {
           </div>
         </div>
       </div>
+
+      {/* Reset Password Modal */}
+      <ResetPasswordModal
+        isOpen={showResetPasswordModal}
+        onClose={() => setShowResetPasswordModal(false)}
+      />
     </div>
   );
 };

@@ -142,6 +142,8 @@ export const statisticsAPI = {
 export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
   changePassword: (data) => api.post('/auth/change-password', data),
+  forgotPassword: (data) => api.post('/auth/forgot-password', data),
+  resetPassword: (data) => api.post('/auth/reset-password', data),
 };
 
 // Requests API

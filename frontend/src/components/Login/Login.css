@@ -384,6 +384,33 @@
   animation: spin 1s linear infinite;
 }
 
+/* Forgot Password Link */
+.login-forgot-password {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.login-forgot-password-btn {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.5rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: all 0.2s;
+}
+
+.login-forgot-password-btn:hover {
+  color: #5568d3;
+  text-decoration-thickness: 2px;
+}
+
 @keyframes spin {
   from {
     transform: rotate(0deg);
