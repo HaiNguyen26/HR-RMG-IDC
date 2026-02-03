@@ -67,6 +67,7 @@ run_migration "create_meal_allowance_requests_schema.sql" "create_meal_allowance
 run_migration "add_manager_fields_customer_entertainment_expenses.sql" "add_manager_fields_customer_entertainment_expenses.sql"
 run_migration "add_ceo_fields_customer_entertainment_expenses.sql" "add_ceo_fields_customer_entertainment_expenses.sql"
 run_migration "grant_permissions_late_early_meal_allowance.sql" "grant_permissions_late_early_meal_allowance.sql"
+run_migration "create_password_reset_table.sql" "create_password_reset_table.sql"
 
 echo -e "${YELLOW}[2/2] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"
