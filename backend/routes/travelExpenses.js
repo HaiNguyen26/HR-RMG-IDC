@@ -1520,12 +1520,14 @@ const upload = multer({
             'image/png',
             'image/jpg',
             'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/zip',
+            'application/x-zip-compressed'
         ];
         if (allowedTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('Chỉ chấp nhận file PDF, DOC, DOCX, JPG, PNG'));
+            cb(new Error('Chỉ chấp nhận file PDF, DOC, DOCX, JPG, PNG, ZIP'));
         }
     }
 });

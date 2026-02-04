@@ -27,11 +27,18 @@ const upload = multer({
         files: 20 // Maximum 20 files
     },
     fileFilter: (req, file, cb) => {
-        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+        const allowedTypes = [
+            'application/pdf',
+            'image/jpeg',
+            'image/jpg',
+            'image/png',
+            'application/zip',
+            'application/x-zip-compressed'
+        ];
         if (allowedTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('Chỉ chấp nhận các định dạng: PDF, JPG, PNG'));
+            cb(new Error('Chỉ chấp nhận các định dạng: PDF, JPG, PNG, ZIP'));
         }
     }
 });

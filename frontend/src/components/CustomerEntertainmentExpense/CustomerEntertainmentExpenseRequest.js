@@ -219,11 +219,11 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
         const files = Array.from(e.target.files);
 
         // Validate file types
-        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'application/zip', 'application/x-zip-compressed'];
         const invalidFiles = files.filter(file => !allowedTypes.includes(file.type));
 
         if (invalidFiles.length > 0) {
-            showToast?.('Chỉ chấp nhận các định dạng: PDF, JPG, PNG', 'warning');
+            showToast?.('Chỉ chấp nhận các định dạng: PDF, JPG, PNG, ZIP', 'warning');
             return;
         }
 
@@ -854,7 +854,7 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                                                                     type="file"
                                                                     id={`file-upload-${item.id}`}
                                                                     className="customer-entertainment-expense-voucher-file-input"
-                                                                    accept=".pdf,.jpg,.jpeg,.png"
+                                                                    accept=".pdf,.jpg,.jpeg,.png,.zip"
                                                                     multiple
                                                                     onChange={(e) => handleExpenseItemFileChange(item.id, e)}
                                                                 />

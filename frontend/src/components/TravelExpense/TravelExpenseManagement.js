@@ -365,7 +365,7 @@ const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
                                                             type="file"
                                                             id="hrAttachments"
                                                             multiple
-                                                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip"
                                                             onChange={handleHrFileChange}
                                                         />
                                                         <label htmlFor="hrAttachments" className="travel-expense-file-input-label">

@@ -563,7 +563,7 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
                                                             type="file"
                                                             id="fileUpload"
                                                             multiple
-                                                            accept=".pdf,.jpg,.jpeg,.png"
+                                                            accept=".pdf,.jpg,.jpeg,.png,.zip"
                                                             onChange={(e) => {
                                                                 const files = Array.from(e.target.files || []);
                                                                 setSelectedFiles(files);
