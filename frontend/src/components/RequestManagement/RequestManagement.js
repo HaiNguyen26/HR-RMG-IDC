@@ -658,6 +658,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             const data = approvedRequests.map((req) => {
                 const baseData = {
                     'Mã đơn': req.id || '',
+                    'Mã nhân viên': req.ma_nhan_vien || req.employee?.ma_nhan_vien || '',
                     'Nhân viên': req.employee_name || req.employee?.ho_ten || '',
                     'Phòng ban': req.employee_department || req.employee?.phong_ban || '',
                     'Chi nhánh': req.employee_branch || req.employee?.chi_nhanh || '',

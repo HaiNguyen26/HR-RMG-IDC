@@ -347,6 +347,7 @@ router.get('/', async (req, res) => {
         const query = `
             SELECT mar.*,
                    e.ho_ten as employee_name,
+                   e.ma_nhan_vien,
                    e.email as employee_email,
                    e.phong_ban as employee_department,
                    e.chi_nhanh as employee_branch,
