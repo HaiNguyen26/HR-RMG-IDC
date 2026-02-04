@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { employeesAPI, requestsAPI, equipmentAPI } from '../../services/api';
 import CustomSelect from '../Common/CustomSelect/CustomSelect';
@@ -645,30 +645,38 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
     console.log('[EmployeeTable] searchQuery:', searchQuery);
   }, [employees, branchFilter, searchQuery]);
 
-  const normalizedFilter = branchFilter
-    ? branchFilter
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-    : '';
-  // Filter by branch first
-  let branchFiltered = normalizedFilter
-    ? safeEmployees.filter((employee) =>
-      (employee.chi_nhanh || employee.chiNhanh || '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') === normalizedFilter)
-    : safeEmployees;
+  const normalizedFilter = useMemo(() => {
+    return branchFilter
+      ? branchFilter
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+      : '';
+  }, [branchFilter]);
 
-  // Filter by search query (name)
-  const filteredEmployees = searchQuery.trim()
-    ? branchFiltered.filter((employee) => {
-        const name = (employee.ho_ten || employee.hoTen || '').toLowerCase();
-        const normalizedName = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        const normalizedQuery = searchQuery.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        return normalizedName.includes(normalizedQuery);
-      })
-    : branchFiltered;
+  // Filter by branch first - memoized
+  const branchFiltered = useMemo(() => {
+    return normalizedFilter
+      ? safeEmployees.filter((employee) =>
+          (employee.chi_nhanh || employee.chiNhanh || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '') === normalizedFilter
+        )
+      : safeEmployees;
+  }, [safeEmployees, normalizedFilter]);
+
+  // Filter by search query (name) - memoized
+  const filteredEmployees = useMemo(() => {
+    return searchQuery.trim()
+      ? branchFiltered.filter((employee) => {
+          const name = (employee.ho_ten || employee.hoTen || '').toLowerCase();
+          const normalizedName = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const normalizedQuery = searchQuery.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          return normalizedName.includes(normalizedQuery);
+        })
+      : branchFiltered;
+  }, [branchFiltered, searchQuery]);
   
   // Debug logging cho filteredEmployees
   useEffect(() => {
@@ -676,19 +684,33 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
     console.log('[EmployeeTable] filteredEmployees length:', filteredEmployees.length);
   }, [branchFiltered.length, filteredEmployees.length]);
 
-  // Sync selectedEmployees with available employees
+  // Sync selectedEmployees with available employees - chỉ update khi IDs thay đổi
+  const filteredEmployeeIds = useMemo(() => 
+    filteredEmployees.map(emp => emp.id).sort().join(','),
+    [filteredEmployees]
+  );
+
+  // Sync selectedEmployees: chỉ loại bỏ các IDs không còn trong filteredEmployees
+  // KHÔNG tự động thêm tất cả nhân viên
   useEffect(() => {
     const availableIds = new Set(filteredEmployees.map(emp => emp.id));
     setSelectedEmployees(prev => {
       const newSet = new Set();
+      let hasChanges = false;
+      
+      // Chỉ giữ lại các IDs đã được chọn TRƯỚC ĐÓ và vẫn còn trong filteredEmployees
       prev.forEach(id => {
         if (availableIds.has(id)) {
-          newSet.add(id);
+          newSet.add(id); // Giữ lại nếu vẫn còn trong danh sách
+        } else {
+          hasChanges = true; // ID bị loại bỏ khỏi filteredEmployees
         }
       });
-      return newSet;
+      
+      // Chỉ update nếu có thay đổi (IDs bị loại bỏ)
+      return hasChanges ? newSet : prev;
     });
-  }, [filteredEmployees]);
+  }, [filteredEmployeeIds]); // Chỉ phụ thuộc vào string IDs, không phải array
 
   // Handle checkbox selection
   const handleSelectEmployee = (employeeId, event) => {
@@ -909,12 +931,13 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
               <th>Quản Lý Trực Tiếp</th>
               <th>Quản Lý Gián Tiếp</th>
               <th>Email</th>
+              {canManage && <th>Mật khẩu</th>}
             </tr>
           </thead>
           <tbody className="employee-table-tbody">
             {!filteredEmployees || filteredEmployees.length === 0 ? (
               <tr>
-                <td colSpan={canManage ? 16 : 15} className="employee-table-empty">
+                <td colSpan={canManage ? 17 : 15} className="employee-table-empty">
                   <div className="empty-state-content">
                     <div className="empty-state-icon">
                       <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1014,6 +1037,27 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                     <td>{employee.quan_ly_truc_tiep || employee.quanLyTrucTiep || '-'}</td>
                     <td>{employee.quan_ly_gian_tiep || employee.quanLyGianTiep || '-'}</td>
                     <td>{employee.email || '-'}</td>
+                    {canManage && (
+                      <td>
+                        {employee.display_password 
+                          ? (
+                            <>
+                              {employee.display_password}
+                              {employee.display_password === 'RMG123@' && (
+                                <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '4px' }}>
+                                  (mặc định)
+                                </span>
+                              )}
+                            </>
+                          )
+                          : employee.password_needs_update ? (
+                            <span style={{ fontSize: '0.875rem', color: '#f59e0b', fontStyle: 'italic' }}>
+                              (Cần đăng nhập lại để cập nhật)
+                            </span>
+                          )
+                          : '-'}
+                      </td>
+                    )}
                   </tr>
                 );
               })

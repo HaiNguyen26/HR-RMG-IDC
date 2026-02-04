@@ -3,6 +3,43 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const pool = require('../config/database');
 
+// Helper function để đảm bảo cột password_display tồn tại
+let ensurePasswordDisplayColumnPromise = null;
+const ensurePasswordDisplayColumn = async () => {
+    if (ensurePasswordDisplayColumnPromise) {
+        return ensurePasswordDisplayColumnPromise;
+    }
+
+    ensurePasswordDisplayColumnPromise = (async () => {
+        const checkQuery = `
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'employees'
+            AND column_name = 'password_display'
+            LIMIT 1
+        `;
+
+        const result = await pool.query(checkQuery);
+
+        if (result.rowCount === 0) {
+            await pool.query(`
+                ALTER TABLE employees
+                ADD COLUMN password_display VARCHAR(255);
+            `);
+
+            await pool.query(`
+                COMMENT ON COLUMN employees.password_display IS 'Mật khẩu plaintext để HR xem (chỉ cập nhật khi nhân viên đổi mật khẩu)';
+            `);
+        }
+    })().catch((error) => {
+        ensurePasswordDisplayColumnPromise = null;
+        console.error('Error ensuring password_display column exists:', error);
+        throw error;
+    });
+
+    return ensurePasswordDisplayColumnPromise;
+};
+
 // Helper function để generate OTP 6 chữ số
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -89,6 +126,21 @@ router.post('/login', async (req, res) => {
 
         if (isPasswordValid) {
           isEmployee = true;
+          
+          // Đảm bảo cột password_display tồn tại và cập nhật với mật khẩu hiện tại
+          // Điều này giúp hiển thị mật khẩu cho HR ngay cả khi nhân viên đổi mật khẩu trước khi migration
+          try {
+            await ensurePasswordDisplayColumn();
+            await pool.query(
+              `UPDATE employees SET password_display = $1 WHERE id = $2`,
+              [password, employee.id]
+            );
+            console.log(`[Auth] Updated password_display for employee ${employee.id} on login`);
+          } catch (updateError) {
+            // Log lỗi nhưng không block login
+            console.error(`[Auth] Error updating password_display for employee ${employee.id}:`, updateError.message);
+          }
+          
           authenticatedUser = {
             id: employee.id,
             username: employee.ho_ten,
@@ -163,6 +215,9 @@ router.post('/change-password', async (req, res) => {
     try {
       await client.query('BEGIN');
 
+      // Đảm bảo cột password_display tồn tại (nếu là employee)
+      await ensurePasswordDisplayColumn();
+
       // Try to find in users table first
       let userQuery = `
         SELECT id, password, 'users' as table_name
@@ -212,8 +267,27 @@ router.post('/change-password', async (req, res) => {
       const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
       // Update password
-      const updateQuery = `UPDATE ${userTable} SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`;
-      await client.query(updateQuery, [hashedNewPassword, userId]);
+      // Nếu là employee, cũng lưu plaintext vào password_display để HR xem
+      let updateQuery;
+      if (userTable === 'employees') {
+        try {
+          updateQuery = `UPDATE ${userTable} SET password = $1, password_display = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`;
+          const updateResult = await client.query(updateQuery, [hashedNewPassword, newPassword, userId]);
+          console.log(`[Auth] Updated password for employee ${userId}, rows affected: ${updateResult.rowCount}`);
+        } catch (updateError) {
+          // Nếu lỗi do cột password_display chưa tồn tại, thử lại không có cột đó
+          if (updateError.code === '42703') {
+            console.log(`[Auth] password_display column not found, retrying without it`);
+            updateQuery = `UPDATE ${userTable} SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`;
+            await client.query(updateQuery, [hashedNewPassword, userId]);
+          } else {
+            throw updateError;
+          }
+        }
+      } else {
+        updateQuery = `UPDATE ${userTable} SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`;
+        await client.query(updateQuery, [hashedNewPassword, userId]);
+      }
 
       await client.query('COMMIT');
 
@@ -409,11 +483,16 @@ router.post('/reset-password', async (req, res) => {
       });
     }
 
-    const userTable = userType === 'employee' ? 'employees' : 'users';
+      const userTable = userType === 'employee' ? 'employees' : 'users';
 
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        // Đảm bảo cột password_display tồn tại (nếu là employee)
+        if (userTable === 'employees') {
+          await ensurePasswordDisplayColumn();
+        }
 
       // Kiểm tra user có tồn tại không
       const checkUserQuery = userType === 'employee' 
@@ -442,12 +521,39 @@ router.post('/reset-password', async (req, res) => {
       const hashedPassword = await bcrypt.hash(newPassword, 10);
 
       // Update password và kiểm tra số rows affected
-      const updateResult = await client.query(
-        `UPDATE ${userTable} 
-         SET password = $1, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = $2`,
-        [hashedPassword, numericUserId]
-      );
+      // Nếu là employee, cũng lưu plaintext vào password_display để HR xem
+      let updateResult;
+      if (userTable === 'employees') {
+        try {
+          updateResult = await client.query(
+            `UPDATE ${userTable} 
+             SET password = $1, password_display = $2, updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $3`,
+            [hashedPassword, newPassword, numericUserId]
+          );
+          console.log(`[Auth] Reset password for employee ${numericUserId}, rows affected: ${updateResult.rowCount}`);
+        } catch (updateError) {
+          // Nếu lỗi do cột password_display chưa tồn tại, thử lại không có cột đó
+          if (updateError.code === '42703') {
+            console.log(`[Auth] password_display column not found, retrying without it`);
+            updateResult = await client.query(
+              `UPDATE ${userTable} 
+               SET password = $1, updated_at = CURRENT_TIMESTAMP 
+               WHERE id = $2`,
+              [hashedPassword, numericUserId]
+            );
+          } else {
+            throw updateError;
+          }
+        }
+      } else {
+        updateResult = await client.query(
+          `UPDATE ${userTable} 
+           SET password = $1, updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $2`,
+          [hashedPassword, numericUserId]
+        );
+      }
 
       console.log('[Auth] Update password result:', { 
         rowCount: updateResult.rowCount,

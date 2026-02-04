@@ -792,6 +792,8 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     const firstDate = items[0]?.expense_date;
                     const lastDate = items[items.length - 1]?.expense_date;
                     const totalAmount = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                    // Nội dung: ghép tất cả content từ items, cách nhau bởi dấu phẩy hoặc xuống dòng
+                    const content = items.map(item => item.content || '').filter(c => c.trim() !== '').join('; ');
 
                     return {
                         ...baseData,
@@ -799,6 +801,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         'Từ ngày': formatDate(firstDate),
                         'Đến ngày': formatDate(lastDate),
                         'Số mục chi tiết': items.length,
+                        'Nội dung': content || '',
                         'Tổng tiền (VNĐ)': totalAmount.toLocaleString('vi-VN'),
                         'Ghi chú': req.notes || '',
                         'Trạng thái': 'Đã duyệt',

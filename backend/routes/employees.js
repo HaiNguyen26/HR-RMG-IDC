@@ -216,12 +216,49 @@ const ensureAdditionalFields = async () => {
     return ensureAdditionalFieldsPromise;
 };
 
+let ensurePasswordDisplayColumnPromise = null;
+const ensurePasswordDisplayColumn = async () => {
+    if (ensurePasswordDisplayColumnPromise) {
+        return ensurePasswordDisplayColumnPromise;
+    }
+
+    ensurePasswordDisplayColumnPromise = (async () => {
+        const checkQuery = `
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'employees'
+            AND column_name = 'password_display'
+            LIMIT 1
+        `;
+
+        const result = await pool.query(checkQuery);
+
+        if (result.rowCount === 0) {
+            await pool.query(`
+                ALTER TABLE employees
+                ADD COLUMN password_display VARCHAR(255);
+            `);
+
+            await pool.query(`
+                COMMENT ON COLUMN employees.password_display IS 'Mật khẩu plaintext để HR xem (chỉ cập nhật khi nhân viên đổi mật khẩu)';
+            `);
+        }
+    })().catch((error) => {
+        ensurePasswordDisplayColumnPromise = null;
+        console.error('Error ensuring password_display column exists:', error);
+        throw error;
+    });
+
+    return ensurePasswordDisplayColumnPromise;
+};
+
 /**
  * POST /api/employees/bulk - Tạo nhiều nhân viên từ danh sách
  */
 router.post('/bulk', async (req, res) => {
     const client = await pool.connect();
     try {
+        await ensurePasswordDisplayColumn();
         const { employees } = req.body; // Array of employee objects
 
         if (!Array.isArray(employees) || employees.length === 0) {
@@ -479,11 +516,12 @@ router.post('/bulk', async (req, res) => {
                         tinh_thue,
                         cap_bac,
                         email, 
-                        password, 
+                        password,
+                        password_display,
                         quan_ly_truc_tiep, 
                         quan_ly_gian_tiep, 
                         trang_thai
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
                     RETURNING id, ma_nhan_vien, ho_ten, email
                 `;
 
@@ -502,6 +540,7 @@ router.post('/bulk', async (req, res) => {
                     finalCapBac,
                     finalEmail,
                     hashedPassword,
+                    DEFAULT_PASSWORD, // password_display
                     finalQuanLyTrucTiep,
                     finalQuanLyGianTiep,
                     'PENDING'  // trang_thai
@@ -622,34 +661,136 @@ router.get('/', async (req, res) => {
         await ensurePhongBanConstraintDropped();
         await ensureManagerColumns();
         await ensureAdditionalFields();
+        await ensurePasswordDisplayColumn();
 
-        const query = `
-            SELECT 
-                id, 
-                ma_nhan_vien,
-                ma_cham_cong,
-                ho_ten, 
-                chuc_danh, 
-                phong_ban, 
-                bo_phan, 
-                chi_nhanh,
-                ngay_gia_nhap, 
-                loai_hop_dong,
-                dia_diem,
-                tinh_thue,
-                cap_bac,
-                email, 
-                quan_ly_truc_tiep,
-                quan_ly_gian_tiep,
-                trang_thai,
-                created_at,
-                updated_at
-            FROM employees 
-            WHERE trang_thai IN ('ACTIVE', 'PENDING')
-            ORDER BY created_at DESC
-        `;
+        // Kiểm tra user role từ header để quyết định có trả về password không
+        const userId = req.headers['user-id'];
+        let includePassword = false;
+        
+        if (userId) {
+            try {
+                // Kiểm tra user có phải HR hoặc ADMIN không
+                const userCheck = await pool.query(
+                    `SELECT role FROM users WHERE id = $1 AND trang_thai = 'ACTIVE'`,
+                    [userId]
+                );
+                if (userCheck.rows.length > 0) {
+                    const role = (userCheck.rows[0].role || '').toUpperCase();
+                    includePassword = role === 'HR' || role === 'ADMIN';
+                }
+            } catch (err) {
+                console.log('[GET /api/employees] Error checking user role:', err.message);
+            }
+        }
 
-        const result = await pool.query(query);
+        // Kiểm tra xem cột password_display có tồn tại không (fallback nếu ensurePasswordDisplayColumn chưa chạy xong)
+        let hasPasswordDisplayColumn = false;
+        try {
+            const columnCheck = await pool.query(`
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'employees'
+                AND column_name = 'password_display'
+                LIMIT 1
+            `);
+            hasPasswordDisplayColumn = columnCheck.rowCount > 0;
+        } catch (err) {
+            console.log('[GET /api/employees] Error checking password_display column:', err.message);
+        }
+
+        let result;
+        try {
+            const query = `
+                SELECT
+                    id, 
+                    ma_nhan_vien,
+                    ma_cham_cong,
+                    ho_ten, 
+                    chuc_danh, 
+                    phong_ban, 
+                    bo_phan, 
+                    chi_nhanh,
+                    ngay_gia_nhap, 
+                    loai_hop_dong,
+                    dia_diem,
+                    tinh_thue,
+                    cap_bac,
+                    email, 
+                    quan_ly_truc_tiep,
+                    quan_ly_gian_tiep,
+                    trang_thai,
+                    ${includePassword ? `password, ${hasPasswordDisplayColumn ? 'password_display' : 'NULL as password_display'},` : ''}
+                    created_at,
+                    updated_at
+                FROM employees 
+                WHERE trang_thai IN ('ACTIVE', 'PENDING')
+                ORDER BY created_at DESC
+            `;
+
+            result = await pool.query(query);
+        } catch (queryError) {
+            // Nếu lỗi do cột password_display chưa tồn tại, thử lại với query không có cột đó
+            if (queryError.code === '42703' && includePassword && hasPasswordDisplayColumn) {
+                console.log('[GET /api/employees] Retrying query without password_display column');
+                const fallbackQuery = `
+                    SELECT
+                        id, 
+                        ma_nhan_vien,
+                        ma_cham_cong,
+                        ho_ten, 
+                        chuc_danh, 
+                        phong_ban, 
+                        bo_phan, 
+                        chi_nhanh,
+                        ngay_gia_nhap, 
+                        loai_hop_dong,
+                        dia_diem,
+                        tinh_thue,
+                        cap_bac,
+                        email, 
+                        quan_ly_truc_tiep,
+                        quan_ly_gian_tiep,
+                        trang_thai,
+                        ${includePassword ? 'password,' : ''}
+                        created_at,
+                        updated_at
+                    FROM employees 
+                    WHERE trang_thai IN ('ACTIVE', 'PENDING')
+                    ORDER BY created_at DESC
+                `;
+                result = await pool.query(fallbackQuery);
+                // Đánh dấu không có password_display
+                hasPasswordDisplayColumn = false;
+            } else {
+                throw queryError;
+            }
+        }
+
+        // Nếu có quyền xem password, trả về password_display hoặc đánh dấu cần update
+        // Tối ưu hóa: Loại bỏ bcrypt.compare() trong GET request để tránh chậm khi có nhiều nhân viên
+        // Password sẽ được cập nhật tự động khi nhân viên đăng nhập lại
+        if (includePassword && result.rows.length > 0) {
+            for (let i = 0; i < result.rows.length; i++) {
+                const row = result.rows[i];
+                
+                // Xóa password hash để không trả về
+                delete row.password;
+                
+                // Luôn ưu tiên password_display nếu có (mật khẩu hiện tại)
+                if (row.password_display) {
+                    row.display_password = row.password_display;
+                } else {
+                    // Không có password_display - đánh dấu cần update
+                    // Không so sánh với DEFAULT_PASSWORD để tránh chậm
+                    // Password sẽ được cập nhật tự động khi nhân viên đăng nhập lại
+                    row.display_password = null;
+                    row.password_needs_update = true;
+                }
+                
+                // Xóa password_display khỏi response (chỉ giữ display_password)
+                delete row.password_display;
+            }
+        }
 
         res.json({
             success: true,
@@ -1316,6 +1457,7 @@ router.post('/', async (req, res) => {
     const client = await pool.connect();
 
     try {
+        await ensurePasswordDisplayColumn();
         const {
             maNhanVien,
             maChamCong,
@@ -1484,10 +1626,11 @@ router.post('/', async (req, res) => {
                 cap_bac,
                 email, 
                 password,
+                password_display,
                 quan_ly_truc_tiep,
                 quan_ly_gian_tiep,
                 trang_thai
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'PENDING')
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'PENDING')
             RETURNING id, ma_nhan_vien, ma_cham_cong, ho_ten, chuc_danh, phong_ban, bo_phan, chi_nhanh, ngay_gia_nhap, loai_hop_dong, dia_diem, tinh_thue, cap_bac, email, quan_ly_truc_tiep, quan_ly_gian_tiep, trang_thai
         `;
 
@@ -1506,6 +1649,7 @@ router.post('/', async (req, res) => {
             capBac && capBac.trim() !== '' ? capBac.trim() : null,
             email && email.trim() !== '' ? email.trim() : null,
             hashedPassword,
+            DEFAULT_PASSWORD, // password_display
             quanLyTrucTiep && quanLyTrucTiep.trim() !== '' ? quanLyTrucTiep.trim() : null,
             quanLyGianTiep && quanLyGianTiep.trim() !== '' ? quanLyGianTiep.trim() : null
         ]);
