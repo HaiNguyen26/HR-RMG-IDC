@@ -319,6 +319,7 @@ export const travelExpensesAPI = {
   confirmAdvanceTransfer: (id, data) => api.post(`/travel-expenses/${id}/advance`, data),
   approveException: (id, data) => api.post(`/travel-expenses/${id}/exception-approval`, data),
   confirmPayment: (id, data) => api.post(`/travel-expenses/${id}/payment`, data),
+  returnSettlement: (id, data) => api.post(`/travel-expenses/${id}/settlement/return`, data),
   cancel: (id, data) => api.post(`/travel-expenses/${id}/cancel`, data),
 };
 
@@ -378,6 +379,8 @@ export const customerEntertainmentExpensesAPI = {
   ceoApprove: (id, data) => api.put(`/customer-entertainment-expenses/${id}/ceo-approve`, data),
   ceoReject: (id, data) => api.put(`/customer-entertainment-expenses/${id}/ceo-reject`, data),
   processPayment: (id, data) => api.put(`/customer-entertainment-expenses/${id}/payment`, data),
+  returnSettlement: (id, data) => api.post(`/customer-entertainment-expenses/${id}/return`, data),
+  resubmit: (id, data) => api.put(`/customer-entertainment-expenses/${id}/resubmit`, data || {}),
 };
 
 // Candidates API

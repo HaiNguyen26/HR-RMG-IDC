@@ -22,6 +22,11 @@ const TravelExpenseAccountant = ({ currentUser, showToast }) => {
         paymentReference: ''
     });
 
+    // State for return modal
+    const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+    const [returnNote, setReturnNote] = useState('');
+    const [isReturning, setIsReturning] = useState(false);
+
     // Fetch requests based on active tab
     useEffect(() => {
         const fetchRequests = async () => {
@@ -288,6 +293,116 @@ const TravelExpenseAccountant = ({ currentUser, showToast }) => {
         (!comparison.exceedsAdvance && !comparison.isAlreadyChecked) || // Chưa check, chi phí <= tạm ứng
         comparison.isAlreadyChecked // Đã check, status = SETTLED, cần giải ngân
     );
+
+    // Handle return settlement
+    const handleReturnSettlement = async () => {
+        if (!returnNote.trim()) {
+            showToast?.('Vui lòng nhập lý do trả phiếu', 'error');
+            return;
+        }
+
+        if (!selectedRequestId) {
+            showToast?.('Vui lòng chọn một yêu cầu', 'error');
+            return;
+        }
+
+        setIsReturning(true);
+        try {
+            const response = await travelExpensesAPI.returnSettlement(selectedRequestId, {
+                returnNote: returnNote.trim()
+            });
+
+            if (response.data && response.data.success) {
+                showToast?.('Đã trả phiếu về cho nhân viên thành công', 'success');
+                setIsReturnModalOpen(false);
+                setReturnNote('');
+                // Refresh requests list
+                const fetchRequests = async () => {
+                    setLoading(true);
+                    try {
+                        let statusFilter;
+                        if (activeTab === 'advance') {
+                            statusFilter = 'PENDING_FINANCE';
+                        } else if (activeTab === 'check') {
+                            statusFilter = 'PENDING_ACCOUNTANT';
+                        } else {
+                            statusFilter = 'SETTLED';
+                        }
+
+                        const res = await travelExpensesAPI.getAll({ status: statusFilter });
+                        if (res.data && res.data.success) {
+                            let filteredData = res.data.data || [];
+                            if (activeTab === 'advance') {
+                                filteredData = filteredData.filter(req => {
+                                    const advanceStatus = req.advance_status || req.advance?.status;
+                                    return advanceStatus === 'PENDING_ACCOUNTANT';
+                                });
+                            } else if (activeTab === 'check') {
+                                try {
+                                    const settledResponse = await travelExpensesAPI.getAll({ status: 'SETTLED' });
+                                    if (settledResponse.data && settledResponse.data.success) {
+                                        const settledRequests = (settledResponse.data.data || []).filter(req => {
+                                            return !req.payment?.confirmedAt && !req.payment_confirmed_at;
+                                        });
+                                        filteredData = [...filteredData, ...settledRequests];
+                                    }
+                                } catch (error) {
+                                    console.error('Error fetching SETTLED requests:', error);
+                                }
+                            }
+
+                            const requestsWithAttachments = await Promise.all(
+                                filteredData.map(async (req) => {
+                                    try {
+                                        const attachmentsResponse = await travelExpensesAPI.getAttachments(req.id);
+                                        return {
+                                            ...req,
+                                            attachments: attachmentsResponse.data?.data || []
+                                        };
+                                    } catch (error) {
+                                        return { ...req, attachments: [] };
+                                    }
+                                })
+                            );
+
+                            const formattedRequests = requestsWithAttachments.map(req => {
+                                const startDate = req.start_time ? new Date(req.start_time) : null;
+                                const endDate = req.end_time ? new Date(req.end_time) : null;
+                                return {
+                                    id: req.id,
+                                    code: `CTX-${req.id}`,
+                                    employeeName: req.employee_name || 'N/A',
+                                    location: req.location || '',
+                                    locationType: req.locationType || req.location_type,
+                                    purpose: req.purpose || '',
+                                    startDate: startDate ? startDate.toLocaleDateString('vi-VN') : '',
+                                    endDate: endDate ? endDate.toLocaleDateString('vi-VN') : '',
+                                    advanceAmount: req.advance?.amount || req.actual_advance_amount || 0,
+                                    requestedAdvanceAmount: req.requestedAdvanceAmount || req.requested_advance_amount || 0,
+                                    actualExpense: req.settlement?.actualExpense || req.actual_expense || null,
+                                    settlementNotes: req.settlement?.notes || req.settlement_notes || null,
+                                    attachments: req.attachments || []
+                                };
+                            });
+                            setRequests(formattedRequests);
+                            setSelectedRequestId(null);
+                            setSelectedRequestDetails(null);
+                        }
+                    } catch (error) {
+                        console.error('Error refreshing requests:', error);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                fetchRequests();
+            }
+        } catch (error) {
+            console.error('Error returning settlement:', error);
+            showToast?.('Lỗi khi trả phiếu: ' + (error.response?.data?.message || error.message), 'error');
+        } finally {
+            setIsReturning(false);
+        }
+    };
 
     // Handle submit
     const handleSubmit = async (e) => {
@@ -1120,11 +1235,11 @@ const TravelExpenseAccountant = ({ currentUser, showToast }) => {
                                                             className="travel-expense-accountant-reject-btn"
                                                             disabled={isSubmitting}
                                                             onClick={() => {
-                                                                // TODO: Handle reject action
-                                                                showToast?.('Chức năng từ chối sẽ được triển khai sau', 'info');
+                                                                setIsReturnModalOpen(true);
+                                                                setReturnNote('');
                                                             }}
                                                         >
-                                                            YÊU CẦU BỔ SUNG / TỪ CHỐI
+                                                            TRẢ PHIẾU
                                                         </button>
                                                     </div>
                                                 </div>
@@ -1144,6 +1259,62 @@ const TravelExpenseAccountant = ({ currentUser, showToast }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Return Modal */}
+            {isReturnModalOpen && (
+                <div className="travel-expense-accountant-modal-overlay" onClick={() => !isReturning && setIsReturnModalOpen(false)}>
+                    <div className="travel-expense-accountant-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="travel-expense-accountant-modal-header">
+                            <h3 className="travel-expense-accountant-modal-title">Trả phiếu về nhân viên</h3>
+                            <button
+                                type="button"
+                                className="travel-expense-accountant-modal-close"
+                                onClick={() => !isReturning && setIsReturnModalOpen(false)}
+                                disabled={isReturning}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="travel-expense-accountant-modal-body">
+                            <div className="travel-expense-accountant-form-group">
+                                <label htmlFor="returnNote" className="travel-expense-accountant-form-label">
+                                    Lý do trả phiếu <span style={{ color: '#dc2626' }}>*</span>
+                                </label>
+                                <textarea
+                                    id="returnNote"
+                                    className="travel-expense-accountant-form-textarea"
+                                    rows="6"
+                                    value={returnNote}
+                                    onChange={(e) => setReturnNote(e.target.value)}
+                                    placeholder="Nhập lý do trả phiếu và yêu cầu nhân viên chỉnh sửa/bổ sung..."
+                                    disabled={isReturning}
+                                />
+                                <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                                    Phiếu sẽ được trả về cho nhân viên tại module "Báo cáo hoàn ứng" để chỉnh sửa và nộp lại.
+                                </div>
+                            </div>
+                        </div>
+                        <div className="travel-expense-accountant-modal-footer">
+                            <button
+                                type="button"
+                                className="travel-expense-accountant-modal-cancel-btn"
+                                onClick={() => setIsReturnModalOpen(false)}
+                                disabled={isReturning}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type="button"
+                                className="travel-expense-accountant-modal-confirm-btn"
+                                onClick={handleReturnSettlement}
+                                disabled={isReturning || !returnNote.trim()}
+                            >
+                                {isReturning ? 'Đang xử lý...' : 'Xác nhận trả phiếu'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

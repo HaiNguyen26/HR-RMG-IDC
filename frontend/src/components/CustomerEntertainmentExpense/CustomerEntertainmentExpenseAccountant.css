@@ -468,6 +468,29 @@
     padding: 1rem 1.5rem 1.5rem;
     display: flex;
     justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.customer-entertainment-expense-accountant-modal-return-btn {
+    border: none;
+    background: #dc2626;
+    color: #ffffff;
+    padding: 0.6rem 1.2rem;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.customer-entertainment-expense-accountant-modal-return-btn:hover:not(:disabled) {
+    background: #b91c1c;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(220, 38, 38, 0.3);
+}
+
+.customer-entertainment-expense-accountant-modal-return-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .customer-entertainment-expense-accountant-modal-close-btn {
@@ -478,6 +501,97 @@
     border-radius: 10px;
     cursor: pointer;
     font-weight: 600;
+    transition: all 0.2s;
+}
+
+.customer-entertainment-expense-accountant-modal-close-btn:hover {
+    background: #1d4ed8;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3);
+}
+
+/* Return Modal Styles */
+.customer-entertainment-expense-accountant-modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+}
+
+.customer-entertainment-expense-accountant-form-group {
+    margin-bottom: 1.5rem;
+}
+
+.customer-entertainment-expense-accountant-form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #374151;
+    font-size: 0.875rem;
+}
+
+.customer-entertainment-expense-accountant-form-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 120px;
+}
+
+.customer-entertainment-expense-accountant-form-textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.customer-entertainment-expense-accountant-form-textarea:disabled {
+    background-color: #f3f4f6;
+    cursor: not-allowed;
+}
+
+.customer-entertainment-expense-accountant-modal-cancel-btn {
+    padding: 0.5rem 1rem;
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.customer-entertainment-expense-accountant-modal-cancel-btn:hover:not(:disabled) {
+    background: #e5e7eb;
+}
+
+.customer-entertainment-expense-accountant-modal-cancel-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.customer-entertainment-expense-accountant-modal-confirm-btn {
+    padding: 0.5rem 1rem;
+    background: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.customer-entertainment-expense-accountant-modal-confirm-btn:hover:not(:disabled) {
+    background: #b91c1c;
+}
+
+.customer-entertainment-expense-accountant-modal-confirm-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 /* Checkbox */

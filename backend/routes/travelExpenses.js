@@ -172,6 +172,12 @@ const ensureTable = async () => {
             IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='settlement_status') THEN
                 ALTER TABLE travel_expense_requests ADD COLUMN settlement_status VARCHAR(50);
             END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='return_notes') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN return_notes TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='return_returned_at') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN return_returned_at TIMESTAMP WITHOUT TIME ZONE;
+            END IF;
             IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='employee_confirmed_at') THEN
                 ALTER TABLE travel_expense_requests ADD COLUMN employee_confirmed_at TIMESTAMP WITHOUT TIME ZONE;
             END IF;
@@ -1537,7 +1543,7 @@ router.post('/:id/settlement', upload.array('attachments', 10), async (req, res)
     const client = await pool.connect();
     try {
         const { id } = req.params;
-        const { actualExpense, notes } = req.body;
+        const { actualExpense, notes, advanceAmount } = req.body;
         const files = req.files || [];
 
         if (!actualExpense) {
@@ -1603,7 +1609,7 @@ router.post('/:id/settlement', upload.array('attachments', 10), async (req, res)
             });
         }
 
-        // Check if already submitted
+        // Check if already submitted (cho phép submit lại nếu bị trả về - RETURNED)
         if (request.settlement_status === 'SUBMITTED' || request.settlement_status === 'HR_CONFIRMED') {
             await client.query('ROLLBACK');
             files.forEach(file => {
@@ -1616,29 +1622,66 @@ router.post('/:id/settlement', upload.array('attachments', 10), async (req, res)
                 message: 'Báo cáo hoàn ứng đã được gửi. Không thể gửi lại.',
             });
         }
+        // Cho phép submit lại nếu phiếu bị trả về (RETURNED) hoặc chưa submit (PENDING/null)
 
         const timestamp = new Date().toISOString();
 
+        // Nếu có advanceAmount, validate và cập nhật (cho phép 0)
+        let advanceAmountNum = null;
+        if (advanceAmount !== undefined && advanceAmount !== null) {
+            if (advanceAmount === '' || advanceAmount === null) {
+                // Bỏ qua nếu là chuỗi rỗng hoặc null
+            } else {
+                advanceAmountNum = parseFloat(advanceAmount);
+                if (isNaN(advanceAmountNum) || advanceAmountNum < 0) {
+                    await client.query('ROLLBACK');
+                    files.forEach(file => {
+                        if (fs.existsSync(file.path)) {
+                            fs.unlinkSync(file.path);
+                        }
+                    });
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Kinh phí đã ứng không hợp lệ',
+                    });
+                }
+            }
+        }
+
         // Update settlement fields
+        // Nếu phiếu bị trả về (RETURNED), reset return_notes và return_returned_at
+        const updateFields = [
+            'actual_expense = $1',
+            "settlement_status = 'SUBMITTED'",
+            'employee_confirmed_at = $2',
+            'settlement_notes = $3',
+            "status = 'PENDING_SETTLEMENT'",
+            'updated_at = $2'
+        ];
+        const updateValues = [actualExpenseNum, timestamp, notes || null];
+        let paramIndex = 4;
+
+        // Cập nhật advance_amount nếu có
+        if (advanceAmountNum !== null) {
+            updateFields.push(`actual_advance_amount = $${paramIndex++}`);
+            updateValues.push(advanceAmountNum);
+        }
+
+        // Nếu đang submit lại sau khi bị trả, xóa return fields
+        if (request.settlement_status === 'RETURNED') {
+            updateFields.push('return_notes = NULL');
+            updateFields.push('return_returned_at = NULL');
+        }
+
+        updateValues.push(id);
         const updateQuery = `
             UPDATE travel_expense_requests
-            SET 
-                actual_expense = $1,
-                settlement_status = 'SUBMITTED',
-                employee_confirmed_at = $2,
-                settlement_notes = $3,
-                status = 'PENDING_SETTLEMENT',
-                updated_at = $2
-            WHERE id = $4
+            SET ${updateFields.join(', ')}
+            WHERE id = $${paramIndex}
             RETURNING *
         `;
 
-        const updateResult = await client.query(updateQuery, [
-            actualExpenseNum,
-            timestamp,
-            notes || null,
-            id
-        ]);
+        const updateResult = await client.query(updateQuery, updateValues);
 
         // Save uploaded files
         const attachmentIds = [];
@@ -1849,6 +1892,98 @@ router.post('/:id/settlement/confirm', upload.array('attachments', 10), async (r
         res.status(500).json({
             success: false,
             message: 'Lỗi khi xác nhận báo cáo hoàn ứng: ' + error.message,
+        });
+    } finally {
+        client.release();
+    }
+});
+
+// POST /api/travel-expenses/:id/settlement/return - Kế toán trả phiếu về nhân viên để chỉnh sửa
+router.post('/:id/settlement/return', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const { returnNote } = req.body;
+
+        if (!returnNote || !returnNote.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vui lòng nhập lý do trả phiếu',
+            });
+        }
+
+        await client.query('BEGIN');
+
+        const requestResult = await client.query(
+            'SELECT * FROM travel_expense_requests WHERE id = $1 FOR UPDATE',
+            [id]
+        );
+
+        if (!requestResult.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy yêu cầu chi phí công tác',
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Chỉ cho phép trả phiếu khi settlement_status là HR_CONFIRMED hoặc PENDING_ACCOUNTANT
+        if (request.settlement_status !== 'HR_CONFIRMED' && request.settlement_status !== 'SUBMITTED') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Chỉ có thể trả phiếu khi báo cáo hoàn ứng đã được HR xác nhận hoặc đang chờ kế toán duyệt',
+            });
+        }
+
+        // Không cho phép trả phiếu nếu đã được giải ngân
+        if (request.payment_confirmed_at) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Không thể trả phiếu đã được giải ngân',
+            });
+        }
+
+        const timestamp = new Date().toISOString();
+
+        // Update settlement_status to RETURNED and save return_notes
+        // Also reset accountant_checked_at if it exists
+        const updateQuery = `
+            UPDATE travel_expense_requests
+            SET 
+                settlement_status = 'RETURNED',
+                return_notes = $1,
+                return_returned_at = $2,
+                accountant_checked_at = NULL,
+                accountant_checked_by = NULL,
+                accountant_notes = NULL,
+                updated_at = $2
+            WHERE id = $3
+            RETURNING *
+        `;
+
+        const updateResult = await client.query(updateQuery, [
+            returnNote.trim(),
+            timestamp,
+            id
+        ]);
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Đã trả phiếu về cho nhân viên thành công',
+            data: mapRowToResponse(updateResult.rows[0]),
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error returning settlement:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi trả phiếu: ' + error.message,
         });
     } finally {
         client.release();

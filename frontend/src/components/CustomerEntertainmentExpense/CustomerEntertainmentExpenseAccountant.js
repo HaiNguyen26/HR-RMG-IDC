@@ -13,6 +13,11 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
     const [selectedRequestIds, setSelectedRequestIds] = useState(new Set());
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
+    
+    // State for return modal
+    const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+    const [returnNote, setReturnNote] = useState('');
+    const [isReturning, setIsReturning] = useState(false);
 
     // Fetch requests from API
     useEffect(() => {
@@ -93,6 +98,77 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
             ? selectedRequests.reduce((sum, req) => sum + req.supplementAmount, 0)
             : filteredRequests.reduce((sum, req) => sum + req.supplementAmount, 0),
         selectedCount: selectedRequests.length
+    };
+
+    // Handle return settlement
+    const handleReturnSettlement = async () => {
+        if (!returnNote.trim()) {
+            showToast?.('Vui lòng nhập lý do trả phiếu', 'error');
+            return;
+        }
+
+        if (!selectedRequest) {
+            showToast?.('Vui lòng chọn một yêu cầu', 'error');
+            return;
+        }
+
+        setIsReturning(true);
+        try {
+            const response = await customerEntertainmentExpensesAPI.returnSettlement(selectedRequest.id, {
+                returnNote: returnNote.trim()
+            });
+
+            if (response.data && response.data.success) {
+                showToast?.('Đã trả phiếu về cho nhân viên thành công', 'success');
+                setIsReturnModalOpen(false);
+                setShowDetailModal(false);
+                setReturnNote('');
+                // Refresh requests list
+                const fetchData = async () => {
+                    try {
+                        setLoading(true);
+                        const res = await customerEntertainmentExpensesAPI.getAll({
+                            status: 'APPROVED_BRANCH_DIRECTOR'
+                        });
+                        if (res.data && res.data.success) {
+                            const apiRequests = res.data.data || [];
+                            const mappedRequests = apiRequests.map(request => {
+                                const totalAmount = (request.expenseItems || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                                const advanceAmount = parseFloat(request.advance_amount) || 0;
+                                const supplementAmount = totalAmount - advanceAmount;
+                                return {
+                                    id: request.id,
+                                    requestNumber: request.request_number,
+                                    requester: request.requester_name || '',
+                                    department: request.requester_department || '',
+                                    branch: request.branch,
+                                    startDate: request.start_date,
+                                    endDate: request.end_date,
+                                    requestedAmount: totalAmount,
+                                    approvedAmount: totalAmount,
+                                    advanceAmount: advanceAmount,
+                                    supplementAmount: supplementAmount,
+                                    status: request.status,
+                                    expenseItems: request.expenseItems || []
+                                };
+                            });
+                            setRequests(mappedRequests);
+                            setFilteredRequests(mappedRequests);
+                        }
+                    } catch (error) {
+                        console.error('Error refreshing requests:', error);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                fetchData();
+            }
+        } catch (error) {
+            console.error('Error returning settlement:', error);
+            showToast?.('Lỗi khi trả phiếu: ' + (error.response?.data?.message || error.message), 'error');
+        } finally {
+            setIsReturning(false);
+        }
     };
 
     // Handle checkbox toggle
@@ -539,6 +615,17 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
                             <div className="customer-entertainment-expense-accountant-modal-footer">
                                 <button
                                     type="button"
+                                    className="customer-entertainment-expense-accountant-modal-return-btn"
+                                    onClick={() => {
+                                        setIsReturnModalOpen(true);
+                                        setReturnNote('');
+                                    }}
+                                    disabled={isReturning}
+                                >
+                                    TRẢ PHIẾU
+                                </button>
+                                <button
+                                    type="button"
                                     className="customer-entertainment-expense-accountant-modal-close-btn"
                                     onClick={() => setShowDetailModal(false)}
                                 >
@@ -548,6 +635,62 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
                         </div>
                     </div>
                 )}
+
+            {/* Return Modal */}
+            {isReturnModalOpen && (
+                <div className="customer-entertainment-expense-accountant-modal-overlay" onClick={() => !isReturning && setIsReturnModalOpen(false)}>
+                    <div className="customer-entertainment-expense-accountant-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="customer-entertainment-expense-accountant-modal-header">
+                            <h3 className="customer-entertainment-expense-accountant-modal-title">Trả phiếu về nhân viên</h3>
+                            <button
+                                type="button"
+                                className="customer-entertainment-expense-accountant-modal-close"
+                                onClick={() => !isReturning && setIsReturnModalOpen(false)}
+                                disabled={isReturning}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="customer-entertainment-expense-accountant-modal-body">
+                            <div className="customer-entertainment-expense-accountant-form-group">
+                                <label htmlFor="returnNote" className="customer-entertainment-expense-accountant-form-label">
+                                    Lý do trả phiếu <span style={{ color: '#dc2626' }}>*</span>
+                                </label>
+                                <textarea
+                                    id="returnNote"
+                                    className="customer-entertainment-expense-accountant-form-textarea"
+                                    rows="6"
+                                    value={returnNote}
+                                    onChange={(e) => setReturnNote(e.target.value)}
+                                    placeholder="Nhập lý do trả phiếu và yêu cầu nhân viên chỉnh sửa/bổ sung..."
+                                    disabled={isReturning}
+                                />
+                                <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                                    Phiếu sẽ được trả về cho nhân viên tại module "Báo cáo hoàn ứng" để chỉnh sửa và nộp lại.
+                                </div>
+                            </div>
+                        </div>
+                        <div className="customer-entertainment-expense-accountant-modal-footer">
+                            <button
+                                type="button"
+                                className="customer-entertainment-expense-accountant-modal-cancel-btn"
+                                onClick={() => setIsReturnModalOpen(false)}
+                                disabled={isReturning}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type="button"
+                                className="customer-entertainment-expense-accountant-modal-confirm-btn"
+                                onClick={handleReturnSettlement}
+                                disabled={isReturning || !returnNote.trim()}
+                            >
+                                {isReturning ? 'Đang xử lý...' : 'Xác nhận trả phiếu'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             </div>
         </div>
     );

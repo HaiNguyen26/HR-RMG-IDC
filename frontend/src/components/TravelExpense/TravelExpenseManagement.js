@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './TravelExpenseManagement.css';
-import { travelExpensesAPI, employeesAPI } from '../../services/api';
+import { travelExpensesAPI } from '../../services/api';
 
 const TravelExpenseManagement = ({ currentUser, showToast, showConfirm }) => {
     const [searchQuery, setSearchQuery] = useState('');

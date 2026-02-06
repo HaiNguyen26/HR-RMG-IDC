@@ -16,6 +16,7 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
     const [pendingTravelExpenseApprovalCount, setPendingTravelExpenseApprovalCount] = useState(0);
     const [pendingTravelExpenseManagementCount, setPendingTravelExpenseManagementCount] = useState(0); // PENDING_SETTLEMENT
     const [pendingTravelExpenseAdvanceProcessingCount, setPendingTravelExpenseAdvanceProcessingCount] = useState(0); // PENDING_FINANCE with advance_status = PENDING_ACCOUNTANT
+    const [returnedOrRejectedSettlementCount, setReturnedOrRejectedSettlementCount] = useState(0); // RETURNED hoặc REJECTED
 
     useEffect(() => {
         let isMounted = true;
@@ -571,6 +572,51 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
         const interval = setInterval(fetchPendingExpenseCeoCount, 30000);
         return () => clearInterval(interval);
     }, [currentUser?.id, currentUser?.hoTen, currentUser?.username]);
+
+    // Fetch returned or rejected settlement count (for employees)
+    useEffect(() => {
+        if (!currentUser?.id || currentUser?.role !== 'EMPLOYEE') {
+            setReturnedOrRejectedSettlementCount(0);
+            return;
+        }
+
+        const fetchReturnedOrRejectedCount = async () => {
+            try {
+                // Fetch tất cả travel expenses và customer entertainment expenses của employee
+                const [travelRes, customerRes] = await Promise.all([
+                    travelExpensesAPI.getAll({}).catch(() => ({ data: { success: false, data: [] } })),
+                    customerEntertainmentExpensesAPI.getAll({ employeeId: currentUser.id }).catch(() => ({ data: { success: false, data: [] } }))
+                ]);
+
+                // Filter travel expenses: RETURNED hoặc REJECTED settlement status
+                const travelRequests = travelRes.data?.success && Array.isArray(travelRes.data.data) ? travelRes.data.data : [];
+                const travelReturnedOrRejected = travelRequests.filter(req => {
+                    const employeeId = req.employee_id || req.employeeId;
+                    if (employeeId !== currentUser.id) return false;
+                    
+                    const settlementStatus = req.settlement?.status || req.settlement_status;
+                    return settlementStatus === 'RETURNED' || settlementStatus === 'REJECTED';
+                });
+
+                // Filter customer entertainment expenses: RETURNED hoặc REJECTED status
+                const customerRequests = customerRes.data?.success && Array.isArray(customerRes.data.data) ? customerRes.data.data : [];
+                const customerReturnedOrRejected = customerRequests.filter(req => {
+                    return req.status === 'RETURNED' || req.status === 'REJECTED';
+                });
+
+                const totalCount = travelReturnedOrRejected.length + customerReturnedOrRejected.length;
+                setReturnedOrRejectedSettlementCount(totalCount);
+            } catch (error) {
+                console.error('Error fetching returned/rejected settlement count:', error);
+                setReturnedOrRejectedSettlementCount(0);
+            }
+        };
+
+        fetchReturnedOrRejectedCount();
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchReturnedOrRejectedCount, 30000);
+        return () => clearInterval(interval);
+    }, [currentUser?.id, currentUser?.role]);
 
     const isEmployee = currentUser?.role === 'EMPLOYEE';
     const chucDanh = (currentUser?.chucDanh || '').trim().replace(/^["']+|["']+$/g, '');
@@ -1230,7 +1276,10 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                                             </path>
                                         </svg>
                                     </span>
-                                    <span className="nav-label">Quyết toán công tác</span>
+                                    <span className="nav-label">Báo cáo hoàn ứng</span>
+                                    {returnedOrRejectedSettlementCount > 0 && (
+                                        <span className="nav-badge">{returnedOrRejectedSettlementCount}</span>
+                                    )}
                                 </button>
                             </li>
                         </>

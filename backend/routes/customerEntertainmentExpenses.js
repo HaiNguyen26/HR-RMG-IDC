@@ -157,12 +157,42 @@ const ensureTable = async () => {
         }
     };
 
+    // Add return columns if they don't exist
+    const addReturnColumns = async () => {
+        const returnColumns = [
+            { name: 'return_notes', type: 'TEXT' },
+            { name: 'return_returned_at', type: 'TIMESTAMP WITHOUT TIME ZONE' }
+        ];
+
+        for (const col of returnColumns) {
+            try {
+                const checkColumn = await pool.query(`
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'customer_entertainment_expense_requests' 
+                    AND column_name = $1
+                `, [col.name]);
+
+                if (checkColumn.rows.length === 0) {
+                    await pool.query(`
+                        ALTER TABLE customer_entertainment_expense_requests 
+                        ADD COLUMN ${col.name} ${col.type}
+                    `);
+                    console.log(`Added column ${col.name} to customer_entertainment_expense_requests`);
+                }
+            } catch (error) {
+                console.error(`Error adding column ${col.name}:`, error.message);
+            }
+        }
+    };
+
     try {
         await pool.query(createTableQuery);
         await pool.query(createExpenseItemsTable);
         await pool.query(createExpenseFilesTable);
         await pool.query(createIndexes);
         await addManagerColumns(); // Add manager columns if they don't exist
+        await addReturnColumns(); // Add return columns if they don't exist
         console.log('Customer entertainment expense tables created/verified');
     } catch (error) {
         console.error('Error creating customer entertainment expense tables:', error);
@@ -874,6 +904,98 @@ router.put('/:id/accountant-process', async (req, res) => {
     }
 });
 
+// POST /api/customer-entertainment-expenses/:id/return - Kế toán trả phiếu về nhân viên để chỉnh sửa
+router.post('/:id/return', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const { returnNote } = req.body;
+
+        if (!returnNote || !returnNote.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vui lòng nhập lý do trả phiếu',
+            });
+        }
+
+        await client.query('BEGIN');
+
+        const requestResult = await client.query(
+            'SELECT * FROM customer_entertainment_expense_requests WHERE id = $1 FOR UPDATE',
+            [id]
+        );
+
+        if (!requestResult.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy yêu cầu chi phí tiếp khách',
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Chỉ cho phép trả phiếu khi status là APPROVED_BRANCH_DIRECTOR hoặc ACCOUNTANT_PROCESSED
+        if (request.status !== 'APPROVED_BRANCH_DIRECTOR' && request.status !== 'ACCOUNTANT_PROCESSED') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Chỉ có thể trả phiếu khi đã được giám đốc chi nhánh duyệt hoặc đang chờ kế toán xử lý',
+            });
+        }
+
+        // Không cho phép trả phiếu nếu đã được thanh toán
+        if (request.status === 'PAID') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Không thể trả phiếu đã được thanh toán',
+            });
+        }
+
+        const timestamp = new Date().toISOString();
+
+        // Update status to RETURNED and save return_notes
+        // Also reset accountant_processed_at if it exists
+        const updateQuery = `
+            UPDATE customer_entertainment_expense_requests
+            SET 
+                status = 'RETURNED',
+                return_notes = $1,
+                return_returned_at = $2,
+                accountant_id = NULL,
+                accountant_notes = NULL,
+                accountant_processed_at = NULL,
+                updated_at = $2
+            WHERE id = $3
+            RETURNING *
+        `;
+
+        const updateResult = await client.query(updateQuery, [
+            returnNote.trim(),
+            timestamp,
+            id
+        ]);
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Đã trả phiếu về cho nhân viên thành công',
+            data: updateResult.rows[0],
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error returning settlement:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi trả phiếu: ' + error.message,
+        });
+    } finally {
+        client.release();
+    }
+});
+
 // PUT /api/customer-entertainment-expenses/:id/ceo-approve - CEO duyệt
 router.put('/:id/ceo-approve', async (req, res) => {
     try {
@@ -941,6 +1063,131 @@ router.put('/:id/ceo-reject', async (req, res) => {
             success: false,
             message: 'Lỗi khi từ chối: ' + error.message
         });
+    }
+});
+
+// PUT /api/customer-entertainment-expenses/:id/resubmit - Nhân viên gửi lại phiếu đã chỉnh sửa sau khi bị trả về
+router.put('/:id/resubmit', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const { advanceAmount, totalAmount } = req.body;
+
+        await client.query('BEGIN');
+
+        const requestResult = await client.query(
+            'SELECT * FROM customer_entertainment_expense_requests WHERE id = $1 FOR UPDATE',
+            [id]
+        );
+
+        if (!requestResult.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy yêu cầu chi phí tiếp khách',
+            });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Chỉ cho phép resubmit khi status là RETURNED
+        if (request.status !== 'RETURNED') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Chỉ có thể gửi lại phiếu đã bị trả về',
+            });
+        }
+
+        // Validate và parse các giá trị
+        // Luôn cập nhật các giá trị nếu được gửi lên (cho phép 0)
+        let advanceAmountNum = null;
+        let totalAmountNum = null;
+
+        // Kiểm tra advanceAmount (cho phép 0)
+        if (advanceAmount !== undefined && advanceAmount !== null) {
+            if (advanceAmount === '' || advanceAmount === null) {
+                // Bỏ qua nếu là chuỗi rỗng hoặc null
+            } else {
+                advanceAmountNum = parseFloat(advanceAmount);
+                if (isNaN(advanceAmountNum) || advanceAmountNum < 0) {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Kinh phí đã ứng không hợp lệ',
+                    });
+                }
+            }
+        }
+
+        if (totalAmount !== undefined && totalAmount !== null && totalAmount !== '') {
+            totalAmountNum = parseFloat(totalAmount);
+            if (isNaN(totalAmountNum) || totalAmountNum < 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({
+                    success: false,
+                    message: 'Tổng chi phí thực tế không hợp lệ',
+                });
+            }
+        }
+
+        // Validate: phải có ít nhất một giá trị được gửi lên
+        if (advanceAmountNum === null && totalAmountNum === null) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                message: 'Vui lòng cung cấp ít nhất một giá trị để cập nhật',
+            });
+        }
+
+        // Update request status back to APPROVED_BRANCH_DIRECTOR, cập nhật các giá trị và xóa return fields
+        const updateFields = [
+            "status = 'APPROVED_BRANCH_DIRECTOR'",
+            'return_notes = NULL',
+            'return_returned_at = NULL',
+            'updated_at = CURRENT_TIMESTAMP'
+        ];
+        const updateValues = [];
+        let paramIndex = 1;
+
+        // Cập nhật advance_amount nếu có
+        if (advanceAmountNum !== null) {
+            updateFields.push(`advance_amount = $${paramIndex++}`);
+            updateValues.push(advanceAmountNum);
+        }
+
+        // Cập nhật total_amount nếu có
+        if (totalAmountNum !== null) {
+            updateFields.push(`total_amount = $${paramIndex++}`);
+            updateValues.push(totalAmountNum);
+        }
+
+        updateValues.push(id);
+        const updateQuery = `
+            UPDATE customer_entertainment_expense_requests
+            SET ${updateFields.join(', ')}
+            WHERE id = $${paramIndex}
+            RETURNING *
+        `;
+
+        const updateResult = await client.query(updateQuery, updateValues);
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Đã gửi lại phiếu thành công',
+            data: updateResult.rows[0]
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error resubmitting customer entertainment expense:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi gửi lại phiếu: ' + error.message,
+        });
+    } finally {
+        client.release();
     }
 });
 
