@@ -47,6 +47,7 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
                             branch: request.branch,
                             startDate: request.start_date,
                             endDate: request.end_date,
+                            createdAt: request.created_at,
                             requestedAmount: totalAmount,
                             approvedAmount: totalAmount,
                             advanceAmount: advanceAmount,
@@ -436,6 +437,7 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
                                         />
                                     </th>
                                     <th style={{ textAlign: 'left' }}>Mã YC</th>
+                                    <th style={{ textAlign: 'left' }}>Ngày tạo phiếu</th>
                                     <th style={{ textAlign: 'left' }}>Người Yêu Cầu</th>
                                     <th style={{ textAlign: 'right' }}>Thực Chi (Y/C)</th>
                                     <th style={{ textAlign: 'right' }}>Đã Duyệt (GĐCN)</th>
@@ -468,6 +470,9 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
                                             {request.requestNumber}
                                         </td>
                                         <td style={{ textAlign: 'left' }}>
+                                            {formatDate(request.createdAt)}
+                                        </td>
+                                        <td style={{ textAlign: 'left' }}>
                                             {request.requester} ({request.department} {request.branch})
                                         </td>
                                         <td className="customer-entertainment-expense-accountant-amount red" style={{ textAlign: 'right' }}>
@@ -495,7 +500,7 @@ const CustomerEntertainmentExpenseAccountant = ({ currentUser, showToast, showCo
                                         <td style={{ width: '40px', textAlign: 'center' }}>
                                             <input type="checkbox" disabled style={{ opacity: 0 }} />
                                         </td>
-                                        <td colSpan="2" className="customer-entertainment-expense-accountant-total-label" style={{ textAlign: 'left' }}>
+                                        <td colSpan="3" className="customer-entertainment-expense-accountant-total-label" style={{ textAlign: 'left' }}>
                                             TỔNG CỘNG ({selectedRequests.length > 0 ? selectedRequests.length : filteredRequests.length} Phiếu)
                                         </td>
                                         <td className="customer-entertainment-expense-accountant-total-amount" style={{ textAlign: 'right' }}>
