@@ -23,7 +23,9 @@ const STATUS_LABELS = {
 
 const REQUEST_TYPE_LABELS = {
     LEAVE: 'Xin nghỉ phép',
-    RESIGN: 'Xin nghỉ việc'
+    RESIGN: 'Xin nghỉ việc',
+    LATE: 'Đi trễ',
+    EARLY: 'Về sớm'
 };
 
 const LEAVE_TYPE_LABELS = {
@@ -350,6 +352,9 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             }
 
             let newRequests = [];
+            
+            // Debug: Log để kiểm tra
+            console.log('[RequestManagement] Fetching requests for module:', activeModule);
 
             if (activeModule === 'all') {
                 const [leaveResponse, overtimeResponse, attendanceResponse, lateEarlyResponse, mealAllowanceResponse] = await Promise.all([
@@ -373,9 +378,29 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             } else if (isLeaveModuleKey(activeModule)) {
                 const response = await leaveRequestsAPI.getAll(params);
                 if (response.data.success) {
-                    newRequests = (response.data.data || [])
+                    const rawData = response.data.data || [];
+                    console.log('[RequestManagement] Leave raw data:', {
+                        module: activeModule,
+                        count: rawData.length,
+                        sample: rawData.length > 0 ? rawData[0] : null
+                    });
+                    newRequests = rawData
                         .filter((r) => getLeaveModuleKey(r) === activeModule)
-                        .map((r) => ({ ...r, requestType: activeModule }));
+                        .map((r) => ({ 
+                            ...r, 
+                            requestType: activeModule,
+                            // Đảm bảo các field quan trọng được copy đầy đủ
+                            request_type: r.request_type,
+                            start_date: r.start_date,
+                            end_date: r.end_date,
+                            reason: r.reason,
+                            leave_type: r.leave_type
+                        }));
+                    console.log('[RequestManagement] Leave filtered & mapped data:', {
+                        module: activeModule,
+                        count: newRequests.length,
+                        sample: newRequests.length > 0 ? newRequests[0] : null
+                    });
                 }
             } else if (activeModule === 'overtime') {
                 const response = await overtimeRequestsAPI.getAll(params);
@@ -390,7 +415,52 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             } else if (activeModule === 'late-early') {
                 const response = await lateEarlyRequestsAPI.getAll(params);
                 if (response.data.success) {
-                    newRequests = (response.data.data || []).map(r => ({ ...r, requestType: 'late-early' }));
+                    const rawData = response.data.data || [];
+                    console.log('[RequestManagement] Late-Early raw data:', {
+                        count: rawData.length,
+                        sample: rawData.length > 0 ? {
+                            id: rawData[0].id,
+                            request_type: rawData[0].request_type,
+                            request_date: rawData[0].request_date,
+                            time_value: rawData[0].time_value,
+                            reason: rawData[0].reason,
+                            status: rawData[0].status,
+                            employee_name: rawData[0].employee_name
+                        } : null
+                    });
+                    // Tạo object mới hoàn toàn để đảm bảo React detect thay đổi
+                    newRequests = rawData.map(r => {
+                        const mapped = {
+                            ...r,
+                            requestType: 'late-early',
+                            // Đảm bảo các field quan trọng được copy đầy đủ
+                            request_date: r.request_date || null,
+                            time_value: r.time_value || null,
+                            reason: r.reason || null,
+                            request_type: r.request_type || null,
+                            id: r.id,
+                            status: r.status,
+                            employee_id: r.employee_id,
+                            team_lead_id: r.team_lead_id,
+                            employee_name: r.employee_name,
+                            ma_nhan_vien: r.ma_nhan_vien
+                        };
+                        return mapped;
+                    });
+                    console.log('[RequestManagement] Late-Early mapped data:', {
+                        count: newRequests.length,
+                        sample: newRequests.length > 0 ? {
+                            id: newRequests[0].id,
+                            requestType: newRequests[0].requestType,
+                            request_type: newRequests[0].request_type,
+                            request_date: newRequests[0].request_date,
+                            time_value: newRequests[0].time_value,
+                            reason: newRequests[0].reason,
+                            status: newRequests[0].status
+                        } : null
+                    });
+                } else {
+                    console.warn('[RequestManagement] Late-Early API response not successful:', response.data);
                 }
             } else if (activeModule === 'meal-allowance') {
                 const response = await mealAllowanceRequestsAPI.getAll(params);
@@ -399,11 +469,67 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 }
             }
 
-            // Chỉ update state nếu data thực sự thay đổi
-            if (!prevRequestsRef.current || !arraysEqual(prevRequestsRef.current, newRequests)) {
-                setRequests(newRequests);
-                prevRequestsRef.current = newRequests;
-            }
+            // Luôn update state khi fetch data mới để đảm bảo hiển thị đầy đủ
+            // Đặc biệt quan trọng khi chuyển tab
+            console.log('[RequestManagement] Fetched requests:', {
+                module: activeModule,
+                status: selectedStatus,
+                count: newRequests.length,
+                requestIds: newRequests.map(r => r.id).slice(0, 5),
+                sampleRequest: newRequests.length > 0 ? {
+                    id: newRequests[0].id,
+                    requestType: newRequests[0].requestType,
+                    request_type: newRequests[0].request_type,
+                    request_date: newRequests[0].request_date,
+                    time_value: newRequests[0].time_value,
+                    start_date: newRequests[0].start_date,
+                    end_date: newRequests[0].end_date
+                } : null
+            });
+            
+            // Luôn update state với data mới (không dùng cache comparison)
+            // Tạo một array mới hoàn toàn để đảm bảo React detect thay đổi
+            // Force update bằng cách tạo array mới với các object mới hoàn toàn
+            const newRequestsCopy = newRequests.map(r => {
+                // Tạo object mới hoàn toàn để đảm bảo reference khác nhau
+                return {
+                    ...r,
+                    // Đảm bảo tất cả các field được copy đầy đủ
+                    id: r.id,
+                    requestType: r.requestType,
+                    request_type: r.request_type,
+                    request_date: r.request_date,
+                    time_value: r.time_value,
+                    start_date: r.start_date,
+                    end_date: r.end_date,
+                    reason: r.reason,
+                    status: r.status,
+                    employee_id: r.employee_id,
+                    employee_name: r.employee_name,
+                    ma_nhan_vien: r.ma_nhan_vien
+                };
+            });
+            
+            // Force update bằng cách set state với array mới
+            setRequests(() => newRequestsCopy);
+            prevRequestsRef.current = newRequestsCopy;
+            
+            console.log('[RequestManagement] State updated:', {
+                module: activeModule,
+                status: selectedStatus,
+                count: newRequestsCopy.length,
+                firstRequest: newRequestsCopy.length > 0 ? {
+                    id: newRequestsCopy[0].id,
+                    requestType: newRequestsCopy[0].requestType,
+                    request_type: newRequestsCopy[0].request_type,
+                    request_date: newRequestsCopy[0].request_date,
+                    time_value: newRequestsCopy[0].time_value,
+                    hasRequestType: !!newRequestsCopy[0].requestType,
+                    hasRequest_type: !!newRequestsCopy[0].request_type,
+                    hasRequest_date: !!newRequestsCopy[0].request_date,
+                    hasTime_value: !!newRequestsCopy[0].time_value
+                } : null
+            });
         } catch (error) {
             console.error('Error fetching requests:', error);
             if (showToast && !silent) {
@@ -417,14 +543,28 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     }, [activeModule, selectedStatus, currentUser?.id, showToast]);
 
     useEffect(() => {
-        fetchRequests(false); // Lần đầu hiển thị loading
+        // Reset state và ref khi chuyển tab hoặc status để đảm bảo data được fetch lại đầy đủ
+        console.log('[RequestManagement] useEffect triggered:', { activeModule, selectedStatus });
+        prevRequestsRef.current = null;
+        setRequests([]); // Clear requests trước khi fetch mới
+        
+        // Đảm bảo fetch được gọi sau khi state đã được clear
+        // Sử dụng requestAnimationFrame để đảm bảo DOM đã update
+        const fetchTimer = requestAnimationFrame(() => {
+            fetchRequests(false); // Lần đầu hiển thị loading
+        });
+        
         // Realtime update: polling mỗi 20s (silent mode - không hiển thị loading)
         const interval = setInterval(() => {
             if (!isPageVisible) return;
             fetchRequests(true);
         }, REQUESTS_POLL_INTERVAL_MS);
-        return () => clearInterval(interval);
-    }, [fetchRequests, isPageVisible]);
+        
+        return () => {
+            cancelAnimationFrame(fetchTimer);
+            clearInterval(interval);
+        };
+    }, [fetchRequests, isPageVisible, activeModule, selectedStatus]);
 
     const handleDelete = async (request) => {
         if (!showConfirm) {
@@ -1873,12 +2013,64 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     };
 
     const filteredRequests = useMemo(() => {
+        console.log('[RequestManagement] Filtering requests:', {
+            activeModule,
+            selectedStatus,
+            totalRequests: requests.length,
+            sampleRequest: requests.length > 0 ? {
+                id: requests[0].id,
+                requestType: requests[0].requestType,
+                request_type: requests[0].request_type
+            } : null
+        });
+        
         // Loại bỏ đơn đã hủy (CANCELLED) khỏi danh sách
-        const nonCancelledRequests = requests.filter(request => request.status !== 'CANCELLED');
+        let nonCancelledRequests = requests.filter(request => request.status !== 'CANCELLED');
+        
+        // Filter theo activeModule để đảm bảo chỉ hiển thị đúng loại đơn
+        if (activeModule !== 'all') {
+            if (isLeaveModuleKey(activeModule)) {
+                nonCancelledRequests = nonCancelledRequests.filter(req => 
+                    isLeaveModuleKey(req.requestType) && getLeaveModuleKey(req) === activeModule
+                );
+            } else {
+                // Đảm bảo filter đúng cho late-early và các module khác
+                nonCancelledRequests = nonCancelledRequests.filter(req => {
+                    const matches = req.requestType === activeModule;
+                    if (activeModule === 'late-early') {
+                        console.log('[RequestManagement] Filtering late-early:', {
+                            requestId: req.id,
+                            requestType: req.requestType,
+                            request_type: req.request_type,
+                            matches,
+                            hasRequestType: !!req.requestType,
+                            hasRequest_type: !!req.request_type
+                        });
+                    }
+                    return matches;
+                });
+            }
+        }
 
-        if (selectedStatus === 'ALL') return nonCancelledRequests;
-        return nonCancelledRequests.filter(r => r.status === selectedStatus);
-    }, [requests, selectedStatus]);
+        const statusFiltered = selectedStatus === 'ALL' 
+            ? nonCancelledRequests 
+            : nonCancelledRequests.filter(r => r.status === selectedStatus);
+        
+        console.log('[RequestManagement] Filtered result:', {
+            activeModule,
+            selectedStatus,
+            filteredCount: statusFiltered.length,
+            sampleFiltered: statusFiltered.length > 0 ? {
+                id: statusFiltered[0].id,
+                requestType: statusFiltered[0].requestType,
+                request_type: statusFiltered[0].request_type,
+                request_date: statusFiltered[0].request_date,
+                time_value: statusFiltered[0].time_value
+            } : null
+        });
+        
+        return statusFiltered;
+    }, [requests, selectedStatus, activeModule]);
 
     // Memoize table header để tránh render lại
     const tableHeader = useMemo(() => {
@@ -2055,7 +2247,16 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                     key={module.key}
                                     type="button"
                                     className={`request-type-filter-chip ${module.key} ${activeModule === module.key ? 'active' : ''} ${hasPending ? 'has-pending' : ''}`}
-                                    onClick={() => setActiveModule(module.key)}
+                                    onClick={() => {
+                                        console.log('[RequestManagement] Tab clicked:', {
+                                            from: activeModule,
+                                            to: module.key
+                                        });
+                                        // Clear state trước khi chuyển tab để đảm bảo data được fetch lại
+                                        prevRequestsRef.current = null;
+                                        setRequests([]);
+                                        setActiveModule(module.key);
+                                    }}
                                 >
                                     <span className="request-type-filter-label">{module.label}</span>
                                     <span className={`request-module-badge ${hasPending ? 'pulsing' : ''}`}>
@@ -2115,7 +2316,12 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                             <div
                                 key={filter.key}
                                 className={`request-management-summary-card ${selectedStatus === filter.key ? 'active' : ''}`}
-                                onClick={() => setSelectedStatus(filter.key)}
+                                onClick={() => {
+                                    setSelectedStatus(filter.key);
+                                    // Reset và fetch lại data khi chuyển status
+                                    prevRequestsRef.current = null;
+                                    setRequests([]);
+                                }}
                                 style={{ background: gradient }}
                             >
                                 <div className="summary-card-icon">
@@ -2137,7 +2343,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     ) : filteredRequests.length === 0 ? (
                         <div className="request-management-empty">Không có đơn từ nào.</div>
                     ) : (
-                        <table className="request-management-table">
+                        <table key={`table-${activeModule}-${selectedStatus}`} className="request-management-table">
                             <thead>
                                 <tr>
                                     {tableHeader}
@@ -2209,7 +2415,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                             <>
                                                                 <strong>Đơn xin đi trễ về sớm</strong>
                                                                 <p className="request-management-period">
-                                                                    {request.request_type === 'LATE' ? 'Đi trễ' : request.request_type === 'EARLY' ? 'Về sớm' : 'N/A'}
+                                                                    {request.request_type === 'LATE' ? 'Đi trễ' : request.request_type === 'EARLY' ? 'Về sớm' : (request.request_type || 'N/A')}
                                                                 </p>
                                                             </>
                                                         )}
@@ -2234,11 +2440,11 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                         <div className="request-dates-info">
                                                             {isLeaveModuleKey(request.requestType) && (
                                                                 <>
-                                                                    <span>{formatDateDisplay(request.start_date)}</span>
+                                                                    <span>{formatDateDisplay(request.start_date) || '-'}</span>
                                                                     {request.request_type === 'LEAVE' && request.end_date && (
                                                                         <>
                                                                             <span className="date-separator"> → </span>
-                                                                            <span>{formatDateDisplay(request.end_date)}</span>
+                                                                            <span>{formatDateDisplay(request.end_date) || '-'}</span>
                                                                         </>
                                                                     )}
                                                                 </>
@@ -2279,9 +2485,11 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                             )}
                                                             {request.requestType === 'late-early' && (
                                                                 <>
-                                                                    <span>{formatDateDisplay(request.request_date)}</span>
-                                                                    {request.time_value && (
-                                                                        <span className="time-info">{request.time_value.slice(0, 5)}</span>
+                                                                    <span>{formatDateDisplay(request.request_date) || '-'}</span>
+                                                                    {request.time_value ? (
+                                                                        <span className="time-info">{typeof request.time_value === 'string' ? request.time_value.slice(0, 5) : request.time_value}</span>
+                                                                    ) : (
+                                                                        <span className="time-info">-</span>
                                                                     )}
                                                                 </>
                                                             )}
@@ -2434,11 +2642,11 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                             {activeModule === 'late-early' && (
                                                 <>
                                                     <td>
-                                                        {request.request_type === 'LATE' ? 'Đi trễ' : request.request_type === 'EARLY' ? 'Về sớm' : 'N/A'}
+                                                        {request.request_type === 'LATE' ? 'Đi trễ' : request.request_type === 'EARLY' ? 'Về sớm' : (request.request_type || 'N/A')}
                                                     </td>
-                                                    <td>{formatDateDisplay(request.request_date)}</td>
+                                                    <td>{formatDateDisplay(request.request_date) || '-'}</td>
                                                     <td>
-                                                        {request.time_value ? request.time_value.slice(0, 5) : '-'}
+                                                        {request.time_value ? (typeof request.time_value === 'string' ? request.time_value.slice(0, 5) : String(request.time_value).slice(0, 5)) : '-'}
                                                     </td>
                                                     <td>
                                                         <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>

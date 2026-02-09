@@ -72,7 +72,20 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
 
     const normalizeChiNhanhValue = (chiNhanh) => {
         if (!chiNhanh) return null;
-        return removeVietnameseAccents(chiNhanh.trim().toLowerCase());
+        let normalized = removeVietnameseAccents(chiNhanh.trim().toLowerCase());
+        // Chuẩn hóa các cách viết khác nhau của Hồ Chí Minh
+        if (normalized.includes('ho chi minh') || normalized.includes('hcm') || normalized.includes('tp ho chi minh')) {
+            normalized = 'ho chi minh';
+        }
+        // Chuẩn hóa các cách viết khác nhau của Hà Nội
+        if (normalized.includes('ha noi') || normalized.includes('hn')) {
+            normalized = 'ha noi';
+        }
+        // Chuẩn hóa các cách viết khác nhau của Đà Nẵng
+        if (normalized.includes('da nang') || normalized.includes('dn')) {
+            normalized = 'da nang';
+        }
+        return normalized;
     };
     const normalizedEmployeeChiNhanh = employeeChiNhanh ? normalizeChiNhanhValue(employeeChiNhanh) : null;
 
@@ -104,9 +117,25 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
         return false;
     };
 
-    // Exact match
+    // Exact match - thử cả với và không có dấu
+    let matches = [];
     if (cache.map.has(normalizedName)) {
-        const matches = cache.map.get(normalizedName);
+        matches = cache.map.get(normalizedName);
+    }
+    
+    // Nếu không tìm thấy exact match, thử tìm với normalized without accents
+    if (matches.length === 0 && normalizedWithoutAccents && normalizedWithoutAccents !== normalizedName) {
+        // Tìm tất cả employees có tên khớp (không phân biệt dấu)
+        matches = cache.all.filter(emp => {
+            const empNormalizedName = (emp.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+            const empNormalizedWithoutAccents = removeVietnameseAccents(empNormalizedName);
+            return empNormalizedName === normalizedName || 
+                   empNormalizedWithoutAccents === normalizedWithoutAccents ||
+                   empNormalizedWithoutAccents === normalizedWithoutAccents.replace(/\s+/g, '');
+        });
+    }
+    
+    if (matches.length > 0) {
 
         if (matches.length > 1 && normalizedEmployeeChiNhanh) {
             const branchMatch = matches.find(emp => chiNhanhMatches(emp.chi_nhanh));
@@ -439,9 +468,28 @@ router.post('/', async (req, res) => {
         const teamLead = await findManagerFromCache(employee.quan_ly_truc_tiep, employee.chi_nhanh);
 
         if (!teamLead) {
+            // Debug: Log thông tin để kiểm tra
+            const cache = await getEmployeesCache();
+            console.log('[lateEarlyRequests POST] Debug info:', {
+                managerName: employee.quan_ly_truc_tiep,
+                employeeChiNhanh: employee.chi_nhanh,
+                allManagers: cache.all.map(e => ({
+                    id: e.id,
+                    ho_ten: e.ho_ten,
+                    chi_nhanh: e.chi_nhanh,
+                    normalized: (e.ho_ten || '').trim().toLowerCase().replace(/\s+/g, ' ').trim()
+                })).filter(e => {
+                    const normalizedName = (employee.quan_ly_truc_tiep || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                    const normalizedWithoutAccents = removeVietnameseAccents(normalizedName);
+                    const empNormalizedName = (e.normalized || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+                    const empNormalizedWithoutAccents = removeVietnameseAccents(empNormalizedName);
+                    return empNormalizedName === normalizedName || empNormalizedWithoutAccents === normalizedWithoutAccents;
+                })
+            });
+            
             return res.status(404).json({
                 success: false,
-                message: `Không tìm thấy quản lý trực tiếp "${employee.quan_ly_truc_tiep}"${employee.chi_nhanh ? ` (chi_nhanh: ${employee.chi_nhanh})` : ''} trong hệ thống.`
+                message: `Không tìm thấy quản lý trực tiếp "${employee.quan_ly_truc_tiep}"${employee.chi_nhanh ? ` (chi_nhanh: ${employee.chi_nhanh})` : ''} trong hệ thống. Vui lòng kiểm tra lại thông tin quản lý trực tiếp trong module Quản lý nhân viên.`
             });
         }
 
