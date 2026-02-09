@@ -35,13 +35,49 @@ else
 fi
 
 if [ -z "$DB_NAME" ] && [ -z "$PGDATABASE" ]; then
-    DB_NAME="hr_management"
+    # Thử các tên database phổ biến theo thứ tự ưu tiên
+    # 1. HR_Management_System (tên trên server thực tế)
+    # 2. hr_management (tên thường dùng)
+    # 3. hr-management (tên với dấu gạch ngang)
+    DB_NAME="HR_Management_System"
 else
     DB_NAME="${DB_NAME:-$PGDATABASE}"
 fi
 
 echo -e "${YELLOW}Database: $DB_NAME${NC}"
 echo -e "${YELLOW}User: $DB_USER${NC}"
+echo ""
+
+# Kiểm tra database có tồn tại không
+echo -e "${YELLOW}[0/2] Kiểm tra database có tồn tại...${NC}"
+DB_EXISTS=false
+DB_LIST=$(sudo -u postgres psql -lqt 2>/dev/null | cut -d \| -f 1 | tr -d ' ' | grep -v "^$" | grep -v "^Name$")
+
+# Thử các tên database phổ biến
+for test_db in "HR_Management_System" "hr_management" "hr-management" "HR_Management_System_RMG_IDC"; do
+    if echo "$DB_LIST" | grep -qi "^${test_db}$"; then
+        DB_NAME="$test_db"
+        DB_EXISTS=true
+        echo -e "${GREEN}✓ Database '$DB_NAME' tồn tại${NC}"
+        break
+    fi
+done
+
+if [ "$DB_EXISTS" = false ]; then
+    echo -e "${YELLOW}⚠ Database '$DB_NAME' không tồn tại. Đang liệt kê các database có sẵn...${NC}"
+    echo -e "${BLUE}Các database có sẵn:${NC}"
+    echo "$DB_LIST" | head -10
+    echo ""
+    read -p "Nhập tên database đúng (hoặc Enter để bỏ qua migration): " -r
+    if [ -n "$REPLY" ]; then
+        DB_NAME="$REPLY"
+        DB_EXISTS=true
+        echo -e "${GREEN}✓ Sử dụng database: $DB_NAME${NC}"
+    else
+        echo -e "${YELLOW}⚠ Bỏ qua migration. Bạn có thể chạy sau khi xác định đúng tên database.${NC}"
+        exit 0
+    fi
+fi
 echo ""
 
 # Chạy migration với nhiều cách thử
