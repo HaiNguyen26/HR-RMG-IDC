@@ -358,13 +358,6 @@ router.post('/forgot-password', async (req, res) => {
 
     const user = userResult.rows[0];
 
-    if (!user.email || user.email.trim() === '') {
-      return res.status(400).json({
-        success: false,
-        message: 'Tài khoản này chưa có email. Vui lòng liên hệ HR để được hỗ trợ.'
-      });
-    }
-
     // Kiểm tra giới hạn 2 lần/tháng
     const resetCount = await checkResetLimit(user.id, user.user_type);
     if (resetCount >= 2) {
@@ -381,7 +374,7 @@ router.post('/forgot-password', async (req, res) => {
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL,
           user_type VARCHAR(20) NOT NULL CHECK (user_type IN ('employee', 'user')),
-          email VARCHAR(255) NOT NULL,
+          email VARCHAR(255),
           is_used BOOLEAN DEFAULT FALSE,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           used_at TIMESTAMP NULL
@@ -393,6 +386,27 @@ router.post('/forgot-password', async (req, res) => {
         CREATE INDEX IF NOT EXISTS idx_password_reset_user_month 
         ON password_reset_requests(user_id, user_type, DATE_TRUNC('month', created_at))
       `);
+      
+      // Đảm bảo cột email cho phép NULL (sửa nếu bảng đã tồn tại với NOT NULL)
+      try {
+        await pool.query(`
+          DO $$
+          BEGIN
+            IF EXISTS (
+              SELECT 1 FROM information_schema.columns 
+              WHERE table_name = 'password_reset_requests' 
+              AND column_name = 'email'
+              AND is_nullable = 'NO'
+            ) THEN
+              ALTER TABLE password_reset_requests 
+              ALTER COLUMN email DROP NOT NULL;
+            END IF;
+          END $$;
+        `);
+      } catch (alterError) {
+        // Có thể column đã là NULL hoặc không tồn tại, bỏ qua
+        console.log('[Auth] Email column alter check:', alterError.message);
+      }
     } catch (createError) {
       // Bảng có thể đã tồn tại, bỏ qua
       console.log('[Auth] Password reset table check:', createError.message);
@@ -401,23 +415,30 @@ router.post('/forgot-password', async (req, res) => {
     // Tạo reset token đơn giản (user_id + user_type + timestamp hash)
     const resetToken = Buffer.from(`${user.id}_${user.user_type}_${Date.now()}`).toString('base64');
 
-    // Xác định identifier để hiển thị (ưu tiên mã nhân viên, sau đó username, cuối cùng là email)
-    let displayIdentifier = user.email;
+    // Xác định identifier để hiển thị (ưu tiên mã nhân viên, sau đó username, cuối cùng là email hoặc tên)
+    let displayIdentifier = user.email || user.ho_ten || '';
     if (user.user_type === 'employee' && user.ma_nhan_vien) {
       displayIdentifier = user.ma_nhan_vien;
     } else if (user.user_type === 'user' && user.username) {
       displayIdentifier = user.username;
     }
 
+    // Nếu không có email, vẫn cho phép reset password nhưng cảnh báo
+    const hasEmail = user.email && user.email.trim() !== '';
+    const message = hasEmail 
+      ? 'Thông tin xác thực thành công'
+      : 'Thông tin xác thực thành công. Tài khoản này chưa có email, bạn có thể đặt mật khẩu mới ngay bây giờ.';
+
     res.json({
       success: true,
-      message: 'Thông tin xác thực thành công',
+      message: message,
       data: {
-        email: user.email,
-        identifier: displayIdentifier, // Mã nhân viên hoặc username để hiển thị
+        email: user.email || null,
+        identifier: displayIdentifier, // Mã nhân viên, username hoặc tên để hiển thị
         resetToken: resetToken,
         userId: user.id,
-        userType: user.user_type
+        userType: user.user_type,
+        hasEmail: hasEmail // Thông tin để frontend biết có email hay không
       }
     });
 
@@ -515,7 +536,7 @@ router.post('/reset-password', async (req, res) => {
         });
       }
 
-      const userEmail = userCheckResult.rows[0].email;
+      const userEmail = userCheckResult.rows[0].email || null;
 
       // Hash password mới
       const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -579,21 +600,31 @@ router.post('/reset-password', async (req, res) => {
             id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL,
             user_type VARCHAR(20) NOT NULL CHECK (user_type IN ('employee', 'user')),
-            email VARCHAR(255) NOT NULL,
+            email VARCHAR(255),
             is_used BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           )
         `);
+        
+        // Nếu bảng đã tồn tại với email NOT NULL, sửa lại để cho phép NULL
+        try {
+          await pool.query(`
+            ALTER TABLE password_reset_requests 
+            ALTER COLUMN email DROP NOT NULL
+          `);
+        } catch (alterError) {
+          // Column có thể đã là NULL hoặc chưa tồn tại, bỏ qua
+          console.log('[Auth] Email column alter check:', alterError.message);
+        }
 
         // Insert vào bảng tracking (dùng pool riêng vì CREATE TABLE không thể trong transaction)
-        if (userEmail) {
-          await pool.query(
-            `INSERT INTO password_reset_requests (user_id, user_type, email, is_used, used_at)
-             VALUES ($1, $2, $3, TRUE, CURRENT_TIMESTAMP)`,
-            [numericUserId, userType, userEmail]
-          );
-        }
+        // Cho phép insert ngay cả khi không có email
+        await pool.query(
+          `INSERT INTO password_reset_requests (user_id, user_type, email, is_used, used_at)
+           VALUES ($1, $2, $3, TRUE, CURRENT_TIMESTAMP)`,
+          [numericUserId, userType, userEmail || null]
+        );
       } catch (trackError) {
         // Nếu không track được cũng không sao, chỉ log
         console.log('[Auth] Error tracking reset:', trackError.message);
