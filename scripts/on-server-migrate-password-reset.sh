@@ -3,7 +3,8 @@
 # Script: Chạy TRÊN SERVER - Migration cho phép reset password không cần email
 # Cách dùng: ssh vào server, cd /var/www/hr-management, bash scripts/on-server-migrate-password-reset.sh
 
-set -e
+# Không dùng set -e để có thể thử nhiều cách authentication
+# set -e
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -43,11 +44,49 @@ echo -e "${YELLOW}Database: $DB_NAME${NC}"
 echo -e "${YELLOW}User: $DB_USER${NC}"
 echo ""
 
-# Chạy migration
+# Chạy migration với nhiều cách thử
 echo -e "${YELLOW}[1/2] Chạy migration script...${NC}"
-if psql -U "$DB_USER" -d "$DB_NAME" -f "$MIGRATION_FILE"; then
-    echo -e "${GREEN}✓ Migration thành công${NC}"
+MIGRATION_SUCCESS=false
+
+# Cách 1: Thử với user hiện tại (nếu là postgres hoặc có quyền)
+if psql -U "$DB_USER" -d "$DB_NAME" -f "$MIGRATION_FILE" 2>/dev/null; then
+    echo -e "${GREEN}✓ Migration thành công (cách 1)${NC}"
+    MIGRATION_SUCCESS=true
+# Cách 2: Thử với sudo -u postgres
+elif sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION_FILE" 2>/dev/null; then
+    echo -e "${GREEN}✓ Migration thành công (cách 2: với postgres user)${NC}"
+    MIGRATION_SUCCESS=true
+# Cách 3: Thử với PGPASSWORD nếu có
+elif [ -n "$PGPASSWORD" ] && PGPASSWORD="$PGPASSWORD" psql -U "$DB_USER" -d "$DB_NAME" -h localhost -f "$MIGRATION_FILE" 2>/dev/null; then
+    echo -e "${GREEN}✓ Migration thành công (cách 3: với password)${NC}"
+    MIGRATION_SUCCESS=true
+# Cách 4: Chạy SQL trực tiếp với postgres user
+elif sudo -u postgres psql -d "$DB_NAME" -c "ALTER TABLE password_reset_requests ALTER COLUMN email DROP NOT NULL;" 2>/dev/null; then
+    echo -e "${GREEN}✓ Migration thành công (cách 4: SQL trực tiếp)${NC}"
+    MIGRATION_SUCCESS=true
 else
+    echo -e "${YELLOW}⚠ Không thể chạy migration tự động. Vui lòng chạy thủ công:${NC}"
+    echo -e "${BLUE}sudo -u postgres psql -d $DB_NAME -f $MIGRATION_FILE${NC}"
+    echo -e "${BLUE}hoặc${NC}"
+    echo -e "${BLUE}sudo -u postgres psql -d $DB_NAME -c \"ALTER TABLE password_reset_requests ALTER COLUMN email DROP NOT NULL;\"${NC}"
+    echo ""
+    read -p "Bạn có muốn thử chạy với sudo -u postgres? (y/n): " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION_FILE"; then
+            echo -e "${GREEN}✓ Migration thành công${NC}"
+            MIGRATION_SUCCESS=true
+        else
+            echo -e "${RED}❌ Migration thất bại${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${YELLOW}⚠ Bỏ qua migration. Bạn có thể chạy sau.${NC}"
+        MIGRATION_SUCCESS=true  # Không fail script, chỉ cảnh báo
+    fi
+fi
+
+if [ "$MIGRATION_SUCCESS" = false ]; then
     echo -e "${RED}❌ Migration thất bại${NC}"
     exit 1
 fi
@@ -55,7 +94,7 @@ echo ""
 
 # Kiểm tra kết quả
 echo -e "${YELLOW}[2/2] Kiểm tra kết quả...${NC}"
-psql -U "$DB_USER" -d "$DB_NAME" -c "
+if psql -U "$DB_USER" -d "$DB_NAME" -c "
 SELECT 
     column_name,
     data_type,
@@ -63,7 +102,22 @@ SELECT
 FROM information_schema.columns
 WHERE table_name = 'password_reset_requests'
 AND column_name = 'email';
-"
+" 2>/dev/null; then
+    echo ""
+elif sudo -u postgres psql -d "$DB_NAME" -c "
+SELECT 
+    column_name,
+    data_type,
+    is_nullable
+FROM information_schema.columns
+WHERE table_name = 'password_reset_requests'
+AND column_name = 'email';
+" 2>/dev/null; then
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không thể kiểm tra kết quả tự động. Vui lòng kiểm tra thủ công:${NC}"
+    echo -e "${BLUE}sudo -u postgres psql -d $DB_NAME -c \"SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = 'password_reset_requests' AND column_name = 'email';\"${NC}"
+fi
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
