@@ -1109,7 +1109,13 @@ router.put('/:id/resubmit', async (req, res) => {
             if (advanceAmount === '' || advanceAmount === null) {
                 // Bỏ qua nếu là chuỗi rỗng hoặc null
             } else {
-                advanceAmountNum = parseFloat(advanceAmount);
+                // Parse advanceAmount - loại bỏ dấu chấm/phẩy nếu có (VND không có phần thập phân)
+                if (typeof advanceAmount === 'string') {
+                    const cleanedValue = advanceAmount.replace(/[.,\s]/g, '');
+                    advanceAmountNum = parseInt(cleanedValue, 10);
+                } else {
+                    advanceAmountNum = Math.round(parseFloat(advanceAmount));
+                }
                 if (isNaN(advanceAmountNum) || advanceAmountNum < 0) {
                     await client.query('ROLLBACK');
                     return res.status(400).json({
@@ -1117,16 +1123,61 @@ router.put('/:id/resubmit', async (req, res) => {
                         message: 'Kinh phí đã ứng không hợp lệ',
                     });
                 }
+                // Validate giá trị không vượt quá NUMERIC(12,2) - tối đa 9,999,999,999
+                if (advanceAmountNum > 9999999999) {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Kinh phí đã ứng quá lớn (tối đa 9.999.999.999 VND)',
+                    });
+                }
             }
         }
 
         if (totalAmount !== undefined && totalAmount !== null && totalAmount !== '') {
-            totalAmountNum = parseFloat(totalAmount);
+            // Parse totalAmount - loại bỏ dấu chấm/phẩy nếu có (VND không có phần thập phân)
+            console.log('[Customer Entertainment Resubmit] Parsing totalAmount:', {
+                original: totalAmount,
+                type: typeof totalAmount
+            });
+            
+            if (typeof totalAmount === 'string') {
+                const cleanedValue = totalAmount.replace(/[.,\s]/g, '');
+                totalAmountNum = parseInt(cleanedValue, 10);
+                console.log('[Customer Entertainment Resubmit] Parsed string:', {
+                    cleaned: cleanedValue,
+                    parsed: totalAmountNum
+                });
+            } else {
+                totalAmountNum = Math.round(parseFloat(totalAmount));
+                console.log('[Customer Entertainment Resubmit] Parsed number:', totalAmountNum);
+            }
+            
             if (isNaN(totalAmountNum) || totalAmountNum < 0) {
+                console.error('[Customer Entertainment Resubmit] Invalid totalAmountNum:', totalAmountNum);
                 await client.query('ROLLBACK');
                 return res.status(400).json({
                     success: false,
                     message: 'Tổng chi phí thực tế không hợp lệ',
+                });
+            }
+            
+            // Validate giá trị không vượt quá NUMERIC(12,2) - tối đa 9,999,999,999
+            console.log('[Customer Entertainment Resubmit] Validating totalAmountNum:', {
+                value: totalAmountNum,
+                limit: 9999999999,
+                exceeds: totalAmountNum > 9999999999
+            });
+            
+            if (totalAmountNum > 9999999999) {
+                console.error('[Customer Entertainment Resubmit] totalAmountNum exceeds limit:', {
+                    value: totalAmountNum,
+                    limit: 9999999999
+                });
+                await client.query('ROLLBACK');
+                return res.status(400).json({
+                    success: false,
+                    message: 'Tổng chi phí thực tế quá lớn (tối đa 9.999.999.999 VND)',
                 });
             }
         }

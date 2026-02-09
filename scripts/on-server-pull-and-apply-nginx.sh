@@ -96,7 +96,7 @@ echo -e "${YELLOW}[3/4] Test cấu hình Nginx...${NC}"
 if ! sudo nginx -t 2>/dev/null; then
     echo -e "${RED}❌ Nginx config lỗi. Khôi phục backup...${NC}"
     sudo cp "$BACKUP_FILE" "$NGINX_SERVER"
-    exit 1
+    exit 1b
 fi
 echo -e "${GREEN}✓ Config hợp lệ${NC}"
 echo ""

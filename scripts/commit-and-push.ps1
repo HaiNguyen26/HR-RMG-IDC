@@ -25,7 +25,7 @@ Write-Host ""
 
 # Commit với message
 Write-Host "[3/4] Commit với message..." -ForegroundColor Yellow
-$commitMessage = "Fix: Sửa linting warnings, cập nhật báo cáo hoàn ứng - chỉnh sửa tại phần II, status APPROVED_BRANCH_DIRECTOR tiếng Việt, badge sidebar, sửa hiển thị tổng chi phí, cho phép kinh phí đã ứng = 0"
+$commitMessage = "Fix: Sửa parse currency từ parseFloat sang parseInt để xử lý đúng số có dấu chấm phân cách hàng nghìn (VD: 650.000)"
 git commit -m $commitMessage
 if ($LASTEXITCODE -eq 0) {
     Write-Host "✓ Đã commit thành công" -ForegroundColor Green

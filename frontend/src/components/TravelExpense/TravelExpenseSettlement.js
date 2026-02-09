@@ -186,9 +186,23 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
                             const createdDate = req.created_at ? new Date(req.created_at) : null;
 
                             // Calculate total amount from expense items if available
-                            const totalAmount = req.total_amount || (req.expenseItems && req.expenseItems.length > 0
-                                ? req.expenseItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
-                                : 0);
+                            // Parse amount từ database (có thể là NUMERIC(12,2) nên cần parse đúng)
+                            let totalAmount = 0;
+                            if (req.total_amount) {
+                                // Nếu có total_amount từ database, sử dụng nó (đã được tính sẵn)
+                                totalAmount = typeof req.total_amount === 'string' 
+                                    ? parseFloat(req.total_amount.replace(/[^\d.-]/g, '')) || 0
+                                    : parseFloat(req.total_amount) || 0;
+                            } else if (req.expenseItems && req.expenseItems.length > 0) {
+                                // Nếu không có total_amount, tính từ expenseItems
+                                totalAmount = req.expenseItems.reduce((sum, item) => {
+                                    // Parse amount từ database (có thể là NUMERIC(12,2))
+                                    const itemAmount = typeof item.amount === 'string'
+                                        ? parseFloat(item.amount.replace(/[^\d.-]/g, '')) || 0
+                                        : parseFloat(item.amount) || 0;
+                                    return sum + itemAmount;
+                                }, 0);
+                            }
 
                             // Map status to display status
                             const displayStatus = getCustomerEntertainmentStatus(req.status);
@@ -366,18 +380,71 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
         const isReturned = selectedRequest.settlementStatus === 'RETURNED';
         const isCustomerEntertainment = selectedRequest.requestType === 'customer-entertainment';
 
-        // Parse currency values (remove commas)
-        const actualExpenseNum = parseFloat(parseCurrency(formData.actualExpense));
-        if (!formData.actualExpense || actualExpenseNum <= 0) {
-            showToast?.('Vui lòng nhập chi phí thực tế', 'error');
+        // Parse currency values (remove commas and dots)
+        // Đối với customer entertainment expenses khi RETURNED, có thể chỉ cần chỉnh sửa advanceAmount
+        // Nên chỉ validate actualExpense nếu nó được nhập và không rỗng
+        let actualExpenseNum = null;
+        if (formData.actualExpense && formData.actualExpense.trim() !== '') {
+            const actualExpenseStr = parseCurrency(formData.actualExpense);
+            // Parse thành số nguyên (VND không có phần thập phân)
+            // Đảm bảo chuỗi không rỗng trước khi parse
+            if (!actualExpenseStr || actualExpenseStr === '') {
+                showToast?.('Vui lòng nhập chi phí thực tế hợp lệ', 'error');
+                return;
+            }
+            
+            // Debug: Log để kiểm tra
+            console.log('Parsing actualExpense:', {
+                original: formData.actualExpense,
+                cleaned: actualExpenseStr,
+            });
+            
+            actualExpenseNum = parseInt(actualExpenseStr, 10);
+            
+            console.log('Parsed actualExpenseNum:', actualExpenseNum);
+            
+            if (isNaN(actualExpenseNum) || actualExpenseNum <= 0) {
+                console.error('Invalid actualExpenseNum:', actualExpenseNum);
+                showToast?.('Vui lòng nhập chi phí thực tế hợp lệ', 'error');
+                return;
+            }
+
+            // Validate giá trị không vượt quá NUMERIC(12,2) - tối đa 9,999,999,999
+            // NUMERIC(12,2) = 12 chữ số tổng cộng, 2 chữ số sau dấu phẩy = tối đa 9,999,999,999.99
+            // VND không có phần thập phân nên giới hạn là 9,999,999,999
+            console.log('Validating actualExpenseNum:', {
+                value: actualExpenseNum,
+                limit: 9999999999,
+                exceeds: actualExpenseNum > 9999999999
+            });
+            
+            if (actualExpenseNum > 9999999999) {
+                console.error('Actual expense validation failed:', {
+                    original: formData.actualExpense,
+                    parsed: actualExpenseStr,
+                    number: actualExpenseNum,
+                    limit: 9999999999
+                });
+                showToast?.('Chi phí thực tế quá lớn (tối đa 9.999.999.999 VND)', 'error');
+                return;
+            }
+        } else if (!isCustomerEntertainment || !isReturned) {
+            // Đối với travel expenses hoặc khi không phải RETURNED, actualExpense là bắt buộc
+            showToast?.('Vui lòng nhập chi phí thực tế hợp lệ', 'error');
             return;
         }
 
         // Nếu phiếu bị trả, validate advanceAmount (cho phép 0 nếu chưa ứng)
         if (isReturned) {
-            const advanceAmountNum = parseFloat(parseCurrency(formData.advanceAmount || '0'));
+            const advanceAmountStr = parseCurrency(formData.advanceAmount || '0');
+            // Parse thành số nguyên (VND không có phần thập phân)
+            const advanceAmountNum = parseInt(advanceAmountStr, 10);
             if (isNaN(advanceAmountNum) || advanceAmountNum < 0) {
                 showToast?.('Kinh phí đã ứng không hợp lệ', 'error');
+                return;
+            }
+            if (advanceAmountNum > 9999999999) {
+                showToast?.('Kinh phí đã ứng quá lớn (tối đa 9.999.999.999 VND)', 'error');
                 return;
             }
         }
@@ -386,10 +453,20 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
         try {
             // Xử lý customer entertainment expenses khi RETURNED
             if (isCustomerEntertainment && isReturned) {
-                const advanceAmountNum = parseFloat(parseCurrency(formData.advanceAmount || '0'));
+                const advanceAmountStr = parseCurrency(formData.advanceAmount || '0');
+                const advanceAmountNum = parseInt(advanceAmountStr, 10);
+                if (isNaN(advanceAmountNum) || advanceAmountNum < 0) {
+                    showToast?.('Kinh phí đã ứng không hợp lệ', 'error');
+                    return;
+                }
+                // Nếu actualExpense không được nhập, sử dụng giá trị hiện tại từ selectedRequest
+                const totalAmountToSubmit = actualExpenseNum !== null 
+                    ? actualExpenseNum 
+                    : (selectedRequest.actualExpense || selectedRequest.rawData?.total_amount || null);
+                
                 const response = await customerEntertainmentExpensesAPI.resubmit(selectedRequest.id, {
                     advanceAmount: advanceAmountNum,
-                    totalAmount: actualExpenseNum
+                    totalAmount: totalAmountToSubmit
                 });
                 if (response.data && response.data.success) {
                     showToast?.('Đã gửi lại phiếu thành công', 'success');
@@ -405,6 +482,12 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
                 return;
             }
 
+            // Đối với travel expenses, actualExpense là bắt buộc
+            if (actualExpenseNum === null) {
+                showToast?.('Vui lòng nhập chi phí thực tế hợp lệ', 'error');
+                return;
+            }
+
             const submitData = {
                 actualExpense: actualExpenseNum,
                 notes: formData.notes || null,
@@ -413,7 +496,8 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
             
             // Nếu phiếu bị trả, gửi cả advanceAmount để cập nhật (có thể là 0)
             if (isReturned) {
-                submitData.advanceAmount = parseFloat(parseCurrency(formData.advanceAmount || '0'));
+                const advanceAmountStr = parseCurrency(formData.advanceAmount || '0');
+                submitData.advanceAmount = parseInt(advanceAmountStr, 10);
             }
 
             const response = await travelExpensesAPI.submitSettlement(selectedRequest.id, submitData);
@@ -442,18 +526,42 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
         }
     };
 
-    // Format currency input - format với dấu phẩy ngăn cách hàng nghìn
+    // Format currency input - format với dấu chấm ngăn cách hàng nghìn (VND)
     const formatCurrency = (value) => {
         // Remove all non-digit characters
         const numericValue = value.replace(/\D/g, '');
-        // Format with thousand separators
+        // Format with thousand separators (dấu chấm cho VND)
         if (numericValue === '') return '';
-        return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     };
 
-    // Parse currency value (remove commas) for submission
+    // Parse currency value (remove commas and dots) for submission
     const parseCurrency = (value) => {
-        return value.replace(/,/g, '');
+        if (!value || value === '') return '';
+        // Loại bỏ tất cả dấu phẩy, dấu chấm, khoảng trắng và các ký tự không phải số
+        // Chỉ giữ lại các chữ số 0-9
+        const cleaned = value.toString().replace(/[^\d]/g, '');
+        // Trả về chuỗi rỗng nếu không còn số nào
+        return cleaned === '' ? '' : cleaned;
+    };
+
+    // Format VND for display (không có phần thập phân, dấu chấm ngăn cách hàng nghìn)
+    const formatVND = (value) => {
+        if (!value && value !== 0) return '0';
+        // Convert to number if string - loại bỏ tất cả dấu chấm/phẩy trước khi parse
+        let numValue;
+        if (typeof value === 'string') {
+            // Loại bỏ tất cả dấu chấm, phẩy và các ký tự không phải số
+            const cleaned = value.replace(/[^\d]/g, '');
+            numValue = cleaned === '' ? 0 : parseInt(cleaned, 10);
+        } else {
+            numValue = value;
+        }
+        if (isNaN(numValue)) return '0';
+        // Round to integer (VND không có phần thập phân)
+        const intValue = Math.round(numValue);
+        // Format với dấu chấm ngăn cách hàng nghìn
+        return intValue.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     };
 
     const handleActualExpenseChange = (e) => {
@@ -528,8 +636,9 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
         if (!selectedRequest || !formData.actualExpense) return null;
 
         const advance = selectedRequest.advanceAmount || 0;
-        // Parse actual expense - loại bỏ dấu phẩy format trước khi parse
-        const actual = parseFloat(parseCurrency(formData.actualExpense));
+        // Parse actual expense - loại bỏ dấu chấm/phẩy format trước khi parse
+        const actualExpenseStr = parseCurrency(formData.actualExpense);
+        const actual = parseInt(actualExpenseStr, 10) || 0;
         const difference = advance - actual;
 
         return {
@@ -640,7 +749,7 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
                                                 </div>
                                                 {request.actualExpense && (
                                                     <div className="travel-expense-settlement-actual-expense">
-                                                        Chi: {request.actualExpense.toLocaleString('vi-VN')} VND
+                                                        Chi: {formatVND(request.actualExpense)} VND
                                                     </div>
                                                 )}
                                             </div>
@@ -723,7 +832,7 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
                                                         <span className="travel-expense-settlement-info-label">Phụ cấp/Phí sinh hoạt:</span>
                                                         <span className="travel-expense-settlement-info-value">
                                                             {selectedRequest.livingAllowance.currency === 'VND'
-                                                                ? selectedRequest.livingAllowance.amount.toLocaleString('vi-VN')
+                                                                ? formatVND(selectedRequest.livingAllowance.amount)
                                                                 : selectedRequest.livingAllowance.amount} {selectedRequest.livingAllowance.currency}
                                                         </span>
                                                     </div>
@@ -732,7 +841,7 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
                                             <div className="travel-expense-settlement-advance-amount-large">
                                                 <span className="travel-expense-settlement-advance-label">Số Tiền Tạm Ứng Ban Đầu:</span>
                                                 <span className="travel-expense-settlement-advance-value">
-                                                    {selectedRequest.advanceAmount.toLocaleString('vi-VN')} VND
+                                                    {formatVND(selectedRequest.advanceAmount)} VND
                                                 </span>
                                             </div>
                                         </div>
@@ -785,7 +894,7 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
                                                         <span className="travel-expense-settlement-currency-unit">VND</span>
                                                     </div>
                                                     <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
-                                                        Giá trị ban đầu: {(selectedRequest.rawData?.advance_amount || selectedRequest.advanceAmount || 0).toLocaleString('vi-VN')} VND
+                                                        Giá trị ban đầu: {formatVND(selectedRequest.rawData?.advance_amount || selectedRequest.advanceAmount || 0)} VND
                                                     </div>
                                                 </div>
                                             )}
@@ -810,7 +919,7 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
                                                     </div>
                                                 ) : selectedRequest.actualExpense ? (
                                                     <div className="travel-expense-settlement-actual-expense-display">
-                                                        {selectedRequest.actualExpense.toLocaleString('vi-VN')} VND
+                                                        {formatVND(selectedRequest.actualExpense)} VND
                                                     </div>
                                                 ) : (
                                                     <div className="travel-expense-settlement-currency-input-wrapper">
@@ -1010,20 +1119,20 @@ const TravelExpenseSettlement = ({ currentUser, showToast }) => {
                                                     <div className="travel-expense-settlement-calculation-row">
                                                         <span className="travel-expense-settlement-calculation-label">Tổng số tiền Tạm ứng:</span>
                                                         <span className="travel-expense-settlement-calculation-value advance">
-                                                            {result.advance.toLocaleString('vi-VN')} VND
+                                                            {formatVND(result.advance)} VND
                                                         </span>
                                                     </div>
                                                     <div className="travel-expense-settlement-calculation-row">
                                                         <span className="travel-expense-settlement-calculation-label">Tổng chi phí Thực tế đã chi:</span>
                                                         <span className="travel-expense-settlement-calculation-value actual">
-                                                            {result.actual.toLocaleString('vi-VN')} VND
+                                                            {formatVND(result.actual)} VND
                                                         </span>
                                                     </div>
                                                 </div>
                                                 <div className="travel-expense-settlement-result">
                                                     <div className="travel-expense-settlement-result-title">KẾT QUẢ:</div>
                                                     <div className={`travel-expense-settlement-result-amount ${result.needsRefund ? 'refund' : result.needsSupplement ? 'supplement' : 'balanced'}`}>
-                                                        {Math.abs(result.difference).toLocaleString('vi-VN')} VND
+                                                        {formatVND(Math.abs(result.difference))} VND
                                                     </div>
                                                     <div className="travel-expense-settlement-result-description">
                                                         {result.needsRefund

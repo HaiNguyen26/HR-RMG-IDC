@@ -1559,7 +1559,16 @@ router.post('/:id/settlement', upload.array('attachments', 10), async (req, res)
             });
         }
 
-        const actualExpenseNum = parseFloat(actualExpense);
+        // Parse actualExpense - loại bỏ dấu chấm/phẩy nếu có (VND không có phần thập phân)
+        let actualExpenseNum;
+        if (typeof actualExpense === 'string') {
+            // Loại bỏ tất cả dấu chấm, phẩy và khoảng trắng
+            const cleanedValue = actualExpense.replace(/[.,\s]/g, '');
+            actualExpenseNum = parseInt(cleanedValue, 10);
+        } else {
+            // Nếu là số, làm tròn về số nguyên
+            actualExpenseNum = Math.round(parseFloat(actualExpense));
+        }
         if (isNaN(actualExpenseNum) || actualExpenseNum < 0) {
             files.forEach(file => {
                 if (fs.existsSync(file.path)) {
@@ -1626,13 +1635,35 @@ router.post('/:id/settlement', upload.array('attachments', 10), async (req, res)
 
         const timestamp = new Date().toISOString();
 
+        // Validate actualExpense không vượt quá NUMERIC(12,2) - tối đa 9,999,999,999.99
+        // NUMERIC(12,2) = 12 chữ số tổng cộng, 2 chữ số sau dấu phẩy = tối đa 9,999,999,999.99
+        // Vì VND không có phần thập phân, giới hạn là 9,999,999,999
+        if (actualExpenseNum > 9999999999) {
+            await client.query('ROLLBACK');
+            files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
+            return res.status(400).json({
+                success: false,
+                message: 'Chi phí thực tế quá lớn (tối đa 9.999.999.999 VND)',
+            });
+        }
+
         // Nếu có advanceAmount, validate và cập nhật (cho phép 0)
         let advanceAmountNum = null;
         if (advanceAmount !== undefined && advanceAmount !== null) {
             if (advanceAmount === '' || advanceAmount === null) {
                 // Bỏ qua nếu là chuỗi rỗng hoặc null
             } else {
-                advanceAmountNum = parseFloat(advanceAmount);
+                // Parse advanceAmount - loại bỏ dấu chấm/phẩy nếu có (VND không có phần thập phân)
+                if (typeof advanceAmount === 'string') {
+                    const cleanedValue = advanceAmount.replace(/[.,\s]/g, '');
+                    advanceAmountNum = parseInt(cleanedValue, 10);
+                } else {
+                    advanceAmountNum = Math.round(parseFloat(advanceAmount));
+                }
                 if (isNaN(advanceAmountNum) || advanceAmountNum < 0) {
                     await client.query('ROLLBACK');
                     files.forEach(file => {
@@ -1643,6 +1674,19 @@ router.post('/:id/settlement', upload.array('attachments', 10), async (req, res)
                     return res.status(400).json({
                         success: false,
                         message: 'Kinh phí đã ứng không hợp lệ',
+                    });
+                }
+                // Validate giá trị không vượt quá NUMERIC(12,2) - tối đa 9,999,999,999
+                if (advanceAmountNum > 9999999999) {
+                    await client.query('ROLLBACK');
+                    files.forEach(file => {
+                        if (fs.existsSync(file.path)) {
+                            fs.unlinkSync(file.path);
+                        }
+                    });
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Kinh phí đã ứng quá lớn (tối đa 9.999.999.999 VND)',
                     });
                 }
             }

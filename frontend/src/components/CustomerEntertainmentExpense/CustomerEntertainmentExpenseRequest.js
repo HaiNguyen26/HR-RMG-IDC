@@ -180,6 +180,31 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
         }
     };
 
+    // Format currency input - format với dấu chấm ngăn cách hàng nghìn (VND)
+    const formatVNDInput = (value) => {
+        // Remove all non-digit characters
+        const numericValue = value.replace(/\D/g, '');
+        // Format with thousand separators (dấu chấm cho VND)
+        if (numericValue === '') return '';
+        return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    };
+
+    // Parse currency value (remove commas and dots) for submission
+    const parseCurrency = (value) => {
+        if (!value || value === '') return '';
+        // Loại bỏ tất cả dấu phẩy, dấu chấm, khoảng trắng và các ký tự không phải số
+        // Chỉ giữ lại các chữ số 0-9
+        const cleaned = value.toString().replace(/[^\d]/g, '');
+        // Trả về chuỗi rỗng nếu không còn số nào
+        return cleaned === '' ? '' : cleaned;
+    };
+
+    // Handle advance amount change with formatting
+    const handleAdvanceAmountChange = (e) => {
+        const formatted = formatVNDInput(e.target.value);
+        handleChange('advanceAmount', formatted);
+    };
+
     // Add new expense item
     const handleAddExpenseItem = () => {
         const newItem = {
@@ -212,6 +237,12 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                 item.id === itemId ? { ...item, [field]: value } : item
             )
         }));
+    };
+
+    // Handle expense item amount change with formatting
+    const handleExpenseItemAmountChange = (itemId, e) => {
+        const formatted = formatVNDInput(e.target.value);
+        handleExpenseItemChange(itemId, 'amount', formatted);
     };
 
     // Handle file selection for expense item
@@ -270,7 +301,9 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
     // Calculate total amount
     const calculateTotalAmount = () => {
         return formData.expenseItems.reduce((total, item) => {
-            const amount = parseFloat(item.amount) || 0;
+            // Parse amount từ format VND (loại bỏ dấu chấm)
+            const amountStr = parseCurrency(item.amount || '0');
+            const amount = parseInt(amountStr, 10) || 0;
             return total + amount;
         }, 0);
     };
@@ -330,8 +363,12 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
         if (!formData.branch) {
             newErrors.branch = 'Vui lòng chọn chi nhánh';
         }
-        if (formData.advanceAmount && parseFloat(formData.advanceAmount) < 0) {
-            newErrors.advanceAmount = 'Số tiền tạm ứng không hợp lệ';
+        // Validate advanceAmount - parse từ format VND
+        if (formData.advanceAmount && formData.advanceAmount.trim() !== '') {
+            const advanceAmountParsed = parseInt(parseCurrency(formData.advanceAmount), 10);
+            if (isNaN(advanceAmountParsed) || advanceAmountParsed < 0) {
+                newErrors.advanceAmount = 'Số tiền tạm ứng không hợp lệ';
+            }
         }
 
         // Section II validation
@@ -342,7 +379,10 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                 if (!item.invoiceNumber.trim()) {
                     newErrors[`expenseItem_${item.id}_invoiceNumber`] = `Mục ${index + 1}: Vui lòng nhập số hóa đơn`;
                 }
-                if (!item.amount || parseFloat(item.amount) <= 0) {
+                // Parse amount từ format VND để validate
+                const amountStr = parseCurrency(item.amount || '0');
+                const amount = parseInt(amountStr, 10) || 0;
+                if (!item.amount || item.amount.trim() === '' || amount <= 0) {
                     newErrors[`expenseItem_${item.id}_amount`] = `Mục ${index + 1}: Vui lòng nhập giá tiền hợp lệ`;
                 }
                 if (!item.companyName.trim()) {
@@ -432,19 +472,29 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
             }
 
             // Chuẩn bị dữ liệu gửi lên, đảm bảo không gửi undefined hoặc chuỗi rỗng
+            // Parse advanceAmount từ format VND (loại bỏ dấu chấm)
+            const advanceAmountParsed = formData.advanceAmount 
+                ? parseInt(parseCurrency(formData.advanceAmount), 10) || 0 
+                : 0;
+            
             const submitData = {
                 employeeId: currentUser?.id,
                 branch: formData.branch,
                 startDate: formData.startDate,
                 endDate: formData.endDate,
-                advanceAmount: formData.advanceAmount ? parseFloat(formData.advanceAmount) : 0,
-                expenseItems: formData.expenseItems.map(item => ({
-                    invoiceNumber: item.invoiceNumber,
-                    amount: parseFloat(item.amount) || 0,
-                    companyName: item.companyName,
-                    content: item.content,
-                    files: item.files || [] // Keep file info for reference
-                })),
+                advanceAmount: advanceAmountParsed,
+                expenseItems: formData.expenseItems.map(item => {
+                    // Parse amount từ format VND (loại bỏ dấu chấm)
+                    const amountStr = parseCurrency(item.amount || '0');
+                    const amount = parseInt(amountStr, 10) || 0;
+                    return {
+                        invoiceNumber: item.invoiceNumber,
+                        amount: amount,
+                        companyName: item.companyName,
+                        content: item.content,
+                        files: item.files || [] // Keep file info for reference
+                    };
+                }),
                 files: allFiles
             };
 
@@ -700,45 +750,49 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                                     <label className="customer-entertainment-expense-form-label">
                                         Số Tiền Tạm Ứng Ban Đầu (VND)
                                     </label>
-                                    <input
-                                        type="number"
-                                        className={`customer-entertainment-expense-form-input ${errors.advanceAmount ? 'error' : ''}`}
-                                        value={formData.advanceAmount}
-                                        onChange={(e) => handleChange('advanceAmount', e.target.value)}
-                                        placeholder="0"
-                                        min="0"
-                                        step="1"
-                                    />
+                                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                        <input
+                                            type="text"
+                                            className={`customer-entertainment-expense-form-input ${errors.advanceAmount ? 'error' : ''}`}
+                                            value={formData.advanceAmount}
+                                            onChange={handleAdvanceAmountChange}
+                                            placeholder="0"
+                                        />
+                                        <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>VND</span>
+                                    </div>
                                     {errors.advanceAmount && (
                                         <span className="customer-entertainment-expense-error-text">{errors.advanceAmount}</span>
                                     )}
 
                                     {/* Khối Quy Đổi */}
-                                    {formData.advanceAmount && parseFloat(formData.advanceAmount) > 0 && (
-                                        <div className="customer-entertainment-expense-exchange-block">
-                                            <div className="customer-entertainment-expense-exchange-title">Quy Đổi:</div>
-                                            <div className="customer-entertainment-expense-exchange-items">
-                                                <div className="customer-entertainment-expense-exchange-item">
-                                                    <span className="exchange-currency">USD:</span>
-                                                    <span className="exchange-value">
-                                                        {formatCurrency((parseFloat(formData.advanceAmount) || 0) / exchangeRate.USD, 'USD')}
-                                                    </span>
-                                                </div>
-                                                <div className="customer-entertainment-expense-exchange-item">
-                                                    <span className="exchange-currency">EUR:</span>
-                                                    <span className="exchange-value">
-                                                        {formatCurrency((parseFloat(formData.advanceAmount) || 0) / exchangeRate.EUR, 'EUR')}
-                                                    </span>
-                                                </div>
-                                                <div className="customer-entertainment-expense-exchange-item">
-                                                    <span className="exchange-currency">JPY:</span>
-                                                    <span className="exchange-value">
-                                                        {formatCurrency((parseFloat(formData.advanceAmount) || 0) / exchangeRate.JPY, 'JPY')}
-                                                    </span>
+                                    {formData.advanceAmount && formData.advanceAmount.trim() !== '' && (() => {
+                                        const advanceAmountNum = parseInt(parseCurrency(formData.advanceAmount), 10) || 0;
+                                        return advanceAmountNum > 0 && (
+                                            <div className="customer-entertainment-expense-exchange-block">
+                                                <div className="customer-entertainment-expense-exchange-title">Quy Đổi:</div>
+                                                <div className="customer-entertainment-expense-exchange-items">
+                                                    <div className="customer-entertainment-expense-exchange-item">
+                                                        <span className="exchange-currency">USD:</span>
+                                                        <span className="exchange-value">
+                                                            {formatCurrency(advanceAmountNum / exchangeRate.USD, 'USD')}
+                                                        </span>
+                                                    </div>
+                                                    <div className="customer-entertainment-expense-exchange-item">
+                                                        <span className="exchange-currency">EUR:</span>
+                                                        <span className="exchange-value">
+                                                            {formatCurrency(advanceAmountNum / exchangeRate.EUR, 'EUR')}
+                                                        </span>
+                                                    </div>
+                                                    <div className="customer-entertainment-expense-exchange-item">
+                                                        <span className="exchange-currency">JPY:</span>
+                                                        <span className="exchange-value">
+                                                            {formatCurrency(advanceAmountNum / exchangeRate.JPY, 'JPY')}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         </div>
@@ -806,13 +860,11 @@ const CustomerEntertainmentExpenseRequest = ({ currentUser, showToast, showConfi
                                                         </td>
                                                         <td>
                                                             <input
-                                                                type="number"
+                                                                type="text"
                                                                 className={`customer-entertainment-expense-voucher-input ${errors[`expenseItem_${item.id}_amount`] ? 'error' : ''}`}
                                                                 value={item.amount}
-                                                                onChange={(e) => handleExpenseItemChange(item.id, 'amount', e.target.value)}
+                                                                onChange={(e) => handleExpenseItemAmountChange(item.id, e)}
                                                                 placeholder="0"
-                                                                min="0"
-                                                                step="1"
                                                             />
                                                             {errors[`expenseItem_${item.id}_amount`] && (
                                                                 <span className="customer-entertainment-expense-error-text-small">
