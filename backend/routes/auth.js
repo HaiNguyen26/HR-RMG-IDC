@@ -109,13 +109,17 @@ router.post('/login', async (req, res) => {
     } else {
       // Not found in users table, try employees table
       const employeeQuery = `
-        SELECT id, ma_nhan_vien, ho_ten, email, password, trang_thai, phong_ban, chuc_danh, chi_nhanh, quan_ly_truc_tiep, quan_ly_gian_tiep
-        FROM employees
+        SELECT e.id, e.ma_nhan_vien, e.ho_ten, e.email, e.password, e.trang_thai, e.phong_ban, e.chuc_danh, e.chi_nhanh,
+               e.quan_ly_truc_tiep, e.quan_ly_gian_tiep,
+               qltt.ho_ten AS quan_ly_truc_tiep_ho_ten, qlgt.ho_ten AS quan_ly_gian_tiep_ho_ten
+        FROM employees e
+        LEFT JOIN employees qltt ON TRIM(qltt.ma_nhan_vien) = TRIM(e.quan_ly_truc_tiep) AND qltt.trang_thai IN ('ACTIVE', 'PENDING')
+        LEFT JOIN employees qlgt ON TRIM(qlgt.ma_nhan_vien) = TRIM(e.quan_ly_gian_tiep) AND qlgt.trang_thai IN ('ACTIVE', 'PENDING')
         WHERE (
-          email = $1 OR
-          LOWER(TRIM(ho_ten)) = LOWER(TRIM($1)) OR
-          LOWER(TRIM(ma_nhan_vien)) = LOWER(TRIM($1))
-        ) AND trang_thai IN ('ACTIVE', 'PENDING')
+          e.email = $1 OR
+          LOWER(TRIM(e.ho_ten)) = LOWER(TRIM($1)) OR
+          LOWER(TRIM(e.ma_nhan_vien)) = LOWER(TRIM($1))
+        ) AND e.trang_thai IN ('ACTIVE', 'PENDING')
       `;
 
       const employeeResult = await pool.query(employeeQuery, [loginIdentifier]);
@@ -152,7 +156,9 @@ router.post('/login', async (req, res) => {
             chucDanh: employee.chuc_danh,
             chiNhanh: employee.chi_nhanh,
             quanLyTrucTiep: employee.quan_ly_truc_tiep,
-            quanLyGianTiep: employee.quan_ly_gian_tiep
+            quanLyGianTiep: employee.quan_ly_gian_tiep,
+            quanLyTrucTiepHoTen: employee.quan_ly_truc_tiep_ho_ten,
+            quanLyGianTiepHoTen: employee.quan_ly_gian_tiep_ho_ten
           };
         }
       }

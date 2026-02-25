@@ -1034,8 +1034,8 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                     <td>{employee.dia_diem || '-'}</td>
                     <td>{employee.tinh_thue || '-'}</td>
                     <td>{employee.cap_bac || '-'}</td>
-                    <td>{employee.quan_ly_truc_tiep || employee.quanLyTrucTiep || '-'}</td>
-                    <td>{employee.quan_ly_gian_tiep || employee.quanLyGianTiep || '-'}</td>
+                    <td>{employee.quan_ly_truc_tiep_ho_ten || employee.quanLyTrucTiepHoTen || employee.quan_ly_truc_tiep || employee.quanLyTrucTiep || '-'}</td>
+                    <td>{employee.quan_ly_gian_tiep_ho_ten || employee.quanLyGianTiepHoTen || employee.quan_ly_gian_tiep || employee.quanLyGianTiep || '-'}</td>
                     <td>{employee.email || '-'}</td>
                     {canManage && (
                       <td>
@@ -1561,11 +1561,11 @@ const EmployeeTable = ({ employees, onRefresh, currentUser, showToast, showConfi
                         </div>
                         <div className="detail-info-item">
                           <span className="detail-info-label">Quản lý trực tiếp</span>
-                          <p>{detailModal.employee.quan_ly_truc_tiep || detailModal.employee.quanLyTrucTiep || '-'}</p>
+                          <p>{detailModal.employee.quan_ly_truc_tiep_ho_ten || detailModal.employee.quanLyTrucTiepHoTen || detailModal.employee.quan_ly_truc_tiep || detailModal.employee.quanLyTrucTiep || '-'}</p>
                         </div>
                         <div className="detail-info-item">
                           <span className="detail-info-label">Quản lý gián tiếp</span>
-                          <p>{detailModal.employee.quan_ly_gian_tiep || detailModal.employee.quanLyGianTiep || '-'}</p>
+                          <p>{detailModal.employee.quan_ly_gian_tiep_ho_ten || detailModal.employee.quanLyGianTiepHoTen || detailModal.employee.quan_ly_gian_tiep || detailModal.employee.quanLyGianTiep || '-'}</p>
                         </div>
                       </div>
                     </div>

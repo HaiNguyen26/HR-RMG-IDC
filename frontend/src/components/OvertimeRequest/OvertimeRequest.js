@@ -113,7 +113,7 @@ const OvertimeRequest = ({ currentUser, showToast, showConfirm }) => {
     return null;
   };
 
-  const directManagerName = getValue('quanLyTrucTiep', 'quan_ly_truc_tiep', 'team_lead_name') || 'Chưa cập nhật';
+  const directManagerName = getValue('quanLyTrucTiepHoTen', 'quan_ly_truc_tiep_ho_ten', 'quanLyTrucTiep', 'quan_ly_truc_tiep', 'team_lead_name') || 'Chưa cập nhật';
 
   // Get employee basic info for read-only fields
   const employeeCode = getValue('maNhanVien', 'ma_nhan_vien', 'employeeCode') || '';

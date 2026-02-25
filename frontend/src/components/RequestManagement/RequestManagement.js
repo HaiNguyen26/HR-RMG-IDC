@@ -677,30 +677,56 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         }
     }, [activeModule]);
 
-    // Export approved requests to Excel
+    // Export approved requests to Excel (HR: luôn lấy đơn đã duyệt từ API, không phụ thuộc bộ lọc trạng thái hiện tại)
     const handleExportRequests = async () => {
         try {
             setLoading(true);
 
-            // Lấy dữ liệu đã được duyệt (APPROVED)
-            let approvedRequests = requests.filter(req => req.status === 'APPROVED');
+            // Gọi API lấy đơn APPROVED theo module hiện tại (HR xem toàn hệ thống, không truyền employeeId)
+            const params = { status: 'APPROVED' };
+            let approvedRequests = [];
 
-            // Filter theo loại đơn (activeModule)
+            if (activeModule === 'all') {
+                const [leaveRes, overtimeRes, attendanceRes, lateEarlyRes, mealRes] = await Promise.all([
+                    leaveRequestsAPI.getAll(params),
+                    overtimeRequestsAPI.getAll(params),
+                    attendanceAdjustmentsAPI.getAll(params),
+                    lateEarlyRequestsAPI.getAll(params),
+                    mealAllowanceRequestsAPI.getAll(params)
+                ]);
+                approvedRequests = [
+                    ...(leaveRes.data.success ? (leaveRes.data.data || []).map(r => ({ ...r, requestType: getLeaveModuleKey(r), request_type: r.request_type })) : []),
+                    ...(overtimeRes.data.success ? (overtimeRes.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
+                    ...(attendanceRes.data.success ? (attendanceRes.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : []),
+                    ...(lateEarlyRes.data.success ? (lateEarlyRes.data.data || []).map(r => ({ ...r, requestType: 'late-early' })) : []),
+                    ...(mealRes.data.success ? (mealRes.data.data || []).map(r => ({ ...r, requestType: 'meal-allowance' })) : [])
+                ];
+                approvedRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            } else if (isLeaveModuleKey(activeModule)) {
+                const res = await leaveRequestsAPI.getAll(params);
+                if (res.data.success) {
+                    const raw = res.data.data || [];
+                    approvedRequests = raw.filter(r => getLeaveModuleKey(r) === activeModule).map(r => ({ ...r, requestType: activeModule, request_type: r.request_type }));
+                }
+            } else if (activeModule === 'overtime') {
+                const res = await overtimeRequestsAPI.getAll(params);
+                if (res.data.success) approvedRequests = (res.data.data || []).map(r => ({ ...r, requestType: 'overtime' }));
+            } else if (activeModule === 'attendance') {
+                const res = await attendanceAdjustmentsAPI.getAll(params);
+                if (res.data.success) approvedRequests = (res.data.data || []).map(r => ({ ...r, requestType: 'attendance' }));
+            } else if (activeModule === 'late-early') {
+                const res = await lateEarlyRequestsAPI.getAll(params);
+                if (res.data.success) approvedRequests = (res.data.data || []).map(r => ({ ...r, requestType: 'late-early' }));
+            } else if (activeModule === 'meal-allowance') {
+                const res = await mealAllowanceRequestsAPI.getAll(params);
+                if (res.data.success) approvedRequests = (res.data.data || []).map(r => ({ ...r, requestType: 'meal-allowance' }));
+            }
+
+            // Filter theo loại đơn (đã xử lý ở trên khi activeModule !== 'all')
             if (activeModule !== 'all') {
                 approvedRequests = approvedRequests.filter(req => {
-                    if (activeModule === 'leave-permission') {
-                        return isLeaveModuleKey(req.requestType) && req.request_type === 'LEAVE';
-                    } else if (activeModule === 'leave-resign') {
-                        return isLeaveModuleKey(req.requestType) && req.request_type === 'RESIGN';
-                    } else if (activeModule === 'overtime') {
-                        return req.requestType === 'overtime';
-                    } else if (activeModule === 'attendance') {
-                        return req.requestType === 'attendance';
-                    } else if (activeModule === 'late-early') {
-                        return req.requestType === 'late-early';
-                    } else if (activeModule === 'meal-allowance') {
-                        return req.requestType === 'meal-allowance';
-                    }
+                    if (activeModule === 'leave') return isLeaveModuleKey(req.requestType) && req.request_type === 'LEAVE';
+                    if (activeModule === 'resign') return isLeaveModuleKey(req.requestType) && req.request_type === 'RESIGN';
                     return true;
                 });
             }
@@ -794,14 +820,41 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 }
             };
 
-            // Chuẩn hóa dữ liệu theo từng loại đơn
-            const data = approvedRequests.map((req) => {
+            // Hàm tính tăng ca ngày/đêm (dùng chung cho lần 1 và lần 2)
+            const calculateOvertimeHours = (startTime, endTime, startDate, endDate) => {
+                if (!startTime || !endTime) return { dayHours: '', nightHours: '' };
+                try {
+                    const [startHour, startMin] = startTime.split(':').map(Number);
+                    const [endHour, endMin] = endTime.split(':').map(Number);
+                    let startMinutes = startHour * 60 + startMin;
+                    let endMinutes = endHour * 60 + endMin;
+                    if (endMinutes < startMinutes) endMinutes += 24 * 60;
+                    let dayMinutes = 0, nightMinutes = 0;
+                    const nightStart = 22 * 60, nightEnd = 6 * 60;
+                    for (let current = startMinutes; current < endMinutes; current += 60) {
+                        const hourOfDay = current % (24 * 60);
+                        const segmentEnd = Math.min(current + 60, endMinutes);
+                        if (hourOfDay >= nightStart || hourOfDay < nightEnd) nightMinutes += (segmentEnd - current) / 60;
+                        else dayMinutes += (segmentEnd - current) / 60;
+                    }
+                    return {
+                        dayHours: dayMinutes > 0 ? dayMinutes.toFixed(2) : '',
+                        nightHours: nightMinutes > 0 ? nightMinutes.toFixed(2) : ''
+                    };
+                } catch (e) {
+                    return { dayHours: '', nightHours: '' };
+                }
+            };
+
+            // Chuẩn hóa dữ liệu theo từng loại đơn (đơn tăng ca có thể 2 dòng: lần 1 + lần 2)
+            const data = approvedRequests.flatMap((req) => {
                 const baseData = {
                     'Mã đơn': req.id || '',
                     'Mã nhân viên': req.ma_nhan_vien || req.employee?.ma_nhan_vien || '',
                     'Nhân viên': req.employee_name || req.employee?.ho_ten || '',
                     'Phòng ban': req.employee_department || req.employee?.phong_ban || '',
                     'Chi nhánh': req.employee_branch || req.employee?.chi_nhanh || '',
+                    'Lần tăng ca': '' // Chỉ đơn tăng ca mới điền 1 hoặc 2
                 };
 
                 // Xử lý theo loại đơn
@@ -816,7 +869,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         totalDays = `${diffDays} ngày`;
                     }
 
-                    return {
+                    return [{
                         ...baseData,
                         'Loại đơn': req.request_type === 'LEAVE' ? 'Xin nghỉ phép' : 'Xin nghỉ việc',
                         'Ngày bắt đầu': formatDate(req.start_date),
@@ -827,74 +880,23 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         'Trạng thái': 'Đã duyệt',
                         'Ngày tạo': formatDateTime(req.created_at),
                         'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
-                    };
+                    }];
                 } else if (req.requestType === 'overtime') {
-                    // Tính toán tăng ca ngày và tăng ca đêm từ start_time và end_time
-                    const calculateOvertimeHours = (startTime, endTime, startDate, endDate) => {
-                        if (!startTime || !endTime) return { dayHours: '', nightHours: '' };
-                        
-                        try {
-                            // Parse times
-                            const [startHour, startMin] = startTime.split(':').map(Number);
-                            const [endHour, endMin] = endTime.split(':').map(Number);
-                            
-                            // Convert to minutes
-                            let startMinutes = startHour * 60 + startMin;
-                            let endMinutes = endHour * 60 + endMin;
-                            
-                            // Nếu end_time < start_time, có nghĩa là qua ngày hôm sau
-                            if (endMinutes < startMinutes) {
-                                endMinutes += 24 * 60; // Thêm 24 giờ
-                            }
-                            
-                            let dayMinutes = 0;
-                            let nightMinutes = 0;
-                            
-                            // Night overtime: 22:00 - 06:00 (next day)
-                            const nightStart = 22 * 60; // 22:00
-                            const nightEnd = 6 * 60; // 06:00
-                            
-                            // Tính từng giờ
-                            for (let current = startMinutes; current < endMinutes; current += 60) {
-                                const hourOfDay = current % (24 * 60);
-                                
-                                // Kiểm tra xem giờ này có phải tăng ca đêm không
-                                if (hourOfDay >= nightStart || hourOfDay < nightEnd) {
-                                    // Tăng ca đêm
-                                    const segmentEnd = Math.min(current + 60, endMinutes);
-                                    nightMinutes += (segmentEnd - current) / 60;
-                                } else {
-                                    // Tăng ca ngày
-                                    const segmentEnd = Math.min(current + 60, endMinutes);
-                                    dayMinutes += (segmentEnd - current) / 60;
-                                }
-                            }
-                            
-                            return {
-                                dayHours: dayMinutes > 0 ? dayMinutes.toFixed(2) : '',
-                                nightHours: nightMinutes > 0 ? nightMinutes.toFixed(2) : ''
-                            };
-                        } catch (error) {
-                            console.error('Error calculating overtime hours:', error);
-                            return { dayHours: '', nightHours: '' };
-                        }
-                    };
-                    
-                    const overtimeHours = calculateOvertimeHours(
+                    const hours1 = calculateOvertimeHours(
                         req.start_time,
                         req.end_time,
                         req.start_date || req.request_date,
                         req.end_date
                     );
-                    
-                    return {
+                    const row1 = {
                         ...baseData,
+                        'Lần tăng ca': '1',
                         'Loại đơn': 'Đơn tăng ca',
                         'Ngày tăng ca': formatDate(req.request_date || req.start_date),
                         'Giờ bắt đầu': req.start_time || '',
                         'Giờ kết thúc': req.end_time || '',
-                        'Tăng ca ngày (giờ)': overtimeHours.dayHours || '0',
-                        'Tăng ca đêm (giờ)': overtimeHours.nightHours || '0',
+                        'Tăng ca ngày (giờ)': hours1.dayHours || '0',
+                        'Tăng ca đêm (giờ)': hours1.nightHours || '0',
                         'Thời lượng (giờ)': req.duration || '',
                         'Nội dung công việc': req.reason || '',
                         'Ghi chú': req.notes || '',
@@ -902,8 +904,34 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         'Ngày tạo': formatDateTime(req.created_at),
                         'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
                     };
+                    if (req.child_request_id && (req.child_start_date || req.child_start_time)) {
+                        const hours2 = calculateOvertimeHours(
+                            req.child_start_time,
+                            req.child_end_time,
+                            req.child_start_date,
+                            req.child_end_date
+                        );
+                        const row2 = {
+                            ...baseData,
+                            'Lần tăng ca': '2',
+                            'Loại đơn': 'Đơn tăng ca',
+                            'Ngày tăng ca': formatDate(req.child_start_date || req.request_date),
+                            'Giờ bắt đầu': req.child_start_time || '',
+                            'Giờ kết thúc': req.child_end_time || '',
+                            'Tăng ca ngày (giờ)': hours2.dayHours || '0',
+                            'Tăng ca đêm (giờ)': hours2.nightHours || '0',
+                            'Thời lượng (giờ)': req.child_duration || '',
+                            'Nội dung công việc': req.child_reason || req.reason || '',
+                            'Ghi chú': req.notes || '',
+                            'Trạng thái': 'Đã duyệt',
+                            'Ngày tạo': formatDateTime(req.created_at),
+                            'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
+                        };
+                        return [row1, row2];
+                    }
+                    return [row1];
                 } else if (req.requestType === 'attendance') {
-                    return {
+                    return [{
                         ...baseData,
                         'Loại đơn': 'Đơn bổ sung công',
                         'Ngày bổ sung': formatDate(req.adjustment_date || req.request_date),
@@ -915,9 +943,9 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         'Trạng thái': 'Đã duyệt',
                         'Ngày tạo': formatDateTime(req.created_at),
                         'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
-                    };
+                    }];
                 } else if (req.requestType === 'late-early') {
-                    return {
+                    return [{
                         ...baseData,
                         'Loại đơn': req.request_type === 'LATE' ? 'Đơn xin đi trễ' : 'Đơn xin về sớm',
                         'Ngày': formatDate(req.request_date),
@@ -927,7 +955,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         'Trạng thái': 'Đã duyệt',
                         'Ngày tạo': formatDateTime(req.created_at),
                         'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
-                    };
+                    }];
                 } else if (req.requestType === 'meal-allowance') {
                     const items = req.items || [];
                     const firstDate = items[0]?.expense_date;
@@ -936,7 +964,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     // Nội dung: ghép tất cả content từ items, cách nhau bởi dấu phẩy hoặc xuống dòng
                     const content = items.map(item => item.content || '').filter(c => c.trim() !== '').join('; ');
 
-                    return {
+                    return [{
                         ...baseData,
                         'Loại đơn': 'Đơn xin phụ cấp cơm công trình',
                         'Từ ngày': formatDate(firstDate),
@@ -948,11 +976,11 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         'Trạng thái': 'Đã duyệt',
                         'Ngày tạo': formatDateTime(req.created_at),
                         'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
-                    };
+                    }];
                 }
 
                 // Fallback cho các loại đơn khác
-                return {
+                return [{
                     ...baseData,
                     'Loại đơn': 'Không xác định',
                     'Ngày': formatDate(req.created_at),
@@ -960,7 +988,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     'Trạng thái': 'Đã duyệt',
                     'Ngày tạo': formatDateTime(req.created_at),
                     'Ngày duyệt': formatDateTime(req.updated_at)
-                };
+                }];
             });
 
             // Tạo worksheet (không cần headers vì json_to_sheet tự động lấy từ object keys)
@@ -2220,8 +2248,8 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                             type="button"
                             className="request-export-excel-btn"
                             onClick={handleExportRequests}
-                            disabled={loading || requests.filter(req => req.status === 'APPROVED').length === 0}
-                            title="Xuất các đơn đã duyệt ra Excel"
+                            disabled={loading}
+                            title="Xuất các đơn đã duyệt ra Excel (theo tab và khoảng ngày đã chọn)"
                         >
                             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>

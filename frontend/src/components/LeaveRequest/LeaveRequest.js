@@ -104,7 +104,7 @@ const LeaveRequest = ({ currentUser, showToast }) => {
     return null;
   };
 
-  const directManagerName = getValue('quanLyTrucTiep', 'quan_ly_truc_tiep') || 'Chưa cập nhật';
+  const directManagerName = getValue('quanLyTrucTiepHoTen', 'quan_ly_truc_tiep_ho_ten', 'quanLyTrucTiep', 'quan_ly_truc_tiep') || 'Chưa cập nhật';
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({

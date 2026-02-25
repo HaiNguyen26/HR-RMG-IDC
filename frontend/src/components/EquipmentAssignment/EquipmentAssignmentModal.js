@@ -61,8 +61,8 @@ const EquipmentAssignmentModal = ({ isOpen, onClose, employee, onComplete, curre
         return departments[code] || code;
     };
 
-    const directManager = employee?.quanLyTrucTiep || employee?.quan_ly_truc_tiep || '';
-    const indirectManager = employee?.quanLyGianTiep || employee?.quan_ly_gian_tiep || '';
+    const directManager = employee?.quan_ly_truc_tiep_ho_ten || employee?.quanLyTrucTiepHoTen || employee?.quanLyTrucTiep || employee?.quan_ly_truc_tiep || '';
+    const indirectManager = employee?.quan_ly_gian_tiep_ho_ten || employee?.quanLyGianTiepHoTen || employee?.quanLyGianTiep || employee?.quan_ly_gian_tiep || '';
 
     const formatDate = (dateString) => {
         if (!dateString) return '-';

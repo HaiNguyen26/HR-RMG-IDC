@@ -28,13 +28,14 @@ const getEmployeesCache = async () => {
     }
 
     const result = await pool.query(
-        `SELECT id, ho_ten, email, quan_ly_truc_tiep, chuc_danh, trang_thai, chi_nhanh
+        `SELECT id, ma_nhan_vien, ho_ten, email, quan_ly_truc_tiep, chuc_danh, trang_thai, chi_nhanh
          FROM employees 
          WHERE (trang_thai = 'ACTIVE' OR trang_thai = 'PENDING' OR trang_thai IS NULL)
          ORDER BY ho_ten`
     );
 
     const employeesMap = new Map();
+    const byMaNhanVien = new Map();
     result.rows.forEach(emp => {
         const normalizedName = (emp.ho_ten || '').toLowerCase().replace(/\s+/g, ' ').trim();
         if (normalizedName) {
@@ -43,11 +44,20 @@ const getEmployeesCache = async () => {
             }
             employeesMap.get(normalizedName).push(emp);
         }
+        const code = (emp.ma_nhan_vien || '').trim();
+        if (code) {
+            const normalizedCode = code.toUpperCase().replace(/\s+/g, ' ').trim();
+            if (!byMaNhanVien.has(normalizedCode)) {
+                byMaNhanVien.set(normalizedCode, []);
+            }
+            byMaNhanVien.get(normalizedCode).push(emp);
+        }
     });
 
     employeesCache = {
         all: result.rows,
-        map: employeesMap
+        map: employeesMap,
+        byMaNhanVien
     };
     employeesCacheTime = now;
 
@@ -66,7 +76,8 @@ const removeVietnameseAccents = (str) => {
 
 const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
     const cache = await getEmployeesCache();
-    const normalizedName = (managerName || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
+    const rawInput = (managerName || '').trim();
+    const normalizedName = rawInput.toLowerCase().replace(/\s+/g, ' ').trim();
     const normalizedWithoutAccents = removeVietnameseAccents(normalizedName);
 
     // Normalize chi_nhanh ngay từ đầu (bỏ dấu, lowercase, trim)
@@ -76,12 +87,58 @@ const findManagerFromCache = async (managerName, employeeChiNhanh = null) => {
     };
     const normalizedEmployeeChiNhanh = employeeChiNhanh ? normalizeChiNhanhValue(employeeChiNhanh) : null;
 
-    if (!normalizedName) {
+    if (!rawInput) {
         console.log('[findManagerFromCache] Manager name is empty');
         return null;
     }
 
     console.log(`[findManagerFromCache] Looking for manager: "${managerName}" (normalized: "${normalizedName}")${normalizedEmployeeChiNhanh ? `, chi_nhanh: "${normalizedEmployeeChiNhanh}"` : ''}`);
+
+    // Ưu tiên tìm theo mã nhân viên (vd: RMG00009) nếu input giống mã (có số hoặc dạng RMG+ số)
+    const looksLikeCode = /[0-9]/.test(rawInput) || /^[A-Za-z]+\d+/.test(rawInput);
+    if (looksLikeCode && cache.byMaNhanVien) {
+        const normalizedCode = rawInput.toUpperCase().replace(/\s+/g, ' ').trim();
+        const byCodeMatches = cache.byMaNhanVien.get(normalizedCode);
+        if (byCodeMatches && byCodeMatches.length > 0) {
+            const chiNhanhMatchesForCode = (empChiNhanh) => {
+                if (!normalizedEmployeeChiNhanh) return true;
+                const normalized = normalizeChiNhanhValue(empChiNhanh);
+                if (!normalized) return false;
+                if (normalized === 'head office' || normalized === 'ho') return true;
+                if (normalized === normalizedEmployeeChiNhanh) return true;
+                if (normalized.includes(normalizedEmployeeChiNhanh) || normalizedEmployeeChiNhanh.includes(normalized)) {
+                    const words1 = normalized.split(/\s+/).filter(w => w.length > 1);
+                    const words2 = normalizedEmployeeChiNhanh.split(/\s+/).filter(w => w.length > 1);
+                    return words1.length > 0 && words2.length > 0 && words1.some(w1 => words2.some(w2 => w1 === w2));
+                }
+                return false;
+            };
+            if (byCodeMatches.length === 1) {
+                const match = byCodeMatches[0];
+                if (!normalizedEmployeeChiNhanh || chiNhanhMatchesForCode(match.chi_nhanh)) {
+                    console.log(`[findManagerFromCache] Found by ma_nhan_vien: "${match.ho_ten}" (${match.ma_nhan_vien || 'N/A'})`);
+                    return match;
+                }
+                // Đã khớp đúng theo mã NV → tin dữ liệu, chấp nhận quản lý khác chi nhánh (quản lý xuyên chi nhánh)
+                console.warn(`[findManagerFromCache] Manager ${match.ma_nhan_vien} (chi_nhanh: ${match.chi_nhanh || 'N/A'}) accepted for employee chi_nhanh "${normalizedEmployeeChiNhanh}" (match by code).`);
+                return match;
+            } else {
+                const branchMatch = byCodeMatches.find(emp => chiNhanhMatchesForCode(emp.chi_nhanh));
+                if (branchMatch) {
+                    console.log(`[findManagerFromCache] Found by ma_nhan_vien (chi_nhanh): "${branchMatch.ho_ten}" (${branchMatch.ma_nhan_vien || 'N/A'})`);
+                    return branchMatch;
+                }
+                // Nhiều người trùng mã (hiếm): ưu tiên theo chi_nhanh; không có thì lấy đầu tiên (match theo mã)
+                const first = byCodeMatches[0];
+                if (normalizedEmployeeChiNhanh) {
+                    console.warn(`[findManagerFromCache] Multiple ma_nhan_vien "${normalizedCode}"; none match chi_nhanh "${normalizedEmployeeChiNhanh}". Using "${first.ho_ten}" (${first.ma_nhan_vien}).`);
+                } else {
+                    console.log(`[findManagerFromCache] Found by ma_nhan_vien (no chi_nhanh): "${first.ho_ten}" (${first.ma_nhan_vien || 'N/A'})`);
+                }
+                return first;
+            }
+        }
+    }
 
     // Helper function để normalize chi_nhanh (bỏ dấu, lowercase, trim)
     const normalizeChiNhanh = (chiNhanh) => {

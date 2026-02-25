@@ -702,29 +702,33 @@ router.get('/', async (req, res) => {
         try {
             const query = `
                 SELECT
-                    id, 
-                    ma_nhan_vien,
-                    ma_cham_cong,
-                    ho_ten, 
-                    chuc_danh, 
-                    phong_ban, 
-                    bo_phan, 
-                    chi_nhanh,
-                    ngay_gia_nhap, 
-                    loai_hop_dong,
-                    dia_diem,
-                    tinh_thue,
-                    cap_bac,
-                    email, 
-                    quan_ly_truc_tiep,
-                    quan_ly_gian_tiep,
-                    trang_thai,
-                    ${includePassword ? `password, ${hasPasswordDisplayColumn ? 'password_display' : 'NULL as password_display'},` : ''}
-                    created_at,
-                    updated_at
-                FROM employees 
-                WHERE trang_thai IN ('ACTIVE', 'PENDING')
-                ORDER BY created_at DESC
+                    e.id, 
+                    e.ma_nhan_vien,
+                    e.ma_cham_cong,
+                    e.ho_ten, 
+                    e.chuc_danh, 
+                    e.phong_ban, 
+                    e.bo_phan, 
+                    e.chi_nhanh,
+                    e.ngay_gia_nhap, 
+                    e.loai_hop_dong,
+                    e.dia_diem,
+                    e.tinh_thue,
+                    e.cap_bac,
+                    e.email, 
+                    e.quan_ly_truc_tiep,
+                    e.quan_ly_gian_tiep,
+                    qltt.ho_ten AS quan_ly_truc_tiep_ho_ten,
+                    qlgt.ho_ten AS quan_ly_gian_tiep_ho_ten,
+                    e.trang_thai,
+                    ${includePassword ? `e.password, ${hasPasswordDisplayColumn ? 'e.password_display' : 'NULL as password_display'},` : ''}
+                    e.created_at,
+                    e.updated_at
+                FROM employees e
+                LEFT JOIN employees qltt ON TRIM(qltt.ma_nhan_vien) = TRIM(e.quan_ly_truc_tiep) AND qltt.trang_thai IN ('ACTIVE', 'PENDING')
+                LEFT JOIN employees qlgt ON TRIM(qlgt.ma_nhan_vien) = TRIM(e.quan_ly_gian_tiep) AND qlgt.trang_thai IN ('ACTIVE', 'PENDING')
+                WHERE e.trang_thai IN ('ACTIVE', 'PENDING')
+                ORDER BY e.created_at DESC
             `;
 
             result = await pool.query(query);
@@ -734,29 +738,33 @@ router.get('/', async (req, res) => {
                 console.log('[GET /api/employees] Retrying query without password_display column');
                 const fallbackQuery = `
                     SELECT
-                        id, 
-                        ma_nhan_vien,
-                        ma_cham_cong,
-                        ho_ten, 
-                        chuc_danh, 
-                        phong_ban, 
-                        bo_phan, 
-                        chi_nhanh,
-                        ngay_gia_nhap, 
-                        loai_hop_dong,
-                        dia_diem,
-                        tinh_thue,
-                        cap_bac,
-                        email, 
-                        quan_ly_truc_tiep,
-                        quan_ly_gian_tiep,
-                        trang_thai,
-                        ${includePassword ? 'password,' : ''}
-                        created_at,
-                        updated_at
-                    FROM employees 
-                    WHERE trang_thai IN ('ACTIVE', 'PENDING')
-                    ORDER BY created_at DESC
+                        e.id, 
+                        e.ma_nhan_vien,
+                        e.ma_cham_cong,
+                        e.ho_ten, 
+                        e.chuc_danh, 
+                        e.phong_ban, 
+                        e.bo_phan, 
+                        e.chi_nhanh,
+                        e.ngay_gia_nhap, 
+                        e.loai_hop_dong,
+                        e.dia_diem,
+                        e.tinh_thue,
+                        e.cap_bac,
+                        e.email, 
+                        e.quan_ly_truc_tiep,
+                        e.quan_ly_gian_tiep,
+                        qltt.ho_ten AS quan_ly_truc_tiep_ho_ten,
+                        qlgt.ho_ten AS quan_ly_gian_tiep_ho_ten,
+                        e.trang_thai,
+                        ${includePassword ? 'e.password,' : ''}
+                        e.created_at,
+                        e.updated_at
+                    FROM employees e
+                    LEFT JOIN employees qltt ON TRIM(qltt.ma_nhan_vien) = TRIM(e.quan_ly_truc_tiep) AND qltt.trang_thai IN ('ACTIVE', 'PENDING')
+                    LEFT JOIN employees qlgt ON TRIM(qlgt.ma_nhan_vien) = TRIM(e.quan_ly_gian_tiep) AND qlgt.trang_thai IN ('ACTIVE', 'PENDING')
+                    WHERE e.trang_thai IN ('ACTIVE', 'PENDING')
+                    ORDER BY e.created_at DESC
                 `;
                 result = await pool.query(fallbackQuery);
                 // Đánh dấu không có password_display
@@ -1403,28 +1411,32 @@ router.get('/:id', async (req, res) => {
 
         const query = `
             SELECT 
-                id, 
-                ma_nhan_vien,
-                ma_cham_cong,
-                ho_ten, 
-                chuc_danh, 
-                phong_ban, 
-                bo_phan, 
-                chi_nhanh,
-                ngay_gia_nhap,
-                loai_hop_dong,
-                dia_diem,
-                tinh_thue,
-                cap_bac,
-                email, 
-                quan_ly_truc_tiep,
-                quan_ly_gian_tiep,
-                trang_thai,
-                created_at,
-                updated_at
-            FROM employees 
-            WHERE id = $1
-            AND trang_thai IN ('ACTIVE', 'PENDING')
+                e.id, 
+                e.ma_nhan_vien,
+                e.ma_cham_cong,
+                e.ho_ten, 
+                e.chuc_danh, 
+                e.phong_ban, 
+                e.bo_phan, 
+                e.chi_nhanh,
+                e.ngay_gia_nhap,
+                e.loai_hop_dong,
+                e.dia_diem,
+                e.tinh_thue,
+                e.cap_bac,
+                e.email, 
+                e.quan_ly_truc_tiep,
+                e.quan_ly_gian_tiep,
+                qltt.ho_ten AS quan_ly_truc_tiep_ho_ten,
+                qlgt.ho_ten AS quan_ly_gian_tiep_ho_ten,
+                e.trang_thai,
+                e.created_at,
+                e.updated_at
+            FROM employees e
+            LEFT JOIN employees qltt ON TRIM(qltt.ma_nhan_vien) = TRIM(e.quan_ly_truc_tiep) AND qltt.trang_thai IN ('ACTIVE', 'PENDING')
+            LEFT JOIN employees qlgt ON TRIM(qlgt.ma_nhan_vien) = TRIM(e.quan_ly_gian_tiep) AND qlgt.trang_thai IN ('ACTIVE', 'PENDING')
+            WHERE e.id = $1
+            AND e.trang_thai IN ('ACTIVE', 'PENDING')
         `;
 
         const result = await pool.query(query, [numericId]);
