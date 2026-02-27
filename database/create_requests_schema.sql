@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS overtime_requests (
 CREATE TABLE IF NOT EXISTS attendance_adjustments (
     id SERIAL PRIMARY KEY,
     employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-    team_lead_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    team_lead_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
     
     -- Thông tin đơn
     adjustment_date DATE NOT NULL,

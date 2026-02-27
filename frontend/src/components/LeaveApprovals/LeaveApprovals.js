@@ -1200,11 +1200,21 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
         }
 
         if (requestType === 'attendance' || activeModule === 'attendance') {
+            const notesAtt = request.notes || '';
+            const rangeM = notesAtt.match(/DATE_RANGE:(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})/);
+            const dateRangeStr = rangeM
+                ? (() => {
+                    const d1 = new Date(rangeM[1] + 'T00:00:00');
+                    const d2 = new Date(rangeM[2] + 'T00:00:00');
+                    const f = (d) => isNaN(d.getTime()) ? rangeM[1] : d.toLocaleDateString('vi-VN');
+                    return `Từ ${f(d1)} đến ${f(d2)}`;
+                })()
+                : formatDateDisplay(request.adjustment_date || request.request_date);
             return (
                 <>
                     <h3>Đơn bổ sung chấm công</h3>
                     <p className="leave-approvals-period">
-                        {formatDateDisplay(request.adjustment_date || request.request_date)} •{' '}
+                        {dateRangeStr} •{' '}
                         {request.check_type === 'CHECK_OUT' ? '-' : request.check_in_time?.slice(0, 5) || '-'}
                         {' → '}
                         {request.check_type === 'CHECK_IN' ? '-' : request.check_out_time?.slice(0, 5) || '-'}
@@ -1292,8 +1302,16 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             );
         }
 
-        // Lọc bỏ ATTENDANCE_TYPE từ notes khi hiển thị
-        const cleanNotes = request.notes ? request.notes.replace(/ATTENDANCE_TYPE:[^\n]*\n?/g, '').trim() : null;
+        // Lọc bỏ dòng kỹ thuật (DATE_RANGE, LOCATION, ATTENDANCE_TYPE) trong notes khi hiển thị
+        const getDisplayNotes = (notes) => {
+            if (!notes || typeof notes !== 'string') return '';
+            return notes
+                .replace(/DATE_RANGE:\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\s*/g, '')
+                .replace(/LOCATION:[^\n]*\n?/g, '')
+                .replace(/ATTENDANCE_TYPE:[^\n]*\n?/g, '')
+                .trim();
+        };
+        const cleanNotes = request.notes ? (() => { const s = getDisplayNotes(request.notes); return s || null; })() : null;
 
         // Xử lý đặc biệt cho meal-allowance
         if (activeModule === 'meal-allowance') {
@@ -1635,14 +1653,14 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                     const canAction = isTeamLead && request.status === 'PENDING';
                                     const isHr = currentUser?.role && currentUser.role !== 'EMPLOYEE';
 
-                                    // Tính tổng số ngày nghỉ
+                                    // Tính tổng số ngày nghỉ (nghỉ nửa ngày = 0.5 ngày)
                                     let totalDays = '-';
                                     if (request.request_type === 'LEAVE' && request.start_date && request.end_date) {
-                                        const start = new Date(request.start_date);
-                                        const end = new Date(request.end_date);
-                                        const diffTime = Math.abs(end - start);
-                                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-                                        totalDays = `${diffDays} ngày`;
+                                        const notes = request.notes || '';
+                                        const isHalfDay = String(request.start_date) === String(request.end_date) &&
+                                            (notes.includes('Nghỉ nửa ngày - Sáng') || notes.includes('Nghỉ nửa ngày - Chiều'));
+                                        const dayCount = isHalfDay ? 0.5 : (Math.ceil(Math.abs(new Date(request.end_date) - new Date(request.start_date)) / (1000 * 60 * 60 * 24)) + 1);
+                                        totalDays = `${dayCount} ngày`;
                                     } else if (request.duration) {
                                         totalDays = request.duration;
                                     } else if (request.request_type === 'OVERTIME' || request.request_type === 'ATTENDANCE') {
@@ -1693,12 +1711,22 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                         </td>
                                                     );
                                                 } else if (requestType === 'attendance' || request.request_type === 'ATTENDANCE') {
+                                                    const notesCard = request.notes || '';
+                                                    const rangeCard = notesCard.match(/DATE_RANGE:(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})/);
+                                                    const dateCardDisplay = rangeCard
+                                                        ? (() => {
+                                                            const d1 = new Date(rangeCard[1] + 'T00:00:00');
+                                                            const d2 = new Date(rangeCard[2] + 'T00:00:00');
+                                                            const f = (d) => isNaN(d.getTime()) ? rangeCard[1] : d.toLocaleDateString('vi-VN');
+                                                            return `Từ ${f(d1)} đến ${f(d2)}`;
+                                                        })()
+                                                        : formatDateDisplay(request.adjustment_date || request.request_date);
                                                     return (
                                                         <td className="leave-request-info-cell">
                                                             <div className="leave-request-info">
                                                                 <div><strong>Đơn bổ sung chấm công</strong></div>
                                                                 <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                                                                    {formatDateDisplay(request.adjustment_date || request.request_date)}
+                                                                    {dateCardDisplay}
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -1794,11 +1822,22 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                     </td>
                                                 </>
                                             )}
-                                            {activeModule === 'attendance' && (
+                                            {activeModule === 'attendance' && (() => {
+                                                const notesA = request.notes || '';
+                                                const rangeMatch = notesA.match(/DATE_RANGE:(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})/);
+                                                const dateDisplay = rangeMatch
+                                                    ? (() => {
+                                                        const d1 = new Date(rangeMatch[1] + 'T00:00:00');
+                                                        const d2 = new Date(rangeMatch[2] + 'T00:00:00');
+                                                        const f = (d) => isNaN(d.getTime()) ? rangeMatch[1] : d.toLocaleDateString('vi-VN');
+                                                        return `Từ ${f(d1)} đến ${f(d2)}`;
+                                                    })()
+                                                    : formatDateDisplay(request.adjustment_date || request.request_date);
+                                                return (
                                                 <>
                                                     <td className="leave-request-dates-cell">
                                                         <div className="leave-request-dates-info">
-                                                            <span>{formatDateDisplay(request.adjustment_date || request.request_date)}</span>
+                                                            <span>{dateDisplay}</span>
                                                         </div>
                                                     </td>
                                                     <td className="leave-request-type-cell">
@@ -1849,7 +1888,8 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                         </div>
                                                     </td>
                                                 </>
-                                            )}
+                                                );
+                                            })()}
                                             {activeModule === 'late-early' && (
                                                 <>
                                                     <td className="leave-request-type-cell">
@@ -2155,6 +2195,11 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                 </span>
                                                 <span className="info-value info-value-highlight">
                                                     {(() => {
+                                                        const notes = selectedRequest.notes || '';
+                                                        const isHalfDay = selectedRequest.start_date && selectedRequest.end_date &&
+                                                            String(selectedRequest.start_date) === String(selectedRequest.end_date) &&
+                                                            (notes.includes('Nghỉ nửa ngày - Sáng') || notes.includes('Nghỉ nửa ngày - Chiều'));
+                                                        if (isHalfDay) return '0.5 ngày';
                                                         const start = new Date(selectedRequest.start_date);
                                                         const end = new Date(selectedRequest.end_date);
                                                         const diffTime = Math.abs(end - start);
@@ -2323,6 +2368,15 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                 const adjustmentDate = selectedRequest.adjustment_date || selectedRequest.request_date;
                                 const checkInTime = selectedRequest.check_in_time;
                                 const checkOutTime = selectedRequest.check_out_time;
+                                const dateRangeMatch = notes.match(/DATE_RANGE:(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})/);
+                                const dateRangeDisplay = dateRangeMatch
+                                    ? (() => {
+                                        const d1 = new Date(dateRangeMatch[1] + 'T00:00:00');
+                                        const d2 = new Date(dateRangeMatch[2] + 'T00:00:00');
+                                        const f = (d) => isNaN(d.getTime()) ? dateRangeMatch[1] : d.toLocaleDateString('vi-VN');
+                                        return `Từ ngày ${f(d1)} đến ngày ${f(d2)}`;
+                                    })()
+                                    : null;
 
                                 return (
                                     <div className="leave-approvals-modal-section">
@@ -2367,9 +2421,9 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
                                                     <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                                     </svg>
-                                                    Ngày bổ sung
+                                                    {dateRangeDisplay ? 'Khoảng ngày bổ sung' : 'Ngày bổ sung'}
                                                 </span>
-                                                <span className="info-value">{formatDateDisplay(adjustmentDate)}</span>
+                                                <span className="info-value">{dateRangeDisplay || formatDateDisplay(adjustmentDate)}</span>
                                             </div>
 
                                             {/* Quên Chấm Công: Hiển thị Giờ vào và Giờ ra */}

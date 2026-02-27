@@ -528,7 +528,9 @@ router.post('/', async (req, res) => {
             employeeId,
             adjustmentDate,
             reason,
-            attendanceItems // Cấu trúc mới: mảng các item với details
+            attendanceItems, // Cấu trúc mới: mảng các item với details
+            dateRangeStart, // Khoảng từ ngày (khi NV chọn nhiều ngày - Đi công trình/Làm việc bên ngoài)
+            dateRangeEnd
         } = req.body;
 
         // Validation cơ bản
@@ -624,6 +626,33 @@ router.post('/', async (req, res) => {
             });
         }
 
+        // Quên chấm công: tối đa 3 đơn trong 1 tháng (cùng nhân viên)
+        if (item.id === 1) {
+            const adjDate = adjustmentDate ? String(adjustmentDate).trim().substring(0, 10) : '';
+            if (adjDate && adjDate.length >= 7) {
+                const [y, m] = adjDate.split('-').map(Number);
+                const monthStart = `${y}-${String(m).padStart(2, '0')}-01`;
+                const nextMonth = m === 12 ? [y + 1, 1] : [y, m + 1];
+                const monthEnd = `${nextMonth[0]}-${String(nextMonth[1]).padStart(2, '0')}-01`;
+                const countResult = await pool.query(
+                    `SELECT COUNT(*) AS cnt FROM attendance_adjustments
+                     WHERE employee_id = $1
+                       AND adjustment_date >= $2::date
+                       AND adjustment_date < $3::date
+                       AND notes LIKE '%ATTENDANCE_TYPE:FORGOT_CHECK%'
+                       AND status IN ('PENDING', 'APPROVED')`,
+                    [parseInt(employeeId, 10), monthStart, monthEnd]
+                );
+                const count = parseInt(countResult.rows[0]?.cnt || 0, 10);
+                if (count >= 3) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Mỗi nhân viên chỉ được gửi tối đa 3 đơn bổ sung "Quên chấm công" trong một tháng. Bạn đã đạt giới hạn trong tháng này.'
+                    });
+                }
+            }
+        }
+
         // Tìm nhân viên
         const employeeResult = await pool.query(
             `SELECT id, ho_ten, quan_ly_truc_tiep, chi_nhanh FROM employees WHERE id = $1`,
@@ -672,8 +701,24 @@ router.post('/', async (req, res) => {
         if (location) {
             notesWithType = `LOCATION:${location}\n${notesWithType}`;
         }
+        // Khoảng ngày (bổ sung nhiều ngày): hiển thị "Từ ngày ... đến ngày ..." khi quản lý duyệt
+        const rangeStart = dateRangeStart && String(dateRangeStart).trim();
+        const rangeEnd = dateRangeEnd && String(dateRangeEnd).trim();
+        if (rangeStart && rangeEnd) {
+            notesWithType = `DATE_RANGE:${rangeStart}_${rangeEnd}\n${notesWithType}`;
+        }
         if (notes) {
             notesWithType = `${notesWithType}\n${notes}`;
+        }
+
+        // Cho phép team_lead_id NULL khi nhân viên không có quản lý trực tiếp (đơn gửi thẳng HR)
+        try {
+            await pool.query(`
+                ALTER TABLE attendance_adjustments
+                ALTER COLUMN team_lead_id DROP NOT NULL
+            `);
+        } catch (alterErr) {
+            // Đã nullable hoặc lỗi khác, bỏ qua
         }
 
         // Tạo đơn

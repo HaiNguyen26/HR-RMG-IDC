@@ -24,9 +24,12 @@ const ATTENDANCE_ITEMS = [
   }
 ];
 
+const MAX_DATE_RANGE_DAYS = 60; // Giới hạn tối đa 60 ngày cho "Đi công trình" / "Làm việc bên ngoài"
+
 const AttendanceRequest = ({ currentUser, showToast }) => {
   const [formData, setFormData] = useState({
     date: '',
+    dateEnd: '', // Khoảng đến ngày (chỉ dùng cho Đi công trình / Làm việc bên ngoài)
     reason: '', // Lý do bổ sung chấm công
     attendanceItems: [] // Danh sách mục cần bổ sung
   });
@@ -142,7 +145,38 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
       handleInputChange('date', '');
     } else {
       handleInputChange('date', formatDateToISO(date));
+      // Nếu đang chọn khoảng ngày và dateEnd nhỏ hơn date mới thì xóa dateEnd
+      const currentEnd = formData.dateEnd ? parseISODateString(formData.dateEnd) : null;
+      if (currentEnd && date > currentEnd) {
+        setFormData(prev => ({ ...prev, date: formatDateToISO(date), dateEnd: '' }));
+      }
     }
+  };
+
+  const handleDateEndChange = (date) => {
+    if (!date) {
+      setFormData(prev => ({ ...prev, dateEnd: '' }));
+    } else {
+      setFormData(prev => ({ ...prev, dateEnd: formatDateToISO(date) }));
+    }
+    setError('');
+  };
+
+  // Sinh danh sách ngày từ start đến end (inclusive), format ISO date only
+  const getDatesBetween = (startISO, endISO) => {
+    const start = parseISODateString(startISO);
+    const end = parseISODateString(endISO);
+    if (!start || !end || start > end) return [];
+    const dates = [];
+    const d = new Date(start);
+    d.setHours(0, 0, 0, 0);
+    const endDate = new Date(end);
+    endDate.setHours(0, 0, 0, 0);
+    while (d <= endDate) {
+      dates.push(formatDateToISO(d));
+      d.setDate(d.getDate() + 1);
+    }
+    return dates;
   };
 
   const handleTimeChange = (field) => (e) => {
@@ -158,9 +192,27 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
     setError('');
 
     // Validation
+    const isDateRangeType = selectedAttendanceItem === 2 || selectedAttendanceItem === 3;
     if (!formData.date) {
-      setError('Vui lòng chọn ngày cần bổ sung.');
+      setError(isDateRangeType ? 'Vui lòng chọn từ ngày.' : 'Vui lòng chọn ngày cần bổ sung.');
       return;
+    }
+    if (isDateRangeType) {
+      if (!formData.dateEnd) {
+        setError('Vui lòng chọn đến ngày.');
+        return;
+      }
+      const start = parseISODateString(formData.date);
+      const end = parseISODateString(formData.dateEnd);
+      if (start > end) {
+        setError('Từ ngày phải trước hoặc bằng đến ngày.');
+        return;
+      }
+      const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+      if (daysDiff > MAX_DATE_RANGE_DAYS) {
+        setError(`Chỉ được chọn tối đa ${MAX_DATE_RANGE_DAYS} ngày liên tiếp. Bạn đã chọn ${daysDiff} ngày.`);
+        return;
+      }
     }
 
     if (!formData.reason || formData.reason.trim() === '') {
@@ -185,11 +237,15 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
       return;
     }
 
+    // Gộp details từ formData và itemDetails để luôn dùng giá trị mới nhất (tránh lỗi khi state chưa kịp cập nhật)
+    const itemKey = `item${selectedItem.id}`;
+    const effectiveDetails = { ...(selectedItem.details || {}), ...(itemDetails[itemKey] || {}) };
+
     // Validate chi tiết của item được chọn
     if (selectedItem.id === 1) {
       // Quên Chấm Công: cần ít nhất một trong hai (giờ vào hoặc giờ ra)
-      const hasCheckIn = selectedItem.details?.checkInTime && selectedItem.details.checkInTime.trim() !== '';
-      const hasCheckOut = selectedItem.details?.checkOutTime && selectedItem.details.checkOutTime.trim() !== '';
+      const hasCheckIn = effectiveDetails.checkInTime && String(effectiveDetails.checkInTime).trim() !== '';
+      const hasCheckOut = effectiveDetails.checkOutTime && String(effectiveDetails.checkOutTime).trim() !== '';
 
       if (!hasCheckIn && !hasCheckOut) {
         setError('Vui lòng nhập ít nhất giờ vào hoặc giờ ra cho mục "Quên Chấm Công".');
@@ -207,24 +263,27 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
       }
 
       // Cập nhật label trong attendanceItems
-      selectedItem.label = label;
-
-      // Cập nhật lại formData với label mới
       setFormData(prev => ({
         ...prev,
         attendanceItems: prev.attendanceItems.map(item =>
-          item.id === selectedItem.id ? { ...item, label } : item
+          item.id === selectedItem.id ? { ...item, label, details: effectiveDetails } : item
         )
       }));
     } else if (selectedItem.id === 2) {
       // Đi Công Trình: cần location, startTime, endTime
-      if (!selectedItem.details?.location || !selectedItem.details?.startTime || !selectedItem.details?.endTime) {
+      const loc = effectiveDetails.location && String(effectiveDetails.location).trim() !== '';
+      const start = effectiveDetails.startTime && String(effectiveDetails.startTime).trim() !== '';
+      const end = effectiveDetails.endTime && String(effectiveDetails.endTime).trim() !== '';
+      if (!loc || !start || !end) {
         setError('Vui lòng nhập đầy đủ thông tin cho mục "Đi Công Trình" (Địa điểm, Giờ bắt đầu, Giờ kết thúc).');
         return;
       }
     } else if (selectedItem.id === 3) {
       // Làm việc bên ngoài: cần location, startTime, endTime
-      if (!selectedItem.details?.location || !selectedItem.details?.startTime || !selectedItem.details?.endTime) {
+      const loc = effectiveDetails.location && String(effectiveDetails.location).trim() !== '';
+      const start = effectiveDetails.startTime && String(effectiveDetails.startTime).trim() !== '';
+      const end = effectiveDetails.endTime && String(effectiveDetails.endTime).trim() !== '';
+      if (!loc || !start || !end) {
         setError('Vui lòng nhập đầy đủ thông tin cho mục "Làm việc bên ngoài" (Địa điểm, Giờ bắt đầu, Giờ kết thúc).');
         return;
       }
@@ -234,31 +293,67 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
     try {
       if (!currentUser?.id) {
         setError('Không xác định được thông tin nhân viên. Vui lòng đăng nhập lại.');
+        setLoading(false);
         return;
       }
 
-      const payload = {
-        employeeId: currentUser.id,
-        adjustmentDate: formData.date,
-        reason: formData.reason.trim(), // Lý do bổ sung chấm công
-        attendanceItems: formData.attendanceItems.map(item => ({
-          id: item.id,
-          type: item.type,
-          label: item.label,
-          details: item.details || {}
-        }))
-      };
+      const reasonTrimmed = formData.reason.trim();
+      // Dùng effectiveDetails đã merge (formData + itemDetails) cho item đang chọn để tránh mất dữ liệu
+      const detailsForPayload = { ...(selectedItem.details || {}), ...effectiveDetails };
+      const itemsPayload = formData.attendanceItems.map(item => ({
+        id: item.id,
+        type: item.type,
+        label: item.label,
+        details: item.id === selectedItem.id ? detailsForPayload : (item.details || {})
+      }));
 
-      const response = await attendanceAdjustmentsAPI.create(payload);
+      const isDateRangeType = selectedAttendanceItem === 2 || selectedAttendanceItem === 3;
+      const datesToSubmit = isDateRangeType && formData.dateEnd
+        ? getDatesBetween(formData.date, formData.dateEnd)
+        : [formData.date];
 
-      if (response.data?.success) {
-        if (showToast) {
-          showToast('Đơn bổ sung chấm công đã được gửi thành công!', 'success');
+      let successCount = 0;
+      let lastError = null;
+
+      const dateRangeStart = isDateRangeType && formData.date ? formData.date : null;
+      const dateRangeEnd = isDateRangeType && formData.dateEnd ? formData.dateEnd : null;
+
+      for (const adjustmentDate of datesToSubmit) {
+        try {
+          const payload = {
+            employeeId: currentUser.id,
+            adjustmentDate,
+            reason: reasonTrimmed,
+            attendanceItems: itemsPayload
+          };
+          if (dateRangeStart && dateRangeEnd) {
+            payload.dateRangeStart = dateRangeStart;
+            payload.dateRangeEnd = dateRangeEnd;
+          }
+          const response = await attendanceAdjustmentsAPI.create(payload);
+          if (response.data?.success) {
+            successCount += 1;
+          } else {
+            lastError = new Error(response.data?.message || 'Không thể gửi đơn.');
+            break;
+          }
+        } catch (err) {
+          lastError = err;
+          break;
         }
+      }
 
-        // Reset form
+      if (successCount === datesToSubmit.length) {
+        const dateStartStr = formData.date ? parseISODateString(formData.date).toLocaleDateString('vi-VN') : '';
+        const dateEndStr = formData.dateEnd ? parseISODateString(formData.dateEnd).toLocaleDateString('vi-VN') : '';
+        const message = datesToSubmit.length > 1
+          ? `Đã gửi ${successCount} đơn bổ sung chấm công (từ ${dateStartStr} đến ${dateEndStr}).`
+          : 'Đơn bổ sung chấm công đã được gửi thành công!';
+        if (showToast) showToast(message, 'success');
+
         setFormData({
           date: '',
+          dateEnd: '',
           reason: '',
           attendanceItems: []
         });
@@ -269,14 +364,14 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
           item3: { location: '', startTime: '', endTime: '' }
         });
       } else {
-        throw new Error(response.data?.message || 'Không thể gửi đơn. Vui lòng thử lại.');
+        const message = lastError?.response?.data?.message || lastError?.message || 'Có lỗi xảy ra. Vui lòng thử lại.';
+        setError(successCount > 0 ? `Đã gửi ${successCount}/${datesToSubmit.length} đơn. Lỗi: ${message}` : message);
+        if (showToast) showToast(message, 'error');
       }
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Có lỗi xảy ra. Vui lòng thử lại.';
       setError(message);
-      if (showToast) {
-        showToast(message, 'error');
-      }
+      if (showToast) showToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -374,31 +469,92 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                     </div>
                   </div>
 
-                  {/* Date and Loại bổ sung - Side by Side */}
+                  {/* Date: một ngày (Quên chấm công) hoặc khoảng ngày (Đi công trình / Làm việc bên ngoài) */}
                   <div className="attendance-form-row">
-                    <div className="attendance-form-group">
-                      <label className="attendance-form-label">
-                        <svg className="attendance-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
-                        <span>Ngày cần bổ sung *</span>
-                      </label>
-                      <div className="attendance-date-picker-wrapper">
-                        <DatePicker
-                          selected={formData.date ? parseISODateString(formData.date) : null}
-                          onChange={handleDateChange}
-                          dateFormat="dd/MM/yyyy"
-                          locale={DATE_PICKER_LOCALE}
-                          placeholderText="dd/mm/yyyy"
-                          className="attendance-form-datepicker"
-                          required
-                          autoComplete="off"
-                        />
-                        <svg className="attendance-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
+                    {selectedAttendanceItem === 2 || selectedAttendanceItem === 3 ? (
+                      <>
+                        <div className="attendance-form-group">
+                          <label className="attendance-form-label">
+                            <svg className="attendance-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <span>Từ ngày *</span>
+                          </label>
+                          <div className="attendance-date-picker-wrapper">
+                            <DatePicker
+                              selected={formData.date ? parseISODateString(formData.date) : null}
+                              onChange={handleDateChange}
+                              dateFormat="dd/MM/yyyy"
+                              locale={DATE_PICKER_LOCALE}
+                              placeholderText="dd/mm/yyyy"
+                              className="attendance-form-datepicker"
+                              maxDate={formData.dateEnd ? parseISODateString(formData.dateEnd) : undefined}
+                              autoComplete="off"
+                            />
+                            <svg className="attendance-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                          </div>
+                        </div>
+                        <div className="attendance-form-group">
+                          <label className="attendance-form-label">
+                            <svg className="attendance-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <span>Đến ngày *</span>
+                          </label>
+                          <div className="attendance-date-picker-wrapper">
+                            <DatePicker
+                              selected={formData.dateEnd ? parseISODateString(formData.dateEnd) : null}
+                              onChange={handleDateEndChange}
+                              dateFormat="dd/MM/yyyy"
+                              locale={DATE_PICKER_LOCALE}
+                              placeholderText="dd/mm/yyyy"
+                              className="attendance-form-datepicker"
+                              minDate={formData.date ? parseISODateString(formData.date) : undefined}
+                              autoComplete="off"
+                            />
+                            <svg className="attendance-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                          </div>
+                        </div>
+                        {(formData.date || formData.dateEnd) && (
+                          <p className="attendance-form-hint" style={{ gridColumn: '1 / -1', marginTop: '-0.25rem', marginBottom: 0, fontSize: '0.8125rem', color: '#6b7280' }}>
+                            Áp dụng cùng địa điểm và giờ cho tất cả các ngày trong khoảng (tối đa {MAX_DATE_RANGE_DAYS} ngày).
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <div className="attendance-form-group">
+                        <label className="attendance-form-label">
+                          <svg className="attendance-label-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                          </svg>
+                          <span>Ngày cần bổ sung *</span>
+                        </label>
+                        <div className="attendance-date-picker-wrapper">
+                          <DatePicker
+                            selected={formData.date ? parseISODateString(formData.date) : null}
+                            onChange={handleDateChange}
+                            dateFormat="dd/MM/yyyy"
+                            locale={DATE_PICKER_LOCALE}
+                            placeholderText="dd/mm/yyyy"
+                            className="attendance-form-datepicker"
+                            required
+                            autoComplete="off"
+                          />
+                          <svg className="attendance-date-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                          </svg>
+                        </div>
+                        {selectedAttendanceItem === 1 && (
+                          <p className="attendance-form-hint" style={{ gridColumn: '1 / -1', marginTop: '0.25rem', marginBottom: 0, fontSize: '0.8125rem', color: '#6b7280' }}>
+                            Tối đa 3 đơn quên chấm công trong 1 tháng.
+                          </p>
+                        )}
                       </div>
-                    </div>
+                    )}
                     <div className="attendance-form-group">
                       <label className="attendance-form-label">
                         <span>Loại bổ sung *</span>
@@ -423,8 +579,10 @@ const AttendanceRequest = ({ currentUser, showToast }) => {
                                 setSelectedAttendanceItem(item.id);
                                 const itemKey = `item${item.id}`;
                                 const currentDetails = itemDetails[itemKey] || {};
+                                const isRangeType = item.id === 2 || item.id === 3;
                                 setFormData(prev => ({
                                   ...prev,
+                                  dateEnd: isRangeType ? prev.dateEnd : '', // Quên chấm công không dùng đến ngày
                                   attendanceItems: [{
                                     id: item.id,
                                     type: item.type,

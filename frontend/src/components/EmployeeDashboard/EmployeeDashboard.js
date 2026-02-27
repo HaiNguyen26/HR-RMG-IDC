@@ -202,6 +202,15 @@ const EmployeeDashboard = ({ currentUser, onNavigate }) => {
                 const approvedRequests = response.data?.data || [];
                 let usedDays = 0;
 
+                // Helper: nghỉ nửa ngày (cùng ngày + ghi chú) chỉ trừ 0.5 ngày phép
+                const isHalfDayLeave = (req) => {
+                    const start = req.start_date || req.startDate;
+                    const end = req.end_date || req.endDate || start;
+                    const notes = req.notes || '';
+                    return start && end && String(start) === String(end) &&
+                        (notes.includes('Nghỉ nửa ngày - Sáng') || notes.includes('Nghỉ nửa ngày - Chiều'));
+                };
+
                 // Calculate used days from approved requests in current year
                 approvedRequests.forEach(request => {
                     const requestStartDate = new Date(request.start_date || request.startDate);
@@ -209,10 +218,15 @@ const EmployeeDashboard = ({ currentUser, onNavigate }) => {
 
                     // Check if request is in current year
                     if (requestStartDate >= yearStart && requestStartDate <= yearEnd) {
-                        // Calculate days (inclusive of both start and end date)
-                        const diffTime = requestEndDate.getTime() - requestStartDate.getTime();
-                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
-                        usedDays += diffDays >= 1 ? diffDays : 0;
+                        let days;
+                        if (isHalfDayLeave(request)) {
+                            days = 0.5;
+                        } else {
+                            const diffTime = requestEndDate.getTime() - requestStartDate.getTime();
+                            const fullDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                            days = fullDays >= 1 ? fullDays : 0;
+                        }
+                        usedDays += days;
                     }
                 });
 

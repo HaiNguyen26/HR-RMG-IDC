@@ -110,6 +110,16 @@ const formatDateDisplay = (value, withTime = false) => {
     });
 };
 
+// Lọc bỏ dòng kỹ thuật trong notes (đơn bổ sung công) khi hiển thị cho người dùng
+const getDisplayNotes = (notes) => {
+    if (!notes || typeof notes !== 'string') return '';
+    return notes
+        .replace(/DATE_RANGE:\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\s*/g, '')
+        .replace(/LOCATION:[^\n]*\n?/g, '')
+        .replace(/ATTENDANCE_TYPE:[^\n]*\n?/g, '')
+        .trim();
+};
+
 // Component này CHỈ dành cho HR/ADMIN
 const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     const [requests, setRequests] = useState([]);
@@ -859,14 +869,14 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
 
                 // Xử lý theo loại đơn
                 if (isLeaveModuleKey(req.requestType)) {
-                    // Tính số ngày nghỉ
+                    // Tính số ngày nghỉ (nghỉ nửa ngày = 0.5 ngày)
                     let totalDays = '';
                     if (req.request_type === 'LEAVE' && req.start_date && req.end_date) {
-                        const start = new Date(req.start_date);
-                        const end = new Date(req.end_date);
-                        const diffTime = Math.abs(end - start);
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-                        totalDays = `${diffDays} ngày`;
+                        const notes = req.notes || '';
+                        const isHalfDay = String(req.start_date) === String(req.end_date) &&
+                            (notes.includes('Nghỉ nửa ngày - Sáng') || notes.includes('Nghỉ nửa ngày - Chiều'));
+                        const dayCount = isHalfDay ? 0.5 : (Math.ceil(Math.abs(new Date(req.end_date) - new Date(req.start_date)) / (1000 * 60 * 60 * 24)) + 1);
+                        totalDays = `${dayCount} ngày`;
                     }
 
                     return [{
@@ -876,7 +886,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         'Ngày kết thúc': req.request_type === 'LEAVE' ? formatDate(req.end_date) : '',
                         'Tổng số ngày': totalDays,
                         'Lý do': req.reason || '',
-                        'Ghi chú': req.notes || '',
+                        'Ghi chú': getDisplayNotes(req.notes) || '',
                         'Trạng thái': 'Đã duyệt',
                         'Ngày tạo': formatDateTime(req.created_at),
                         'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
@@ -899,7 +909,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         'Tăng ca đêm (giờ)': hours1.nightHours || '0',
                         'Thời lượng (giờ)': req.duration || '',
                         'Nội dung công việc': req.reason || '',
-                        'Ghi chú': req.notes || '',
+                        'Ghi chú': getDisplayNotes(req.notes) || '',
                         'Trạng thái': 'Đã duyệt',
                         'Ngày tạo': formatDateTime(req.created_at),
                         'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
@@ -922,7 +932,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                             'Tăng ca đêm (giờ)': hours2.nightHours || '0',
                             'Thời lượng (giờ)': req.child_duration || '',
                             'Nội dung công việc': req.child_reason || req.reason || '',
-                            'Ghi chú': req.notes || '',
+                            'Ghi chú': getDisplayNotes(req.notes) || '',
                             'Trạng thái': 'Đã duyệt',
                             'Ngày tạo': formatDateTime(req.created_at),
                             'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
@@ -939,7 +949,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         'Giờ vào': req.check_in_time || '',
                         'Giờ ra': req.check_out_time || '',
                         'Lý do': req.reason || '',
-                        'Ghi chú': req.notes || '',
+                        'Ghi chú': getDisplayNotes(req.notes) || '',
                         'Trạng thái': 'Đã duyệt',
                         'Ngày tạo': formatDateTime(req.created_at),
                         'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
@@ -951,7 +961,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         'Ngày': formatDate(req.request_date),
                         'Thời gian': req.time_value || '',
                         'Lý do': req.reason || '',
-                        'Ghi chú': req.notes || '',
+                        'Ghi chú': getDisplayNotes(req.notes) || '',
                         'Trạng thái': 'Đã duyệt',
                         'Ngày tạo': formatDateTime(req.created_at),
                         'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
@@ -972,7 +982,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                         'Số mục chi tiết': items.length,
                         'Nội dung': content || '',
                         'Tổng tiền (VNĐ)': totalAmount.toLocaleString('vi-VN'),
-                        'Ghi chú': req.notes || '',
+                        'Ghi chú': getDisplayNotes(req.notes) || '',
                         'Trạng thái': 'Đã duyệt',
                         'Ngày tạo': formatDateTime(req.created_at),
                         'Ngày duyệt': formatDateTime(req.team_lead_action_at || req.updated_at)
@@ -984,7 +994,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     ...baseData,
                     'Loại đơn': 'Không xác định',
                     'Ngày': formatDate(req.created_at),
-                    'Lý do': req.reason || req.notes || '',
+                    'Lý do': req.reason || getDisplayNotes(req.notes) || '',
                     'Trạng thái': 'Đã duyệt',
                     'Ngày tạo': formatDateTime(req.created_at),
                     'Ngày duyệt': formatDateTime(req.updated_at)
@@ -1052,14 +1062,14 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
         const requestType = activeModule === 'all' ? (request.requestType || 'unknown') : (request.requestType || activeModule);
 
         if (isLeaveModuleKey(requestType) || isLeaveModuleKey(activeModule)) {
-            // Tính số ngày nghỉ
+            // Tính số ngày nghỉ (nghỉ nửa ngày = 0.5 ngày)
             let totalDays = '-';
             if (request.request_type === 'LEAVE' && request.start_date && request.end_date) {
-                const start = new Date(request.start_date);
-                const end = new Date(request.end_date);
-                const diffTime = Math.abs(end - start);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-                totalDays = `${diffDays} ngày`;
+                const notes = request.notes || '';
+                const isHalfDay = String(request.start_date) === String(request.end_date) &&
+                    (notes.includes('Nghỉ nửa ngày - Sáng') || notes.includes('Nghỉ nửa ngày - Chiều'));
+                const dayCount = isHalfDay ? 0.5 : (Math.ceil(Math.abs(new Date(request.end_date) - new Date(request.start_date)) / (1000 * 60 * 60 * 24)) + 1);
+                totalDays = `${dayCount} ngày`;
             } else if (request.duration) {
                 totalDays = request.duration;
             }
@@ -1204,7 +1214,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     </div>
 
                     {/* Lý do và Ghi chú */}
-                    {(request.reason || request.notes || request.manager_comment || request.team_lead_comment) && (
+                    {(request.reason || getDisplayNotes(request.notes) || request.manager_comment || request.team_lead_comment) && (
                         <div className="request-management-modal-section">
                             <h3 className="request-management-modal-section-title">
                                 <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1217,9 +1227,9 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                     <strong>Lý do:</strong> {request.reason}
                                 </div>
                             )}
-                            {request.notes && (
+                            {getDisplayNotes(request.notes) && (
                                 <div className="request-management-notes-text">
-                                    <strong>Ghi chú:</strong> {request.notes}
+                                    <strong>Ghi chú:</strong> {getDisplayNotes(request.notes)}
                                 </div>
                             )}
                             {(request.manager_comment || request.team_lead_comment) && (
@@ -1473,6 +1483,16 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 (notes.includes('ATTENDANCE_TYPE:')
                     ? notes.split('ATTENDANCE_TYPE:')[1]?.split('\n')[0]?.trim()
                     : null);
+            // Parse khoảng ngày (bổ sung nhiều ngày) từ notes: DATE_RANGE:YYYY-MM-DD_YYYY-MM-DD
+            const dateRangeMatch = notes.match(/DATE_RANGE:(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})/);
+            const attendanceDateRange = dateRangeMatch
+                ? { start: dateRangeMatch[1], end: dateRangeMatch[2] }
+                : null;
+            const formatDateRangeDisplay = (iso) => {
+                if (!iso) return '';
+                const d = new Date(iso + 'T00:00:00');
+                return isNaN(d.getTime()) ? iso : d.toLocaleDateString('vi-VN');
+            };
             let attendanceTypeLabel = 'Quên Chấm Công';
             if (attendanceType === 'FORGOT_CHECK' || attendanceType === '1') {
                 attendanceTypeLabel = 'Quên Chấm Công';
@@ -1482,8 +1502,8 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                 attendanceTypeLabel = 'Làm việc bên ngoài';
             }
 
-            // Lọc bỏ ATTENDANCE_TYPE từ notes khi hiển thị
-            const cleanNotes = notes.replace(/ATTENDANCE_TYPE:[^\n]*\n?/g, '').trim() || null;
+            // Ghi chú hiển thị (bỏ dòng kỹ thuật DATE_RANGE, LOCATION, ATTENDANCE_TYPE)
+            const cleanNotes = getDisplayNotes(notes) || null;
 
             return (
                 <>
@@ -1584,9 +1604,13 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                     <svg className="info-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                     </svg>
-                                    Ngày bổ sung
+                                    {attendanceDateRange ? 'Khoảng ngày bổ sung' : 'Ngày bổ sung'}
                                 </span>
-                                <span className="info-value">{formatDateDisplay(request.adjustment_date || request.request_date) || '-'}</span>
+                                <span className="info-value">
+                                    {attendanceDateRange
+                                        ? `Từ ngày ${formatDateRangeDisplay(attendanceDateRange.start)} đến ngày ${formatDateRangeDisplay(attendanceDateRange.end)}`
+                                        : (formatDateDisplay(request.adjustment_date || request.request_date) || '-')}
+                                </span>
                             </div>
                             {request.check_in_time && (
                                 <div className="request-management-modal-info-item">
@@ -1627,7 +1651,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     </div>
 
                     {/* Lý do bổ sung và Nhận xét */}
-                    {(cleanNotes || request.manager_comment || request.team_lead_comment) && (
+                    {(request.reason || cleanNotes || request.manager_comment || request.team_lead_comment) && (
                         <div className="request-management-modal-section">
                             <h3 className="request-management-modal-section-title">
                                 <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1635,9 +1659,14 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                 </svg>
                                 Lý do bổ sung và Nhận xét
                             </h3>
-                            {cleanNotes && (
+                            {(request.reason || cleanNotes) && (
                                 <div className="request-management-reason-text">
-                                    <strong>Lý do bổ sung:</strong> {cleanNotes}
+                                    <strong>Lý do bổ sung:</strong> {request.reason || cleanNotes}
+                                </div>
+                            )}
+                            {cleanNotes && request.reason && cleanNotes !== request.reason && (
+                                <div className="request-management-reason-text">
+                                    <strong>Ghi chú:</strong> {cleanNotes}
                                 </div>
                             )}
                             {(request.manager_comment || request.team_lead_comment) && (
@@ -1805,7 +1834,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     </div>
 
                     {/* Lý do và Ghi chú */}
-                    {(request.reason || request.notes || request.team_lead_comment) && (
+                    {(request.reason || getDisplayNotes(request.notes) || request.team_lead_comment) && (
                         <div className="request-management-modal-section">
                             <h3 className="request-management-modal-section-title">
                                 <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1818,9 +1847,9 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                     <strong>Lý do:</strong> {request.reason}
                                 </div>
                             )}
-                            {request.notes && (
+                            {getDisplayNotes(request.notes) && (
                                 <div className="request-management-notes-text">
-                                    <strong>Ghi chú:</strong> {request.notes}
+                                    <strong>Ghi chú:</strong> {getDisplayNotes(request.notes)}
                                 </div>
                             )}
                             {request.team_lead_comment && (
@@ -2008,7 +2037,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     </div>
 
                     {/* Ghi chú và Nhận xét */}
-                    {(request.notes || request.team_lead_comment) && (
+                    {(getDisplayNotes(request.notes) || request.team_lead_comment) && (
                         <div className="request-management-modal-section">
                             <h3 className="request-management-modal-section-title">
                                 <svg className="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2016,9 +2045,9 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                 </svg>
                                 Ghi chú và Nhận xét
                             </h3>
-                            {request.notes && (
+                            {getDisplayNotes(request.notes) && (
                                 <div className="request-management-notes-text">
-                                    <strong>Ghi chú:</strong> {request.notes}
+                                    <strong>Ghi chú:</strong> {getDisplayNotes(request.notes)}
                                 </div>
                             )}
                             {request.team_lead_comment && (
@@ -2494,11 +2523,22 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                     )}
                                                                 </>
                                                             )}
-                                                            {request.requestType === 'attendance' && (
+                                                            {request.requestType === 'attendance' && (() => {
+                                                                const n = request.notes || '';
+                                                                const rm = n.match(/DATE_RANGE:(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})/);
+                                                                const rangeDisplay = rm
+                                                                    ? (() => {
+                                                                        const d1 = new Date(rm[1] + 'T00:00:00');
+                                                                        const d2 = new Date(rm[2] + 'T00:00:00');
+                                                                        const f = (d) => isNaN(d.getTime()) ? rm[1] : d.toLocaleDateString('vi-VN');
+                                                                        return `Từ ${f(d1)} đến ${f(d2)}`;
+                                                                    })()
+                                                                    : null;
+                                                                return (
                                                                 <>
-                                                                    <span>{formatDateDisplay(request.adjustment_date || request.request_date)}</span>
+                                                                    <span>{rangeDisplay || formatDateDisplay(request.adjustment_date || request.request_date)}</span>
                                                                     {request.check_in_time && (
-                                                                        <span>Vào: {request.check_in_time.slice(0, 5)}</span>
+                                                                        <span> Vào: {request.check_in_time.slice(0, 5)}</span>
                                                                     )}
                                                                     {request.check_in_time && request.check_out_time && (
                                                                         <span className="date-separator"> / </span>
@@ -2510,7 +2550,8 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                                         <span>-</span>
                                                                     )}
                                                                 </>
-                                                            )}
+                                                                );
+                                                            })()}
                                                             {request.requestType === 'late-early' && (
                                                                 <>
                                                                     <span>{formatDateDisplay(request.request_date) || '-'}</span>
@@ -2635,9 +2676,22 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     </td>
                                                 </>
                                             )}
-                                            {activeModule === 'attendance' && (
+                                            {activeModule === 'attendance' && (() => {
+                                                const notesAtt = request.notes || '';
+                                                const rangeMatch = notesAtt.match(/DATE_RANGE:(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})/);
+                                                const rangeStr = rangeMatch
+                                                    ? (() => {
+                                                        const d1 = new Date(rangeMatch[1] + 'T00:00:00');
+                                                        const d2 = new Date(rangeMatch[2] + 'T00:00:00');
+                                                        const f = (d) => isNaN(d.getTime()) ? rangeMatch[1] : d.toLocaleDateString('vi-VN');
+                                                        return `Từ ${f(d1)} đến ${f(d2)}`;
+                                                    })()
+                                                    : null;
+                                                return (
                                                 <>
-                                                    <td>{formatDateDisplay(request.adjustment_date || request.request_date)}</td>
+                                                    <td>
+                                                        {rangeStr || formatDateDisplay(request.adjustment_date || request.request_date)}
+                                                    </td>
                                                     <td>
                                                         {request.check_in_time && `Vào: ${request.check_in_time.slice(0, 5)}`}
                                                         {request.check_in_time && request.check_out_time && ' / '}
@@ -2666,7 +2720,8 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                         </button>
                                                     </td>
                                                 </>
-                                            )}
+                                                );
+                                            })()}
                                             {activeModule === 'late-early' && (
                                                 <>
                                                     <td>
