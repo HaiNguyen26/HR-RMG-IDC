@@ -106,6 +106,21 @@ else
     echo -e "${YELLOW}⚠ Không tìm thấy migration 1: $MIGRATION1${NC}"
 fi
 
+# Migration 1b: migrate_attendance_adjustments_allow_null_team_lead.sql (Cho phép team_lead_id NULL - đơn gửi thẳng HR)
+MIGRATION1B="$PROJECT_DIR/database/migrate_attendance_adjustments_allow_null_team_lead.sql"
+if [ -f "$MIGRATION1B" ]; then
+    echo -e "${BLUE}→ Chạy migration: migrate_attendance_adjustments_allow_null_team_lead.sql${NC}"
+    sudo -u postgres psql -d "$DB_NAME" -f "$MIGRATION1B"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Migration 1b thành công${NC}"
+    else
+        echo -e "${RED}❌ Lỗi khi chạy migration 1b${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}⚠ Không tìm thấy migration 1b: $MIGRATION1B${NC}"
+fi
+
 # Migration 2: migrate_travel_expense_step1_fields.sql
 MIGRATION2="$PROJECT_DIR/database/migrate_travel_expense_step1_fields.sql"
 if [ -f "$MIGRATION2" ]; then

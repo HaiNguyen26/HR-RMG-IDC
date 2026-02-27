@@ -39,6 +39,7 @@ run_migration() {
 }
 
 run_migration "migrate_attendance_adjustments_allow_null_reason.sql" "migrate_attendance_adjustments_allow_null_reason.sql"
+run_migration "migrate_attendance_adjustments_allow_null_team_lead.sql" "migrate_attendance_adjustments_allow_null_team_lead.sql"
 run_migration "migrate_travel_expense_step1_fields.sql" "migrate_travel_expense_step1_fields.sql"
 run_migration "add_trang_thai_to_candidates.sql" "add_trang_thai_to_candidates.sql"
 run_migration "add_chi_nhanh_to_candidates.sql" "add_chi_nhanh_to_candidates.sql"
