@@ -826,6 +826,11 @@
     margin: 0;
 }
 
+.resign-form-warning {
+    color: #dc2626;
+    font-weight: 500;
+}
+
 /* Calculated Fields - Trường tính toán tự động */
 .resign-calculated-field {
     display: flex;

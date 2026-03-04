@@ -105,6 +105,47 @@ router.post('/login', async (req, res) => {
           hoTen: user.ho_ten,
           email: user.email
         };
+        // Map user -> employee (email / họ tên / mã nhân viên) để QL thấy đơn nghỉ việc
+        try {
+          let employeeId = null;
+
+          if (user.email) {
+            const empByEmail = await pool.query(
+              `SELECT id FROM employees WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) AND trang_thai IN ('ACTIVE','PENDING') LIMIT 1`,
+              [user.email]
+            );
+            if (empByEmail.rows.length > 0) {
+              employeeId = empByEmail.rows[0].id;
+            }
+          }
+
+          if (!employeeId && user.ho_ten) {
+            const empByName = await pool.query(
+              `SELECT id FROM employees WHERE LOWER(TRIM(ho_ten)) = LOWER(TRIM($1)) AND trang_thai IN ('ACTIVE','PENDING') LIMIT 1`,
+              [user.ho_ten]
+            );
+            if (empByName.rows.length > 0) {
+              employeeId = empByName.rows[0].id;
+            }
+          }
+
+          // Thử khớp theo mã nhân viên nếu username trùng mã
+          if (!employeeId && user.username) {
+            const empByCode = await pool.query(
+              `SELECT id FROM employees WHERE TRIM(ma_nhan_vien) = TRIM($1) AND trang_thai IN ('ACTIVE','PENDING') LIMIT 1`,
+              [user.username]
+            );
+            if (empByCode.rows.length > 0) {
+              employeeId = empByCode.rows[0].id;
+            }
+          }
+
+          if (employeeId) {
+            authenticatedUser.employeeId = employeeId;
+          }
+        } catch (e) {
+          console.warn('[Auth] Lookup employeeId for user:', e.message);
+        }
       }
     } else {
       // Not found in users table, try employees table
@@ -147,6 +188,7 @@ router.post('/login', async (req, res) => {
           
           authenticatedUser = {
             id: employee.id,
+            employeeId: employee.id,
             username: employee.ho_ten,
             role: 'EMPLOYEE',
             hoTen: employee.ho_ten,

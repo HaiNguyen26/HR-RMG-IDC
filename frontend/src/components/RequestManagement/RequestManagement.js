@@ -7,6 +7,7 @@ import {
     overtimeRequestsAPI,
     lateEarlyRequestsAPI,
     mealAllowanceRequestsAPI,
+    resignationRequestsAPI,
 } from '../../services/api';
 import { formatDateToISO } from '../../utils/dateUtils';
 import { DATE_PICKER_LOCALE } from '../../utils/datepickerLocale';
@@ -19,6 +20,20 @@ const STATUS_LABELS = {
     APPROVED: 'Đã duyệt',
     REJECTED: 'Đã từ chối',
     CANCELLED: 'Đã hủy'
+};
+
+// Trạng thái lifecycle đơn nghỉ việc mới (resignation_requests)
+const RESIGN_STATUS_LABELS = {
+    SUBMITTED: 'Đã gửi đơn',
+    HR_ACKNOWLEDGED: 'HR đã xác nhận',
+    PENDING_DIRECT_MANAGER: 'Chờ QL trực tiếp',
+    PENDING_INDIRECT_MANAGER: 'Chờ QL gián tiếp',
+    PENDING_BRANCH_DIRECTOR: 'Chờ GĐ chi nhánh',
+    NOTICE_PERIOD_RUNNING: 'Đang thời gian báo trước',
+    PRE_EXIT_CLEARANCE: 'Chờ clearance',
+    LAST_WORKING_DAY: 'Ngày làm việc cuối',
+    CONTRACT_LIQUIDATION: 'Thanh lý hợp đồng',
+    CLOSED: 'Đã đóng'
 };
 
 const REQUEST_TYPE_LABELS = {
@@ -129,6 +144,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     const [activeModule, setActiveModule] = useState('all');
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
+    const [resignAckLoading, setResignAckLoading] = useState(false);
     const [exportFilterStartDate, setExportFilterStartDate] = useState(null);
     const [exportFilterEndDate, setExportFilterEndDate] = useState(null);
     const isPageVisible = usePageVisibility();
@@ -194,12 +210,13 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             // Không thêm employeeId - lấy toàn bộ đơn trong hệ thống
             const baseParams = {};
 
-            const [leaveResponse, overtimeResponse, attendanceResponse, lateEarlyResponse, mealAllowanceResponse] = await Promise.all([
+            const [leaveResponse, overtimeResponse, attendanceResponse, lateEarlyResponse, mealAllowanceResponse, resignResponse] = await Promise.all([
                 Promise.all(statuses.map(status => leaveRequestsAPI.getAll({ ...baseParams, status }))),
                 Promise.all(statuses.map(status => overtimeRequestsAPI.getAll({ ...baseParams, status }))),
                 Promise.all(statuses.map(status => attendanceAdjustmentsAPI.getAll({ ...baseParams, status }))),
                 Promise.all(statuses.map(status => lateEarlyRequestsAPI.getAll({ ...baseParams, status }))),
-                Promise.all(statuses.map(status => mealAllowanceRequestsAPI.getAll({ ...baseParams, status })))
+                Promise.all(statuses.map(status => mealAllowanceRequestsAPI.getAll({ ...baseParams, status }))),
+                resignationRequestsAPI.getAll({}).catch(() => ({ data: { success: false, data: [] } }))
             ]);
 
             const leavePendingList = leaveResponse[0].data.success ? (leaveResponse[0].data.data || []) : [];
@@ -216,14 +233,17 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             };
             leaveStats.total = leaveStats.pending + leaveStats.approved + leaveStats.rejected;
 
+            // Đơn nghỉ việc: API mới (resignation_requests), không từ leave_requests
+            const resignList = resignResponse?.data?.success ? (resignResponse.data.data || []) : [];
+            const resignPending = resignList.filter((r) => r.status !== 'CLOSED').length;
+            const resignApproved = resignList.filter((r) => r.status === 'CLOSED').length;
             const resignStats = {
-                pending: countLeaveType(leavePendingList, 'RESIGN'),
-                approved: countLeaveType(leaveApprovedList, 'RESIGN'),
-                rejected: countLeaveType(leaveRejectedList, 'RESIGN'),
-                cancelled: countLeaveType(leaveCancelledList, 'RESIGN'),
-                total: 0
+                pending: resignPending,
+                approved: resignApproved,
+                rejected: 0,
+                cancelled: 0,
+                total: resignList.length
             };
-            resignStats.total = resignStats.pending + resignStats.approved + resignStats.rejected;
 
             const overtimeStats = {
                 pending: overtimeResponse[0].data.success ? (overtimeResponse[0].data.data || []).length : 0,
@@ -366,17 +386,32 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             // Debug: Log để kiểm tra
             console.log('[RequestManagement] Fetching requests for module:', activeModule);
 
+            // Map đơn nghỉ việc từ API mới (resignation_requests) sang format dùng chung
+            const mapResignFromNewAPI = (list) => (list || []).map((r) => ({
+                ...r,
+                requestType: 'resign',
+                statusForFilter: r.status === 'CLOSED' ? 'APPROVED' : 'PENDING',
+                employee_name: r.employee_name,
+                ma_nhan_vien: r.ma_nhan_vien,
+                intended_last_work_date: r.intended_last_work_date,
+                reason: r.reason
+            }));
+
             if (activeModule === 'all') {
-                const [leaveResponse, overtimeResponse, attendanceResponse, lateEarlyResponse, mealAllowanceResponse] = await Promise.all([
+                const [leaveResponse, overtimeResponse, attendanceResponse, lateEarlyResponse, mealAllowanceResponse, resignResponse] = await Promise.all([
                     leaveRequestsAPI.getAll(params),
                     overtimeRequestsAPI.getAll(params),
                     attendanceAdjustmentsAPI.getAll(params),
                     lateEarlyRequestsAPI.getAll(params),
-                    mealAllowanceRequestsAPI.getAll(params)
+                    mealAllowanceRequestsAPI.getAll(params),
+                    resignationRequestsAPI.getAll({}).catch(() => ({ data: { success: false, data: [] } }))
                 ]);
 
+                const leaveData = leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: getLeaveModuleKey(r) })) : [];
+                const resignNewData = resignResponse?.data?.success ? mapResignFromNewAPI(resignResponse.data.data || []) : [];
                 newRequests = [
-                    ...(leaveResponse.data.success ? (leaveResponse.data.data || []).map(r => ({ ...r, requestType: getLeaveModuleKey(r) })) : []),
+                    ...leaveData,
+                    ...resignNewData,
                     ...(overtimeResponse.data.success ? (overtimeResponse.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
                     ...(attendanceResponse.data.success ? (attendanceResponse.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : []),
                     ...(lateEarlyResponse.data.success ? (lateEarlyResponse.data.data || []).map(r => ({ ...r, requestType: 'late-early' })) : []),
@@ -385,32 +420,27 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
 
                 // Sắp xếp theo thời gian tạo mới nhất
                 newRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            } else if (isLeaveModuleKey(activeModule)) {
+            } else if (activeModule === 'resign') {
+                const response = await resignationRequestsAPI.getAll({});
+                if (response?.data?.success) {
+                    const rawData = response.data.data || [];
+                    newRequests = mapResignFromNewAPI(rawData);
+                }
+            } else if (activeModule === 'leave') {
                 const response = await leaveRequestsAPI.getAll(params);
                 if (response.data.success) {
                     const rawData = response.data.data || [];
-                    console.log('[RequestManagement] Leave raw data:', {
-                        module: activeModule,
-                        count: rawData.length,
-                        sample: rawData.length > 0 ? rawData[0] : null
-                    });
                     newRequests = rawData
-                        .filter((r) => getLeaveModuleKey(r) === activeModule)
-                        .map((r) => ({ 
-                            ...r, 
-                            requestType: activeModule,
-                            // Đảm bảo các field quan trọng được copy đầy đủ
+                        .filter((r) => getLeaveModuleKey(r) === 'leave')
+                        .map((r) => ({
+                            ...r,
+                            requestType: 'leave',
                             request_type: r.request_type,
                             start_date: r.start_date,
                             end_date: r.end_date,
                             reason: r.reason,
                             leave_type: r.leave_type
                         }));
-                    console.log('[RequestManagement] Leave filtered & mapped data:', {
-                        module: activeModule,
-                        count: newRequests.length,
-                        sample: newRequests.length > 0 ? newRequests[0] : null
-                    });
                 }
             } else if (activeModule === 'overtime') {
                 const response = await overtimeRequestsAPI.getAll(params);
@@ -601,6 +631,11 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             
             // Xác định API dựa trên requestType
             const requestType = request.requestType || activeModule;
+            if (requestType === 'resign' && (request.intended_last_work_date || RESIGN_STATUS_LABELS[request.status])) {
+                if (showToast) showToast('Đơn nghỉ việc xử lý tại menu "Duyệt đơn nghỉ việc".', 'info');
+                setLoading(false);
+                return;
+            }
             if (isLeaveModuleKey(requestType)) {
                 api = leaveRequestsAPI;
             } else if (requestType === 'overtime') {
@@ -654,6 +689,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
     };
 
     const getStatusLabel = (status) => {
+        if (RESIGN_STATUS_LABELS[status]) return RESIGN_STATUS_LABELS[status];
         return STATUS_LABELS[status] || status;
     };
 
@@ -696,27 +732,45 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             const params = { status: 'APPROVED' };
             let approvedRequests = [];
 
+            const mapResignForExport = (list) => (list || []).filter((r) => r.status === 'CLOSED').map((r) => ({
+                ...r,
+                requestType: 'resign',
+                statusForFilter: 'APPROVED',
+                employee_name: r.employee_name,
+                ma_nhan_vien: r.ma_nhan_vien,
+                intended_last_work_date: r.intended_last_work_date,
+                reason: r.reason
+            }));
+
             if (activeModule === 'all') {
-                const [leaveRes, overtimeRes, attendanceRes, lateEarlyRes, mealRes] = await Promise.all([
+                const [leaveRes, overtimeRes, attendanceRes, lateEarlyRes, mealRes, resignRes] = await Promise.all([
                     leaveRequestsAPI.getAll(params),
                     overtimeRequestsAPI.getAll(params),
                     attendanceAdjustmentsAPI.getAll(params),
                     lateEarlyRequestsAPI.getAll(params),
-                    mealAllowanceRequestsAPI.getAll(params)
+                    mealAllowanceRequestsAPI.getAll(params),
+                    resignationRequestsAPI.getAll({}).catch(() => ({ data: { success: false, data: [] } }))
                 ]);
+                const resignClosed = resignRes?.data?.success ? mapResignForExport(resignRes.data.data || []) : [];
                 approvedRequests = [
                     ...(leaveRes.data.success ? (leaveRes.data.data || []).map(r => ({ ...r, requestType: getLeaveModuleKey(r), request_type: r.request_type })) : []),
+                    ...resignClosed,
                     ...(overtimeRes.data.success ? (overtimeRes.data.data || []).map(r => ({ ...r, requestType: 'overtime' })) : []),
                     ...(attendanceRes.data.success ? (attendanceRes.data.data || []).map(r => ({ ...r, requestType: 'attendance' })) : []),
                     ...(lateEarlyRes.data.success ? (lateEarlyRes.data.data || []).map(r => ({ ...r, requestType: 'late-early' })) : []),
                     ...(mealRes.data.success ? (mealRes.data.data || []).map(r => ({ ...r, requestType: 'meal-allowance' })) : [])
                 ];
                 approvedRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            } else if (isLeaveModuleKey(activeModule)) {
+            } else if (activeModule === 'resign') {
+                const res = await resignationRequestsAPI.getAll({});
+                if (res?.data?.success) {
+                    approvedRequests = mapResignForExport(res.data.data || []);
+                }
+            } else if (activeModule === 'leave') {
                 const res = await leaveRequestsAPI.getAll(params);
                 if (res.data.success) {
                     const raw = res.data.data || [];
-                    approvedRequests = raw.filter(r => getLeaveModuleKey(r) === activeModule).map(r => ({ ...r, requestType: activeModule, request_type: r.request_type }));
+                    approvedRequests = raw.filter(r => getLeaveModuleKey(r) === 'leave').map(r => ({ ...r, requestType: 'leave', request_type: r.request_type }));
                 }
             } else if (activeModule === 'overtime') {
                 const res = await overtimeRequestsAPI.getAll(params);
@@ -736,7 +790,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             if (activeModule !== 'all') {
                 approvedRequests = approvedRequests.filter(req => {
                     if (activeModule === 'leave') return isLeaveModuleKey(req.requestType) && req.request_type === 'LEAVE';
-                    if (activeModule === 'resign') return isLeaveModuleKey(req.requestType) && req.request_type === 'RESIGN';
+                    if (activeModule === 'resign') return req.requestType === 'resign';
                     return true;
                 });
             }
@@ -766,6 +820,7 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                     };
 
                     if (isLeaveModuleKey(req.requestType)) {
+                        if (req.requestType === 'resign' && req.intended_last_work_date) return normalizeDate(req.intended_last_work_date);
                         return normalizeDate(req.start_date);
                     }
                     if (req.requestType === 'overtime') {
@@ -1060,6 +1115,84 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
 
         // Khi activeModule === 'all', sử dụng request.requestType thay vì activeModule
         const requestType = activeModule === 'all' ? (request.requestType || 'unknown') : (request.requestType || activeModule);
+
+        // Đơn nghỉ việc từ API mới (resignation_requests) – HR có thể xác nhận ngay trên modal
+        if ((requestType === 'resign' || activeModule === 'resign') && (request.intended_last_work_date || RESIGN_STATUS_LABELS[request.status])) {
+            const canHrAcknowledge = (currentUser?.role === 'HR' || currentUser?.role === 'ADMIN') && request.status === 'SUBMITTED';
+            const handleHrAcknowledgeInModal = async () => {
+                if (!request.id) return;
+                setResignAckLoading(true);
+                try {
+                    const res = await resignationRequestsAPI.hrAcknowledge(request.id, { hrEmployeeId: currentUser?.id });
+                    if (showToast) showToast('Đã xác nhận tiếp nhận đơn. Đơn đã chuyển đến quản lý trực tiếp.', 'success');
+                    const updated = res.data?.data;
+                    if (updated && selectedRequest?.id === request.id) {
+                        setSelectedRequest((prev) => prev && prev.id === request.id ? { ...prev, ...updated, statusForFilter: updated.status === 'CLOSED' ? 'APPROVED' : 'PENDING' } : prev);
+                    }
+                    fetchRequests(true);
+                } catch (e) {
+                    if (showToast) showToast(e.response?.data?.message || 'Xác nhận thất bại', 'error');
+                } finally {
+                    setResignAckLoading(false);
+                }
+            };
+            return (
+                <>
+                    <div className="request-management-modal-section">
+                        <h3 className="request-management-modal-section-title">Thông tin đơn nghỉ việc</h3>
+                        <div className="request-management-modal-info-grid">
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">Tên nhân viên</span>
+                                <span className="info-value">{request.employee_name || '-'}</span>
+                            </div>
+                            {request.ma_nhan_vien && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">Mã nhân viên</span>
+                                    <span className="info-value">{request.ma_nhan_vien}</span>
+                                </div>
+                            )}
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">Mã đơn</span>
+                                <span className="info-value">ĐN{String(request.id).padStart(6, '0')}</span>
+                            </div>
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">Trạng thái</span>
+                                <span className={`status-badge ${(request.statusForFilter || request.status)?.toLowerCase() || 'pending'}`}>
+                                    {getStatusLabel(request.status)}
+                                </span>
+                            </div>
+                            <div className="request-management-modal-info-item">
+                                <span className="info-label">Ngày nghỉ dự kiến</span>
+                                <span className="info-value">{formatDateDisplay(request.intended_last_work_date) || '-'}</span>
+                            </div>
+                            {request.created_at && (
+                                <div className="request-management-modal-info-item">
+                                    <span className="info-label">Ngày tạo</span>
+                                    <span className="info-value">{formatDateDisplay(request.created_at, true)}</span>
+                                </div>
+                            )}
+                        </div>
+                        {request.reason && (
+                            <div className="request-management-reason-text" style={{ marginTop: '0.75rem' }}>
+                                <strong>Lý do:</strong> {request.reason}
+                            </div>
+                        )}
+                        {canHrAcknowledge && (
+                            <div className="request-management-resign-ack-section" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                                <button
+                                    type="button"
+                                    className="request-management-btn-resign-ack"
+                                    onClick={handleHrAcknowledgeInModal}
+                                    disabled={resignAckLoading}
+                                >
+                                    {resignAckLoading ? 'Đang xử lý...' : 'Xác nhận đã tiếp nhận'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </>
+            );
+        }
 
         if (isLeaveModuleKey(requestType) || isLeaveModuleKey(activeModule)) {
             // Tính số ngày nghỉ (nghỉ nửa ngày = 0.5 ngày)
@@ -2109,9 +2242,12 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
             }
         }
 
-        const statusFiltered = selectedStatus === 'ALL' 
-            ? nonCancelledRequests 
-            : nonCancelledRequests.filter(r => r.status === selectedStatus);
+        const statusFiltered = selectedStatus === 'ALL'
+            ? nonCancelledRequests
+            : nonCancelledRequests.filter((r) => {
+                const statusToUse = r.statusForFilter != null ? r.statusForFilter : r.status;
+                return statusToUse === selectedStatus;
+            });
         
         console.log('[RequestManagement] Filtered result:', {
             activeModule,
@@ -2439,11 +2575,13 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                     <td className="request-info-cell">
                                                         {isLeaveModuleKey(request.requestType) && (
                                                             <>
-                                                                <strong>{getRequestTypeLabel(request.request_type)}</strong>
+                                                                <strong>{request.requestType === 'resign' && request.intended_last_work_date ? 'Đơn xin nghỉ việc' : getRequestTypeLabel(request.request_type)}</strong>
                                                                 <p className="request-management-period">
                                                                     {request.requestType === 'leave'
                                                                         ? getLeaveTypeLabel(request.leave_type)
-                                                                        : 'Nghỉ việc'}
+                                                                        : request.requestType === 'resign' && request.intended_last_work_date
+                                                                            ? `Ngày nghỉ dự kiến: ${formatDateDisplay(request.intended_last_work_date)}`
+                                                                            : 'Nghỉ việc'}
                                                                 </p>
                                                             </>
                                                         )}
@@ -2497,13 +2635,18 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                                         <div className="request-dates-info">
                                                             {isLeaveModuleKey(request.requestType) && (
                                                                 <>
-                                                                    <span>{formatDateDisplay(request.start_date) || '-'}</span>
-                                                                    {request.request_type === 'LEAVE' && request.end_date && (
-                                                                        <>
-                                                                            <span className="date-separator"> → </span>
-                                                                            <span>{formatDateDisplay(request.end_date) || '-'}</span>
-                                                                        </>
-                                                                    )}
+                                                                    {request.requestType === 'resign' && request.intended_last_work_date
+                                                                        ? <span>{formatDateDisplay(request.intended_last_work_date)}</span>
+                                                                        : <>
+                                                                            <span>{formatDateDisplay(request.start_date) || '-'}</span>
+                                                                            {request.request_type === 'LEAVE' && request.end_date && (
+                                                                                <>
+                                                                                    <span className="date-separator"> → </span>
+                                                                                    <span>{formatDateDisplay(request.end_date) || '-'}</span>
+                                                                                </>
+                                                                            )}
+                                                                          </>
+                                                                    }
                                                                 </>
                                                             )}
                                                             {request.requestType === 'overtime' && (
@@ -2606,31 +2749,40 @@ const RequestManagement = ({ currentUser, showToast, showConfirm }) => {
                                             )}
                                             {isLeaveModuleKey(activeModule) && (
                                                 <>
-                                                    <td>{getRequestTypeLabel(request.request_type)}</td>
+                                                    <td>{request.requestType === 'resign' && request.intended_last_work_date ? 'Đơn xin nghỉ việc' : getRequestTypeLabel(request.request_type)}</td>
                                                     <td>
-                                                        {formatDateDisplay(request.start_date)}
-                                                        {request.request_type === 'LEAVE' && request.end_date && ` → ${formatDateDisplay(request.end_date)}`}
+                                                        {request.requestType === 'resign' && request.intended_last_work_date
+                                                            ? formatDateDisplay(request.intended_last_work_date)
+                                                            : <>
+                                                                {formatDateDisplay(request.start_date)}
+                                                                {request.request_type === 'LEAVE' && request.end_date && ` → ${formatDateDisplay(request.end_date)}`}
+                                                              </>
+                                                        }
                                                     </td>
                                                     <td>
-                                                        <span className={`status-badge ${request.status?.toLowerCase() || 'pending'}`}>
+                                                        <span className={`status-badge ${(request.statusForFilter || request.status)?.toLowerCase() || 'pending'}`}>
                                                             {getStatusLabel(request.status)}
                                                         </span>
                                                     </td>
                                                     <td>
-                                                        <button
-                                                            type="button"
-                                                            className="btn-delete-small"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDelete(request);
-                                                            }}
-                                                            title="Xóa đơn"
-                                                        >
-                                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '4px' }}>
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                            </svg>
-                                                            Xóa
-                                                        </button>
+                                                        {request.requestType === 'resign' && (request.intended_last_work_date || RESIGN_STATUS_LABELS[request.status]) ? (
+                                                            <span className="request-management-resign-action-hint">Xử lý tại Duyệt đơn nghỉ việc</span>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                className="btn-delete-small"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDelete(request);
+                                                                }}
+                                                                title="Xóa đơn"
+                                                            >
+                                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '16px', height: '16px', marginRight: '4px' }}>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                                </svg>
+                                                                Xóa
+                                                            </button>
+                                                        )}
                                                     </td>
                                                 </>
                                             )}

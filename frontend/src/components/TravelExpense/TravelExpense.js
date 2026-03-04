@@ -5,13 +5,14 @@ import { destinations } from './destinations';
 const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
     // State cho form
     const [formData, setFormData] = useState({
-        purpose: '',             // Mục đích công tác
-        partnerCompany: '',      // Tên công ty/đối tác
-        companyAddress: '',      // Địa chỉ công ty
-        destination: '',         // Địa điểm công tác
-        startDateTime: '',       // Ngày giờ bắt đầu
-        endDateTime: '',         // Ngày giờ kết thúc
-        requestedAdvanceAmount: '' // Số tiền cần tạm ứng
+        purpose: '',                 // Mục đích công tác
+        partnerCompany: '',          // Tên công ty/đối tác
+        companyAddress: '',          // Địa chỉ công ty
+        destination: '',             // Địa điểm công tác
+        startDateTime: '',           // Ngày giờ bắt đầu
+        endDateTime: '',             // Ngày giờ kết thúc
+        requestedAdvanceAmount: '',  // Số tiền cần tạm ứng (theo đơn vị đã chọn)
+        requestedAdvanceCurrency: 'VND'  // Đơn vị tiền tệ tạm ứng
     });
 
     // State cho phí sinh hoạt tự động và châu lục
@@ -259,6 +260,10 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
         setFormData(prev => ({ ...prev, requestedAdvanceAmount: value }));
     };
 
+    const handleCurrencyChange = (e) => {
+        setFormData(prev => ({ ...prev, requestedAdvanceCurrency: e.target.value }));
+    };
+
     const validateForm = () => {
         const errors = [];
 
@@ -318,6 +323,7 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
                 startTime: startTime,
                 endTime: endTime,
                 requestedAdvanceAmount: formData.requestedAdvanceAmount ? parseFloat(formData.requestedAdvanceAmount.replace(/[^\d]/g, '')) : null,
+                requestedAdvanceCurrency: formData.requestedAdvanceCurrency || 'VND',
             };
 
             const response = await travelExpensesAPI.create(requestData);
@@ -334,7 +340,8 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
                     destination: '',
                     startDateTime: '',
                     endDateTime: '',
-                    requestedAdvanceAmount: ''
+                    requestedAdvanceAmount: '',
+                    requestedAdvanceCurrency: 'VND'
                 });
                 setContinent(null);
                 setLivingAllowance(null);
@@ -430,19 +437,34 @@ const TravelExpense = ({ currentUser, showToast, showConfirm }) => {
 
                         <div className="travel-expense-form-group">
                             <label htmlFor="requestedAdvanceAmount" className="travel-expense-label">
-                                3. Số Tiền Cần Tạm Ứng (VND)
+                                3. Số Tiền Cần Tạm Ứng
                             </label>
-                            <input
-                                id="requestedAdvanceAmount"
-                                name="requestedAdvanceAmount"
-                                type="text"
-                                className="travel-expense-input"
-                                value={formatCurrency(formData.requestedAdvanceAmount)}
-                                onChange={handleAmountChange}
-                                placeholder="Nhập số tiền cần tạm ứng (ví dụ: 5,000,000)"
-                            />
+                            <div className="travel-expense-advance-row">
+                                <input
+                                    id="requestedAdvanceAmount"
+                                    name="requestedAdvanceAmount"
+                                    type="text"
+                                    className="travel-expense-input"
+                                    value={formatCurrency(formData.requestedAdvanceAmount)}
+                                    onChange={handleAmountChange}
+                                    placeholder="Nhập số tiền cần tạm ứng (ví dụ: 5,000,000)"
+                                />
+                                <select
+                                    className="travel-expense-select travel-expense-currency-select"
+                                    value={formData.requestedAdvanceCurrency}
+                                    onChange={handleCurrencyChange}
+                                >
+                                    <option value="VND">VND</option>
+                                    <option value="USD">USD</option>
+                                    <option value="EUR">EUR</option>
+                                    <option value="JPY">JPY</option>
+                                    <option value="SGD">SGD</option>
+                                    <option value="THB">THB</option>
+                                    <option value="CNY">CNY</option>
+                                </select>
+                            </div>
                             <p className="travel-expense-input-hint">
-                                Người tạo yêu cầu tự điền số tiền cần tạm ứng.
+                                Chọn đơn vị tiền tệ (VND, USD, EUR, …). HR và Kế toán sẽ thấy số tiền và đơn vị đã chọn.
                             </p>
                         </div>
                     </div>

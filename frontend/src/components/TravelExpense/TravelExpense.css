@@ -416,6 +416,34 @@
     margin: 0;
 }
 
+.travel-expense-advance-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.travel-expense-currency-select {
+    width: 120px;
+}
+
+.travel-expense-exchange-row {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.travel-expense-label-small {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #4b5563;
+}
+
+.travel-expense-exchange-summary {
+    font-size: 0.85rem;
+    color: #0f766e;
+}
+
 /* Destination Autocomplete Dropdown */
 .travel-expense-destination-dropdown {
     position: absolute;

@@ -20,6 +20,7 @@ const recruitmentRequestsRoutes = require('./routes/recruitmentRequests');
 const interviewRequestsRoutes = require('./routes/interviewRequests');
 const interviewEvaluationsRoutes = require('./routes/interviewEvaluations');
 const requestViewerRoutes = require('./routes/requestViewer');
+// const resignationRequestsRoutes = require('./routes/resignationRequests'); // Tạm thời vô hiệu hóa module xin nghỉ việc
 // EPAD - chưa hoàn thành
 // const attendanceSyncRoutes = require('./routes/attendanceSync');
 // const attendanceRecordsRoutes = require('./routes/attendanceRecords');
@@ -58,6 +59,7 @@ app.use('/api/recruitment-requests', recruitmentRequestsRoutes);
 app.use('/api/interview-requests', interviewRequestsRoutes);
 app.use('/api/interview-evaluations', interviewEvaluationsRoutes);
 app.use('/api/request-viewer', requestViewerRoutes);
+// app.use('/api/resignation-requests', resignationRequestsRoutes);
 // EPAD - chưa hoàn thành
 // app.use('/api/attendance-sync', attendanceSyncRoutes);
 // app.use('/api/attendance-records', attendanceRecordsRoutes);

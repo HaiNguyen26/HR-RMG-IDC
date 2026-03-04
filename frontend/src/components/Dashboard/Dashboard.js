@@ -25,6 +25,7 @@ const Dashboard = ({ onAddEmployee, employees, onRefreshEmployees, currentUser, 
   const [branchFilter, setBranchFilter] = useState('');
   const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
   const branchSelectRef = useRef(null);
+  // Nghỉ việc: phần thống kê sắp nghỉ tạm thời ẩn, sẽ thiết kế lại sau
 
   useEffect(() => {
     if (!branchDropdownOpen) {
@@ -43,8 +44,25 @@ const Dashboard = ({ onAddEmployee, employees, onRefreshEmployees, currentUser, 
 
   useEffect(() => {
     fetchStatistics();
-    // Chỉ fetch lại khi employees thay đổi (thêm/sửa/xóa nhân viên)
   }, [employees.length]);
+
+  // useEffect(() => {
+  //   const fetchResignationUpcoming = async () => {
+  //     try {
+  //       const res = await resignationRequestsAPI.getDashboardUpcoming();
+  //       if (res.data?.success && res.data?.data) {
+  //         setResignationUpcoming({
+  //           in7Days: res.data.data.in7Days || [],
+  //           in14Days: res.data.data.in14Days || [],
+  //           in30Days: res.data.data.in30Days || []
+  //         });
+  //       }
+  //     } catch (e) {
+  //       console.warn('Resignation upcoming:', e);
+  //     }
+  //   };
+  //   fetchResignationUpcoming();
+  // }, []);
 
   const handleExportTemplate = () => {
     exportEmployeeTemplate();
@@ -269,6 +287,8 @@ const Dashboard = ({ onAddEmployee, employees, onRefreshEmployees, currentUser, 
         <div className="dashboard-content">
           {/* Statistics Cards */}
           <StatisticsCards statistics={statistics} loading={loading} />
+
+          {/* Nghỉ việc trong 30/14/7 ngày tới – tạm ẩn, sẽ thiết kế lại sau */}
 
           {/* Employee Table */}
           <div className="dashboard-main-grid">

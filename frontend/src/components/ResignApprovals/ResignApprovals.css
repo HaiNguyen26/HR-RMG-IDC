@@ -1,0 +1,245 @@
+.resign-approvals-container {
+    padding: 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.resign-approvals-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.resign-approvals-desc {
+    color: #6b7280;
+    font-size: 0.875rem;
+    margin-bottom: 1.25rem;
+}
+
+.resign-approvals-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.resign-approvals-tab {
+    padding: 0.5rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.resign-approvals-tab:hover {
+    background: #f9fafb;
+}
+
+.resign-approvals-tab.active {
+    background: #6366f1;
+    color: #fff;
+    border-color: #6366f1;
+}
+
+.resign-approvals-loading {
+    padding: 2rem;
+    text-align: center;
+    color: #6b7280;
+}
+
+.resign-approvals-table-wrap {
+    overflow-x: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+}
+
+.resign-approvals-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.resign-approvals-table th,
+.resign-approvals-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.resign-approvals-table th {
+    background: #f9fafb;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.resign-approvals-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+.resign-approvals-table tbody tr.selected {
+    background: #eef2ff;
+}
+
+.resign-approvals-btn-ack {
+    padding: 0.35rem 0.75rem;
+    background: #6366f1;
+    color: #fff;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 0.8125rem;
+    cursor: pointer;
+}
+
+.resign-approvals-btn-ack:hover {
+    background: #4f46e5;
+}
+
+.resign-approvals-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.resign-approvals-modal {
+    background: #fff;
+    border-radius: 0.75rem;
+    max-width: 520px;
+    width: 90%;
+    max-height: 90vh;
+    overflow: auto;
+}
+
+.resign-approvals-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.resign-approvals-modal-header h2 {
+    margin: 0;
+    font-size: 1.125rem;
+}
+
+.resign-approvals-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+    line-height: 1;
+}
+
+.resign-approvals-modal-body {
+    padding: 1.25rem;
+}
+
+.resign-approvals-modal-body p {
+    margin: 0 0 0.75rem;
+    font-size: 0.875rem;
+}
+
+.resign-approvals-form-group {
+    margin-top: 1rem;
+}
+
+.resign-approvals-form-group label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.resign-approvals-form-group input,
+.resign-approvals-form-group textarea {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+}
+
+.resign-approvals-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.resign-approvals-btn-cancel {
+    padding: 0.5rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    background: #fff;
+    cursor: pointer;
+}
+
+.resign-approvals-btn-primary {
+    padding: 0.5rem 1rem;
+    background: #6366f1;
+    color: #fff;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+}
+
+.resign-approvals-btn-primary:hover:not(:disabled) {
+    background: #4f46e5;
+}
+
+.resign-approvals-btn-primary:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.resign-approvals-handover-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.resign-approvals-handover-section h4 {
+    font-size: 0.95rem;
+    margin: 0 0 0.5rem 0;
+}
+
+.resign-approvals-handover-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 0.75rem 0;
+    font-size: 0.875rem;
+}
+
+.resign-approvals-handover-list li {
+    padding: 0.35rem 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.resign-approvals-handover-list li.completed {
+    color: #64748b;
+    text-decoration: line-through;
+}
+
+.resign-approvals-handover-add {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.resign-approvals-handover-add input {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    min-width: 160px;
+}
+
+.resign-approvals-handover-add input:first-of-type {
+    min-width: 200px;
+}

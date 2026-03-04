@@ -81,7 +81,7 @@ const ensureTable = async () => {
     `;
     await pool.query(addBudgetFields);
 
-    // Add Step 1 fields (company_name, company_address, requested_advance_amount, living_allowance_amount, living_allowance_currency, continent)
+    // Add Step 1 fields (company_name, company_address, requested_advance_amount, requested_advance_currency, requested_advance_exchange_rate, living_allowance_amount, living_allowance_currency, continent)
     const addStep1Fields = `
         DO $$ 
         BEGIN
@@ -93,6 +93,12 @@ const ensureTable = async () => {
             END IF;
             IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='requested_advance_amount') THEN
                 ALTER TABLE travel_expense_requests ADD COLUMN requested_advance_amount NUMERIC(12, 2);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='requested_advance_currency') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN requested_advance_currency VARCHAR(10);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='requested_advance_exchange_rate') THEN
+                ALTER TABLE travel_expense_requests ADD COLUMN requested_advance_exchange_rate NUMERIC(10, 4);
             END IF;
             IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='travel_expense_requests' AND column_name='living_allowance_amount') THEN
                 ALTER TABLE travel_expense_requests ADD COLUMN living_allowance_amount NUMERIC(12, 2);
@@ -547,6 +553,13 @@ const mapRowToResponse = (row) => {
         status: row.status,
         currentStep: row.current_step,
         requestedAdvanceAmount: row.requested_advance_amount ? Number(row.requested_advance_amount) : null,
+        requestedAdvanceCurrency: row.requested_advance_currency || 'VND',
+        requestedAdvanceExchangeRate: row.requested_advance_exchange_rate ? Number(row.requested_advance_exchange_rate) : null,
+        requestedAdvanceAmountVnd: (row.requested_advance_currency || 'VND') === 'VND' && row.requested_advance_amount
+            ? Number(row.requested_advance_amount)
+            : row.requested_advance_amount && row.requested_advance_exchange_rate
+                ? Number(row.requested_advance_amount) * Number(row.requested_advance_exchange_rate)
+                : null,
         livingAllowance: row.living_allowance_amount ? {
             amount: Number(row.living_allowance_amount),
             currency: row.living_allowance_currency || 'USD',
@@ -789,9 +802,63 @@ router.post('/', async (req, res) => {
         }
 
         const isOvernight = end.getTime() - start.getTime() > DAY_IN_MS;
-        const requiresCEO = normalizedLocationType === 'INTERNATIONAL';
-        const initialStatus = 'PENDING_LEVEL_1';
-        const initialStep = 'LEVEL_1';
+
+        // Xác định xem người nộp đơn có phải Tổng Giám đốc (Lê Thanh Tùng)
+        // hoặc Giám đốc chi nhánh hay không
+        let isCEORequester = false;
+        let isBranchDirectorRequester = false;
+        try {
+            const empRes = await pool.query(
+                'SELECT ho_ten, chuc_danh FROM employees WHERE id = $1',
+                [employeeId]
+            );
+            if (empRes.rows[0]) {
+                const { ho_ten, chuc_danh } = empRes.rows[0];
+                const normalizeName = (str) => {
+                    if (!str) return '';
+                    return str
+                        .toString()
+                        .trim()
+                        .toLowerCase()
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/đ/g, 'd')
+                        .replace(/Đ/g, 'D');
+                };
+                const normalizedName = normalizeName(ho_ten);
+                const normalizedTitle = normalizeName(chuc_danh);
+
+                // Tổng Giám đốc
+                if (
+                    normalizedName.includes('le thanh tung') ||
+                    (normalizedTitle.includes('tong giam doc') &&
+                        normalizedName.includes('le') &&
+                        normalizedName.includes('thanh') &&
+                        normalizedName.includes('tung'))
+                ) {
+                    isCEORequester = true;
+                } else {
+                    // Giám đốc chi nhánh (có "giam doc" nhưng không phải "tong giam doc")
+                    if (normalizedTitle.includes('giam doc') && !normalizedTitle.includes('tong giam doc')) {
+                        isBranchDirectorRequester = true;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[TravelExpense] Could not determine if requester is CEO:', e.message);
+        }
+
+        // Nếu người nộp là Tổng Giám đốc HOẶC Giám đốc chi nhánh:
+        // bỏ qua toàn bộ bước duyệt quản lý/giám đốc/CEO,
+        // chuyển thẳng sang HR/Kế toán (PENDING_FINANCE)
+        let requiresCEO = normalizedLocationType === 'INTERNATIONAL';
+        let initialStatus = 'PENDING_LEVEL_1';
+        let initialStep = 'LEVEL_1';
+        if (isCEORequester || isBranchDirectorRequester) {
+            requiresCEO = false;
+            initialStatus = 'PENDING_FINANCE';
+            initialStep = 'FINANCE';
+        }
 
         // Xác định châu lục và tính phí sinh hoạt tự động
         let continent = null;
@@ -830,13 +897,15 @@ router.post('/', async (req, res) => {
                 status,
                 current_step,
                 requested_advance_amount,
+                requested_advance_currency,
+                requested_advance_exchange_rate,
                 living_allowance_amount,
                 living_allowance_currency,
                 continent,
                 estimated_cost,
                 requested_by
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
             RETURNING *
         `;
 
@@ -855,6 +924,12 @@ router.post('/', async (req, res) => {
             initialStatus,
             initialStep,
             requestedAdvanceAmount !== undefined && requestedAdvanceAmount !== null && requestedAdvanceAmount !== '' ? parseFloat(requestedAdvanceAmount) : null,
+            // Đơn vị tiền tệ tạm ứng (employee chọn) – mặc định VND
+            req.body.requestedAdvanceCurrency || 'VND',
+            // Tỷ giá quy đổi sang VND (nếu khác VND) – để HR/Kế toán có thể thấy và điều chỉnh
+            req.body.requestedAdvanceExchangeRate
+                ? parseFloat(req.body.requestedAdvanceExchangeRate)
+                : null,
             livingAllowanceAmount,
             livingAllowanceCurrency,
             continent,

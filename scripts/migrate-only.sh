@@ -70,6 +70,7 @@ run_migration "add_ceo_fields_customer_entertainment_expenses.sql" "add_ceo_fiel
 run_migration "grant_permissions_late_early_meal_allowance.sql" "grant_permissions_late_early_meal_allowance.sql"
 run_migration "create_password_reset_table.sql" "create_password_reset_table.sql"
 run_migration "add_password_display_column.sql" "add_password_display_column.sql"
+run_migration "create_resignation_lifecycle_schema.sql" "create_resignation_lifecycle_schema.sql"
 
 echo -e "${YELLOW}[2/2] Tạo và cấp quyền cho thư mục uploads...${NC}"
 UPLOADS_DIR="$PROJECT_DIR/backend/uploads"

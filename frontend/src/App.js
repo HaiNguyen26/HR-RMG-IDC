@@ -9,8 +9,12 @@ import RequestsManagementModal from './components/RequestsManagement/RequestsMan
 import LeaveRequest from './components/LeaveRequest/LeaveRequest';
 import LateEarlyRequest from './components/LateEarlyRequest/LateEarlyRequest';
 import MealAllowanceRequest from './components/MealAllowanceRequest/MealAllowanceRequest';
-import ResignRequest from './components/ResignRequest/ResignRequest';
 import LeaveApprovals from './components/LeaveApprovals/LeaveApprovals';
+// Các màn hình xin nghỉ việc tạm thời ẩn khỏi UI, sẽ thiết kế lại sau
+// import ResignRequest from './components/ResignRequest/ResignRequest';
+// import ResignApprovals from './components/ResignApprovals/ResignApprovals';
+// import ResignationForManager from './components/ResignationForManager/ResignationForManager';
+// import ResignationStatus from './components/ResignationStatus/ResignationStatus';
 import RequestManagement from './components/RequestManagement/RequestManagement';
 import EmployeeRequestHistory from './components/EmployeeRequestHistory/EmployeeRequestHistory';
 import ProbationList from './components/ProbationList/ProbationList';
@@ -346,13 +350,7 @@ function App() {
               showToast={showToast}
             />
           );
-        case 'resign-request':
-          return (
-            <ResignRequest
-              currentUser={currentUser}
-              showToast={showToast}
-            />
-          );
+        // Các view xin nghỉ việc tạm thời bị vô hiệu hóa
         case 'leave-approvals':
           return (
             <LeaveApprovals
@@ -361,6 +359,8 @@ function App() {
               showConfirm={showConfirm}
             />
           );
+        // case 'resignation-for-manager':
+        // case 'resign-approvals':
         case 'probation-list':
           return (
             <ProbationList
@@ -527,6 +527,22 @@ function App() {
             showConfirm={showConfirm}
           />
         );
+      case 'resignation-for-manager':
+      case 'resign-approvals':
+        // Module xin nghỉ việc tạm ẩn – chuyển về dashboard
+        setCurrentView('dashboard');
+        return (
+          <Dashboard
+            onAddEmployee={handleAddEmployee}
+            employees={employees}
+            onRefreshEmployees={fetchEmployees}
+            currentUser={currentUser}
+            showConfirm={showConfirm}
+            onUpdateEquipment={handleUpdateEquipment}
+            onOpenRequestsModal={() => setIsRequestsModalOpen(true)}
+          />
+        );
+      // case 'resignation-status':
       case 'request-management':
         return (
           <RequestManagement

@@ -165,6 +165,23 @@ export const leaveRequestsAPI = {
   remove: (id, data) => api.delete(`/leave-requests/${id}`, { data }),
 };
 
+export const resignationRequestsAPI = {
+  create: (data) => api.post('/resignation-requests', data),
+  getAll: (params) => api.get('/resignation-requests', { params }),
+  getById: (id) => api.get(`/resignation-requests/${id}`),
+  getDashboardUpcoming: (directManagerId) => api.get('/resignation-requests/dashboard/upcoming', directManagerId != null ? { params: { directManagerId } } : {}),
+  hrAcknowledge: (id, data) => api.post(`/resignation-requests/${id}/hr-acknowledge`, data),
+  directManagerAcknowledge: (id, data) => api.post(`/resignation-requests/${id}/direct-manager-acknowledge`, data),
+  indirectManagerAcknowledge: (id, data) => api.post(`/resignation-requests/${id}/indirect-manager-acknowledge`, data),
+  branchDirectorAcknowledge: (id, data) => api.post(`/resignation-requests/${id}/branch-director-acknowledge`, data),
+  getHandover: (id) => api.get(`/resignation-requests/${id}/handover`),
+  addHandover: (id, data) => api.post(`/resignation-requests/${id}/handover`, data),
+  completeHandoverItem: (requestId, itemId, data) => api.patch(`/resignation-requests/${requestId}/handover/${itemId}`, data),
+  itClearance: (id, data) => api.post(`/resignation-requests/${id}/it-clearance`, data),
+  financeClearance: (id, data) => api.post(`/resignation-requests/${id}/finance-clearance`, data),
+  close: (id) => api.post(`/resignation-requests/${id}/close`),
+};
+
 export const overtimeRequestsAPI = {
   create: (data) => api.post('/overtime-requests', data),
   getAll: (params) => api.get('/overtime-requests', { params }),

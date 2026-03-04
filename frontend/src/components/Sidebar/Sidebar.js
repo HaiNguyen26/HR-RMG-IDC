@@ -695,7 +695,7 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
         normalizedTitle.includes('trưởng phòng')
     );
 
-    // Show approval module if user can approve OR is branch director
+    // Show approval module if user can approve OR is branch director (HR xác nhận đơn nghỉ việc ngay trên modal Quản lý đơn từ)
     const showEmployeeApprovalModule = canApproveAsEmployee || isBranchDirector || (managerAccessResolved && canApproveFromManagerLookup);
 
     // Fetch pending travel expense approvals for managers/CEOs
@@ -1636,29 +1636,7 @@ const Sidebar = ({ currentView, onNavigate, onAddEmployee, currentUser, onLogout
                             <div className="nav-divider-line"></div>
                         </li>
                     )}
-                    {/* Nhóm 5: Nghỉ việc - Red */}
-                    {currentUser?.role === 'EMPLOYEE' && (
-                        <>
-                            <li className="nav-section-label">
-                                <p>Nghỉ Việc</p>
-                            </li>
-                            <li>
-                                <button
-                                    onClick={() => onNavigate('resign-request')}
-                                    className={`nav-item nav-item-resign ${currentView === 'resign-request' ? 'active' : ''}`}
-                                >
-                                    <span className="nav-icon-wrapper">
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
-                                            </path>
-                                        </svg>
-                                    </span>
-                                    <span className="nav-label">Xin nghỉ việc</span>
-                                </button>
-                            </li>
-                        </>
-                    )}
+                    {/* Nhóm 5: Nghỉ việc - tạm ẩn toàn bộ cho đến khi thiết kế lại quy trình */}
                     {/* Phỏng vấn & duyệt ứng viên cho Admin */}
                     {(currentUser?.role !== 'EMPLOYEE') && (
                         <>

@@ -1,0 +1,298 @@
+.resign-for-manager {
+    /* Full-width nội dung giống các module duyệt đơn khác */
+    padding: 1.5rem 2rem;
+}
+
+.resign-for-manager-header {
+    margin-bottom: 1.5rem;
+}
+
+.resign-for-manager-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.25rem 0;
+}
+
+.resign-for-manager-desc {
+    color: #6b7280;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.resign-for-manager-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.resign-for-manager-stat-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    text-align: center;
+}
+
+.resign-for-manager-stat-value {
+    display: block;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #0f766e;
+}
+
+.resign-for-manager-stat-label {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.resign-for-manager-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.resign-for-manager-filter-btn {
+    padding: 0.4rem 0.75rem;
+    border-radius: 0.375rem;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.resign-for-manager-filter-btn:hover {
+    background: #f1f5f9;
+}
+
+.resign-for-manager-filter-btn.active {
+    background: #0d9488;
+    color: #fff;
+    border-color: #0d9488;
+}
+
+.resign-for-manager-table-wrap {
+    overflow-x: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: #fff;
+}
+
+.resign-for-manager-loading,
+.resign-for-manager-empty {
+    padding: 2rem;
+    text-align: center;
+    color: #64748b;
+}
+
+.resign-for-manager-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.resign-for-manager-table th,
+.resign-for-manager-table td {
+    padding: 0.6rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.resign-for-manager-table th {
+    background: #f1f5f9;
+    font-weight: 600;
+    color: #475569;
+}
+
+.resign-for-manager-row {
+    cursor: pointer;
+}
+
+.resign-for-manager-row:hover {
+    background: #f8fafc;
+}
+
+.resign-for-manager-mnv {
+    color: #64748b;
+    font-weight: normal;
+}
+
+.resign-for-manager-reason {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.resign-for-manager-urgent {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+.resign-for-manager-status {
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+}
+
+.resign-for-manager-status.status-PENDING_DIRECT_MANAGER {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.resign-for-manager-status.status-NOTICE_PERIOD_RUNNING,
+.resign-for-manager-status.status-PRE_EXIT_CLEARANCE {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+/* Modal */
+.resign-for-manager-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.resign-for-manager-modal {
+    background: #fff;
+    border-radius: 0.5rem;
+    max-width: 640px;
+    width: 100%;
+    max-height: 90vh;
+    overflow: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.resign-for-manager-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.resign-for-manager-modal-header h2 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.resign-for-manager-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #64748b;
+    line-height: 1;
+}
+
+.resign-for-manager-modal-body {
+    padding: 1.25rem;
+}
+
+.resign-for-manager-block {
+    margin-bottom: 1.5rem;
+}
+
+.resign-for-manager-block h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #374151;
+    margin: 0 0 0.75rem 0;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.resign-for-manager-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+
+.resign-for-manager-grid .label {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-bottom: 0.15rem;
+}
+
+.resign-for-manager-form-group {
+    margin-bottom: 1rem;
+}
+
+.resign-for-manager-form-group label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.35rem;
+}
+
+.resign-for-manager-form-group input[type="text"],
+.resign-for-manager-form-group input[type="date"],
+.resign-for-manager-form-group select,
+.resign-for-manager-form-group textarea {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+}
+
+.resign-for-manager-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.resign-for-manager-checkboxes label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.resign-for-manager-checkboxes.readonly span {
+    font-size: 0.875rem;
+    color: #4b5563;
+}
+
+.resign-for-manager-modal-actions {
+    margin-top: 1rem;
+}
+
+.resign-for-manager-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+}
+
+.resign-for-manager-btn.primary {
+    background: #0d9488;
+    color: #fff;
+}
+
+.resign-for-manager-btn.primary:hover:not(:disabled) {
+    background: #0f766e;
+}
+
+.resign-for-manager-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.resign-for-manager-no-action {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0;
+}

@@ -30,8 +30,7 @@ const LEAVE_TYPE_LABELS = {
 };
 
 const LEAVE_MODULES = [
-    'leave-permission',
-    'leave-resign'
+    'leave-permission'
 ];
 
 const STATS_POLL_INTERVAL_MS = 20000;
@@ -61,19 +60,6 @@ const MODULE_OPTIONS = [
         description: {
             teamLead: 'Xem và xử lý các đơn xin nghỉ phép của nhân viên thuộc nhóm bạn phụ trách.',
             hr: 'Theo dõi trạng thái và tiến độ phê duyệt đơn xin nghỉ phép.'
-        }
-    },
-    {
-        key: 'leave-resign',
-        label: 'Đơn xin nghỉ việc',
-        requestType: 'RESIGN',
-        header: {
-            teamLead: 'Đơn xin nghỉ việc chờ quản lý duyệt',
-            hr: 'Theo dõi đơn xin nghỉ việc'
-        },
-        description: {
-            teamLead: 'Xem và xử lý các đơn xin nghỉ việc của nhân viên thuộc nhóm bạn phụ trách.',
-            hr: 'Theo dõi trạng thái và tiến độ phê duyệt đơn xin nghỉ việc.'
         }
     },
     {
@@ -226,7 +212,6 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     // Statistics per module - fetch all modules to show badges (đã bỏ 'all')
     const [moduleStatistics, setModuleStatistics] = useState({
         'leave-permission': { pending: 0, total: 0 },
-        'leave-resign': { pending: 0, total: 0 },
         overtime: { pending: 0, total: 0 },
         attendance: { pending: 0, total: 0 },
         'late-early': { pending: 0, total: 0 },
@@ -587,7 +572,6 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             };
 
             const leavePermissionStats = buildLeaveStats(leaveResults, 'LEAVE');
-            const leaveResignStats = buildLeaveStats(leaveResults, 'RESIGN');
             const overtimeStats = calculateStats(overtimeResults);
             const attendanceStats = calculateStats(attendanceResults);
             const lateEarlyStats = calculateStats(lateEarlyResults);
@@ -596,7 +580,6 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             // Không cần tính 'all' stats nữa vì đã bỏ module 'all'
             const newModuleStats = {
                 'leave-permission': leavePermissionStats,
-                'leave-resign': leaveResignStats,
                 overtime: overtimeStats,
                 attendance: attendanceStats,
                 'late-early': lateEarlyStats,
@@ -606,7 +589,6 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             // Chỉ update state nếu data thực sự thay đổi (không check 'all' nữa)
             if (!prevModuleStatsRef.current ||
                 !shallowEqual(prevModuleStatsRef.current['leave-permission'], newModuleStats['leave-permission']) ||
-                !shallowEqual(prevModuleStatsRef.current['leave-resign'], newModuleStats['leave-resign']) ||
                 !shallowEqual(prevModuleStatsRef.current.overtime, newModuleStats.overtime) ||
                 !shallowEqual(prevModuleStatsRef.current.attendance, newModuleStats.attendance) ||
                 !shallowEqual(prevModuleStatsRef.current['late-early'], newModuleStats['late-early']) ||
@@ -626,7 +608,6 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
     const moduleApiMap = useMemo(
         () => ({
             'leave-permission': leaveRequestsAPI,
-            'leave-resign': leaveRequestsAPI,
             overtime: overtimeRequestsAPI,
             attendance: attendanceAdjustmentsAPI,
             'late-early': lateEarlyRequestsAPI,
@@ -669,9 +650,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
 
             const requestTypeFilter = activeModule === 'leave-permission'
                 ? 'LEAVE'
-                : activeModule === 'leave-resign'
-                    ? 'RESIGN'
-                    : null;
+                : null;
 
             results.forEach((result, index) => {
                 const status = statuses[index];
@@ -811,9 +790,7 @@ const LeaveApprovals = ({ currentUser, showToast, showConfirm }) => {
             if (response.data.success) {
                 const requestTypeFilter = activeModule === 'leave-permission'
                     ? 'LEAVE'
-                    : activeModule === 'leave-resign'
-                        ? 'RESIGN'
-                        : null;
+                    : null;
                 const newRequestsRaw = response.data.data || [];
                 const newRequests = requestTypeFilter
                     ? newRequestsRaw.filter(r => r.request_type === requestTypeFilter)

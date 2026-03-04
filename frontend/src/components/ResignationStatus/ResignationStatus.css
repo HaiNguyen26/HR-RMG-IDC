@@ -1,0 +1,91 @@
+.resignation-status-container {
+    padding: 1.5rem;
+    max-width: 640px;
+    margin: 0 auto;
+}
+
+.resignation-status-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.resignation-status-empty {
+    color: #6b7280;
+}
+
+.resignation-status-card {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.resignation-status-card p {
+    margin: 0 0 0.5rem;
+    font-size: 0.875rem;
+}
+
+.resignation-status-countdown {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e5e7eb;
+    font-size: 1rem;
+}
+
+.resignation-status-today {
+    color: #b45309;
+    font-weight: 600;
+}
+
+.resignation-status-handover h3 {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.resignation-status-handover-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.resignation-status-handover-list li {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.resignation-status-handover-list li.completed {
+    opacity: 0.85;
+}
+
+.resignation-status-handover-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    cursor: pointer;
+}
+
+.resignation-status-handover-item input {
+    margin-right: 0.5rem;
+}
+
+.resignation-status-handover-item small {
+    color: #6b7280;
+    font-size: 0.8125rem;
+    margin-left: 1.5rem;
+}
+
+.resignation-status-done-at {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.resignation-status-no-items {
+    color: #6b7280;
+    font-size: 0.875rem;
+}

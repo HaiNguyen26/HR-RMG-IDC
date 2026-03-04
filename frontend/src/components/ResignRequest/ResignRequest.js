@@ -1,20 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
-import { leaveRequestsAPI, employeesAPI } from '../../services/api';
+import { resignationRequestsAPI, employeesAPI } from '../../services/api';
 import { formatDateToISO, parseISODateString, today } from '../../utils/dateUtils';
 import { DATE_PICKER_LOCALE } from '../../utils/datepickerLocale';
 import './ResignRequest.css';
 
+// Số ngày báo trước tối thiểu theo loại hợp đồng (giống backend)
+const getRequiredNoticeDays = (loaiHopDong) => {
+  if (!loaiHopDong || typeof loaiHopDong !== 'string') return 30;
+  const s = loaiHopDong.toLowerCase().trim().replace(/\s+/g, ' ');
+  if (/th[uử] vi[eệ]c|thu viec|probation|thử việc/.test(s) || s.includes('thu viec')) return 3;
+  if (/kh[oô]ng x[aá]c định|khong xac dinh|indefinite/.test(s) || s.includes('khong xac dinh')) return 45;
+  if (/x[aá]c định th[oơ]i h[aạ]n|xac dinh thoi han|fixed|determined/.test(s) || s.includes('xac dinh')) return 30;
+  return 30;
+};
+
 const ResignRequest = ({ currentUser, showToast }) => {
   const [formData, setFormData] = useState({
-    startDate: '',
+    intendedLastWorkDate: '',
     reason: '',
     notes: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [employeeProfile, setEmployeeProfile] = useState(null);
-  const [createdDate] = useState(new Date()); // Ngày tạo form (ngày hiện tại)
+  const [submittedAt] = useState(new Date()); // Ngày nộp đơn (ngày hiện tại)
 
   // Fetch employee profile to get manager info
   useEffect(() => {
@@ -124,14 +134,15 @@ const ResignRequest = ({ currentUser, showToast }) => {
       return;
     }
 
-    // Validation
-    if (!formData.startDate || !formData.reason) {
+    if (!formData.intendedLastWorkDate || !formData.reason || !formData.reason.trim()) {
       setError('Vui lòng điền đầy đủ thông tin bắt buộc.');
       return;
     }
 
-    if (!directManagerName || directManagerName === 'Chưa cập nhật') {
-      setError('Không tìm thấy thông tin quản lý trực tiếp. Vui lòng liên hệ HR để cập nhật.');
+    const requiredDays = getRequiredNoticeDays(getValue('loaiHopDong', 'loai_hop_dong'));
+    const noticeDays = calculateAdvanceNoticeDays();
+    if (noticeDays !== null && noticeDays < requiredDays) {
+      setError(`Theo loại hợp đồng của bạn, cần báo trước tối thiểu ${requiredDays} ngày. Hiện tại chỉ còn ${noticeDays} ngày. Không đủ điều kiện nộp đơn.`);
       return;
     }
 
@@ -139,25 +150,19 @@ const ResignRequest = ({ currentUser, showToast }) => {
     try {
       const payload = {
         employeeId: currentUser.id,
-        requestType: 'RESIGN',
-        startDate: formData.startDate,
-        endDate: null,
-        leaveType: null,
-        reason: formData.reason,
-        notes: formData.notes || '',
-        hasViolation: false,
-        violationMessage: null
+        intendedLastWorkDate: formData.intendedLastWorkDate,
+        reason: formData.reason.trim(),
+        notes: formData.notes && formData.notes.trim() ? formData.notes.trim() : ''
       };
 
-      const response = await leaveRequestsAPI.create(payload);
+      const response = await resignationRequestsAPI.create(payload);
 
       if (response.data.success) {
         if (showToast) {
-          showToast('Đơn xin nghỉ việc đã được gửi thành công!', 'success');
+          showToast('Đơn xin nghỉ việc đã được gửi. HR sẽ xác nhận tiếp nhận.', 'success');
         }
-        // Reset form
         setFormData({
-          startDate: '',
+          intendedLastWorkDate: '',
           reason: '',
           notes: ''
         });
@@ -175,23 +180,23 @@ const ResignRequest = ({ currentUser, showToast }) => {
     }
   };
 
-  const startDateValue = parseISODateString(formData.startDate);
+  const intendedDateValue = parseISODateString(formData.intendedLastWorkDate);
+  const loaiHopDong = getValue('loaiHopDong', 'loai_hop_dong');
+  const requiredNoticeDays = getRequiredNoticeDays(loaiHopDong);
 
-  // Tính toán số ngày thông báo trước: (Từ ngày - Ngày tạo)
+  // Số ngày thông báo trước: (Ngày dự kiến nghỉ - Ngày nộp đơn)
   const calculateAdvanceNoticeDays = () => {
-    if (!startDateValue) {
-      return null;
-    }
-    const start = new Date(startDateValue);
-    const today = new Date(createdDate);
+    if (!intendedDateValue) return null;
+    const start = new Date(intendedDateValue);
+    const ref = new Date(submittedAt);
     start.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
-    const diffTime = start.getTime() - today.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    ref.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((start.getTime() - ref.getTime()) / (1000 * 60 * 60 * 24));
     return diffDays >= 0 ? diffDays : null;
   };
 
   const advanceNoticeDays = calculateAdvanceNoticeDays();
+  const noticeOk = advanceNoticeDays !== null && advanceNoticeDays >= requiredNoticeDays;
 
   return (
     <div className="resign-request-container">
@@ -229,14 +234,21 @@ const ResignRequest = ({ currentUser, showToast }) => {
 
             {/* Form Fields */}
             <div className="resign-form-fields">
-              {/* Date Field */}
+              <div className="resign-form-group">
+                <label className="resign-form-label">Ngày nộp đơn</label>
+                <div className="resign-calculated-field">
+                  <span className="resign-calculated-value">{submittedAt.toLocaleDateString('vi-VN')}</span>
+                </div>
+                <p className="resign-form-hint">Tạo đơn là ghi nhận thông báo ngay (không có bản nháp).</p>
+              </div>
+
               <div className="resign-form-row">
                 <div className="resign-form-group">
-                  <label className="resign-form-label">Ngày nghỉ việc *</label>
+                  <label className="resign-form-label">Ngày dự kiến nghỉ *</label>
                   <div className="resign-date-picker-wrapper">
                     <DatePicker
-                      selected={startDateValue}
-                      onChange={handleDateChange('startDate')}
+                      selected={intendedDateValue}
+                      onChange={handleDateChange('intendedLastWorkDate')}
                       minDate={today()}
                       dateFormat="dd/MM/yyyy"
                       locale={DATE_PICKER_LOCALE}
@@ -259,21 +271,24 @@ const ResignRequest = ({ currentUser, showToast }) => {
 
                 {advanceNoticeDays !== null && (
                   <div className="resign-form-group">
-                    <label className="resign-form-label">Số ngày thông báo trước</label>
+                    <label className="resign-form-label">Số ngày báo trước (thực tế)</label>
                     <div className="resign-calculated-field">
                       <span className="resign-calculated-value">{advanceNoticeDays}</span>
                       <span className="resign-calculated-unit">ngày</span>
                     </div>
                     <p className="resign-form-hint">
-                      Công thức: (Ngày nghỉ việc - Ngày tạo)
+                      Yêu cầu tối thiểu: <strong>{requiredNoticeDays} ngày</strong>
+                      {loaiHopDong ? ` (theo loại HĐ: ${loaiHopDong})` : ''}.
+                      {!noticeOk && advanceNoticeDays !== null && (
+                        <span className="resign-form-warning"> Không đủ điều kiện.</span>
+                      )}
                     </p>
                   </div>
                 )}
               </div>
 
-              {/* Manager Field */}
               <div className="resign-form-group">
-                <label className="resign-form-label">Quản lý duyệt đơn *</label>
+                <label className="resign-form-label">Quản lý trực tiếp (thông tin)</label>
                 <input
                   type="text"
                   className="resign-form-input resign-form-input-readonly"
@@ -282,7 +297,7 @@ const ResignRequest = ({ currentUser, showToast }) => {
                   disabled
                 />
                 <p className="resign-form-hint">
-                  Thông tin quản lý trực tiếp từ hồ sơ nhân sự. Đơn sẽ được gửi đến quản lý trực tiếp để duyệt.
+                  Đơn sẽ qua: HR xác nhận → QL trực tiếp → QL gián tiếp → GĐ chi nhánh (chỉ xác nhận tiếp nhận, không từ chối).
                 </p>
               </div>
 
