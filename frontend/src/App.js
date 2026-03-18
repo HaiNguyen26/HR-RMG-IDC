@@ -174,20 +174,10 @@ function App() {
   }, [isAuthenticated, currentView, currentUser?.role, employees.length, fetchEmployees]);
 
 
-  useEffect(() => {
-    let timer;
-    if (showIntroOverlay) {
-      timer = setTimeout(() => {
-        setShowIntroOverlay(false);
-        setIntroUser(null);
-      }, 2000);
-    }
-    return () => {
-      if (timer) {
-        clearTimeout(timer);
-      }
-    };
-  }, [showIntroOverlay]);
+  const handleCloseIntroOverlay = () => {
+    setShowIntroOverlay(false);
+    setIntroUser(null);
+  };
 
   const handleNavigate = (view) => {
     setCurrentView(view);
@@ -686,7 +676,7 @@ function App() {
 
   return (
     <div className="app">
-      {showIntroOverlay && <IntroOverlay user={introUser || currentUser} />}
+      {showIntroOverlay && <IntroOverlay user={introUser || currentUser} onClose={handleCloseIntroOverlay} />}
       <Sidebar
         currentView={currentView}
         onNavigate={(view) => {

@@ -1,111 +1,508 @@
-.intro-overlay {
+/* =============================================
+   HRM V2.0 Release Announcement Modal
+   ============================================= */
+
+.hrm-release-overlay {
     position: fixed;
     inset: 0;
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
-    pointer-events: auto;
+    padding: 1rem;
+    box-sizing: border-box;
 }
 
-.intro-overlay-backdrop {
+.hrm-release-backdrop {
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, rgba(37, 99, 235, 0.85), rgba(59, 130, 246, 0.75));
-    backdrop-filter: blur(12px);
-    animation: introFade 0.4s ease forwards;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: hrmFadeIn 0.3s ease forwards;
 }
 
-.intro-overlay-card {
+.hrm-release-modal {
     position: relative;
-    width: min(90%, 420px);
-    background: rgba(255, 255, 255, 0.96);
+    width: min(92vw, 560px);
+    max-height: 90vh;
+    background: #ffffff;
     border-radius: 1.25rem;
-    padding: 2.5rem 2rem;
-    box-shadow: 0 30px 60px -25px rgba(15, 23, 42, 0.6);
+    box-shadow: 0 32px 64px -16px rgba(15, 23, 42, 0.5);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    animation: hrmSlideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ---- HEADER ---- */
+.hrm-release-header {
+    background: linear-gradient(135deg, #2563eb 0%, #4f46e5 60%, #7c3aed 100%);
+    padding: 1.25rem 1.5rem;
+    display: flex;
     align-items: center;
-    gap: 1.25rem;
-    transform: translateY(10px);
-    animation: introSlideUp 0.5s ease forwards;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-shrink: 0;
 }
 
-.intro-overlay-spinner {
-    width: 60px;
-    height: 60px;
-    border-radius: 9999px;
-    border: 5px solid rgba(37, 99, 235, 0.2);
-    border-top-color: rgba(37, 99, 235, 0.95);
-    animation: introSpin 1s linear infinite;
+.hrm-release-header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
-.intro-overlay-content {
-    text-align: center;
+.hrm-release-icon {
+    width: 3rem;
+    height: 3rem;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
-.intro-overlay-subtitle {
-    display: inline-block;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #2563eb;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    margin-bottom: 0.35rem;
+.hrm-release-icon svg {
+    width: 1.6rem;
+    height: 1.6rem;
+    color: #ffffff;
 }
 
-.intro-overlay-title {
-    font-size: 1.65rem;
+.hrm-release-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.hrm-release-badge-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+}
+
+.hrm-release-badge {
+    background: #f97316;
+    color: #ffffff;
+    font-size: 0.65rem;
     font-weight: 700;
-    color: #0f172a;
-    margin: 0 0 0.75rem;
+    letter-spacing: 0.06em;
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+    text-transform: uppercase;
 }
 
-.intro-overlay-user {
-    font-size: 0.95rem;
-    color: #475569;
+.hrm-release-version {
+    color: #ffffff;
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.01em;
+}
+
+.hrm-release-tagline {
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.8125rem;
     margin: 0;
 }
 
-.intro-overlay-user strong {
-    color: #1e3a8a;
+.hrm-release-close {
+    background: rgba(255, 255, 255, 0.18);
+    border: none;
+    color: #ffffff;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.2s;
 }
 
-@keyframes introFade {
+.hrm-release-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* ---- BODY ---- */
+.hrm-release-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.hrm-release-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.hrm-release-body::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.hrm-release-body::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+/* Thank you */
+.hrm-release-thankyou {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #475569;
+}
+
+.hrm-release-heart {
+    color: #e11d48;
+    font-size: 1rem;
+}
+
+/* Title & desc */
+.hrm-release-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+    line-height: 1.35;
+}
+
+.hrm-release-desc {
+    font-size: 0.875rem;
+    color: #475569;
+    line-height: 1.65;
+    margin: 0;
+}
+
+/* Feature cards */
+.hrm-release-features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.hrm-release-feature-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 0.875rem;
+}
+
+.hrm-release-feature-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.hrm-release-feature-icon svg {
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+.hrm-feature-blue {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.hrm-feature-teal {
+    background: #ccfbf1;
+    color: #0f766e;
+}
+
+.hrm-feature-green {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.hrm-feature-orange {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.hrm-release-feature-title {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 0.2rem;
+}
+
+.hrm-release-feature-desc {
+    font-size: 0.75rem;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+/* Roadmap */
+.hrm-release-roadmap {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 0.75rem;
+    padding: 0.875rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+.hrm-release-roadmap-title {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #92400e;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.hrm-roadmap-arrow {
+    color: #d97706;
+    font-size: 1rem;
+    font-weight: 900;
+}
+
+.hrm-release-roadmap-items {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.hrm-release-roadmap-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: #78350f;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+}
+
+.hrm-roadmap-item-icon {
+    color: #2563eb;
+    font-size: 1rem;
+}
+
+.hrm-roadmap-item-icon--orange {
+    color: #d97706;
+}
+
+/* Transition plan */
+.hrm-release-plan {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 0.75rem;
+    padding: 0.875rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.hrm-release-plan-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.hrm-release-plan-icon {
+    font-size: 1rem;
+    color: #0369a1;
+}
+
+.hrm-release-plan-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #0369a1;
+}
+
+.hrm-release-plan-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8125rem;
+    color: #334155;
+    padding: 0.375rem 0;
+    border-bottom: 1px solid rgba(186, 230, 253, 0.5);
+}
+
+.hrm-release-plan-row:last-child {
+    border-bottom: none;
+}
+
+.hrm-release-plan-date {
+    font-weight: 700;
+    color: #dc2626;
+}
+
+/* Warning box */
+.hrm-release-warning {
+    background: #fff7ed;
+    border: 1.5px solid #fed7aa;
+    border-left: 4px solid #f97316;
+    border-radius: 0.75rem;
+    padding: 1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.hrm-release-warning-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.hrm-release-warning-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.hrm-release-warning-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #c2410c;
+}
+
+.hrm-release-warning-lead {
+    font-size: 0.8125rem;
+    color: #7c2d12;
+    line-height: 1.6;
+    margin: 0;
+    background: rgba(254, 215, 170, 0.3);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+}
+
+.hrm-release-warning-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+.hrm-release-warning-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    font-size: 0.8125rem;
+    color: #7c2d12;
+    line-height: 1.6;
+}
+
+.hrm-warning-step-num {
+    min-width: 1.5rem;
+    height: 1.5rem;
+    background: #f97316;
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+/* ---- FOOTER ---- */
+.hrm-release-footer {
+    padding: 1rem 1.5rem 1.25rem;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+}
+
+.hrm-release-btn-primary {
+    flex: 1;
+    padding: 0.75rem 1.25rem;
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    color: #ffffff;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+}
+
+.hrm-release-btn-primary:hover {
+    background: linear-gradient(135deg, #1d4ed8, #4338ca);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45);
+    transform: translateY(-1px);
+}
+
+.hrm-release-btn-secondary {
+    background: none;
+    border: none;
+    color: #64748b;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    transition: color 0.2s;
+    white-space: nowrap;
+}
+
+.hrm-release-btn-secondary:hover {
+    color: #1e293b;
+}
+
+/* ---- ANIMATIONS ---- */
+@keyframes hrmFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes hrmSlideUp {
     from {
         opacity: 0;
+        transform: translateY(30px) scale(0.97);
     }
-
     to {
         opacity: 1;
+        transform: translateY(0) scale(1);
     }
 }
 
-@keyframes introSlideUp {
-    from {
-        opacity: 0;
-        transform: translateY(24px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes introSpin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
+/* ---- RESPONSIVE ---- */
 @media (max-width: 480px) {
-    .intro-overlay-card {
-        padding: 2rem 1.5rem;
-        gap: 1rem;
+    .hrm-release-features {
+        grid-template-columns: 1fr;
     }
 
-    .intro-overlay-title {
-        font-size: 1.35rem;
+    .hrm-release-roadmap-items {
+        grid-template-columns: 1fr;
+    }
+
+    .hrm-release-version {
+        font-size: 1.4rem;
+    }
+
+    .hrm-release-footer {
+        flex-direction: column;
+    }
+
+    .hrm-release-btn-primary {
+        width: 100%;
+    }
+
+    .hrm-release-btn-secondary {
+        width: 100%;
+        text-align: center;
     }
 }
