@@ -467,8 +467,8 @@
    ============================================= */
 .hrm-guide-modal {
     position: relative;
-    width: min(92vw, 640px);
-    max-height: 90vh;
+    width: min(96vw, 1024px);
+    max-height: 94vh;
     background: #ffffff;
     border-radius: 1.25rem;
     box-shadow: 0 32px 64px -16px rgba(15, 23, 42, 0.5);
@@ -513,7 +513,7 @@
 }
 
 .hrm-guide-body {
-    padding: 1.5rem;
+    padding: 1rem 1.25rem;
     overflow-y: auto;
     flex: 1;
     display: flex;
@@ -531,15 +531,18 @@
 .hrm-guide-img-wrapper {
     position: relative;
     border-radius: 0.875rem;
-    overflow: hidden;
+    overflow: auto;
     border: 2px solid #e2e8f0;
     box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    background: #ffffff;
 }
 
 .hrm-guide-img {
     width: 100%;
     height: auto;
     display: block;
+    object-fit: contain;
+    min-width: 720px;
 }
 
 .hrm-guide-img-arrow {
@@ -635,5 +638,11 @@
     .hrm-release-btn-secondary {
         width: 100%;
         text-align: center;
+    }
+}
+
+@media (max-width: 768px) {
+    .hrm-guide-img {
+        min-width: 100%;
     }
 }
