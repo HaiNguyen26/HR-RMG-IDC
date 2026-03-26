@@ -462,6 +462,137 @@
     color: #1e293b;
 }
 
+/* =============================================
+   Step 2 — Guide image modal
+   ============================================= */
+.hrm-guide-modal {
+    position: relative;
+    width: min(92vw, 640px);
+    max-height: 90vh;
+    background: #ffffff;
+    border-radius: 1.25rem;
+    box-shadow: 0 32px 64px -16px rgba(15, 23, 42, 0.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: hrmSlideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.hrm-guide-header {
+    background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.hrm-guide-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.hrm-guide-badge {
+    background: rgba(255,255,255,0.25);
+    color: #ffffff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 0.18rem 0.6rem;
+    border-radius: 999px;
+    display: inline-block;
+    width: fit-content;
+}
+
+.hrm-guide-title {
+    color: #ffffff;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.hrm-guide-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.hrm-guide-desc {
+    font-size: 0.9rem;
+    color: #475569;
+    margin: 0;
+    line-height: 1.6;
+}
+
+.hrm-guide-img-wrapper {
+    position: relative;
+    border-radius: 0.875rem;
+    overflow: hidden;
+    border: 2px solid #e2e8f0;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+.hrm-guide-img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.hrm-guide-img-arrow {
+    position: absolute;
+    bottom: 1rem;
+    right: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    pointer-events: none;
+}
+
+.hrm-guide-img-arrow svg {
+    width: 3.5rem;
+    height: auto;
+    transform: rotate(30deg);
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+.hrm-guide-img-arrow span {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #ef4444;
+    background: rgba(255,255,255,0.9);
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.hrm-guide-portal-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 0.625rem;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.8125rem;
+}
+
+.hrm-guide-portal-link a {
+    color: #0369a1;
+    font-weight: 600;
+    text-decoration: none;
+    word-break: break-all;
+}
+
+.hrm-guide-portal-link a:hover {
+    text-decoration: underline;
+}
+
 /* ---- ANIMATIONS ---- */
 @keyframes hrmFadeIn {
     from { opacity: 0; }
