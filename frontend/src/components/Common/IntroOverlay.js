@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './IntroOverlay.css';
+import hrmGuideImg from './hrm-guide.png';
 
 const PORTAL_URL = 'http://27.71.16.15/portal-web-rmg/';
 
@@ -203,7 +204,7 @@ const IntroOverlay = ({ user, onClose }) => {
                         </p>
                         <div className="hrm-guide-img-wrapper">
                             <img
-                                src="/hrm-guide.png"
+                                src={hrmGuideImg}
                                 alt="Hướng dẫn truy cập HRM V2.0"
                                 className="hrm-guide-img"
                             />
