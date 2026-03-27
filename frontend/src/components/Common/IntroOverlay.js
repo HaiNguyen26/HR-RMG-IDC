@@ -11,8 +11,6 @@ const IntroOverlay = ({ user, onClose }) => {
     const handleStep1Done = () => setStep(2);
 
     const handleStep2Done = () => {
-        // Đánh dấu đã chuyển sang V2 để khi quay lại V1 sẽ bị khóa
-        localStorage.setItem('v1PortalRedirected', 'true');
         onClose?.();
         window.location.href = PORTAL_URL;
     };

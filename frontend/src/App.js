@@ -44,8 +44,6 @@ import IntroOverlay from './components/Common/IntroOverlay';
 import { employeesAPI } from './services/api';
 import './App.css';
 
-const PORTAL_URL = 'http://27.71.16.15/portal-web-rmg/';
-
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -61,11 +59,7 @@ function App() {
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
   const [equipmentModalEmployee, setEquipmentModalEmployee] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isV1Locked, setIsV1Locked] = useState(false);
-
-  const handleGoToPortal = () => {
-    window.location.href = PORTAL_URL;
-  };
+  const lockedEmployeeRequestWarnedViewRef = useRef(null);
 
   // Toast management
   const showToast = (message, type = 'info', duration = 3000) => {
@@ -154,12 +148,6 @@ function App() {
 
   // Kiểm tra authentication khi component mount
   useEffect(() => {
-    const redirectedToPortal = localStorage.getItem('v1PortalRedirected') === 'true';
-    if (redirectedToPortal) {
-      setIsV1Locked(true);
-      return;
-    }
-
     const savedAuth = localStorage.getItem('isAuthenticated');
     const savedUser = localStorage.getItem('user');
 
@@ -281,51 +269,6 @@ function App() {
     }
   };
 
-  // Khóa V1 sau khi user đã bấm chuyển sang Portal V2
-  if (isV1Locked) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%)',
-        padding: '1rem'
-      }}>
-        <div style={{
-          width: '100%',
-          maxWidth: '520px',
-          background: '#ffffff',
-          borderRadius: '16px',
-          border: '1px solid #dbeafe',
-          boxShadow: '0 20px 40px -16px rgba(30, 41, 59, 0.25)',
-          padding: '1.5rem'
-        }}>
-          <h2 style={{ margin: 0, color: '#1e40af', fontSize: '1.25rem' }}>HRM V1 đã ngừng sử dụng</h2>
-          <p style={{ margin: '0.75rem 0 0', color: '#475569', lineHeight: 1.6 }}>
-            Hệ thống này đã chuyển sang <strong>HRM V2.0</strong>. Vui lòng truy cập Portal để vào phiên bản mới.
-          </p>
-          <button
-            onClick={handleGoToPortal}
-            style={{
-              marginTop: '1rem',
-              width: '100%',
-              border: 'none',
-              borderRadius: '12px',
-              padding: '0.8rem 1rem',
-              background: 'linear-gradient(135deg, #2563eb, #4f46e5)',
-              color: '#fff',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            Đi đến Portal HRM V2.0
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Hiển thị Login nếu chưa authenticated
   if (!isAuthenticated) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
@@ -376,6 +319,33 @@ function App() {
 
     // Employee view - giao diện riêng cho nhân viên
     if (currentUser?.role === 'EMPLOYEE') {
+      const lockedEmployeeRequestViews = new Set([
+        'leave-request',
+        'late-early-request',
+        'meal-allowance-request',
+        'overtime-request',
+        'attendance-request',
+        'travel-expense',
+        'travel-expense-settlement',
+        'customer-entertainment-expense-request'
+      ]);
+
+      if (lockedEmployeeRequestViews.has(currentView)) {
+        if (lockedEmployeeRequestWarnedViewRef.current !== currentView) {
+          lockedEmployeeRequestWarnedViewRef.current = currentView;
+          showToast('Đã khóa toàn bộ module đăng ký đơn. Bạn chỉ được xem/duyệt phiếu.', 'warning');
+        }
+        if (currentView !== 'dashboard') {
+          setCurrentView('dashboard');
+        }
+        return (
+          <EmployeeDashboard
+            currentUser={currentUser}
+            onNavigate={handleNavigate}
+          />
+        );
+      }
+
       switch (currentView) {
         case 'leave-request':
           return (
